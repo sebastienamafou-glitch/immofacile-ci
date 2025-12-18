@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Politique de Confidentialité | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 font-['Plus_Jakarta_Sans'] p-6 md:p-12">
+
+    <div class="max-w-3xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100">
+        
+        <div class="text-center mb-10">
+            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-20 mx-auto mb-4 object-contain">
+            <h1 class="text-2xl font-bold text-[#0B1120]">Politique de Confidentialité</h1>
+            <p class="text-slate-500 text-sm">Dernière mise à jour : <%= new Date().toLocaleDateString('fr-FR') %></p>
+        </div>
+
+        <div class="space-y-6 text-sm leading-relaxed text-slate-600">
+            <section>
+                <h2 class="text-lg font-bold text-[#0B1120] mb-2">1. Préambule</h2>
+                <p>L'application <strong>ImmoFacile CI</strong> est développée et maintenue par <strong>WebApp CI</strong>. Nous accordons une importance capitale à la protection de vos données personnelles.</p>
+            </section>
+
+            <section>
+                <h2 class="text-lg font-bold text-[#0B1120] mb-2">2. Données collectées</h2>
+                <p>Dans le cadre de l'utilisation de nos services, nous collectons les données suivantes :</p>
+                <ul class="list-disc pl-5 mt-2 space-y-1">
+                    <li>Informations d'identité (Nom, Prénoms).</li>
+                    <li>Coordonnées (Numéro de téléphone, Email).</li>
+                    <li>Données financières relatives aux baux et paiements (pour la génération des quittances).</li>
+                    <li>Photos des biens immobiliers (État des lieux).</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-lg font-bold text-[#0B1120] mb-2">3. Utilisation des données</h2>
+                <p>Vos données sont utilisées exclusivement pour :</p>
+                <ul class="list-disc pl-5 mt-2 space-y-1">
+                    <li>La gestion locative (création de contrats, quittances).</li>
+                    <li>La communication entre propriétaires et locataires.</li>
+                    <li>L'amélioration de nos services.</li>
+                </ul>
+                <p class="mt-2 font-bold text-red-500">Aucune donnée n'est vendue à des tiers.</p>
+            </section>
+
+            <section>
+                <h2 class="text-lg font-bold text-[#0B1120] mb-2">4. Sécurité</h2>
+                <p>WebApp CI met en œuvre toutes les mesures techniques nécessaires pour sécuriser vos données (chiffrement des mots de passe, protocoles sécurisés HTTPS).</p>
+            </section>
+
+            <section>
+                <h2 class="text-lg font-bold text-[#0B1120] mb-2">5. Contact & Droits</h2>
+                <p>Conformément à la législation en vigueur en Côte d'Ivoire, vous disposez d'un droit d'accès, de rectification et de suppression de vos données.</p>
+                <p class="mt-2">Pour toute demande, contactez l'éditeur :</p>
+                <div class="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-4">
+                    <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-10 object-contain">
+                    <div>
+                        <p class="font-bold text-[#0B1120]">WebApp CI Support</p>
+                        <a href="mailto:contact@webappci.com" class="text-blue-600 hover:underline">contact@webappci.com</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="mt-10 text-center pt-6 border-t border-slate-100">
+            <a href="javascript:history.back()" class="text-[#F59E0B] font-bold hover:underline">Retour à l'application</a>
+        </div>
+
+    </div>
+
+</body>
+</html>

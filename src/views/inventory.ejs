@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>État des Lieux Numérique</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-50 font-['Plus_Jakarta_Sans'] pb-20">
+
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-xl">
+        <div class="bg-[#0B1120] p-6 text-white rounded-b-3xl mb-6">
+            <h1 class="text-xl font-bold">État des Lieux : <%= type %></h1>
+            <p class="text-sm text-slate-400"><%= property.title %> • <%= tenant.name %></p>
+        </div>
+
+        <form action="/inventory/<%= lease.id %>" method="POST" enctype="multipart/form-data" class="p-6 space-y-8">
+            <input type="hidden" name="type" value="<%= type %>">
+
+            <div class="border-b border-slate-100 pb-6">
+                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🛋️ Le Salon</h3>
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-400 uppercase">État général</label>
+                    <select name="livingState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <option value="NEUF">Neuf / Excellent</option>
+                        <option value="BON">Bon état</option>
+                        <option value="USAGÉ">Usagé / Vieillissant</option>
+                        <option value="DÉGRADÉ">Dégradé / À repeindre</option>
+                    </select>
+                    
+                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+                        <span class="text-2xl">📸</span>
+                        <p class="text-xs text-slate-500 mt-1">Photo du Salon</p>
+                        <input type="file" name="livingPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-living')">
+                    </label>
+                    <img id="preview-living" class="w-full h-32 object-cover rounded-xl hidden mt-2">
+                </div>
+            </div>
+
+            <div class="border-b border-slate-100 pb-6">
+                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🍳 La Cuisine</h3>
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-400 uppercase">État (Evier, Placards)</label>
+                    <select name="kitchenState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <option value="BON">Bon état</option>
+                        <option value="NEUF">Neuf</option>
+                        <option value="SALE">Sale / Gras</option>
+                        <option value="CASSÉ">Éléments cassés</option>
+                    </select>
+                    
+                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+                        <span class="text-2xl">📸</span>
+                        <p class="text-xs text-slate-500 mt-1">Photo Cuisine</p>
+                        <input type="file" name="kitchenPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-kitchen')">
+                    </label>
+                    <img id="preview-kitchen" class="w-full h-32 object-cover rounded-xl hidden mt-2">
+                </div>
+            </div>
+
+            <div class="border-b border-slate-100 pb-6">
+                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🚿 Salle d'Eau</h3>
+                <div class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-400 uppercase">État (Robinetterie, WC)</label>
+                    <select name="bathState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <option value="FONCTIONNEL">Fonctionnel</option>
+                        <option value="FUITE">Fuite détectée</option>
+                        <option value="CASSÉ">Cassé / Manquant</option>
+                    </select>
+                    
+                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
+                        <span class="text-2xl">📸</span>
+                        <p class="text-xs text-slate-500 mt-1">Photo Douche/WC</p>
+                        <input type="file" name="bathPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-bath')">
+                    </label>
+                    <img id="preview-bath" class="w-full h-32 object-cover rounded-xl hidden mt-2">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-[#0B1120] text-white py-4 rounded-xl font-bold shadow-lg hover:scale-105 transition">
+                Valider et Signer
+            </button>
+        </form>
+    </div>
+
+    <script>
+        function preview(input, id) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById(id).src = e.target.result;
+                    document.getElementById(id).classList.remove('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+</body>
+</html>

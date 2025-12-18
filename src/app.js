@@ -1,0 +1,641 @@
+const express = require('express');
+const path = require('path');
+const { PrismaClient } = require('@prisma/client');
+const session = require('express-session');
+const bcrypt = require('bcryptjs'); 
+require('dotenv').config();
+
+const app = express();
+const prisma = new PrismaClient();
+const PORT = process.env.PORT || 3000;
+
+const multer = require('multer');
+
+// --- CONFIGURATION MULTER (STOCKAGE PHOTOS) ---
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'public/'); 
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+const upload = multer({ storage: storage });
+
+// --- CONFIGURATIONS EXPRESS & MIDDLEWARES ---
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Configuration de la session sécurisée [cite: 50, 134]
+app.use(session({
+    secret: 'secret_key_immofacile_abidjan_2024', 
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false } // Mettre à true si HTTPS est activé
+}));
+
+// Middleware pour rendre l'utilisateur et les variables globales disponibles dans toutes les vues [cite: 50, 135]
+app.use((req, res, next) => {
+    res.locals.user = req.session.user || null;
+    next();
+});
+
+// --- ROUTES PUBLIQUES (LANDING & INFOS) ---
+
+// Accueil [cite: 50, 136]
+app.get('/', (req, res) => {
+    res.render('landing');
+});
+
+// Politique de Confidentialité [cite: 50, 137]
+app.get('/privacy', (req, res) => {
+    res.render('privacy');
+});
+
+// Inscription "Lead" / Liste d'attente [cite: 50, 138]
+app.post('/register', async (req, res) => {
+    const { name, phone } = req.body;
+    try {
+        await prisma.lead.create({ data: { name, phone } });
+        res.send(`<div style="background:#0B1120;color:white;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;font-family:sans-serif;">
+            <h1 style="color:#F59E0B;font-size:3rem;">Merci !</h1>
+            <p>On vous rappelle très vite pour valider votre accès.</p>
+            <a href="/signup" style="margin-top:20px;color:white;text-decoration:underline;">Créer mon Compte Propriétaire maintenant</a>
+        </div>`);
+    } catch (error) {
+        res.status(500).send("Erreur ou numéro déjà pris dans la liste d'attente.");
+    }
+});
+
+// --- SYSTÈME D'AUTHENTIFICATION (SIGNUP / LOGIN / LOGOUT) ---
+
+// Page d'Inscription [cite: 50, 140]
+app.get('/signup', (req, res) => {
+    res.render('signup', { error: null });
+});
+
+// Traitement de l'Inscription (Rôle par défaut : OWNER) [cite: 50, 141, 142]
+app.post('/signup', async (req, res) => {
+    const { name, email, phone, password } = req.body;
+    try {
+        const existingUser = await prisma.user.findFirst({
+            where: { OR: [{ email }, { phone }] }
+        });
+        if (existingUser) {
+            return res.render('signup', { error: "Cet email ou ce numéro de téléphone est déjà utilisé." });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({
+            data: { 
+                name, 
+                email, 
+                phone, 
+                password: hashedPassword, 
+                role: 'OWNER',
+                credit: 0 // Initialisation du solde à 0
+            }
+        });
+        req.session.user = { id: user.id, name: user.name, role: user.role };
+        res.redirect('/dashboard-owner');
+    } catch (error) {
+        console.error(error);
+        res.render('signup', { error: "Une erreur technique est survenue lors de la création du compte." });
+    }
+});
+
+// Page de Connexion [cite: 50, 144]
+app.get('/login', (req, res) => {
+    res.render('login', { error: null });
+});
+
+// Traitement de la connexion Multi-Rôles [cite: 50, 145, 147, 148, 149]
+app.post('/login', async (req, res) => {
+    const { identifier, password } = req.body;
+    try {
+        const user = await prisma.user.findFirst({
+            where: { OR: [{ email: identifier }, { phone: identifier }] }
+        });
+
+        if (!user) return res.render('login', { error: "Utilisateur inconnu." });
+
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) return res.render('login', { error: "Mot de passe incorrect." });
+
+        req.session.user = { id: user.id, name: user.name, role: user.role };
+
+        // Redirection intelligente selon le rôle [cite: 147, 148, 149]
+        if (user.role === 'OWNER') res.redirect('/dashboard-owner');
+        else if (user.role === 'TENANT') res.redirect('/dashboard-tenant');
+        else if (user.role === 'AGENT') res.redirect('/dashboard-agent');
+        else if (user.role === 'ADMIN') res.redirect('/dashboard-admin');
+        else res.redirect('/');
+    } catch (error) {
+        console.error(error);
+        res.render('login', { error: "Erreur de connexion serveur." });
+    }
+});
+
+// Déconnexion [cite: 50, 152]
+app.get('/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.redirect('/login');
+    });
+});
+
+// --- DASHBOARD PROPRIÉTAIRE & GESTION DES BIENS ---
+
+// Dashboard Propriétaire (Revenus, Dépenses, Incidents, Solde Credit) [cite: 50, 153, 154, 157, 158]
+app.get('/dashboard-owner', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+
+    const properties = await prisma.property.findMany({
+        where: { ownerId: req.session.user.id },
+        include: { 
+            leases: { include: { tenant: true, payments: true } },
+            incidents: { include: { reporter: true } },
+            expenses: true, 
+            candidates: true
+        }, 
+        orderBy: { id: 'desc' }
+    });
+
+    let totalRent = 0, totalDeposit = 0, activeIncidentsCount = 0, totalExpenses = 0;
+
+    properties.forEach(prop => {
+        prop.leases.forEach(lease => {
+            if (lease.isActive) {
+                totalRent += lease.monthlyRent;
+                totalDeposit += lease.depositAmount;
+            }
+        });
+        prop.incidents.forEach(inc => {
+            if (inc.status !== 'RESOLVED') activeIncidentsCount++;
+        });
+        prop.expenses.forEach(exp => {
+            totalExpenses += exp.amount; 
+        });
+    });
+
+    // On récupère le solde à jour depuis la DB pour éviter les décalages de session [cite: 157]
+    const freshUser = await prisma.user.findUnique({ where: { id: req.session.user.id } });
+
+    res.render('dashboard-owner', { 
+        user: freshUser, 
+        properties, totalRent, totalDeposit, activeIncidentsCount, totalExpenses,
+        netIncome: totalRent - totalExpenses 
+    });
+});
+
+// Ajouter un Bien - Formulaire [cite: 50, 160]
+app.get('/add-property', (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    res.render('add-property');
+});
+
+// Ajouter un Bien - Traitement [cite: 50, 161, 162]
+app.post('/add-property', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { title, commune, address, price } = req.body;
+    try {
+        await prisma.property.create({
+            data: {
+                title, commune, address,
+                price: parseFloat(price),
+                ownerId: req.session.user.id
+            }
+        });
+        res.redirect('/dashboard-owner');
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors de l'enregistrement du bien.");
+    }
+});
+
+// --- GESTION LOCATAIRES, BAUX & PAIEMENTS ---
+
+// Formulaire Nouveau Locataire [cite: 50, 163, 164]
+app.get('/add-tenant', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const properties = await prisma.property.findMany({
+        where: { ownerId: req.session.user.id }
+    });
+    res.render('add-tenant', { properties });
+});
+
+// Traitement Création Locataire & Bail [cite: 50, 165, 167, 168]
+app.post('/add-tenant', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { propertyId, tenantName, tenantPhone, monthlyRent, depositMonths, startDate } = req.body;
+
+    try {
+        let tenant = await prisma.user.findUnique({ where: { phone: tenantPhone } });
+        if (!tenant) {
+            const hashedPassword = await bcrypt.hash('123456', 10); // Mot de passe par défaut
+            tenant = await prisma.user.create({
+                data: {
+                    name: tenantName, phone: tenantPhone,
+                    email: `${tenantPhone}@immofacile.ci`,
+                    password: hashedPassword, role: 'TENANT'
+                }
+            });
+        }
+        const calculatedDeposit = parseFloat(monthlyRent) * parseFloat(depositMonths);
+        await prisma.lease.create({
+            data: {
+                monthlyRent: parseFloat(monthlyRent),
+                depositAmount: calculatedDeposit, 
+                startDate: new Date(startDate),
+                tenantId: tenant.id, propertyId: propertyId
+            }
+        });
+        res.redirect('/dashboard-owner');
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors de la création du locataire ou du bail.");
+    }
+});
+
+// Encaisser un loyer avec Système de Commission (Péage Admin) [cite: 50, 170, 171, 173, 174, 175]
+app.post('/pay-rent', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const { leaseId, amount, month } = req.body;
+    const rentAmount = parseFloat(amount);
+    const COMMISSION_RATE = 0.05; // 5% de commission prélevée sur le solde credit
+    const commission = rentAmount * COMMISSION_RATE;
+
+    try {
+        const owner = await prisma.user.findUnique({ where: { id: req.session.user.id } });
+        
+        // Vérification du solde Credit avant encaissement [cite: 170, 171]
+        if (owner.credit < commission) {
+            return res.send(`
+                <div style="background:#0B1120; color:white; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; font-family:sans-serif; text-align:center; padding:20px;">
+                    <h1 style="color:#EF4444; font-size:3rem;">Solde Insuffisant 🛑</h1>
+                    <p style="font-size:1.2rem; margin-bottom:20px;">Commission de <strong>${commission} F</strong> requise pour encaisser ce loyer.</p>
+                    <p>Votre solde actuel : <strong>${owner.credit} F</strong>.</p>
+                    <div style="background:#1E293B; padding:20px; border-radius:15px; margin-top:20px;">
+                        <p>Veuillez recharger votre compte via Wave/Orange Money.</p>
+                        <h2 style="color:#F59E0B;">Service Client : +225 07 00 00 00</h2>
+                    </div>
+                    <a href="/dashboard-owner" style="margin-top:30px; color:white; text-decoration:underline;">Retour au Dashboard</a>
+                </div>
+            `);
+        }
+
+        // Transaction atomique : Débit commission + Enregistrement Transaction + Création Paiement 
+        await prisma.$transaction([
+            prisma.user.update({
+                where: { id: owner.id },
+                data: { credit: { decrement: commission } }
+            }),
+            prisma.creditTransaction.create({
+                data: {
+                    amount: -commission,
+                    description: `Commission Loyer ${month} (${rentAmount}F)`,
+                    userId: owner.id
+                }
+            }),
+            prisma.payment.create({
+                data: { amount: rentAmount, month: month, leaseId: leaseId }
+            })
+        ]);
+
+        res.redirect('/dashboard-owner');
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors du traitement du paiement.");
+    }
+});
+
+// --- DOCUMENTS & GÉNÉRATION (QUITTANCES / CONTRATS / MISES EN DEMEURE) ---
+
+// Vue Quittance [cite: 50, 177, 179]
+app.get('/receipt/:paymentId', async (req, res) => {
+    try {
+        const payment = await prisma.payment.findUnique({
+            where: { id: req.params.paymentId },
+            include: { 
+                lease: { include: { tenant: true, property: { include: { owner: true } } } } 
+            }
+        });
+        if (!payment) return res.send("Quittance introuvable.");
+        res.render('receipt', {
+            payment, tenant: payment.lease.tenant,
+            property: payment.lease.property, owner: payment.lease.property.owner
+        });
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors de la récupération de la quittance.");
+    }
+});
+
+// Vue Contrat de Bail avec contrôle de permission Propriétaire/Locataire [cite: 50, 181, 182, 183]
+app.get('/contract/:leaseId', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    try {
+        const lease = await prisma.lease.findUnique({
+            where: { id: req.params.leaseId },
+            include: { tenant: true, property: { include: { owner: true } } }
+        });
+        if (!lease) return res.send("Contrat introuvable.");
+        
+        const isOwner = lease.property.ownerId === req.session.user.id;
+        const isTenant = lease.tenantId === req.session.user.id;
+
+        if (!isOwner && !isTenant) return res.send("Accès refusé : Vous ne faites pas partie de ce contrat.");
+
+        res.render('contract', {
+            lease, tenant: lease.tenant,
+            property: lease.property, owner: lease.property.owner,
+            startDate: lease.startDate
+        });
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors de la génération du contrat.");
+    }
+});
+
+// Mise en Demeure (Bouton Rouge) [cite: 50, 197, 198, 199]
+app.get('/formal-notice/:leaseId', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+    try {
+        const lease = await prisma.lease.findUnique({
+            where: { id: req.params.leaseId },
+            include: { tenant: true, property: { include: { owner: true } } }
+        });
+        if (!lease || lease.property.ownerId !== req.session.user.id) return res.send("Accès interdit.");
+        res.render('formal-notice', {
+            lease, tenant: lease.tenant, property: lease.property,
+            owner: lease.property.owner, totalDue: lease.monthlyRent 
+        });
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors de la génération de la mise en demeure.");
+    }
+});
+
+// --- ESPACE LOCATAIRE (DASHBOARD, INCIDENTS, ARTISANS) ---
+
+// Dashboard Locataire [cite: 50, 186, 187, 188]
+app.get('/dashboard-tenant', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'TENANT') return res.redirect('/login');
+    const lease = await prisma.lease.findFirst({
+        where: { tenantId: req.session.user.id, isActive: true },
+        include: { 
+            property: { include: { owner: true } }, 
+            payments: { orderBy: { date: 'desc' } } 
+        }
+    });
+    let artisans = [];
+    if (lease) {
+        artisans = await prisma.artisan.findMany({
+            where: { ownerId: lease.property.ownerId }
+        });
+    }
+    res.render('dashboard-tenant', {
+        user: req.session.user, lease,
+        payments: lease ? lease.payments : [], artisans 
+    });
+});
+
+// Signaler un Incident [cite: 50, 189, 190, 191]
+app.get('/report-issue', (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'TENANT') return res.redirect('/login');
+    res.render('report-issue');
+});
+
+app.post('/report-issue', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'TENANT') return res.redirect('/login');
+    const { title, priority, description } = req.body;
+    try {
+        const lease = await prisma.lease.findFirst({ where: { tenantId: req.session.user.id, isActive: true } });
+        if (!lease) return res.send("Aucun bail actif pour signaler un problème.");
+        await prisma.incident.create({
+            data: {
+                title, priority, description,
+                reporterId: req.session.user.id, propertyId: lease.propertyId
+            }
+        });
+        res.redirect('/dashboard-tenant');
+    } catch (error) {
+        console.error(error);
+        res.send("Erreur lors du signalement de l'incident.");
+    }
+});
+
+// Résoudre un Incident (Action Propriétaire) [cite: 50, 193]
+app.post('/resolve-incident', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+    try {
+        await prisma.incident.update({
+            where: { id: req.body.incidentId },
+            data: { status: 'RESOLVED' }
+        });
+        res.redirect('/dashboard-owner');
+    } catch (error) {
+        res.send("Erreur mise à jour incident.");
+    }
+});
+
+// --- CANDIDATURES PUBLIQUES & SCORING ---
+
+// Page Publique du Bien [cite: 50, 200]
+app.get('/property/:id', async (req, res) => {
+    try {
+        const property = await prisma.property.findUnique({ where: { id: req.params.id } });
+        if (!property) return res.send("Bien non trouvé.");
+        res.render('public-property', { property });
+    } catch (error) { res.send("Erreur lien public."); }
+});
+
+// Traitement Candidature + Algorithme de Scoring Solvabilité [cite: 50, 201, 202]
+app.post('/apply/:propertyId', async (req, res) => {
+    const { name, phone, email, income } = req.body;
+    try {
+        const property = await prisma.property.findUnique({ where: { id: req.params.propertyId } });
+        const rentRatio = (property.price / parseFloat(income)) * 100;
+        let score = rentRatio < 30 ? 95 : (rentRatio < 35 ? 80 : (rentRatio < 45 ? 50 : 20));
+
+        await prisma.candidate.create({
+            data: { 
+                name, phone, email, 
+                income: parseFloat(income), score, 
+                propertyId: req.params.propertyId 
+            }
+        });
+        res.send(`<div style="font-family:sans-serif; text-align:center; padding:50px;">
+            <h1 style="color:#10B981;">Dossier Envoyé !</h1>
+            <p>Score de solvabilité estimé : <strong>${score}%</strong>.</p>
+            <p>Le propriétaire va analyser votre dossier.</p>
+        </div>`);
+    } catch (error) { res.send("Erreur candidature."); }
+});
+
+// --- GESTION DES DÉPENSES & ARTISANS ---
+
+// Enregistrer une Dépense [cite: 50, 195, 196]
+app.post('/add-expense', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+    const { propertyId, description, amount, category } = req.body;
+    try {
+        await prisma.expense.create({
+            data: { description, amount: parseFloat(amount), category, propertyId }
+        });
+        res.redirect('/dashboard-owner');
+    } catch (error) { res.send("Erreur enregistrement dépense."); }
+});
+
+// Ajouter un Artisan Partenaire [cite: 50, 203]
+app.post('/add-artisan', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+    const { name, job, phone } = req.body;
+    try {
+        await prisma.artisan.create({
+            data: { name, job, phone, ownerId: req.session.user.id }
+        });
+        res.redirect('/dashboard-owner');
+    } catch (error) { res.send("Erreur ajout artisan."); }
+});
+
+// --- ÉTATS DES LIEUX (AVEC PHOTOS) ---
+
+// Formulaire État des lieux [cite: 50, 204]
+app.get('/inventory/:leaseId', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const type = req.query.type || 'ENTREE';
+    const lease = await prisma.lease.findUnique({
+        where: { id: req.params.leaseId },
+        include: { property: true, tenant: true }
+    });
+    res.render('inventory', { lease, property: lease.property, tenant: lease.tenant, type });
+});
+
+// Traitement État des lieux + Upload Photos [cite: 50, 205, 206, 208]
+app.post('/inventory/:leaseId', upload.fields([
+    { name: 'livingPhoto', maxCount: 1 },
+    { name: 'kitchenPhoto', maxCount: 1 },
+    { name: 'bathPhoto', maxCount: 1 }
+]), async (req, res) => {
+    const { type, livingState, kitchenState, bathState } = req.body;
+    const livingPhoto = req.files['livingPhoto'] ? '/' + req.files['livingPhoto'][0].filename : null;
+    const kitchenPhoto = req.files['kitchenPhoto'] ? '/' + req.files['kitchenPhoto'][0].filename : null;
+    const bathPhoto = req.files['bathPhoto'] ? '/' + req.files['bathPhoto'][0].filename : null;
+
+    try {
+        await prisma.inventory.create({
+            data: {
+                type, livingState, livingPhoto,
+                kitchenState, kitchenPhoto,
+                bathState, bathPhoto,
+                leaseId: req.params.leaseId
+            }
+        });
+        res.send(`<div style="text-align:center; padding:50px;"><h1>✅ État des lieux archivé !</h1><a href="/dashboard-owner">Retour</a></div>`);
+    } catch (error) { res.send("Erreur archive état des lieux."); }
+});
+
+// --- CLÔTURE DE BAIL & LOGIQUE DE RELOGEMENT ---
+
+// Départ Locataire + Scoring Qualité + Proposition Relogement [cite: 213, 214]
+app.post('/end-lease', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'OWNER') return res.redirect('/login');
+    const { leaseId, deduction } = req.body;
+    try {
+        const lease = await prisma.lease.update({
+            where: { id: leaseId },
+            data: { isActive: false, endDate: new Date() },
+            include: { property: true, tenant: true }
+        });
+        
+        // Un locataire est considéré "Bon" s'il n'y a aucune retenue sur caution [cite: 213]
+        const isGoodTenant = parseFloat(deduction) <= 0;
+        const vacantProperties = await prisma.property.findMany({
+            where: { ownerId: req.session.user.id, leases: { none: { isActive: true } } }
+        });
+
+        res.render('rehousing', { lease, tenant: lease.tenant, isGoodTenant, vacantProperties });
+    } catch (error) { res.send("Erreur lors de la clôture du bail."); }
+});
+
+// --- ESPACE AGENTS DE TERRAIN ---
+
+// Dashboard Agent [cite: 50, 209]
+app.get('/dashboard-agent', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'AGENT') return res.redirect('/login');
+    const leads = await prisma.lead.findMany({
+        where: { agentId: req.session.user.id },
+        orderBy: { createdAt: 'desc' }
+    });
+    let commission = 0;
+    leads.forEach(l => {
+        commission += 5000; // Bonus de prospection
+        if (l.status === 'SIGNÉ') commission += 20000; // Bonus de succès
+    });
+    res.render('dashboard-agent', { user: req.session.user, leads, commission });
+});
+
+// Ajouter un Prospect (Lead) [cite: 50, 210, 211, 212]
+app.post('/add-lead', upload.single('leadPhoto'), async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'AGENT') return res.redirect('/login');
+    try {
+        await prisma.lead.create({
+            data: { 
+                name: req.body.name, phone: req.body.phone, address: req.body.address,
+                photo: req.file ? '/' + req.file.filename : null,
+                agentId: req.session.user.id, status: 'NOUVEAU' 
+            }
+        });
+        res.redirect('/dashboard-agent');
+    } catch (error) { res.send("Erreur lead agent."); }
+});
+
+// --- SUPER ADMIN DASHBOARD (PILOTAGE CENTRAL) ---
+
+// Dashboard Admin [cite: 50, 216, 217, 218]
+app.get('/dashboard-admin', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'ADMIN') return res.redirect('/login');
+    const owners = await prisma.user.findMany({
+        where: { role: 'OWNER' },
+        orderBy: { credit: 'asc' }
+    });
+    const allPayments = await prisma.payment.findMany();
+    const volumeAffaires = allPayments.reduce((acc, pay) => acc + pay.amount, 0);
+    const agents = await prisma.user.findMany({
+        where: { role: 'AGENT' }, include: { leads: true }
+    });
+    const activeIncidents = await prisma.incident.findMany({
+        where: { status: 'OPEN' }, include: { property: true }
+    });
+    res.render('dashboard-admin', {
+        user: req.session.user, owners, volumeAffaires,
+        myRevenue: volumeAffaires * 0.05, agents, activeIncidents,
+        totalUsers: await prisma.user.count(),
+        totalProperties: await prisma.property.count()
+    });
+});
+
+// Recharger le compte d'un Propriétaire (Action Admin) [cite: 50, 219, 220]
+app.post('/admin/add-credit', async (req, res) => {
+    if (!req.session.user || req.session.user.role !== 'ADMIN') return res.redirect('/login');
+    const { ownerId, amount } = req.body;
+    try {
+        const creditAmount = parseFloat(amount);
+        await prisma.$transaction([
+            prisma.user.update({ where: { id: ownerId }, data: { credit: { increment: creditAmount } } }),
+            prisma.creditTransaction.create({
+                data: { amount: creditAmount, description: "Rechargement Manuel Admin", userId: ownerId }
+            })
+        ]);
+        res.redirect('/dashboard-admin#tresorerie');
+    } catch (error) { res.send("Erreur lors du rechargement manuel."); }
+});
+
+// --- LANCEMENT DU SERVEUR ---
+
+app.listen(PORT, () => {
+    console.log(`🚀 ImmoFacile-CI opérationnel sur http://localhost:${PORT}`);
+});

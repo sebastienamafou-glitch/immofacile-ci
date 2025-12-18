@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODÈLES UTILISATEURS ---
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String   @unique
+  name      String?
+  role      UserRole @default(TENANT)
+  password  String
+  createdAt DateTime @default(now())
+  
+  // --- NOUVEAUX CHAMPS FINANCIERS ---
+  credit    Float    @default(0) // LE PORTEFEUILLE PRÉPAYÉ (En FCFA)
+
+  // Relations
+  properties        Property[] @relation("OwnerProperties")
+  leasesAsTenant    Lease[]    @relation("TenantLeases")
+  reportedIncidents Incident[] @relation("Reporter")
+  artisans          Artisan[]  @relation("OwnerArtisans")
+  leads             Lead[]     @relation("AgentLeads")
+  transactions      CreditTransaction[] 
+}
+
+enum UserRole {
+  OWNER
+  TENANT
+  ADMIN
+  AGENT
+}
+
+// --- NOUVEAU MODÈLE : TRAÇABILITÉ DE L'ARGENT ---
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  amount      Float    // Positif (+10000) si rechargement, Négatif (-500) si commission
+  description String   // Ex: "Rechargement Wave", "Commission Loyer Janvier"
+  date        DateTime @default(now())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+// --- MODÈLES IMMOBILIERS ---
+
+model Property {
+  id        String   @id @default(cuid())
+  title     String
+  address   String
+  commune   String
+  price     Float
+  createdAt DateTime @default(now())
+  
+  ownerId   String
+  owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
+
+  leases    Lease[]
+  incidents Incident[]
+  expenses  Expense[]
+  candidates Candidate[]
+}
+
+model Lease {
+  id            String    @id @default(cuid())
+  startDate     DateTime
+  endDate       DateTime?
+  depositAmount Float
+  monthlyRent   Float
+  isActive      Boolean   @default(true)
+
+  tenantId      String
+  tenant        User      @relation("TenantLeases", fields: [tenantId], references: [id])
+
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id])
+
+  payments      Payment[]
+  inventories   Inventory[]
+}
+
+// --- FINANCES, INCIDENTS ET ÉTAT DES LIEUX ---
+
+model Payment {
+  id        String   @id @default(cuid())
+  amount    Float
+  date      DateTime @default(now())
+  month     String
+  type      String   @default("LOYER")
+  
+  leaseId   String
+  lease     Lease    @relation(fields: [leaseId], references: [id])
+}
+
+model Incident {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  createdAt   DateTime @default(now())
+  
+  reporterId  String
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  category    String
+  
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  type           String
+  date           DateTime @default(now())
+  
+  kitchenState   String?
+  kitchenPhoto   String?
+  livingState    String?
+  livingPhoto    String?
+  bathState      String?
+  bathPhoto      String?
+  generalComment String?
+  
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+}
+
+// --- GESTION DES PROSPECTS (LEADS) ET CANDIDATS ---
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  address     String?
+  photo       String?
+  status      String   @default("NOUVEAU")
+  createdAt   DateTime @default(now())
+  
+  agentId     String?
+  agent       User?    @relation("AgentLeads", fields: [agentId], references: [id])
+}
+
+model Candidate {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  email       String
+  income      Float
+  status      String   @default("PENDING")
+  score       Int
+  createdAt   DateTime @default(now())
+  
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+// --- MODÈLE ARTISAN ---
+
+model Artisan {
+  id          String   @id @default(cuid())
+  name        String
+  job         String
+  phone       String
+  rating      Float    @default(5.0)
+  isVerified  Boolean  @default(false)
+  
+  ownerId     String
+  owner       User     @relation("OwnerArtisans", fields: [ownerId], references: [id])
+}

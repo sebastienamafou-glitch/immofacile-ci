@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscription Propriétaire | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="text-center mb-8">
+        <div class="text-3xl font-extrabold tracking-tighter">IMMOFACILE<span class="text-[#F59E0B]">CI</span></div>
+        <p class="text-slate-500 mt-2">Prenez le contrôle de vos loyers.</p>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] w-full max-w-md shadow-2xl">
+        <h1 class="text-xl font-bold text-center mb-8">Espace Propriétaire</h1>
+
+        <% if (locals.error) { %>
+            <div class="bg-red-500/10 border border-red-500/20 text-red-500 text-sm p-3 rounded-xl mb-6 text-center font-bold">
+                ⚠️ <%= error %>
+            </div>
+        <% } %>
+
+        <form action="/signup" method="POST" class="space-y-5">
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Nom Complet</label>
+                <input type="text" name="name" placeholder="Ex: Kouassi Jean" required 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1 outline-none focus:border-[#F59E0B] transition">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                <input type="email" name="email" placeholder="Ex: jean@immo.ci" required 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1 outline-none focus:border-[#F59E0B] transition">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Téléphone (WhatsApp)</label>
+                <input type="tel" name="phone" placeholder="Ex: 0707102030" required 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1 outline-none focus:border-[#F59E0B] transition">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Mot de passe</label>
+                <input type="password" name="password" placeholder="••••••••" required 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1 outline-none focus:border-[#F59E0B] transition">
+            </div>
+
+            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-[#D97706] text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-widest transition shadow-lg mt-4">
+                Créer mon espace sécurisé
+            </button>
+        </form>
+    </div>
+
+    <p class="text-slate-500 mt-8 text-sm">
+        Déjà membre ? 
+        <a href="/login" class="text-[#F59E0B] font-bold hover:underline hover:text-white transition">Connexion</a>
+    </p>
+
+</body>
+</html>

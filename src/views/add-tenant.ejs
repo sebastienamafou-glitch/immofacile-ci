@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nouveau Locataire | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg">
+        <div class="mb-8">
+            <a href="/dashboard-owner" class="text-slate-500 hover:text-white text-sm flex items-center gap-2">
+                ← Retour au Dashboard
+            </a>
+            <h1 class="text-3xl font-bold mt-4">Nouveau Bail</h1>
+            <p class="text-slate-400">Digitalisez un locataire en 30 secondes.</p>
+        </div>
+
+        <form action="/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6">
+            
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quel appartement ?</label>
+                <select name="propertyId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                    <% properties.forEach(function(prop) { %>
+                        <option value="<%= prop.id %>"><%= prop.title %> (<%= prop.price %> FCFA)</option>
+                    <% }); %>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom du Locataire</label>
+                    <input type="text" name="tenantName" required placeholder="Ex: M. Diallo" 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Téléphone (Mobile Money)</label>
+                    <input type="tel" name="tenantPhone" required placeholder="0707..." 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Loyer (FCFA)</label>
+                    <input type="number" name="monthlyRent" required placeholder="Montant" 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Caution (Nombre de mois)</label>
+                    <input type="number" name="depositMonths" placeholder="Ex: 2" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white outline-none focus:border-[#F59E0B] transition">
+                    <p class="text-[10px] text-slate-500 mt-1">Le montant sera calculé automatiquement (ex: 2 mois = Loyer x 2).</p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Date d'entrée</label>
+                <input type="date" name="startDate" required 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+            </div>
+
+            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition">
+                Générer le Bail Numérique
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

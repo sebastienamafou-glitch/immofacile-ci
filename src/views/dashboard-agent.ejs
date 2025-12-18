@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace Agent | ImmoFacile CI</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-white font-['Plus_Jakarta_Sans'] pb-20">
+
+    <div class="bg-[#F59E0B] p-6 rounded-b-[2rem] shadow-lg mb-6 text-[#0B1120]">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="font-black text-xl">AGENT <%= user.name.toUpperCase() %></h1>
+            <a href="/logout" class="text-xs font-bold underline">Déconnexion</a>
+        </div>
+        <div class="flex justify-between items-end">
+            <div>
+                <p class="text-xs font-bold uppercase opacity-80">Commissions estimées</p>
+                <p class="text-4xl font-black"><%= commission.toLocaleString('fr-FR') %></p>
+                <span class="text-sm font-bold opacity-80">FCFA</span>
+            </div>
+            <div class="text-right">
+                <p class="text-2xl font-black"><%= leads.length %></p>
+                <p class="text-xs font-bold uppercase opacity-80">Immeubles repérés</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="px-6">
+        
+        <h2 class="text-sm font-bold text-slate-400 uppercase mb-4">Action Terrain</h2>
+        
+        <button onclick="document.getElementById('leadModal').classList.remove('hidden')" class="w-full bg-white text-[#0B1120] p-6 rounded-2xl shadow-xl flex items-center justify-between group hover:scale-105 transition">
+            <div class="text-left">
+                <p class="text-xl font-black mb-1">🎯 SIGNALER UN BIEN</p>
+                <p class="text-xs text-slate-500">J'ai trouvé un propriétaire intéressé</p>
+            </div>
+            <div class="bg-[#0B1120] text-white w-12 h-12 rounded-full flex items-center justify-center text-2xl group-hover:rotate-90 transition">
+                +
+            </div>
+        </button>
+
+        <h2 class="text-sm font-bold text-slate-400 uppercase mb-4 mt-8">Mon Tableau de Chasse</h2>
+        
+        <div class="space-y-4">
+            <% if (leads.length === 0) { %>
+                <div class="text-center py-10 border border-dashed border-slate-700 rounded-2xl">
+                    <p class="text-slate-500">Aucune chasse aujourd'hui.<br>Allez sur le terrain ! 🏃‍♂️</p>
+                </div>
+            <% } %>
+
+            <% leads.forEach(function(lead) { %>
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex gap-4 items-center">
+                    <div class="w-16 h-16 bg-slate-700 rounded-lg overflow-hidden flex-shrink-0 border border-slate-600">
+                        <% if (lead.photo) { %>
+                            <img src="<%= lead.photo %>" class="w-full h-full object-cover">
+                        <% } else { %>
+                            <span class="flex items-center justify-center h-full text-2xl">🏢</span>
+                        <% } %>
+                    </div>
+                    
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <h3 class="font-bold text-white"><%= lead.name %></h3>
+                            <% if (lead.status === 'SIGNÉ') { %>
+                                <span class="bg-green-500 text-[#0B1120] text-[10px] font-bold px-2 py-1 rounded">💰 SIGNÉ</span>
+                            <% } else { %>
+                                <span class="bg-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">⏳ EN COURS</span>
+                            <% } %>
+                        </div>
+                        <p class="text-xs text-slate-400"><%= lead.address || 'Adresse inconnue' %></p>
+                        <p class="text-xs text-[#F59E0B] mt-1"><%= lead.phone %></p>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    </div>
+
+    <div id="leadModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-md relative">
+            <button onclick="document.getElementById('leadModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+            <h2 class="text-xl font-bold mb-6 text-white">Nouveau Repérage</h2>
+            
+            <form action="/add-lead" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Nom du Propriétaire</label>
+                    <input type="text" name="name" placeholder="M. Kouamé" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Contact</label>
+                    <input type="tel" name="phone" placeholder="07 07 ..." required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Localisation (Quartier)</label>
+                    <input type="text" name="address" placeholder="Cocody Angré, Rue L12" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1">
+                </div>
+                
+                <div>
+                    <label class="block w-full border-2 border-dashed border-[#F59E0B] rounded-xl p-4 text-center cursor-pointer hover:bg-slate-800 transition">
+                        <span class="text-2xl">📸</span>
+                        <p class="text-xs text-[#F59E0B] font-bold mt-1">PRENDRE PHOTO IMMEUBLE</p>
+                        <input type="file" name="leadPhoto" accept="image/*" capture="environment" required class="hidden" onchange="document.getElementById('photo-check').classList.remove('hidden')">
+                    </label>
+                    <p id="photo-check" class="text-green-500 text-xs text-center mt-2 hidden">✅ Photo enregistrée</p>
+                </div>
+
+                <button type="submit" class="w-full bg-[#F59E0B] text-[#0B1120] font-black py-4 rounded-xl mt-4 uppercase tracking-widest">
+                    Enregistrer le Lead
+                </button>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>

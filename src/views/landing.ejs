@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImmoFacile CI | La Super-App du Propriétaire Ivoirien</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('App installée (SW Registered) ✅'))
+                    .catch(err => console.log('Erreur SW ❌', err));
+            });
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+        .hero-card {
+            background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.8)), 
+                        url('/images/landing page photo.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto hero-card rounded-[2rem] shadow-2xl overflow-hidden min-h-[600px] relative">
+        <nav class="flex justify-between items-center px-10 py-8 relative z-10">
+            <div class="text-2xl font-extrabold text-white tracking-tighter">
+                ImmoFacile <span class="text-[#F59E0B]">CI</span>
+            </div>
+            <a href="#register" class="bg-[#F59E0B] hover:bg-[#D97706] text-white px-8 py-3 rounded-full font-bold transition shadow-lg">
+                S'inscrire
+            </a>
+        </nav>
+
+        <div class="px-10 py-20 relative z-10 max-w-3xl">
+            <h1 class="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6">
+                Finis les impayés et les litiges de <span class="text-[#F59E0B]">caution</span> à Abidjan.
+            </h1>
+            <p class="text-lg text-slate-200 mb-10 leading-relaxed opacity-90">
+                La première plateforme qui automatise la collecte de vos loyers via <b>Mobile Money</b> et sécurise vos baux avec une assistance juridique intégrée.
+            </p>
+            
+            <div class="flex flex-wrap items-center gap-6">
+                <a href="#register" class="bg-[#F59E0B] text-white px-10 py-4 rounded-xl font-black text-lg hover:scale-105 transition transform">
+                    Lancer mon projet
+                </a>
+                <span class="text-white/80 font-medium italic text-sm">Déjà +50 propriétaires en attente</span>
+            </div>
+        </div>
+
+        <div class="absolute right-10 bottom-20 text-right hidden lg:block">
+            <p class="text-white/50 text-xs font-bold uppercase tracking-widest mb-2">Gestion Immobilière</p>
+            <div class="inline-block p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-8 -mt-16 px-4 relative z-20">
+        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Paiement Mobile Money</h3>
+            <p class="text-slate-500 text-sm leading-relaxed">Recevez vos loyers directement sur Wave ou Orange Money chaque mois sans intermédiaire.</p>
+        </div>
+
+        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-10V4m-5 0V4h5"></path></svg>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Bouton Rouge Juridique</h3>
+            <p class="text-slate-500 text-sm leading-relaxed">Un impayé ? Activez l'huissier en un clic pour une mise en demeure certifiée sous 48h.</p>
+        </div>
+
+        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
+            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Caution Sécurisée</h3>
+            <p class="text-slate-500 text-sm leading-relaxed">Les cautions sont bloquées en séquestre numérique pour éviter tout conflit en fin de bail.</p>
+        </div>
+    </div>
+
+    <section id="register" class="max-w-7xl mx-auto py-24 px-4 text-center">
+        <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-20 relative overflow-hidden">
+            <div class="relative z-10">
+                <h2 class="text-4xl font-black text-white mb-6">Rejoignez la liste d'attente</h2>
+                <p class="text-slate-400 mb-12 max-w-xl mx-auto">Soyez informé dès l'ouverture du service à Cocody, Angré et Riviera.</p>
+                <form action="/register" method="POST" class="flex flex-col md:flex-row gap-4 max-w-3xl mx-auto">
+                    <input type="text" name="name" placeholder="Votre nom" class="flex-1 p-5 rounded-2xl bg-white/10 border border-white/20 text-white outline-none focus:border-[#F59E0B]" required>
+                    <input type="text" name="phone" placeholder="WhatsApp (ex: 0707...)" class="flex-1 p-5 rounded-2xl bg-white/10 border border-white/20 text-white outline-none focus:border-[#F59E0B]" required>
+                    <button type="submit" class="bg-[#F59E0B] hover:bg-[#D97706] text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest transition">
+                        Je m'inscris
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+</body>
+</html>

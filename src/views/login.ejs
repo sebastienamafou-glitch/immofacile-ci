@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Connexion | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('App installée (SW Registered) ✅'))
+                    .catch(err => console.log('Erreur SW ❌', err));
+            });
+        }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet"> 
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4"> 
+
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-extrabold tracking-tighter">IMMOFACILE <span class="text-[#F59E0B]">CI</span></h1>
+            <p class="text-slate-400 mt-2 text-sm">Accédez à votre espace sécurisé.</p>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-2xl">
+      
+            <% if (error) { %> 
+                <div class="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-4 rounded-xl mb-6 text-center">
+                    <%= error %> 
+                </div>
+            <% } %>
+
+            <form action="/login" method="POST" class="space-y-4"> 
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Email ou Téléphone</label> 
+                    <input type="text" name="identifier" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]" placeholder="Votre identifiant"> 
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Mot de passe</label>
+                    <input type="password" name="password" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]" placeholder="••••••••">
+                </div>
+
+                <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition mt-4">
+                    Se connecter
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-slate-500 text-sm mt-8">
+            Pas encore de compte ? <a href="/signup" class="text-[#F59E0B] hover:underline">S'inscrire</a>
+        </p>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Quittance de Loyer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body class="bg-gray-100 p-8 font-sans text-slate-800">
+
+    <div class="max-w-3xl mx-auto bg-white p-10 shadow-2xl rounded-sm border border-gray-200">
+        <div class="flex justify-between items-start mb-12 border-b-2 border-[#F59E0B] pb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-[#0B1120] uppercase tracking-widest">Quittance de Loyer</h1>
+                <p class="text-sm text-gray-500 mt-1">N° de référence : <%= payment.id.split('-')[0] %></p>
+            </div>
+            <div class="text-right">
+                <p class="font-bold text-xl text-[#F59E0B]">IMMOFACILE CI</p>
+                <p class="text-sm text-gray-500">Gestion Immobilière Numérique</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-12 mb-12">
+            <div>
+                <p class="text-xs font-bold text-gray-400 uppercase mb-2">Bailleur (Propriétaire)</p>
+                <p class="font-bold text-lg"><%= owner.name %></p>
+                <p class="text-gray-600"><%= owner.email %></p>
+                <p class="text-gray-600"><%= owner.phone %></p>
+            </div>
+            <div class="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                <p class="text-xs font-bold text-gray-400 uppercase mb-2">Locataire</p>
+                <p class="font-bold text-lg"><%= tenant.name %></p>
+                <p class="text-gray-600">Bien loué : <%= property.title %></p>
+                <p class="text-gray-600"><%= property.address %>, <%= property.commune %></p>
+            </div>
+        </div>
+
+        <div class="mb-12">
+            <h3 class="text-lg font-bold mb-4 border-b border-gray-200 pb-2">Détails du règlement</h3>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="text-gray-400 text-sm uppercase">
+                        <th class="pb-4">Période / Description</th>
+                        <th class="pb-4 text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="py-4 border-b border-gray-100 font-medium">Loyer - <%= payment.month %></td>
+                        <td class="py-4 border-b border-gray-100 text-right font-bold"><%= payment.amount.toLocaleString('fr-FR') %> FCFA</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="pt-6 text-xl font-bold">Total Payé</td>
+                        <td class="pt-6 text-xl font-bold text-right text-[#F59E0B]"><%= payment.amount.toLocaleString('fr-FR') %> FCFA</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="text-xs text-gray-400 mt-20 pt-6 border-t border-gray-100 text-center">
+            <p>Ce document est généré électroniquement par ImmoFacile CI et vaut preuve de paiement.</p>
+            <p>Date d'émission : <%= new Date(payment.date).toLocaleDateString('fr-FR') %></p>
+        </div>
+    </div>
+
+    <div class="text-center mt-8 no-print">
+        <button onclick="window.print()" class="bg-[#0B1120] text-white px-8 py-3 rounded-xl font-bold hover:scale-105 transition shadow-lg">
+            🖨️ Imprimer / Télécharger PDF
+        </button>
+        <a href="/dashboard-owner" class="block mt-4 text-gray-500 hover:underline">Retour au tableau de bord</a>
+    </div>
+
+</body>
+</html>

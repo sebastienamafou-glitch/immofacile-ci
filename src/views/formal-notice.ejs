@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mise en Demeure - Cabinet Huissier</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #000; max-width: 800px; margin: 0 auto; padding: 40px; background: white; }
+        .header { text-align: center; border-bottom: 3px double #000; padding-bottom: 20px; margin-bottom: 40px; }
+        .huissier-title { font-size: 1.4em; font-weight: bold; text-transform: uppercase; }
+        .sub-title { font-style: italic; font-size: 1.1em; }
+        .urgent-box { border: 2px solid #000; padding: 15px; text-align: center; font-weight: bold; font-size: 1.2em; background: #eee; margin: 30px 0; }
+        .content { margin-top: 30px; text-align: justify; }
+        .signature { margin-top: 60px; text-align: right; }
+        .stamp { border: 3px solid #cc0000; color: #cc0000; padding: 10px; display: inline-block; transform: rotate(-5deg); font-weight: bold; text-transform: uppercase; }
+        @media print { .no-print { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+
+    <div class="no-print" style="text-align:center; margin-bottom: 30px; padding: 20px; background: #fee2e2; border-bottom: 1px solid #ef4444;">
+        <span style="color:#b91c1c; font-weight:bold; margin-right: 15px;">⚠️ Ce document a une valeur juridique.</span>
+        <button onclick="window.print()" style="background:#b91c1c; color:white; border:none; padding:10px 20px; font-weight:bold; cursor:pointer; border-radius: 5px;">🖨️ Imprimer / Sauvegarder PDF</button>
+    </div>
+
+    <div class="header">
+        <div class="huissier-title">ÉTUDE DE MAÎTRE KOUASSI ALAIN</div>
+        <div class="sub-title">Commissaire de Justice près le Tribunal d'Abidjan</div>
+        <p>Cocody, II Plateaux, Rue des Jardins - Tél : 27 22 44 XX XX</p>
+    </div>
+
+    <div class="urgent-box">
+        OBJET : MISE EN DEMEURE DE PAYER<br>
+        AVANT PROCÉDURE D'EXPULSION
+    </div>
+
+    <div style="margin-bottom: 40px;">
+        <p><strong>À l'attention de :</strong> M./Mme <%= tenant.name %></p>
+        <p><strong>Adresse du logement :</strong> <%= property.address %>, <%= property.commune %></p>
+        <p><strong>Date :</strong> Abidjan, le <%= new Date().toLocaleDateString('fr-FR') %></p>
+    </div>
+
+    <div class="content">
+        <p>Monsieur, Madame,</p>
+
+        <p>Agissant pour le compte de votre Propriétaire, <strong>M./Mme <%= owner.name %></strong>, via la plateforme de gestion agréée <strong>ImmoFacile CI</strong>.</p>
+
+        <p>Nous constatons qu'à ce jour, en dépit de nos relances amiables, vous restez redevable de la somme de :</p>
+
+        <h2 style="text-align:center; margin: 30px 0;"><%= totalDue.toLocaleString('fr-FR') %> FCFA</h2>
+
+        <p>Cette somme correspond aux loyers impayés sur la période en cours.</p>
+
+        <p>En vertu de la <strong>loi n°2019-576</strong> relative au bail à usage d'habitation en Côte d'Ivoire, nous vous mettons en demeure de régler ladite somme sous <strong>48 heures</strong> par le biais de l'application ImmoFacile CI ou par tout moyen à votre convenance.</p>
+
+        <p>À défaut de paiement intégral dans ce délai impératif, nous avons pour instruction d'engager sans autre avis :</p>
+        <ol>
+            <li>La résiliation de plein droit de votre bail ;</li>
+            <li>Une procédure d'expulsion forcée par voie de justice ;</li>
+            <li>La saisie conservatoire de vos comptes bancaires et biens mobiliers.</li>
+        </ol>
+
+        <p style="font-weight:bold; text-decoration: underline;">VEUILLEZ CONSIDÉRER LA PRÉSENTE COMME DERNIÈRE SOMMATION.</p>
+    </div>
+
+    <div class="signature">
+        <p>Pour Maître KOUASSI A.</p>
+        <p>Commissaire de Justice</p>
+        <div class="stamp">
+            ACTE SIGNIFIÉ<br>
+            PAR VOIE ÉLECTRONIQUE<br>
+            IMMOFACILE CI
+        </div>
+    </div>
+
+    <p style="font-size: 0.8em; color: #666; margin-top: 100px; border-top: 1px solid #ccc; padding-top: 10px;">
+        Document généré le <%= new Date().toLocaleString('fr-FR') %> - Réf Dossier: <%= lease.id.split('-')[0].toUpperCase() %>
+    </p>
+
+</body>
+</html>

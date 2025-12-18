@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUPER ADMIN | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>html { scroll-behavior: smooth; }</style>
+</head>
+<body class="bg-black text-white font-['Plus_Jakarta_Sans']">
+
+    <div class="flex min-h-screen">
+        <aside class="w-64 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full overflow-y-auto z-10 bg-black">
+            
+            <div class="mb-10 text-center md:text-left">
+                <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
+            </div>
+
+            <nav class="space-y-2 flex-1">
+                <a href="/dashboard-admin" class="block p-3 bg-white/10 rounded-lg font-bold text-white hover:bg-white/20 transition-all">
+                    Vue Globale
+                </a>
+
+                <a href="#tresorerie" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                    Trésorerie & Guichet
+                </a>
+
+                <a href="#agents" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                    Agents & Sales
+                </a>
+
+                <a href="#alertes" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                    Alertes Système
+                </a>
+
+                <a href="/logout" class="block p-3 font-semibold text-red-500 mt-10 hover:bg-red-500/10 rounded-lg transition-all">
+                    Déconnexion
+                </a>
+            </nav>
+
+            <div class="mt-auto pt-6 border-t border-slate-800 text-center md:text-left">
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
+                <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain opacity-80 hover:opacity-100 transition mb-2">
+                <div class="flex flex-col gap-1">
+                    <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">contact@webappci.com</a>
+                    <a href="/privacy" class="text-[10px] text-[#F59E0B] hover:underline">Confidentialité</a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 ml-64 p-10">
+            
+            <header class="flex justify-between items-end mb-10">
+                <div>
+                    <h1 class="text-3xl font-bold">Bonjour Boss 👋</h1>
+                    <p class="text-slate-500">Voici la situation du business aujourd'hui.</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs font-bold text-slate-500 uppercase">Utilisateurs Totaux</p>
+                    <p class="text-2xl font-black"><%= totalUsers %></p>
+                </div>
+            </header>
+
+            <section class="grid grid-cols-3 gap-6 mb-12">
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Volume d'Affaires (GMV)</span>
+                        <span class="text-green-500 bg-green-500/10 px-2 rounded text-xs">▲ +12%</span>
+                    </div>
+                    <p class="text-3xl font-black text-white"><%= volumeAffaires.toLocaleString('fr-FR') %></p>
+                    <p class="text-xs text-slate-500">FCFA encaissés (Loyers)</p>
+                </div>
+
+                <div class="bg-gradient-to-br from-[#F59E0B] to-orange-700 p-6 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-bold text-black/60 uppercase">MA COMMISSION (5%)</span>
+                    </div>
+                    <p class="text-4xl font-black text-white"><%= myRevenue.toLocaleString('fr-FR') %></p>
+                    <p class="text-xs text-white/80">FCFA Net dans votre poche</p>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Biens sous gestion</span>
+                    </div>
+                    <p class="text-3xl font-black text-white"><%= totalProperties %></p>
+                    <p class="text-xs text-slate-500">Appartements actifs</p>
+                </div>
+            </section>
+
+            <section id="tresorerie" class="mt-12 mb-12 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                <h3 class="font-bold text-[#F59E0B] uppercase text-sm mb-6 flex items-center gap-2">
+                    💳 Guichet de Rechargement / Trésorerie
+                    <span class="text-xs text-slate-500 normal-case">(Quand vous recevez un Wave, ajoutez le crédit ici)</span>
+                </h3>
+
+                <div class="flex gap-6">
+                    <form action="/admin/add-credit" method="POST" class="bg-black/30 p-4 rounded-xl border border-slate-700 w-1/3">
+                        <div class="mb-3">
+                            <label class="text-xs font-bold text-slate-400">Propriétaire Client</label>
+                            <select name="ownerId" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
+                                <% owners.forEach(o => { %>
+                                    <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.credit.toLocaleString('fr-FR') %> F)</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="text-xs font-bold text-slate-400">Montant reçu (FCFA)</label>
+                            <input type="number" name="amount" placeholder="Ex: 10000" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
+                        </div>
+                        <button type="submit" class="w-full bg-[#F59E0B] text-black font-bold py-2 rounded hover:bg-orange-500">Créditer le compte</button>
+                    </form>
+
+                    <div class="flex-1 overflow-y-auto max-h-60">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-800">
+                                <tr><th class="p-2">Client</th><th class="p-2">Solde Actuel</th><th class="p-2">Statut</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-700">
+                                <% owners.forEach(o => { %>
+                                    <tr>
+                                        <td class="p-2 font-bold"><%= o.name %></td>
+                                        <td class="p-2 font-mono <%= o.credit < 2000 ? 'text-red-500' : 'text-green-400' %>"><%= o.credit.toLocaleString('fr-FR') %> FCFA</td>
+                                        <td class="p-2">
+                                            <% if (o.credit < 2000) { %>
+                                                <span class="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs">Bloqué bientôt</span>
+                                            <% } else { %>
+                                                <span class="bg-green-500/20 text-green-500 px-2 py-1 rounded text-xs">OK</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid grid-cols-2 gap-8">
+                
+                <section id="agents">
+                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4">Performance Agents</h3>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
+                                <tr>
+                                    <th class="p-4">Agent</th>
+                                    <th class="p-4">Leads</th>
+                                    <th class="p-4 text-right">Commission due</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                <% agents.forEach(agent => { %>
+                                    <tr>
+                                        <td class="p-4 font-bold"><%= agent.name %></td>
+                                        <td class="p-4"><%= agent.leads.length %> immeubles</td>
+                                        <td class="p-4 text-right font-mono text-[#F59E0B]">
+                                            <%= (agent.leads.length * 5000).toLocaleString('fr-FR') %> FCFA
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="alertes">
+                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4">Alertes Système</h3>
+                    <div class="space-y-3">
+                        <% if (activeIncidents.length === 0) { %>
+                            <div class="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm">
+                                ✅ R.A.S. Système sain.
+                            </div>
+                        <% } %>
+
+                        <% activeIncidents.forEach(inc => { %>
+                            <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex justify-between items-center">
+                                <div>
+                                    <p class="text-red-400 font-bold text-sm">🚨 <%= inc.priority %> : <%= inc.title %></p>
+                                    <p class="text-slate-500 text-xs"><%= inc.property.title %></p>
+                                </div>
+                                <button class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold">Intervenir</button>
+                            </div>
+                        <% }) %>
+                    </div>
+                </section>
+
+            </div>
+
+        </main>
+    </div>
+
+</body>
+</html>

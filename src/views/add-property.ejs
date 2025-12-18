@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajouter un Bien | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-lg">
+        <div class="mb-8">
+            <a href="/dashboard-owner" class="text-slate-500 hover:text-white text-sm flex items-center gap-2">
+                ← Retour au Dashboard
+            </a>
+            <h1 class="text-3xl font-bold mt-4">Nouveau Bien</h1>
+            <p class="text-slate-400">Ajoutez un actif à votre portefeuille.</p>
+        </div>
+
+        <form action="/add-property" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6">
+            
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom du bien</label>
+                <input type="text" name="title" required placeholder="Ex: Appartement 3 pièces - Résidence Akwaba" 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Commune</label>
+                    <select name="commune" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                        <option value="Cocody">Cocody</option>
+                        <option value="Yopougon">Yopougon</option>
+                        <option value="Marcory">Marcory</option>
+                        <option value="Plateau">Plateau</option>
+                        <option value="Bingerville">Bingerville</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quartier / Adresse</label>
+                    <input type="text" name="address" required placeholder="Ex: Angré 8ème Tranche" 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Loyer Mensuel (FCFA)</label>
+                <input type="number" name="price" required placeholder="250000" 
+                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+            </div>
+
+            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition">
+                Enregistrer le Bien
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>
