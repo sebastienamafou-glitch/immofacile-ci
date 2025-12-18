@@ -1,14 +1,15 @@
 {
   "name": "immofacile-ci",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Application de gestion immobilière ImmoFacile CI",
+  "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
-  "author": "",
+  "author": "WebApp CI",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
