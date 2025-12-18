@@ -29,7 +29,6 @@
 
     <div class="flex min-h-screen">
         <aside class="w-64 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full bg-[#0B1120] overflow-y-auto z-10">
-            
             <div class="mb-10 text-center md:text-left">
                 <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
             </div>
@@ -53,11 +52,9 @@
         </aside>
 
         <main class="flex-1 p-8 md:ml-64">
-            
             <header id="dashboard" class="mb-10 pt-4">
                 <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">La Météo des Revenus</h2>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-               
                     <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
                         <p class="text-slate-400 text-xs mb-1">Revenus Bruts</p>
                         <p class="text-2xl font-black text-white"><%= typeof totalRent !== 'undefined' ? totalRent.toLocaleString('fr-FR') : 0 %></p>
@@ -83,17 +80,27 @@
                     </div>
                 </div>
 
-                <div class="max-w-xs p-4 bg-gradient-to-r from-[#F59E0B] to-orange-600 rounded-xl shadow-lg">
-                    <p class="text-xs font-bold text-[#0B1120] uppercase opacity-80">Mon Solde Service</p>
-                    <div class="flex justify-between items-end">
-                        <p class="text-2xl font-black text-white"><%= user.credit.toLocaleString('fr-FR') %></p>
-                        <span class="text-xs font-bold text-white">FCFA</span>
+                <div class="mb-8 p-6 bg-gradient-to-r from-[#F59E0B] to-orange-600 rounded-3xl shadow-xl text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 opacity-10 transform translate-x-4 -translate-y-4">
+                        <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.15-1.46-3.27-3.4h1.96c.1 1.05 1.18 1.91 2.53 1.91 1.33 0 2.26-.86 2.26-1.9 0-1.02-.96-1.47-2.27-1.79l-1.46-.35c-2.12-.54-2.77-1.84-2.77-3.04 0-1.86 1.48-3 3.29-3.32V4h2.67v1.9c1.43.33 2.65 1.25 2.76 2.9h-1.86c-.1-1.03-1.05-1.57-2.13-1.57-1.22 0-2.02.77-2.02 1.62 0 .97.99 1.43 2.23 1.74l1.49.37c2.12.55 2.82 1.83 2.82 3.16 0 1.95-1.55 3.19-3.56 3.49z"/></svg>
                     </div>
-                    <% if (user.credit < 5000) { %>
-                        <div class="mt-2 bg-black/20 rounded p-2 text-[10px] text-white font-bold flex items-center gap-2">
-                            ⚠️ Rechargez vite (Wave: 0707...)
+
+                    <div class="relative z-10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Solde Disponible</p>
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-4xl font-black"><%= user.credit.toLocaleString('fr-FR') %></span>
+                                <span class="text-sm font-bold opacity-80">FCFA</span>
+                            </div>
+                            <% if (user.credit < 2000) { %>
+                                <p class="text-xs bg-black/20 inline-block px-2 py-1 rounded mt-2 font-bold text-red-100">⚠️ Solde critique</p>
+                            <% } %>
                         </div>
-                    <% } %>
+
+                        <button onclick="document.getElementById('rechargeModal').classList.remove('hidden')" class="bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition flex items-center gap-2">
+                            <span>⚡️</span> Recharger
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -245,6 +252,33 @@
                 </div>
             </div>
 
+            <div id="rechargeModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                <div class="bg-slate-900 border border-slate-700 p-8 rounded-3xl w-full max-w-sm relative">
+                    <button onclick="document.getElementById('rechargeModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+                    <div class="text-center mb-6">
+                        <h2 class="text-xl font-bold text-white mb-2">Recharger mon compte</h2>
+                        <p class="text-slate-400 text-sm">Paiement sécurisé par CinetPay</p>
+                        <div class="flex justify-center gap-2 mt-4 opacity-70">
+                            <span class="bg-white px-2 rounded h-6 flex items-center"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Orange_logo.svg/1200px-Orange_logo.svg.png" class="h-4"></span>
+                            <span class="bg-blue-500 px-2 rounded h-6 flex items-center text-[10px] font-bold text-white">Wave</span>
+                            <span class="bg-yellow-400 px-2 rounded h-6 flex items-center text-[10px] font-bold text-black">MTN</span>
+                        </div>
+                    </div>
+                    <form action="/api/payment/init" method="POST" class="space-y-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-400 uppercase">Montant à créditer</label>
+                            <select name="amount" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold mt-2 focus:border-[#F59E0B] outline-none">
+                                <option value="5000">5 000 FCFA</option>
+                                <option value="10000" selected>10 000 FCFA</option>
+                                <option value="20000">20 000 FCFA</option>
+                                <option value="50000">50 000 FCFA</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl transition mt-2">Payer maintenant</button>
+                    </form>
+                </div>
+            </div>
+
             <div id="exitModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                 <div class="bg-slate-900 border border-slate-700 p-8 rounded-3xl w-full max-w-md relative">
                     <button onclick="document.getElementById('exitModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
@@ -301,9 +335,46 @@
                     </form>
                 </div>
             </div>
-
         </main>
     </div>
+    <div class="mt-12 mb-8">
+    <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+        </div>
+        <div>
+            <h2 class="text-xl font-black text-[#0B1120]">Annuaire Artisans Agréés</h2>
+            <p class="text-slate-500 text-sm">Trouvez un professionnel de confiance pour vos travaux.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <% if (locals.artisans && artisans.length > 0) { %>
+            <% artisans.forEach(artisan => { %>
+                <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition group">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-xl">👷🏾‍♂️</div>
+                        <% if (artisan.isVerified) { %>
+                            <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">Vérifié</span>
+                        <% } %>
+                    </div>
+                    
+                    <h3 class="font-bold text-[#0B1120]"><%= artisan.name %></h3>
+                    <p class="text-[#F59E0B] font-medium text-sm mb-1"><%= artisan.job %></p>
+                    <p class="text-slate-400 text-xs mb-4">📍 <%= artisan.location %></p>
+                    
+                    <a href="tel:<%= artisan.phone %>" class="flex items-center justify-center gap-2 w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-bold hover:bg-[#F59E0B] hover:text-[#0B1120] transition">
+                        <span>📞</span> Appeler
+                    </a>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="col-span-full text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <p class="text-slate-400">Aucun artisan n'est référencé pour le moment.</p>
+            </div>
+        <% } %>
+    </div>
+</div>
 
     <script>
         function openExitModal(leaseId, tenantName, deposit) {

@@ -1,115 +1,235 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ImmoFacile CI | La Super-App du Propriétaire Ivoirien</title>
-
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0B1120">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('App installée (SW Registered) ✅'))
-                    .catch(err => console.log('Erreur SW ❌', err));
-            });
-        }
-    </script>
-
+    
+    <meta name="description" content="Gérez vos biens immobiliers à Abidjan : Loyers Mobile Money, Contrats numériques et Huissier en 1 clic.">
+    <meta property="og:image" content="/images/immo_logo.png">
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/icon-512.png">
+    <link rel="manifest" href="/manifest.json">
+    
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .hero-card {
-            background: linear-gradient(rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.8)), 
-                        url('/images/landing page photo.jpg');
-            background-size: cover;
-            background-position: center;
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="bg-gray-50 text-slate-900">
 
-    <div class="max-w-7xl mx-auto hero-card rounded-[2rem] shadow-2xl overflow-hidden min-h-[600px] relative">
-        <nav class="flex justify-between items-center px-10 py-8 relative z-10">
-            <div class="text-2xl font-extrabold text-white tracking-tighter">
-                ImmoFacile <span class="text-[#F59E0B]">CI</span>
-            </div>
-            <a href="#register" class="bg-[#F59E0B] hover:bg-[#D97706] text-white px-8 py-3 rounded-full font-bold transition shadow-lg">
-                S'inscrire
-            </a>
-        </nav>
-
-        <div class="px-10 py-20 relative z-10 max-w-3xl">
-            <h1 class="text-5xl md:text-7xl font-extrabold text-white leading-tight mb-6">
-                Finis les impayés et les litiges de <span class="text-[#F59E0B]">caution</span> à Abidjan.
-            </h1>
-            <p class="text-lg text-slate-200 mb-10 leading-relaxed opacity-90">
-                La première plateforme qui automatise la collecte de vos loyers via <b>Mobile Money</b> et sécurise vos baux avec une assistance juridique intégrée.
-            </p>
+    <div class="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
+        
+        <section class="relative rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden bg-[#0B1120] min-h-[85vh] flex flex-col shadow-2xl">
             
-            <div class="flex flex-wrap items-center gap-6">
-                <a href="#register" class="bg-[#F59E0B] text-white px-10 py-4 rounded-xl font-black text-lg hover:scale-105 transition transform">
-                    Lancer mon projet
+            <div class="absolute inset-0 z-0">
+                <img src="/images/landing page photo.png" alt="Abidjan Plateau Skyline" class="w-full h-full object-cover opacity-80">
+                <div class="absolute inset-0 bg-gradient-to-r from-[#0B1120]/90 via-[#0B1120]/60 to-transparent"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-transparent"></div>
+            </div>
+
+            <nav class="relative z-20 px-8 py-8 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <img src="/images/immo_logo.png" alt="Logo" class="h-8 w-auto">
+                    <span class="text-white font-bold text-xl tracking-tight">ImmoFacile<span class="text-[#F59E0B]">CI</span></span>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+                    <a href="#fonctionnalites" class="hover:text-white transition">Fonctionnalités</a>
+                    <a href="#demo" class="hover:text-white transition">Mode d'emploi</a>
+                    <a href="/login" class="hover:text-white transition">Se connecter</a>
+                </div>
+
+                <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-6 py-3 rounded-full font-bold text-sm transition shadow-lg hover:scale-105">
+                    S'inscrire
                 </a>
-                <span class="text-white/80 font-medium italic text-sm">Déjà +50 propriétaires en attente</span>
-            </div>
-        </div>
+            </nav>
 
-        <div class="absolute right-10 bottom-20 text-right hidden lg:block">
-            <p class="text-white/50 text-xs font-bold uppercase tracking-widest mb-2">Gestion Immobilière</p>
-            <div class="inline-block p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <div class="relative z-10 flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 pb-32 max-w-4xl">
+                <h1 class="text-5xl md:text-7xl lg:text-[5.5rem] font-black text-white leading-[1.1] mb-8 tracking-tight">
+                    Finis les impayés et <br>
+                    les litiges de <br>
+                    <span class="text-[#F59E0B]">caution</span> à Abidjan.
+                </h1>
+
+                <p class="text-lg md:text-xl text-gray-300 mb-10 max-w-xl leading-relaxed font-medium">
+                    La première plateforme qui automatise la collecte de vos loyers via <span class="text-white font-bold">Mobile Money</span> et sécurise vos baux avec une assistance juridique intégrée.
+                </p>
+
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                    <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-8 py-4 rounded-xl font-bold text-lg transition shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:scale-105">
+                        Lancer mon projet
+                    </a>
+                    <div class="flex items-center gap-3 text-sm text-gray-400 font-medium">
+                        <div class="flex -space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 border-2 border-[#0B1120]"></div>
+                            <div class="w-8 h-8 rounded-full bg-slate-600 border-2 border-[#0B1120]"></div>
+                            <div class="w-8 h-8 rounded-full bg-slate-500 border-2 border-[#0B1120]"></div>
+                        </div>
+                        <p>Déjà +50 propriétaires <br class="hidden sm:block">en attente</p>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-8 right-8 text-xs font-bold text-gray-500 uppercase tracking-widest hidden md:block">
+                    Gestion Immobilière 2.0
+                </div>
+                
+                <div class="absolute bottom-8 right-8 border border-white/20 p-4 rounded-2xl hidden md:block">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                </div>
             </div>
-        </div>
+        </section>
+
+        <section id="fonctionnalites" class="relative z-20 -mt-20 px-4 md:px-12">
+            <div class="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
+                    <div class="w-14 h-14 bg-orange-100 text-[#F59E0B] rounded-2xl flex items-center justify-center text-2xl mb-6">
+                        $
+                    </div>
+                    <h3 class="text-xl font-bold text-[#0B1120] mb-3">Paiement Mobile Money</h3>
+                    <p class="text-slate-500 text-sm leading-relaxed">Encaissement automatique via Wave & Orange. Réconciliation instantanée et génération de quittance.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
+                    <div class="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                        ⚖️
+                    </div>
+                    <h3 class="text-xl font-bold text-[#0B1120] mb-3">Bouton Rouge Juridique</h3>
+                    <p class="text-slate-500 text-sm leading-relaxed">Un impayé ? Activez la procédure d'urgence. Mise en demeure et huissier déclenchés en 1 clic.</p>
+                </div>
+
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
+                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                        🛡️
+                    </div>
+                    <h3 class="text-xl font-bold text-[#0B1120] mb-3">Caution Sécurisée</h3>
+                    <p class="text-slate-500 text-sm leading-relaxed">Calcul exact selon la loi. Gestion transparente des retenues pour travaux à la sortie.</p>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="demo" class="py-24 px-4 md:px-12 mt-10">
+            <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+                
+                <div class="relative">
+                    <div class="absolute -inset-4 bg-gradient-to-r from-orange-500 to-amber-300 rounded-[2.5rem] rotate-2 opacity-20 blur-lg"></div>
+                    <div class="relative bg-white border border-slate-100 rounded-[2rem] p-8 md:p-12 shadow-2xl">
+                        <div class="flex justify-between items-center mb-10">
+                            <div>
+                                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Mon Tableau de Bord</p>
+                                <h3 class="text-3xl font-black text-[#0B1120]">Vue Propriétaire</h3>
+                            </div>
+                            <div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Actif</div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">K</div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-[#0B1120]">Koffi Jean</p>
+                                    <p class="text-xs text-slate-500">Villa Cocody • Loyer à jour</p>
+                                </div>
+                                <span class="text-green-600 font-bold text-sm">+ 250.000 F</span>
+                            </div>
+                            <div class="flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100">
+                                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold">⚠️</div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-[#0B1120]">Alerte Impayé</p>
+                                    <p class="text-xs text-red-500">Mise en demeure générée</p>
+                                </div>
+                                <button class="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold">Voir</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="text-[#F59E0B] font-bold tracking-widest uppercase text-xs mb-2 block">Simple & Efficace</span>
+                    <h2 class="text-4xl md:text-5xl font-black text-[#0B1120] mb-6 leading-tight">Reprenez le contrôle de vos biens.</h2>
+                    <p class="text-lg text-slate-500 mb-10">Plus besoin de courir après les locataires ou de gérer la paperasse. ImmoFacile CI centralise tout.</p>
+                    
+                    <ul class="space-y-6">
+                        <li class="flex items-start gap-4">
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div>
+                                <h4 class="font-bold text-[#0B1120]">Ajoutez vos biens</h4>
+                                <p class="text-sm text-slate-500">Appartements, villas, studios... tout est gérable.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-4">
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div>
+                                <h4 class="font-bold text-[#0B1120]">Invitez vos locataires</h4>
+                                <p class="text-sm text-slate-500">Ils reçoivent un lien pour payer par Wave/Orange.</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-4">
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div>
+                                <h4 class="font-bold text-[#0B1120]">Dormez tranquille</h4>
+                                <p class="text-sm text-slate-500">Les fonds arrivent sur votre compte, les quittances partent seules.</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="mb-20">
+            <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-20 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
+                <div class="absolute bottom-0 right-0 w-64 h-64 bg-orange-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
+
+                <div class="relative z-10 max-w-2xl mx-auto">
+                    <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Prêt à moderniser votre gestion ?</h2>
+                    <p class="text-slate-400 mb-10 text-lg">Rejoignez la communauté des propriétaires sereins d'Abidjan.</p>
+                    <div class="flex justify-center gap-4">
+                        <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-8 py-4 rounded-xl font-bold text-lg transition hover:scale-105">
+                            Créer mon compte gratuit
+                        </a>
+                    </div>
+                    <p class="mt-6 text-xs text-slate-500">Aucune carte bancaire requise pour commencer.</p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-20 border-t border-slate-200 pt-10 pb-10">
+            <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+    
+                <div class="text-center md:text-left">
+                    <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
+                        <img src="/images/immo_logo.png" alt="Logo" class="h-6 w-auto grayscale opacity-70">
+                        <span class="font-bold text-slate-600">ImmoFacile CI</span>
+                    </div>
+                    <p class="text-xs text-slate-400">&copy; 2025. Tous droits réservés.</p>
+                </div>
+    
+                <div class="flex flex-wrap justify-center gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    <a href="/privacy" class="hover:text-[#F59E0B] transition">Politique de Confidentialité</a>
+                    <a href="/cgu" class="text-slate-500 hover:text-[#F59E0B] transition">CGU & Mentions Légales</a> 
+                    <a href="mailto:contact@webappci.com" class="text-slate-500 hover:text-[#F59E0B] transition">Support</a>
+                </div>
+    
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Développé par</span>
+                    <a href="https://webappci.com" target="_blank" class="group hover:opacity-80 transition block">
+                        <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-10 w-auto object-contain group-hover:scale-105 transition">
+                    </a>
+                </div>
+    
+            </div>
+        </footer>
+
     </div>
-
-    <div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-8 -mt-16 px-4 relative z-20">
-        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
-            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Paiement Mobile Money</h3>
-            <p class="text-slate-500 text-sm leading-relaxed">Recevez vos loyers directement sur Wave ou Orange Money chaque mois sans intermédiaire.</p>
-        </div>
-
-        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
-            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-10V4m-5 0V4h5"></path></svg>
-            </div>
-            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Bouton Rouge Juridique</h3>
-            <p class="text-slate-500 text-sm leading-relaxed">Un impayé ? Activez l'huissier en un clic pour une mise en demeure certifiée sous 48h.</p>
-        </div>
-
-        <div class="bg-white p-10 rounded-[2rem] shadow-xl border border-slate-100 group hover:border-[#F59E0B] transition">
-            <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-[#F59E0B] mb-6">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-            </div>
-            <h3 class="text-xl font-extrabold text-slate-900 mb-3">Caution Sécurisée</h3>
-            <p class="text-slate-500 text-sm leading-relaxed">Les cautions sont bloquées en séquestre numérique pour éviter tout conflit en fin de bail.</p>
-        </div>
-    </div>
-
-    <section id="register" class="max-w-7xl mx-auto py-24 px-4 text-center">
-        <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-20 relative overflow-hidden">
-            <div class="relative z-10">
-                <h2 class="text-4xl font-black text-white mb-6">Rejoignez la liste d'attente</h2>
-                <p class="text-slate-400 mb-12 max-w-xl mx-auto">Soyez informé dès l'ouverture du service à Cocody, Angré et Riviera.</p>
-                <form action="/register" method="POST" class="flex flex-col md:flex-row gap-4 max-w-3xl mx-auto">
-                    <input type="text" name="name" placeholder="Votre nom" class="flex-1 p-5 rounded-2xl bg-white/10 border border-white/20 text-white outline-none focus:border-[#F59E0B]" required>
-                    <input type="text" name="phone" placeholder="WhatsApp (ex: 0707...)" class="flex-1 p-5 rounded-2xl bg-white/10 border border-white/20 text-white outline-none focus:border-[#F59E0B]" required>
-                    <button type="submit" class="bg-[#F59E0B] hover:bg-[#D97706] text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest transition">
-                        Je m'inscris
-                    </button>
-                </form>
-            </div>
-        </div>
-    </section>
 
 </body>
 </html>

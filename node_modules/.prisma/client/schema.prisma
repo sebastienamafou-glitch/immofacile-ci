@@ -17,17 +17,19 @@ model User {
   role      UserRole @default(TENANT)
   password  String
   createdAt DateTime @default(now())
+  isActive  Boolean  @default(true) // Pour bloquer un mauvais payeur
   
-  // --- NOUVEAUX CHAMPS FINANCIERS ---
+  // --- FINANCES ---
   credit    Float    @default(0) // LE PORTEFEUILLE PRÉPAYÉ (En FCFA)
 
   // Relations
   properties        Property[] @relation("OwnerProperties")
   leasesAsTenant    Lease[]    @relation("TenantLeases")
   reportedIncidents Incident[] @relation("Reporter")
-  artisans          Artisan[]  @relation("OwnerArtisans")
   leads             Lead[]     @relation("AgentLeads")
   transactions      CreditTransaction[] 
+  
+  // Note : J'ai retiré la relation "artisans" car l'annuaire est désormais public/global
 }
 
 enum UserRole {
@@ -37,12 +39,12 @@ enum UserRole {
   AGENT
 }
 
-// --- NOUVEAU MODÈLE : TRAÇABILITÉ DE L'ARGENT ---
+// --- TRAÇABILITÉ DE L'ARGENT ---
 
 model CreditTransaction {
   id          String   @id @default(cuid())
-  amount      Float    // Positif (+10000) si rechargement, Négatif (-500) si commission
-  description String   // Ex: "Rechargement Wave", "Commission Loyer Janvier"
+  amount      Float    // Positif (+10000) ou Négatif (-500)
+  description String   
   date        DateTime @default(now())
   
   userId      String
@@ -171,16 +173,17 @@ model Candidate {
   property    Property @relation(fields: [propertyId], references: [id])
 }
 
-// --- MODÈLE ARTISAN ---
+// --- MODÈLE ARTISAN (CORRIGÉ : UN SEUL MODÈLE) ---
 
 model Artisan {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   name        String
-  job         String
+  job         String   // Ex: Plombier, Électricien
   phone       String
-  rating      Float    @default(5.0)
-  isVerified  Boolean  @default(false)
+  location    String   // Ex: Cocody, Yopougon
+  isVerified  Boolean  @default(true)
+  rating      Float    @default(5.0) // J'ai gardé le rating de l'autre modèle, ça peut servir !
+  createdAt   DateTime @default(now())
   
-  ownerId     String
-  owner       User     @relation("OwnerArtisans", fields: [ownerId], references: [id])
+  // Pas de relation ownerId car c'est un annuaire public géré par l'Admin
 }
