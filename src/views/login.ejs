@@ -40,7 +40,8 @@
                 </div>
             <% } %>
 
-            <form action="/login" method="POST" class="space-y-4"> 
+            <form action="/login" method="POST" class="space-y-4">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Email ou Téléphone</label> 
                     <input type="text" name="identifier" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]" placeholder="Votre identifiant"> 
@@ -56,6 +57,9 @@
                 </button>
             </form>
         </div>
+        <div class="flex justify-end mb-2">
+    <a href="/forgot-password" class="text-xs text-[#F59E0B] hover:underline">Mot de passe oublié ?</a>
+</div>
 
         <p class="text-center text-slate-500 text-sm mt-8">
             Pas encore de compte ? <a href="/signup" class="text-[#F59E0B] hover:underline">S'inscrire</a>

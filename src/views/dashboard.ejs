@@ -4,31 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Animation Sidebar Mobile */
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        
+        /* Gestion de l'affichage mobile */
+        @media (max-width: 768px) {
+            #sidebar.closed { transform: translateX(-100%); }
+            #sidebar.open { transform: translateX(0); }
+        }
+    </style>
 </head>
 <body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans']">
 
+    <div class="md:hidden flex items-center justify-between p-4 bg-[#0B1120] border-b border-slate-800 sticky top-0 z-50">
+        <div class="text-lg font-extrabold tracking-tighter">IMMOFACILE <span class="text-[#F59E0B]">CI</span></div>
+        <button onclick="toggleMenu()" class="text-white p-2 focus:outline-none rounded-lg hover:bg-slate-800 transition">
+            <svg id="burgerIcon" class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+            </svg>
+        </button>
+    </div>
+
     <div class="flex min-h-screen">
-        <aside class="w-64 border-r border-slate-800 p-6 hidden md:block">
-            <div class="text-xl font-extrabold mb-10 tracking-tighter">IMMOFACILE <span class="text-[#F59E0B]">CI</span></div>
-            <nav class="space-y-2">
-                <a href="#" class="block px-4 py-3 bg-blue-600 rounded-xl text-white font-bold shadow-lg shadow-blue-900/20">Vue d'ensemble</a>
-                <a href="#" class="block px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition">Propriétaires</a>
-                <a href="#" class="block px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition">Finances</a>
+        
+        <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] z-40 md:relative md:translate-x-0 closed flex flex-col">
+            <div class="text-xl font-extrabold mb-10 tracking-tighter hidden md:block">IMMOFACILE <span class="text-[#F59E0B]">CI</span></div>
+            
+            <nav class="space-y-2 flex-1">
+                <a href="#" class="block px-4 py-3 bg-blue-600 rounded-xl text-white font-bold shadow-lg shadow-blue-900/20 flex items-center gap-3">
+                    <span>📊</span> Vue d'ensemble
+                </a>
+                <a href="#" class="block px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition flex items-center gap-3">
+                    <span>🏠</span> Propriétaires
+                </a>
+                <a href="#" class="block px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition flex items-center gap-3">
+                    <span>💰</span> Finances
+                </a>
+                <a href="#" class="block px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition flex items-center gap-3">
+                    <span>👥</span> Utilisateurs
+                </a>
             </nav>
+
+            <div class="mt-auto pt-6 border-t border-slate-800">
+                <a href="/logout" class="block px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3 font-bold">
+                    <span>🚪</span> Déconnexion
+                </a>
+            </div>
         </aside>
 
-        <main class="flex-1 p-8 overflow-y-auto">
+        <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+        <main class="flex-1 p-4 md:p-8 overflow-y-auto w-full">
             <header class="mb-10">
-                <div class="flex justify-between items-end mb-6">
+                <div class="flex flex-col md:flex-row justify-between md:items-end gap-4 mb-6">
                     <div>
                         <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest">Performance du Lancement</h2>
-                        <h1 class="text-3xl font-bold mt-1">Bienvenue, Sébastien</h1>
+                        <h1 class="text-3xl font-bold mt-1">Bienvenue, Admin</h1>
                     </div>
-                    <div class="text-right">
-                        <span class="bg-green-500/10 text-green-400 px-4 py-2 rounded-full text-sm font-bold border border-green-500/20">
-                            🟢 Système en ligne
+                    <div class="flex items-center gap-2">
+                        <span class="bg-green-500/10 text-green-400 px-4 py-2 rounded-full text-sm font-bold border border-green-500/20 flex items-center gap-2">
+                            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Système en ligne
                         </span>
                     </div>
                 </div>
@@ -48,7 +94,7 @@
 
                     <div class="bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
                         <p class="text-slate-400 text-xs font-bold uppercase mb-2">CA Mensuel Potentiel</p>
-                        <p class="text-4xl font-black text-white"><%= leadsCount * 5000 %> <span class="text-lg text-slate-500 font-normal">FCFA</span></p>
+                        <p class="text-4xl font-black text-white"><%= (leadsCount * 5000).toLocaleString('fr-FR') %> <span class="text-lg text-slate-500 font-normal">FCFA</span></p>
                         <p class="text-slate-500 text-sm mt-2">Basé sur une estimation basse</p>
                     </div>
 
@@ -59,7 +105,7 @@
                             <p class="text-white/80 font-bold mb-1"><%= Math.round((leadsCount / 50) * 100) %>%</p>
                         </div>
                         <div class="w-full bg-black/20 h-2 rounded-full mt-4 overflow-hidden">
-                            <div class="bg-white h-full" style="width: <%= (leadsCount / 50) * 100 %>%"></div>
+                            <div class="bg-white h-full transition-all duration-1000 ease-out" style="width: <%= (leadsCount / 50) * 100 %>%"></div>
                         </div>
                     </div>
                 </div>
@@ -71,19 +117,19 @@
                     <span class="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded-lg border border-slate-700"><%= leads.length %> récents</span>
                 </h3>
                 
-                <div class="grid gap-4">
+                <div class="grid gap-4 pb-20">
                     <% leads.forEach(function(lead) { %>
-                    <div class="bg-slate-900/50 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl flex justify-between items-center transition group">
+                    <div class="bg-slate-900/50 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center transition group gap-4">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-900/20">
-                                <%= lead.name.charAt(0) %>
+                                <%= lead.name.charAt(0).toUpperCase() %>
                             </div>
                             <div>
                                 <p class="font-bold text-white"><%= lead.name %></p>
-                                <p class="text-sm text-slate-500 font-mono"><%= lead.phone %></p>
+                                <a href="tel:<%= lead.phone %>" class="text-sm text-slate-500 font-mono hover:text-[#F59E0B] transition"><%= lead.phone %></a>
                             </div>
                         </div>
-                        <div class="text-right">
+                        <div class="text-left sm:text-right w-full sm:w-auto pl-14 sm:pl-0">
                             <p class="text-xs text-slate-500 mb-1">Inscrit le</p>
                             <span class="bg-slate-800 text-slate-300 text-xs font-medium px-3 py-1 rounded-full border border-slate-700">
                                 <%= new Date(lead.createdAt).toLocaleDateString('fr-FR') %>
@@ -94,7 +140,7 @@
                     
                     <% if (leads.length === 0) { %>
                         <div class="text-center py-10 text-slate-500 italic border border-dashed border-slate-800 rounded-2xl">
-                            Aucun inscrit pour le moment. La machine chauffe...
+                            Aucun inscrit pour le moment. La machine chauffe... 🔥
                         </div>
                     <% } %>
                 </div>
@@ -102,5 +148,34 @@
         </main>
     </div>
 
+    <script>
+        // Gestion Menu Burger
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            
+            if (sidebar.classList.contains('closed')) {
+                sidebar.classList.remove('closed');
+                sidebar.classList.add('open');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('closed');
+                sidebar.classList.remove('open');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // Fermer le menu au clic sur overlay
+        document.getElementById('overlay').addEventListener('click', toggleMenu);
+
+        // Installation Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Admin App installée ✅'))
+                    .catch(err => console.log('Erreur SW ❌', err));
+            });
+        }
+    </script>
 </body>
 </html>

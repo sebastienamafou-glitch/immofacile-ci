@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Introuvable | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-6 text-center">
+
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden">
+        
+        <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-500 to-yellow-500"></div>
+
+        <div class="text-6xl mb-6 animate-bounce">🤔</div>
+        
+        <h1 class="text-4xl font-black text-[#F59E0B] mb-2">Oups ! 404</h1>
+        <h2 class="text-xl font-bold mb-6 text-white">Cette page n'existe pas.</h2>
+        
+        <p class="text-slate-400 mb-8 text-sm leading-relaxed">
+            Il semble que vous ayez pris une mauvaise direction dans les couloirs de l'immeuble. Cette page a peut-être été déménagée ou supprimée.
+        </p>
+
+        <a href="/" class="block w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition shadow-lg hover:shadow-orange-500/20">
+            Retourner à l'accueil
+        </a>
+    </div>
+
+    <script>
+        // Enregistrement du Service Worker pour le cache PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+        }
+    </script>
+</body>
+</html>

@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>À Louer : <%= property.title %></title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="/icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -31,6 +36,8 @@
             <p class="text-sm text-slate-500 mb-6">Déposez votre dossier en 30 secondes. Notre IA analyse votre solvabilité instantanément.</p>
 
             <form action="/apply/<%= property.id %>" method="POST" class="space-y-4">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Votre Nom Complet</label>
                     <input type="text" name="name" required class="w-full border border-slate-300 rounded-xl p-3 focus:border-[#F59E0B] outline-none">
@@ -56,5 +63,10 @@
         </div>
     </div>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+        }
+    </script>
 </body>
 </html>

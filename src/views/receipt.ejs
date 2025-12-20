@@ -2,10 +2,19 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Quittance de Loyer</title>
+    <title>Quittance de Loyer | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="/icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @media print { .no-print { display: none; } }
+        @media print { 
+            .no-print { display: none; } 
+            body { background: white; }
+            .shadow-2xl { shadow: none; box-shadow: none; }
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-8 font-sans text-slate-800">
@@ -14,7 +23,7 @@
         <div class="flex justify-between items-start mb-12 border-b-2 border-[#F59E0B] pb-6">
             <div>
                 <h1 class="text-3xl font-bold text-[#0B1120] uppercase tracking-widest">Quittance de Loyer</h1>
-                <p class="text-sm text-gray-500 mt-1">N° de référence : <%= payment.id.split('-')[0] %></p>
+                <p class="text-sm text-gray-500 mt-1">N° de référence : <%= payment.id ? payment.id.split('-')[0] : 'REF' %></p>
             </div>
             <div class="text-right">
                 <p class="font-bold text-xl text-[#F59E0B]">IMMOFACILE CI</p>
@@ -25,15 +34,15 @@
         <div class="grid grid-cols-2 gap-12 mb-12">
             <div>
                 <p class="text-xs font-bold text-gray-400 uppercase mb-2">Bailleur (Propriétaire)</p>
-                <p class="font-bold text-lg"><%= owner.name %></p>
-                <p class="text-gray-600"><%= owner.email %></p>
-                <p class="text-gray-600"><%= owner.phone %></p>
+                <p class="font-bold text-lg"><%= locals.owner ? owner.name : 'Nom Bailleur' %></p>
+                <p class="text-gray-600"><%= locals.owner ? owner.email : '' %></p>
+                <p class="text-gray-600"><%= locals.owner ? owner.phone : '' %></p>
             </div>
             <div class="bg-gray-50 p-6 rounded-xl border border-gray-100">
                 <p class="text-xs font-bold text-gray-400 uppercase mb-2">Locataire</p>
-                <p class="font-bold text-lg"><%= tenant.name %></p>
-                <p class="text-gray-600">Bien loué : <%= property.title %></p>
-                <p class="text-gray-600"><%= property.address %>, <%= property.commune %></p>
+                <p class="font-bold text-lg"><%= locals.tenant ? tenant.name : 'Nom Locataire' %></p>
+                <p class="text-gray-600">Bien loué : <%= locals.property ? property.title : 'Bien' %></p>
+                <p class="text-gray-600"><%= locals.property ? property.address + ', ' + property.commune : '' %></p>
             </div>
         </div>
 

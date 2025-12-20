@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace Agent | ImmoFacile CI</title>
+    
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png"> <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body class="bg-slate-900 text-white font-['Plus_Jakarta_Sans'] pb-20">
@@ -84,7 +88,7 @@
             <button onclick="document.getElementById('leadModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
             <h2 class="text-xl font-bold mb-6 text-white">Nouveau Repérage</h2>
             
-            <form action="/add-lead" method="POST" enctype="multipart/form-data" class="space-y-4">
+            <form action="/agent/add-lead?_csrf=<%= csrfToken %>" method="POST" enctype="multipart/form-data" class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-slate-400 uppercase">Nom du Propriétaire</label>
                     <input type="text" name="name" placeholder="M. Kouamé" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white mt-1">
@@ -114,5 +118,18 @@
         </div>
     </div>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('Agent App installée ✅: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('Erreur installation SW ❌: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

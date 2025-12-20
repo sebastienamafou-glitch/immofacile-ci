@@ -9,79 +9,117 @@
     <meta property="og:image" content="/images/immo_logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/icon-512.png">
-    <link rel="manifest" href="/manifest.json">
     
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="icon" type="image/jpeg" href="/images/favicon.jpg">
+    <link rel="apple-touch-icon" href="/images/icon.png">
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
-</head>
-<body class="bg-gray-50 text-slate-900">
 
-    <div class="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+        }
         
-        <section class="relative rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden bg-[#0B1120] min-h-[85vh] flex flex-col shadow-2xl">
+        /* Masquer la scrollbar tout en gardant le scroll */
+        .no-scrollbar::-webkit-scrollbar { 
+            display: none; 
+        }
+        .no-scrollbar { 
+            -ms-overflow-style: none; 
+            scrollbar-width: none; 
+        }
+    </style>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('App installée ✅'))
+                    .catch(err => console.log('Erreur SW ❌', err));
+            });
+        }
+    </script>
+</head>
+
+<body class="bg-gray-50 text-slate-900 selection:bg-orange-100 selection:text-orange-600">
+
+    <div class="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto relative">
+        
+        <section class="relative rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden bg-[#0B1120] min-h-[90vh] flex flex-col shadow-2xl">
             
             <div class="absolute inset-0 z-0">
-                <img src="/images/landing page photo.png" alt="Abidjan Plateau Skyline" class="w-full h-full object-cover opacity-80">
-                <div class="absolute inset-0 bg-gradient-to-r from-[#0B1120]/90 via-[#0B1120]/60 to-transparent"></div>
+                <img src="/images/landing_page_photo.png" alt="Abidjan Plateau Skyline" class="w-full h-full object-cover opacity-60 mix-blend-overlay">
+                <div class="absolute inset-0 bg-gradient-to-r from-[#0B1120] via-[#0B1120]/80 to-transparent"></div>
                 <div class="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-transparent to-transparent"></div>
             </div>
 
-            <nav class="relative z-20 px-8 py-8 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <img src="/images/immo_logo.png" alt="Logo" class="h-8 w-auto">
-                    <span class="text-white font-bold text-xl tracking-tight">ImmoFacile<span class="text-[#F59E0B]">CI</span></span>
+            <nav class="relative z-50 px-6 md:px-12 py-8 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <img src="/images/immo_logo.png" alt="Logo ImmoFacile" class="h-16 w-16 object-cover rounded-xl shadow-lg border border-white/10 bg-white/5 p-1">
+                    <span class="text-white font-bold text-xl tracking-tight hidden sm:block">ImmoFacile<span class="text-[#F59E0B]">CI</span></span>
                 </div>
                 
-                <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
-                    <a href="#fonctionnalites" class="hover:text-white transition">Fonctionnalités</a>
-                    <a href="#demo" class="hover:text-white transition">Mode d'emploi</a>
-                    <a href="/login" class="hover:text-white transition">Se connecter</a>
+                <div class="hidden md:flex items-center gap-10 text-sm font-semibold text-gray-300">
+                    <a href="#fonctionnalites" class="hover:text-white transition-colors duration-200">Fonctionnalités</a>
+                    <a href="#demo" class="hover:text-white transition-colors duration-200">Mode d'emploi</a>
+                    <a href="/login" class="hover:text-white transition-colors duration-200">Se connecter</a>
                 </div>
 
-                <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-6 py-3 rounded-full font-bold text-sm transition shadow-lg hover:scale-105">
+                <a href="/signup" class="hidden md:inline-block bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-6 py-3 rounded-full font-bold text-sm transition-all shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:scale-105 hover:shadow-[0_0_30px_rgba(245,158,11,0.5)]">
                     S'inscrire
                 </a>
+
+                <button id="burgerBtn" onclick="toggleMenu()" class="md:hidden text-white p-2 z-50 focus:outline-none bg-white/10 rounded-full backdrop-blur-sm">
+                    <svg id="iconOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <svg id="iconClose" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </nav>
 
-            <div class="relative z-10 flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-24 pb-32 max-w-4xl">
+            <div id="mobileMenu" class="hidden absolute top-24 left-4 right-4 bg-[#0B1120]/95 backdrop-blur-xl border border-slate-700 p-6 rounded-3xl shadow-2xl z-40 flex flex-col gap-4 text-center transform origin-top md:hidden">
+                <a href="#fonctionnalites" onclick="toggleMenu()" class="text-gray-300 hover:text-white hover:bg-white/5 py-3 rounded-xl transition">Fonctionnalités</a>
+                <a href="#demo" onclick="toggleMenu()" class="text-gray-300 hover:text-white hover:bg-white/5 py-3 rounded-xl transition">Mode d'emploi</a>
+                <a href="/login" onclick="toggleMenu()" class="text-white font-bold py-3 border-t border-slate-700 mt-2">Se connecter</a>
+                <a href="/signup" onclick="toggleMenu()" class="bg-[#F59E0B] text-[#0B1120] font-bold py-4 rounded-xl shadow-lg mt-2">S'inscrire maintenant</a>
+            </div>
+
+            <div class="relative z-10 flex-1 flex flex-col justify-center px-6 md:px-16 lg:px-24 pb-20 pt-10 max-w-5xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-orange-400 w-fit mb-6 backdrop-blur-sm">
+                    <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                    Disponible à Abidjan & Intérieur
+                </div>
+                
                 <h1 class="text-5xl md:text-7xl lg:text-[5.5rem] font-black text-white leading-[1.1] mb-8 tracking-tight">
                     Finis les impayés et <br>
                     les litiges de <br>
-                    <span class="text-[#F59E0B]">caution</span> à Abidjan.
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#F59E0B] to-orange-400">caution</span>.
                 </h1>
 
                 <p class="text-lg md:text-xl text-gray-300 mb-10 max-w-xl leading-relaxed font-medium">
-                    La première plateforme qui automatise la collecte de vos loyers via <span class="text-white font-bold">Mobile Money</span> et sécurise vos baux avec une assistance juridique intégrée.
+                    La première plateforme qui automatise la collecte de vos loyers via <span class="text-white font-bold decoration-orange-500 underline decoration-2 underline-offset-4">Mobile Money</span> et sécurise vos baux avec une assistance juridique intégrée.
                 </p>
 
                 <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                    <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-8 py-4 rounded-xl font-bold text-lg transition shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:scale-105">
+                    <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-8 py-4 rounded-full font-bold text-lg transition shadow-[0_0_30px_rgba(245,158,11,0.3)] hover:scale-105">
                         Lancer mon projet
                     </a>
-                    <div class="flex items-center gap-3 text-sm text-gray-400 font-medium">
-                        <div class="flex -space-x-2">
-                            <div class="w-8 h-8 rounded-full bg-slate-700 border-2 border-[#0B1120]"></div>
-                            <div class="w-8 h-8 rounded-full bg-slate-600 border-2 border-[#0B1120]"></div>
-                            <div class="w-8 h-8 rounded-full bg-slate-500 border-2 border-[#0B1120]"></div>
+                    
+                    <div class="flex items-center gap-4 text-sm text-gray-400 font-medium">
+                        <div class="flex -space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-slate-700 border-2 border-[#0B1120] flex items-center justify-center text-xs text-white">KJ</div>
+                            <div class="w-10 h-10 rounded-full bg-slate-600 border-2 border-[#0B1120] flex items-center justify-center text-xs text-white">AS</div>
+                            <div class="w-10 h-10 rounded-full bg-slate-500 border-2 border-[#0B1120] flex items-center justify-center text-xs text-white">+50</div>
                         </div>
-                        <p>Déjà +50 propriétaires <br class="hidden sm:block">en attente</p>
+                        <p class="leading-tight">Déjà +50 propriétaires <br class="hidden sm:block">en liste d'attente</p>
                     </div>
                 </div>
 
-                <div class="absolute bottom-8 right-8 text-xs font-bold text-gray-500 uppercase tracking-widest hidden md:block">
-                    Gestion Immobilière 2.0
-                </div>
-                
-                <div class="absolute bottom-8 right-8 border border-white/20 p-4 rounded-2xl hidden md:block">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                <div class="absolute bottom-10 right-10 hidden md:block animate-bounce">
+                    <svg class="w-6 h-6 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
                 </div>
             </div>
         </section>
@@ -89,28 +127,29 @@
         <section id="fonctionnalites" class="relative z-20 -mt-20 px-4 md:px-12">
             <div class="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
                 
-                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
-                    <div class="w-14 h-14 bg-orange-100 text-[#F59E0B] rounded-2xl flex items-center justify-center text-2xl mb-6">
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300 border border-slate-100">
+                    <div class="w-14 h-14 bg-orange-100 text-[#F59E0B] rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner">
                         $
                     </div>
                     <h3 class="text-xl font-bold text-[#0B1120] mb-3">Paiement Mobile Money</h3>
-                    <p class="text-slate-500 text-sm leading-relaxed">Encaissement automatique via Wave & Orange. Réconciliation instantanée et génération de quittance.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Encaissement automatique via Wave & Orange. Réconciliation instantanée et génération de quittance automatique.</p>
                 </div>
 
-                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
-                    <div class="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300 border border-slate-100 relative overflow-hidden group">
+                    <div class="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner relative z-10">
                         ⚖️
                     </div>
-                    <h3 class="text-xl font-bold text-[#0B1120] mb-3">Bouton Rouge Juridique</h3>
-                    <p class="text-slate-500 text-sm leading-relaxed">Un impayé ? Activez la procédure d'urgence. Mise en demeure et huissier déclenchés en 1 clic.</p>
+                    <h3 class="text-xl font-bold text-[#0B1120] mb-3 relative z-10">Bouton Rouge Juridique</h3>
+                    <p class="text-slate-500 text-sm leading-relaxed relative z-10">Un impayé ? Activez la procédure d'urgence. Mise en demeure et huissier déclenchés en 1 clic.</p>
+                    <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-red-50 rounded-full group-hover:scale-150 transition duration-500 z-0"></div>
                 </div>
 
-                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300">
-                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mb-6">
+                <div class="bg-white p-8 rounded-[2rem] shadow-xl hover:-translate-y-2 transition duration-300 border border-slate-100">
+                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner">
                         🛡️
                     </div>
                     <h3 class="text-xl font-bold text-[#0B1120] mb-3">Caution Sécurisée</h3>
-                    <p class="text-slate-500 text-sm leading-relaxed">Calcul exact selon la loi. Gestion transparente des retenues pour travaux à la sortie.</p>
+                    <p class="text-slate-500 text-sm leading-relaxed">Calcul exact selon la loi ivoirienne. Gestion transparente des retenues pour travaux à la sortie.</p>
                 </div>
 
             </div>
@@ -119,33 +158,45 @@
         <section id="demo" class="py-24 px-4 md:px-12 mt-10">
             <div class="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
                 
-                <div class="relative">
-                    <div class="absolute -inset-4 bg-gradient-to-r from-orange-500 to-amber-300 rounded-[2.5rem] rotate-2 opacity-20 blur-lg"></div>
-                    <div class="relative bg-white border border-slate-100 rounded-[2rem] p-8 md:p-12 shadow-2xl">
-                        <div class="flex justify-between items-center mb-10">
+                <div class="relative group">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-orange-500 to-amber-300 rounded-[2.5rem] rotate-2 opacity-30 blur-lg group-hover:opacity-50 transition duration-500"></div>
+                    
+                    <div class="relative bg-white border border-slate-100 rounded-[2rem] p-8 md:p-10 shadow-2xl">
+                        <div class="flex justify-between items-center mb-8 pb-6 border-b border-slate-50">
                             <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Mon Tableau de Bord</p>
-                                <h3 class="text-3xl font-black text-[#0B1120]">Vue Propriétaire</h3>
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Mon Tableau de Bord</p>
+                                <h3 class="text-2xl font-black text-[#0B1120]">Vue Propriétaire</h3>
                             </div>
-                            <div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Actif</div>
+                            <div class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Actif
+                            </div>
                         </div>
 
                         <div class="space-y-4">
-                            <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">K</div>
+                            <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition cursor-default">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">KJ</div>
                                 <div class="flex-1">
                                     <p class="text-sm font-bold text-[#0B1120]">Koffi Jean</p>
                                     <p class="text-xs text-slate-500">Villa Cocody • Loyer à jour</p>
                                 </div>
-                                <span class="text-green-600 font-bold text-sm">+ 250.000 F</span>
+                                <span class="text-green-600 font-bold text-sm bg-green-50 px-2 py-1 rounded">+ 250.000 F</span>
                             </div>
-                            <div class="flex items-center gap-4 p-4 bg-red-50 rounded-2xl border border-red-100">
-                                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold">⚠️</div>
+                            
+                            <div class="flex items-center gap-4 p-4 bg-red-50/50 rounded-2xl border border-red-100 hover:shadow-md transition cursor-pointer group/alert">
+                                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold animate-pulse">⚠️</div>
                                 <div class="flex-1">
                                     <p class="text-sm font-bold text-[#0B1120]">Alerte Impayé</p>
                                     <p class="text-xs text-red-500">Mise en demeure générée</p>
                                 </div>
-                                <button class="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold">Voir</button>
+                                <button class="text-xs bg-red-600 group-hover/alert:bg-red-700 text-white px-3 py-1.5 rounded-lg font-bold shadow-sm transition">Voir</button>
+                            </div>
+
+                            <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 opacity-60">
+                                <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">AM</div>
+                                <div class="flex-1">
+                                    <div class="h-2 w-24 bg-slate-200 rounded mb-1"></div>
+                                    <div class="h-2 w-16 bg-slate-200 rounded"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -154,25 +205,25 @@
                 <div>
                     <span class="text-[#F59E0B] font-bold tracking-widest uppercase text-xs mb-2 block">Simple & Efficace</span>
                     <h2 class="text-4xl md:text-5xl font-black text-[#0B1120] mb-6 leading-tight">Reprenez le contrôle de vos biens.</h2>
-                    <p class="text-lg text-slate-500 mb-10">Plus besoin de courir après les locataires ou de gérer la paperasse. ImmoFacile CI centralise tout.</p>
+                    <p class="text-lg text-slate-500 mb-10 leading-relaxed">Plus besoin de courir après les locataires ou de gérer la paperasse. ImmoFacile CI centralise tout.</p>
                     
                     <ul class="space-y-6">
                         <li class="flex items-start gap-4">
-                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1 shrink-0 shadow-lg shadow-green-200">✓</div>
                             <div>
                                 <h4 class="font-bold text-[#0B1120]">Ajoutez vos biens</h4>
-                                <p class="text-sm text-slate-500">Appartements, villas, studios... tout est gérable.</p>
+                                <p class="text-sm text-slate-500">Appartements, villas, studios... tout est gérable en 2 min.</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-4">
-                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1 shrink-0 shadow-lg shadow-green-200">✓</div>
                             <div>
                                 <h4 class="font-bold text-[#0B1120]">Invitez vos locataires</h4>
-                                <p class="text-sm text-slate-500">Ils reçoivent un lien pour payer par Wave/Orange.</p>
+                                <p class="text-sm text-slate-500">Ils reçoivent un lien sécurisé pour payer par Wave/Orange.</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-4">
-                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1">✓</div>
+                            <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs mt-1 shrink-0 shadow-lg shadow-green-200">✓</div>
                             <div>
                                 <h4 class="font-bold text-[#0B1120]">Dormez tranquille</h4>
                                 <p class="text-sm text-slate-500">Les fonds arrivent sur votre compte, les quittances partent seules.</p>
@@ -180,56 +231,85 @@
                         </li>
                     </ul>
                 </div>
-
             </div>
         </section>
 
-        <section class="mb-20">
-            <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-20 text-center relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
-                <div class="absolute bottom-0 right-0 w-64 h-64 bg-orange-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
+        <section class="mb-20 px-4 md:px-0">
+            <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden shadow-2xl">
+                
+                <div class="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-screen filter blur-[80px] opacity-30 -translate-x-1/2 -translate-y-1/2"></div>
+                <div class="absolute bottom-0 right-0 w-80 h-80 bg-orange-600 rounded-full mix-blend-screen filter blur-[80px] opacity-30 translate-x-1/2 translate-y-1/2"></div>
 
                 <div class="relative z-10 max-w-2xl mx-auto">
-                    <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Prêt à moderniser votre gestion ?</h2>
+                    <h2 class="text-4xl md:text-6xl font-black text-white mb-6">Prêt à moderniser votre gestion ?</h2>
                     <p class="text-slate-400 mb-10 text-lg">Rejoignez la communauté des propriétaires sereins d'Abidjan.</p>
-                    <div class="flex justify-center gap-4">
-                        <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-8 py-4 rounded-xl font-bold text-lg transition hover:scale-105">
+                    
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <a href="/signup" class="bg-[#F59E0B] hover:bg-[#d97706] text-[#0B1120] px-10 py-5 rounded-full font-bold text-lg transition hover:scale-105 shadow-xl">
                             Créer mon compte gratuit
                         </a>
                     </div>
-                    <p class="mt-6 text-xs text-slate-500">Aucune carte bancaire requise pour commencer.</p>
+                    <p class="mt-6 text-xs text-slate-500 font-medium tracking-wide">AUCUNE CARTE BANCAIRE REQUISE POUR COMMENCER</p>
                 </div>
             </div>
         </section>
 
-        <footer class="mt-20 border-t border-slate-200 pt-10 pb-10">
-            <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+        <footer class="mt-20 border-t border-slate-200 pt-16 pb-10">
+            <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-10">
     
                 <div class="text-center md:text-left">
-                    <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
-                        <img src="/images/immo_logo.png" alt="Logo" class="h-6 w-auto grayscale opacity-70">
-                        <span class="font-bold text-slate-600">ImmoFacile CI</span>
+                    <div class="flex items-center justify-center md:justify-start gap-2 mb-3">
+                        <img src="/images/immo_logo.png" alt="Logo" class="h-10 w-auto grayscale opacity-70">
+                        <span class="font-bold text-slate-700">ImmoFacile CI</span>
                     </div>
                     <p class="text-xs text-slate-400">&copy; 2025. Tous droits réservés.</p>
                 </div>
     
-                <div class="flex flex-wrap justify-center gap-6 text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    <a href="/privacy" class="hover:text-[#F59E0B] transition">Politique de Confidentialité</a>
-                    <a href="/cgu" class="text-slate-500 hover:text-[#F59E0B] transition">CGU & Mentions Légales</a> 
-                    <a href="mailto:contact@webappci.com" class="text-slate-500 hover:text-[#F59E0B] transition">Support</a>
+                <div class="flex flex-wrap justify-center gap-8 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                    <a href="/privacy" class="hover:text-[#F59E0B] transition">Confidentialité</a>
+                    <a href="/cgu" class="hover:text-[#F59E0B] transition">CGU & Mentions Légales</a> 
+                    <a href="mailto:contact@webappci.com" class="hover:text-[#F59E0B] transition">Support</a>
                 </div>
     
                 <div class="flex items-center gap-3">
                     <span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Développé par</span>
                     <a href="https://webappci.com" target="_blank" class="group hover:opacity-80 transition block">
-                        <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-10 w-auto object-contain group-hover:scale-105 transition">
+                        <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 w-auto object-contain">
                     </a>
                 </div>
-    
             </div>
         </footer>
 
-    </div>
+    </div> <script>
+        function toggleMenu() {
+            const menu = document.getElementById('mobileMenu');
+            const iconOpen = document.getElementById('iconOpen');
+            const iconClose = document.getElementById('iconClose');
+            
+            // Toggle visibility
+            if (menu.classList.contains('hidden')) {
+                menu.classList.remove('hidden');
+                iconOpen.classList.add('hidden');
+                iconClose.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+                iconOpen.classList.remove('hidden');
+                iconClose.classList.add('hidden');
+            }
+        }
 
+        // Fermer le menu si on clique en dehors
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('mobileMenu');
+            const btn = document.getElementById('burgerBtn');
+            
+            // Vérification de sécurité pour s'assurer que les éléments existent
+            if (!menu || !btn) return;
+
+            if (!menu.contains(event.target) && !btn.contains(event.target) && !menu.classList.contains('hidden')) {
+                toggleMenu();
+            }
+        });
+    </script>
 </body>
 </html>

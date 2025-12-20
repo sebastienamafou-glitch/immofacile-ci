@@ -1,3 +1,5 @@
+// schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -18,18 +20,20 @@ model User {
   password  String
   createdAt DateTime @default(now())
   isActive  Boolean  @default(true) // Pour bloquer un mauvais payeur
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
   
-  // --- FINANCES ---
-  credit    Float    @default(0) // LE PORTEFEUILLE PRÉPAYÉ (En FCFA)
+  // --- FINANCES (MODIFIÉ POUR SÉQUESTRE) ---
+  walletBalance Float    @default(0) // Argent disponible (ex-credit)
+  escrowBalance Float    @default(0) // NOUVEAU : Argent bloqué (Cautions/Séquestre)
 
   // Relations
-  properties        Property[] @relation("OwnerProperties")
-  leasesAsTenant    Lease[]    @relation("TenantLeases")
-  reportedIncidents Incident[] @relation("Reporter")
-  leads             Lead[]     @relation("AgentLeads")
+  properties        Property[]          @relation("OwnerProperties")
+  leasesAsTenant    Lease[]             @relation("TenantLeases")
+  reportedIncidents Incident[]          @relation("Reporter")
+  leads             Lead[]              @relation("AgentLeads")
   transactions      CreditTransaction[] 
-  
-  // Note : J'ai retiré la relation "artisans" car l'annuaire est désormais public/global
+  pushSubscriptions PushSubscription[]
 }
 
 enum UserRole {
@@ -74,7 +78,7 @@ model Lease {
   id            String    @id @default(cuid())
   startDate     DateTime
   endDate       DateTime?
-  depositAmount Float
+  depositAmount Float     // Montant théorique de la caution
   monthlyRent   Float
   isActive      Boolean   @default(true)
 
@@ -139,7 +143,7 @@ model Inventory {
   bathState      String?
   bathPhoto      String?
   generalComment String?
-  
+
   leaseId        String
   lease          Lease    @relation(fields: [leaseId], references: [id])
 }
@@ -173,7 +177,7 @@ model Candidate {
   property    Property @relation(fields: [propertyId], references: [id])
 }
 
-// --- MODÈLE ARTISAN (CORRIGÉ : UN SEUL MODÈLE) ---
+// --- MODÈLE ARTISAN ---
 
 model Artisan {
   id          String   @id @default(uuid())
@@ -182,8 +186,16 @@ model Artisan {
   phone       String
   location    String   // Ex: Cocody, Yopougon
   isVerified  Boolean  @default(true)
-  rating      Float    @default(5.0) // J'ai gardé le rating de l'autre modèle, ça peut servir !
+  rating      Float    @default(5.0)
   createdAt   DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique 
+  keys      String   
+  createdAt DateTime @default(now())
   
-  // Pas de relation ownerId car c'est un annuaire public géré par l'Admin
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
 }

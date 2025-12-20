@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CGU & Mentions Légales | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <link rel="apple-touch-icon" href="/icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -23,7 +28,7 @@
                 <p><strong>Éditeur du service :</strong> L'application ImmoFacile CI est éditée par <strong>WebApp CI</strong>, entreprise de droit ivoirien.</p>
                 <p><strong>Siège social :</strong> Abidjan, Côte d'Ivoire Cocody/Palmeraie</p>
                 <p><strong>Contact :</strong> contact@webappci.com</p>
-                <p><strong>Hébergement :</strong> Ce site est hébergé par <strong>Vercel Inc.</strong> (440 N Barranca Ave #4133, Covina, CA 91723, USA) et les données sont stockées sur <strong>Neon.tech</strong>.</p>
+                <p><strong>Hébergement :</strong> Ce site est hébergé par <strong>Vercel Inc.</strong> et les données sur <strong>Neon.tech</strong>.</p>
             </div>
         </section>
 
@@ -42,38 +47,32 @@
                     <li>Suivre les encaissements de loyers.</li>
                     <li>Gérer les incidents techniques.</li>
                 </ul>
-                <p class="mt-2 text-[#F59E0B] font-bold">Important : ImmoFacile CI est un outil technique et n'agit pas en tant qu'agence immobilière ou administrateur de biens. Le Propriétaire reste seul responsable de la gestion de son bien.</p>
+                <p class="mt-2 text-[#F59E0B] font-bold">Important : ImmoFacile CI est un outil technique et n'agit pas en tant qu'agence immobilière. Le Propriétaire reste responsable de la gestion.</p>
             </section>
 
             <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 3 : Modèle Économique (Prépaiement)</h3>
-                <p>L'accès aux services avancés (génération de documents, suivi des paiements) fonctionne selon un modèle de <strong>crédit prépayé</strong>.</p>
+                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 3 : Modèle Économique</h3>
+                <p>L'accès aux services avancés fonctionne selon un modèle de <strong>crédit prépayé</strong>.</p>
                 <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>Le Propriétaire recharge son "Solde Service" via Mobile Money (CinetPay).</li>
-                    <li>Une commission de service (fixée à 5% du montant du loyer déclaré) est débitée du solde à chaque enregistrement de transaction.</li>
-                    <li>En cas de solde insuffisant, l'accès aux fonctionnalités de génération de documents est suspendu jusqu'au rechargement.</li>
+                    <li>Le Propriétaire recharge son "Solde Service" via Mobile Money.</li>
+                    <li>Une commission de service (5%) est débitée à chaque transaction.</li>
+                    <li>En cas de solde insuffisant, les services sont suspendus.</li>
                 </ul>
-                <p class="mt-2">Les crédits achetés ne sont pas remboursables, sauf en cas de défaillance technique avérée de la plateforme.</p>
             </section>
 
             <section>
                 <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 4 : Responsabilité</h3>
-                <p><strong>WebApp CI</strong> met tout en œuvre pour assurer la disponibilité du service 24/7. Toutefois, sa responsabilité ne saurait être engagée en cas de :</p>
-                <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>Panne des services tiers de paiement (CinetPay, Opérateurs Mobile Money).</li>
-                    <li>Force majeure ou coupure d'internet.</li>
-                    <li>Informations erronées saisies par le Propriétaire (montant du loyer, identité du locataire).</li>
-                </ul>
+                <p><strong>WebApp CI</strong> assure une disponibilité 24/7, sauf en cas de force majeure, panne des services tiers ou coupure internet.</p>
             </section>
 
             <section>
                 <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 5 : Données Personnelles</h3>
-                <p>Conformément à la loi n° 2013-450 du 19 juin 2013 relative à la protection des données à caractère personnel en Côte d'Ivoire, les utilisateurs disposent d'un droit d'accès et de rectification. Voir notre <a href="/privacy" class="text-blue-600 underline">Politique de Confidentialité</a>.</p>
+                <p>Conformément à la loi n° 2013-450, voir notre <a href="/privacy" class="text-blue-600 underline">Politique de Confidentialité</a>.</p>
             </section>
 
             <section>
                 <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 6 : Droit Applicable</h3>
-                <p>Tout litige relatif à l'interprétation et à l'exécution des présentes conditions générales d'utilisation est soumis au droit ivoirien. À défaut de résolution amiable, le litige sera porté devant les tribunaux compétents d'Abidjan.</p>
+                <p>Soumis au droit ivoirien. Litiges portés devant les tribunaux d'Abidjan.</p>
             </section>
 
         </div>
@@ -84,5 +83,10 @@
 
     </div>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+        }
+    </script>
 </body>
 </html>

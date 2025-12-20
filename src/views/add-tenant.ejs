@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nouveau Locataire | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
@@ -18,14 +25,17 @@
             <p class="text-slate-400">Digitalisez un locataire en 30 secondes.</p>
         </div>
 
-        <form action="/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6">
+        <form action="/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6 shadow-2xl">
+            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
             
             <div>
                 <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quel appartement ?</label>
                 <select name="propertyId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-                    <% properties.forEach(function(prop) { %>
-                        <option value="<%= prop.id %>"><%= prop.title %> (<%= prop.price %> FCFA)</option>
-                    <% }); %>
+                    <% if (locals.properties) { %>
+                        <% properties.forEach(function(prop) { %>
+                            <option value="<%= prop.id %>"><%= prop.title %> (<%= prop.price.toLocaleString('fr-FR') %> FCFA)</option>
+                        <% }); %>
+                    <% } %>
                 </select>
             </div>
 
@@ -36,7 +46,7 @@
                            class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Téléphone (Mobile Money)</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Téléphone</label>
                     <input type="tel" name="tenantPhone" required placeholder="0707..." 
                            class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
                 </div>
@@ -49,9 +59,10 @@
                            class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Caution (Nombre de mois)</label>
-                    <input type="number" name="depositMonths" placeholder="Ex: 2" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white outline-none focus:border-[#F59E0B] transition">
-                    <p class="text-[10px] text-slate-500 mt-1">Le montant sera calculé automatiquement (ex: 2 mois = Loyer x 2).</p>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Caution (Mois)</label>
+                    <input type="number" name="depositMonths" placeholder="Ex: 2" required 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white outline-none focus:border-[#F59E0B] transition">
+                    <p class="text-[10px] text-slate-500 mt-1">Calcul auto (ex: 2 mois = Loyer x 2).</p>
                 </div>
             </div>
 
@@ -61,11 +72,16 @@
                        class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
             </div>
 
-            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition">
+            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition shadow-lg hover:shadow-orange-500/20">
                 Générer le Bail Numérique
             </button>
         </form>
     </div>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+        }
+    </script>
 </body>
 </html>

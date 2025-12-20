@@ -24,6 +24,7 @@
         <% } %>
 
         <form action="/signup" method="POST" class="space-y-5">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div>
                 <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Nom Complet</label>
                 <input type="text" name="name" placeholder="Ex: Kouassi Jean" required 

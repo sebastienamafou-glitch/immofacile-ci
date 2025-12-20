@@ -11,9 +11,9 @@
 <body class="bg-black text-white font-['Plus_Jakarta_Sans']">
 
     <div class="flex min-h-screen">
-        <aside class="w-64 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full overflow-y-auto z-10 bg-black">
-            
-            <div class="mb-10 text-center md:text-left">
+        <aside id="adminSidebar" class="w-64 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full overflow-y-auto z-50 bg-black transition-all">   
+            <div class="md:hidden flex justify-end mb-4">
+                <button onclick="toggleAdminMenu()" class="text-white text-xl">✕</button>
                 <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
             </div>
 
@@ -52,6 +52,11 @@
         <main class="flex-1 ml-64 p-10">
             
             <header class="flex justify-between items-end mb-10">
+                <link rel="icon" type="image/jpeg" href="/images/favicon.jpg">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleAdminMenu()" class="md:hidden text-white bg-slate-800 p-2 rounded-lg">
+                        ☰
+                    </button>
                 <div>
                     <h1 class="text-3xl font-bold">Bonjour ADMIN 👋</h1>
                     <p class="text-slate-500">Voici la situation du business aujourd'hui.</p>
@@ -97,11 +102,12 @@
 
                 <div class="flex gap-6">
                     <form action="/admin/add-credit" method="POST" class="bg-black/30 p-4 rounded-xl border border-slate-700 w-1/3">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-400">Propriétaire Client</label>
                             <select name="ownerId" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
                                 <% owners.forEach(o => { %>
-                                    <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.credit.toLocaleString('fr-FR') %> F)</option>
+                                    <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.walletBalance.toLocaleString('fr-FR') %> F)</option>
                                 <% }) %>
                             </select>
                         </div>
@@ -126,9 +132,9 @@
                                 <% owners.forEach(o => { %>
                                     <tr>
                                         <td class="p-2 font-bold"><%= o.name %></td>
-                                        <td class="p-2 font-mono <%= o.credit < 2000 ? 'text-red-500' : 'text-green-400' %>"><%= o.credit.toLocaleString('fr-FR') %> FCFA</td>
+                                        <td class="p-2 font-mono <%= o.walletBalance < 2000 ? 'text-red-500' : 'text-green-400' %>"><%= o.walletBalance.toLocaleString('fr-FR') %> FCFA</td>
                                         <td class="p-2">
-                                            <% if (o.credit < 2000) { %>
+                                            <% if (o.walletBalance < 2000) { %>
                                                 <span class="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs">Bloqué bientôt</span>
                                             <% } else { %>
                                                 <span class="bg-green-500/20 text-green-500 px-2 py-1 rounded text-xs">OK</span>
@@ -136,6 +142,7 @@
                                         </td>
                                         <td class="p-2">
                                             <form action="/admin/toggle-status" method="POST">
+                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                                                 <input type="hidden" name="userId" value="<%= o.id %>">
                                                 <input type="hidden" name="currentStatus" value="<%= o.isActive %>">
                                                 
@@ -238,9 +245,12 @@
                                         <td class="p-3 font-bold text-[#0B1120]"><%= a.name %></td>
                                         <td class="p-3"><span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold"><%= a.job %></span></td>
                                         <td class="p-3 text-slate-500"><%= a.location %></td>
-                                        <td class="p-3 font-mono"><%= a.phone %></td>
+                                        
+                                        <td class="p-3 font-mono text-slate-700"><%= a.phone %></td>
+                                        
                                         <td class="p-3 text-right">
                                             <form action="/admin/delete-artisan" method="POST" onsubmit="return confirm('Supprimer cet artisan ?');">
+                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                                                 <input type="hidden" name="artisanId" value="<%= a.id %>">
                                                 <button type="submit" class="text-red-400 hover:text-red-600 font-bold text-xs">🗑 Supprimer</button>
                                             </form>
@@ -267,15 +277,19 @@
             <h3 class="text-xl font-black text-[#0B1120] mb-6">Nouveau Partenaire</h3>
             
             <form action="/admin/add-artisan" method="POST" class="space-y-4">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
+                
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom de l'entreprise / Artisan</label>
-                    <input type="text" name="name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-[#F59E0B]" placeholder="Ex: Kouamé Élec">
+                    <input type="text" name="name" required 
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F59E0B]" 
+                           placeholder="Ex: Kouamé Élec">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Métier</label>
-                        <select name="job" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
+                        <select name="job" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#F59E0B]">
                             <option>Plombier</option>
                             <option>Électricien</option>
                             <option>Menuisier</option>
@@ -286,13 +300,17 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Secteur</label>
-                        <input type="text" name="location" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3" placeholder="Ex: Cocody">
+                        <input type="text" name="location" required 
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F59E0B]" 
+                               placeholder="Ex: Cocody">
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Téléphone</label>
-                    <input type="tel" name="phone" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3" placeholder="07 07 ...">
+                    <input type="tel" name="phone" required 
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F59E0B]" 
+                           placeholder="07 07 ...">
                 </div>
 
                 <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition mt-2">
@@ -301,6 +319,13 @@
             </form>
         </div>
     </div>
+    <script>
+    function toggleAdminMenu() {
+        const sidebar = document.getElementById('adminSidebar');
+        sidebar.classList.toggle('hidden');
+        sidebar.classList.toggle('flex');
+    }
+</script>
 
 </body>
 </html>
