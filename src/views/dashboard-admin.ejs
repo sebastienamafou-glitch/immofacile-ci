@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SUPER ADMIN | ImmoFacile CI</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>html { scroll-behavior: smooth; }</style>
@@ -49,25 +54,25 @@
             </div>
         </aside>
 
-        <main class="flex-1 ml-64 p-10">
+        <main class="flex-1 md:ml-64 p-10">
             
             <header class="flex justify-between items-end mb-10">
-                <link rel="icon" type="image/jpeg" href="/images/favicon.jpg">
                 <div class="flex items-center gap-4">
                     <button onclick="toggleAdminMenu()" class="md:hidden text-white bg-slate-800 p-2 rounded-lg">
                         ☰
                     </button>
-                <div>
-                    <h1 class="text-3xl font-bold">Bonjour ADMIN 👋</h1>
-                    <p class="text-slate-500">Voici la situation du business aujourd'hui.</p>
+                    <div>
+                        <h1 class="text-3xl font-bold">Bonjour ADMIN 👋</h1>
+                        <p class="text-slate-500">Voici la situation du business aujourd'hui.</p>
+                    </div>
                 </div>
-                <div class="text-right">
+                <div class="text-right hidden sm:block">
                     <p class="text-xs font-bold text-slate-500 uppercase">Utilisateurs Totaux</p>
                     <p class="text-2xl font-black"><%= totalUsers %></p>
                 </div>
             </header>
 
-            <section class="grid grid-cols-3 gap-6 mb-12">
+            <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                 <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                     <div class="flex justify-between mb-4">
                         <span class="text-xs font-bold text-slate-400 uppercase">Volume d'Affaires (GMV)</span>
@@ -94,14 +99,70 @@
                 </div>
             </section>
 
-            <section id="tresorerie" class="mt-12 mb-12 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+            <section class="mb-12">
+                <h3 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+                    📈 Valeur Générée (Tracking Live)
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                        <p class="text-slate-500 text-xs font-bold uppercase">Interactions totales</p>
+                        <p class="text-2xl font-black text-white"><%= totalInteractions %></p>
+                    </div>
+            
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl border-l-4 border-green-500">
+                        <p class="text-slate-500 text-xs font-bold uppercase">Mises en relation WA</p>
+                        <p class="text-2xl font-black text-green-500"><%= whatsappTotal %></p>
+                    </div>
+            
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl border-l-4 border-red-500">
+                        <p class="text-slate-500 text-xs font-bold uppercase">Alertes traitées</p>
+                        <p class="text-2xl font-black text-red-500"><%= incidentsTotal %></p>
+                    </div>
+            
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                        <p class="text-slate-500 text-xs font-bold uppercase">Engagement / User</p>
+                        <p class="text-2xl font-black text-blue-400">
+                            <%= totalUsers > 0 ? (totalInteractions / totalUsers).toFixed(1) : 0 %>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <h3 class="text-sm font-bold text-slate-400 uppercase mb-4">Flux d'activité en temps réel</h3>
+                    <div class="space-y-3">
+                        <% if(locals.recentActivities && recentActivities.length > 0) { %>
+                            <% recentActivities.forEach(log => { %>
+                                <div class="flex items-center justify-between text-xs p-3 bg-black/20 rounded-lg border border-slate-800">
+                                    <div class="flex items-center gap-3">
+                                        <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-bold uppercase" style="font-size: 8px;">
+                                            <%= log.category %>
+                                        </span>
+                                        <span class="text-white">
+                                            <strong><%= log.user ? log.user.name : 'Visiteur' %></strong> a déclenché 
+                                            <span class="text-[#F59E0B]"><%= log.action %></span>
+                                        </span>
+                                    </div>
+                                    <span class="text-slate-600">
+                                        <%= new Date(log.createdAt).toLocaleTimeString('fr-FR') %>
+                                    </span>
+                                </div>
+                            <% }) %>
+                        <% } else { %>
+                            <p class="text-slate-500 italic text-sm">Aucune activité récente.</p>
+                        <% } %>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tresorerie" class="mb-12 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
                 <h3 class="font-bold text-[#F59E0B] uppercase text-sm mb-6 flex items-center gap-2">
                     💳 Guichet de Rechargement / Trésorerie
-                    <span class="text-xs text-slate-500 normal-case">(Quand vous recevez un Wave, ajoutez le crédit ici)</span>
+                    <span class="text-xs text-slate-500 normal-case hidden md:inline">(Quand vous recevez un Wave, ajoutez le crédit ici)</span>
                 </h3>
 
-                <div class="flex gap-6">
-                    <form action="/admin/add-credit" method="POST" class="bg-black/30 p-4 rounded-xl border border-slate-700 w-1/3">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <form action="/admin/add-credit" method="POST" class="bg-black/30 p-4 rounded-xl border border-slate-700 w-full md:w-1/3">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                         <div class="mb-3">
                             <label class="text-xs font-bold text-slate-400">Propriétaire Client</label>
@@ -120,7 +181,7 @@
 
                     <div class="flex-1 overflow-y-auto max-h-60">
                         <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-500 uppercase bg-slate-800">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-800 sticky top-0">
                                 <tr>
                                     <th class="p-2">Client</th>
                                     <th class="p-2">Solde Actuel</th>
@@ -165,7 +226,7 @@
                 </div>
             </section>
 
-            <div class="grid grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 
                 <section id="agents">
                     <h3 class="font-bold text-slate-400 uppercase text-xs mb-4">Performance Agents</h3>
@@ -206,7 +267,7 @@
                             <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex justify-between items-center">
                                 <div>
                                     <p class="text-red-400 font-bold text-sm">🚨 <%= inc.priority %> : <%= inc.title %></p>
-                                    <p class="text-slate-500 text-xs"><%= inc.property.title %></p>
+                                    <p class="text-slate-500 text-xs"><%= inc.property ? inc.property.title : 'Immeuble inconnu' %></p>
                                 </div>
                                 <button class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold">Intervenir</button>
                             </div>
@@ -215,7 +276,7 @@
                 </section>
             </div>
 
-            <div class="mt-12 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+            <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
                 
                 <div class="flex justify-between items-center mb-6">
                     <div>
@@ -245,9 +306,7 @@
                                         <td class="p-3 font-bold text-[#0B1120]"><%= a.name %></td>
                                         <td class="p-3"><span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold"><%= a.job %></span></td>
                                         <td class="p-3 text-slate-500"><%= a.location %></td>
-                                        
                                         <td class="p-3 font-mono text-slate-700"><%= a.phone %></td>
-                                        
                                         <td class="p-3 text-right">
                                             <form action="/admin/delete-artisan" method="POST" onsubmit="return confirm('Supprimer cet artisan ?');">
                                                 <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
@@ -275,7 +334,7 @@
             <button onclick="document.getElementById('artisanModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-black text-xl font-bold">✕</button>
             
             <h3 class="text-xl font-black text-[#0B1120] mb-6">Nouveau Partenaire</h3>
-            
+             
             <form action="/admin/add-artisan" method="POST" class="space-y-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                 
@@ -319,13 +378,27 @@
             </form>
         </div>
     </div>
+
     <script>
-    function toggleAdminMenu() {
-        const sidebar = document.getElementById('adminSidebar');
-        sidebar.classList.toggle('hidden');
-        sidebar.classList.toggle('flex');
-    }
-</script>
+        function toggleAdminMenu() {
+            const sidebar = document.getElementById('adminSidebar');
+            sidebar.classList.toggle('hidden');
+            sidebar.classList.toggle('flex');
+        }
+
+        // PWA SERVICE WORKER REGISTRATION
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW enregistré:', registration);
+                    })
+                    .catch(error => {
+                        console.log('Echec SW:', error);
+                    });
+            });
+        }
+    </script>
 
 </body>
 </html>

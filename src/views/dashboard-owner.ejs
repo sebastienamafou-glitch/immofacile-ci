@@ -190,13 +190,13 @@
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="text-slate-500">📅 Entrée : <%= new Date(activeLease.startDate).toLocaleDateString('fr-FR') %></span>
                                         <div class="flex gap-3">
-                                            <a href="/contract/<%= activeLease.id %>" target="_blank" class="text-[#F59E0B] font-bold hover:underline">📜 Contrat</a>
-                                            <a href="/inventory/<%= activeLease.id %>?type=ENTREE" target="_blank" class="text-slate-400 hover:text-white">📥 EDL</a>
+                                            <a href="/owner/contract/<%= activeLease.id %>" target="_blank" class="text-[#F59E0B] font-bold hover:underline">📜 Contrat</a>
+                                            <a href="/owner/inventory/<%= activeLease.id %>?type=ENTREE" target="_blank" class="text-slate-400 hover:text-white">📥 EDL</a>
                                         </div>
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-2">
-                                        <a href="/formal-notice/<%= activeLease.id %>" target="_blank" class="text-center bg-red-600/20 text-red-500 border border-red-500/50 text-[10px] font-bold py-2 rounded-lg uppercase hover:bg-red-600/30 transition">⚖️ Huissier</a>
+                                        <a href="/owner/formal-notice/<%= activeLease.id %>" target="_blank" class="text-center bg-red-600/20 text-red-500 border border-red-500/50 text-[10px] font-bold py-2 rounded-lg uppercase hover:bg-red-600/30 transition">⚖️ Huissier</a>
                                         <button onclick="openExitModal('<%= activeLease.id %>', '<%= activeLease.tenant.name %>', '<%= activeLease.depositAmount %>')" class="bg-slate-800 text-slate-300 text-[10px] font-bold py-2 rounded-lg uppercase border border-slate-600 hover:bg-slate-700 transition">🚪 Sortie</button>
                                     </div>
 
@@ -210,7 +210,7 @@
                                     <% if (isPaidThisMonth) { %>
                                         <div class="flex items-center justify-between bg-green-500/10 p-2 rounded-lg border border-green-500/20">
                                             <span class="text-green-400 text-xs font-bold">✅ Loyer à jour</span>
-                                            <a href="/receipt/<%= lastPayment.id %>" target="_blank" class="text-slate-400 text-xs underline hover:text-white">Quittance</a>
+                                            <a href="/owner/receipt/<%= lastPayment.id %>" target="_blank" class="text-slate-400 text-xs underline hover:text-white">Quittance</a>
                                         </div>
                                     <% } else { %>
                                         <div class="flex flex-col gap-2">
@@ -255,7 +255,7 @@
                                 hasTenants = true; 
                                 let waPhone = lease.tenant.phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
                                 if (!waPhone.startsWith('225')) waPhone = '225' + waPhone;
-                    %>
+                            %>
                         <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between hover:border-slate-700 transition">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg">
@@ -290,19 +290,19 @@
                             <% properties.forEach(prop => { 
                                 prop.leases.forEach(lease => { 
                                     if(lease.isActive) { 
-                            %>
+                                %>
                                 <tr>
                                     <td class="px-4 py-3 flex items-center gap-2">📜 Contrat de bail <span class="text-slate-500 text-xs">- <%= prop.title %></span></td>
                                     <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
                                     <td class="px-4 py-3 text-right">
-                                        <a href="/contract/<%= lease.id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
+                                        <a href="/owner/contract/<%= lease.id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3">📥 État des lieux entrée</td>
                                     <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
                                     <td class="px-4 py-3 text-right">
-                                        <a href="/inventory/<%= lease.id %>?type=ENTREE" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
+                                        <a href="/owner/inventory/<%= lease.id %>?type=ENTREE" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
                                     </td>
                                 </tr>
                                 <% if (lease.payments && lease.payments.length > 0) { %>
@@ -310,7 +310,7 @@
                                         <td class="px-4 py-3">💰 Dernière Quittance</td>
                                         <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
                                         <td class="px-4 py-3 text-right">
-                                            <a href="/receipt/<%= lease.payments[lease.payments.length-1].id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
+                                            <a href="/owner/receipt/<%= lease.payments[lease.payments.length-1].id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
                                         </td>
                                     </tr>
                                 <% } %>

@@ -74,7 +74,7 @@ app.use('/agent', agentRoutes);
 app.use('/api', apiRoutes);
 
 app.use((req, res) => {
-    res.status(404).render('404');
+    res.status(404).render('errors/404');
 });
 
 if (require.main === module) {

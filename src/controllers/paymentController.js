@@ -1,35 +1,34 @@
-// controllers/paymentController.js
+// src/controllers/paymentController.js
 const prisma = require('../prisma/client');
 const axios = require('axios');
+const tracker = require('../utils/tracker'); // NOUVEAU : Pour le BI Tracking
 
 // 1. Logique d'encaissement manuel (Loyer)
 exports.postPayRent = async (req, res) => {
     const { leaseId, amount, month } = req.body;
-    const rentAmount = parseFloat(amount);
+    const rentAmount = parseInt(amount); // CORRECTION : Utilisation de Int (Audit)
     const userId = req.session.user.id;
     const COMMISSION_RATE = 0.05; 
 
     try {
         const owner = await prisma.user.findUnique({ where: { id: userId } });
-        const commission = rentAmount * COMMISSION_RATE;
+        const commission = Math.round(rentAmount * COMMISSION_RATE);
 
-        // --- CORRECTION SCHEMA : credit -> walletBalance ---
         if (owner.walletBalance < commission) {
-            // Pas assez de fonds dans le portefeuille pour payer la com'
             return res.status(402).render('errors/insufficient-funds', { 
                 commission, 
                 currentCredit: owner.walletBalance 
             });
         }
 
-        // Transaction Atomique
+        // TRANSACTION ATOMIQUE CORRIGÉE (Audit & Logs)
         await prisma.$transaction([
-            // 1. Débit Owner (Commission)
+            // A. Débit de la commission seule (Structure simplifiée pour Prisma)
             prisma.user.update({
                 where: { id: userId },
                 data: { walletBalance: { decrement: commission } } 
             }),
-            // 2. Historique Transaction
+            // B. Historique de débit
             prisma.creditTransaction.create({
                 data: {
                     amount: -commission,
@@ -37,16 +36,27 @@ exports.postPayRent = async (req, res) => {
                     userId: userId
                 }
             }),
-            // 3. Création Preuve Paiement
+            // C. Création de la quittance
             prisma.payment.create({
-                data: { amount: rentAmount, month, leaseId }
+                data: { 
+                    amount: rentAmount, 
+                    month: month, 
+                    leaseId: leaseId,
+                    type: "LOYER"
+                }
             })
         ]);
+
+        // TRACKING BUSINESS INTELLIGENCE
+        await tracker.trackAction("RENT_COLLECTED", "OWNER", userId, { 
+            amount: rentAmount, 
+            leaseId: leaseId 
+        });
 
         res.redirect('/owner/dashboard?success=payment_recorded');
 
     } catch (error) {
-        console.error("Erreur Encaissement:", error);
+        console.error("❌ Erreur Prisma Encaissement:", error);
         res.redirect('/owner/dashboard?error=payment_failed');
     }
 };
@@ -54,7 +64,7 @@ exports.postPayRent = async (req, res) => {
 // 2. Intégration CINETPAY (Initialisation)
 exports.initCinetPay = async (req, res) => {
     const amount = parseInt(req.body.amount);
-    const transactionId = Math.floor(Math.random() * 100000000).toString();
+    const transactionId = `TRANS_${Date.now()}_${Math.floor(Math.random() * 1000)}`; // Plus robuste
     const SITE_URL = process.env.SITE_URL || 'http://localhost:3000'; 
 
     const data = {
@@ -63,11 +73,11 @@ exports.initCinetPay = async (req, res) => {
         transaction_id: transactionId,
         amount: amount,
         currency: 'XOF',
-        description: `Rechargement ${req.session.user.name}`,
+        description: `Rechargement ImmoFacile - ${req.session.user.name}`,
         customer_id: req.session.user.id,
         customer_name: req.session.user.name,
         notify_url: `${SITE_URL}/api/payment/notify`, 
-        return_url: `${SITE_URL}/owner/dashboard`,
+        return_url: `${SITE_URL}/owner/dashboard?success=recharge_pending`,
         channels: 'ALL',
         metadata: JSON.stringify({ userId: req.session.user.id })
     };
@@ -99,10 +109,9 @@ exports.webhookCinetPay = async (req, res) => {
         const { code, data } = verification.data;
 
         if (code === '00') { 
-            const amountPaid = parseFloat(data.amount);
+            const amountPaid = parseInt(data.amount); // CORRECTION : Int
             const userId = JSON.parse(data.metadata).userId;
 
-            // --- CORRECTION SCHEMA : credit -> walletBalance ---
             await prisma.$transaction([
                 prisma.user.update({
                     where: { id: userId },
@@ -116,6 +125,13 @@ exports.webhookCinetPay = async (req, res) => {
                     }
                 })
             ]);
+
+            // TRACKING BUSINESS INTELLIGENCE
+            await tracker.trackAction("WALLET_RECHARGED", "OWNER", userId, { 
+                amount: amountPaid, 
+                ref: cpm_trans_id 
+            });
+
             console.log(`✅ Compte rechargé : ${amountPaid} FCFA pour User ${userId}`);
         }
     } catch (error) {

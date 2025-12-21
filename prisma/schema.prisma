@@ -200,3 +200,14 @@ model PushSubscription {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
 }
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  action    String   // Ex: "WHATSAPP_CONTACT", "INCIDENT_REPORT", "REHOUSING_CLICK"
+  category  String   // Ex: "AGENT", "TENANT", "OWNER"
+  metadata  Json?     // Détails : { propertyId: "...", artisanId: "..." }
+  createdAt DateTime @default(now())
+  
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+}
