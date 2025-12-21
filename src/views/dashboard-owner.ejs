@@ -203,7 +203,14 @@
                                             <a href="/inventory/<%= activeLease.id %>?type=ENTREE" target="_blank" class="text-slate-400 hover:text-white">📥 EDL</a>
                                         </div>
                                     </div>
-
+                                    <% } else { %>
+                                        <div class="mt-4 pt-4 border-t border-slate-800">
+                                            <a href="/owner/add-tenant" class="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-900/20">
+                                                <span>👤</span> Ajouter un Locataire
+                                            </a>
+                                    </div>
+                                    <% } %>
+                                    
                                     <div class="grid grid-cols-2 gap-2">
                                         <a href="/formal-notice/<%= activeLease.id %>" target="_blank" class="text-center bg-red-600/20 text-red-500 border border-red-500/50 text-[10px] font-bold py-2 rounded-lg uppercase hover:bg-red-600/30 transition">⚖️ Huissier</a>
                                         <button onclick="openExitModal('<%= activeLease.id %>', '<%= activeLease.tenant.name %>', '<%= activeLease.depositAmount %>')" class="bg-slate-800 text-slate-300 text-[10px] font-bold py-2 rounded-lg uppercase border border-slate-600 hover:bg-slate-700 transition">🚪 Sortie</button>
