@@ -25,8 +25,8 @@
             <p class="text-slate-400">Digitalisez un locataire en 30 secondes.</p>
         </div>
 
-        <form action="/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6 shadow-2xl">
-            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <form action="/owner/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6 shadow-2xl">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             
             <div>
                 <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quel appartement ?</label>
