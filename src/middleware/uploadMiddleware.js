@@ -1,25 +1,10 @@
 // middleware/uploadMiddleware.js
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
-// Sécurité : On s'assure que le dossier de destination existe
-const uploadDir = 'public/uploads/';
-if (!fs.existsSync(uploadDir)){
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Configuration du stockage
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir); 
-    },
-    filename: (req, file, cb) => {
-        // Nom unique : timestamp-random.extension
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// Configuration du stockage :
+// IMPORTANT : On utilise la mémoire (RAM) car Vercel interdit l'écriture sur le disque.
+const storage = multer.memoryStorage();
 
 // Filtre de sécurité (Images uniquement)
 const fileFilter = (req, file, cb) => {

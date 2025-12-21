@@ -2,6 +2,7 @@
 const prisma = require('../prisma/client');
 const bcrypt = require('bcryptjs');
 const { generateRandomPassword } = require('../utils/security'); 
+const { uploadFromBuffer } = require('../utils/cloudinary');
 
 // --- GESTION LOCATAIRES (AVEC SÉQUESTRE À L'ENTRÉE) ---
 
@@ -167,17 +168,40 @@ exports.getDashboard = async (req, res) => {
 
 exports.postAddProperty = async (req, res) => {
     const { title, commune, address, price } = req.body;
+    
     try {
+        let imageUrl = null; // Par défaut pas d'image
+
+        // 1. Vérifier si un fichier est présent (grâce au middleware corrigé)
+        if (req.file) {
+            console.log("Image détectée, upload vers Cloudinary...");
+            try {
+                // On envoie le buffer (mémoire) vers Cloudinary
+                const result = await uploadFromBuffer(req.file.buffer);
+                imageUrl = result.secure_url; // On récupère l'URL sécurisée (https)
+            } catch (uploadError) {
+                console.error("Erreur Cloudinary:", uploadError);
+                // On peut décider de continuer sans image ou de bloquer
+                return res.redirect('/owner/dashboard?error=image_upload_failed');
+            }
+        }
+
+        // 2. Création en base de données
         await prisma.property.create({
             data: {
-                title, commune, address,
+                title, 
+                commune, 
+                address,
                 price: parseFloat(price),
+                imageUrl: imageUrl, // AJOUT : On sauvegarde l'URL ici
                 ownerId: req.session.user.id
             }
         });
-        res.redirect('/owner/dashboard');
+
+        res.redirect('/owner/dashboard?success=property_created');
+
     } catch (error) {
-        console.error(error);
+        console.error("Erreur création bien:", error);
         res.redirect('/owner/dashboard?error=creation_failed');
     }
 };

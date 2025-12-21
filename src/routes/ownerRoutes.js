@@ -8,6 +8,7 @@ const paymentController = require('../controllers/paymentController'); // Néces
 
 // Import du Middleware
 const auth = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware'); // Ton fichier corrigé
 
 // --- ROUTES D'AFFICHAGE (GET) ---
 
@@ -39,5 +40,7 @@ router.post('/pay-rent', auth.isOwner, paymentController.postPayRent); // Utilis
 // Gestion Incidents & Artisans
 router.post('/resolve-incident', auth.isOwner, ownerController.postResolveIncident);
 router.post('/add-artisan', auth.isOwner, ownerController.postAddArtisan);
+
+router.post('/add-property', upload.single('image'), ownerController.postAddProperty);
 
 module.exports = router;

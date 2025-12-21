@@ -64,6 +64,7 @@ model Property {
   commune   String
   price     Float
   createdAt DateTime @default(now())
+  imageUrl String?  // Le "?" signifie que c'est optionnel
   
   ownerId   String
   owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
