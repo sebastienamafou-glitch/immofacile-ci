@@ -23,6 +23,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// --- AJOUT CRUCIAL POUR VERCEL ---
+// Permet de gérer les cookies sécurisés derrière le proxy de Vercel
+app.set('trust proxy', 1); 
+
 // --- 4. CONFIGURATION MOTEUR DE VUE ---
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -55,7 +59,7 @@ app.use(session({
         secure: IS_PROD, 
         httpOnly: true,  
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours (Plus confortable pour une app mobile)
-        sameSite: 'lax'
+        sameSite: 'lax' // 'lax' est préférable à 'strict' pour les liens externes
     }
 }));
 
