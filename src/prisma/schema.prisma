@@ -1,0 +1,173 @@
+// CORRECTION AUDIT : Utilisation de Int pour la fiabilité financière
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String   @unique
+  name      String?
+  role      UserRole @default(TENANT)
+  password  String
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  
+  // FINANCES (CORRIGÉ : Int au lieu de Float)
+  walletBalance Int    @default(0) 
+  escrowBalance Int    @default(0) 
+
+  properties        Property[]          @relation("OwnerProperties")
+  leasesAsTenant    Lease[]             @relation("TenantLeases")
+  reportedIncidents Incident[]          @relation("Reporter")
+  leads             Lead[]              @relation("AgentLeads")
+  transactions      CreditTransaction[] 
+  pushSubscriptions PushSubscription[]
+}
+
+enum UserRole {
+  OWNER
+  TENANT
+  ADMIN
+  AGENT
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  amount      Int      // CORRIGÉ : Int
+  description String   
+  date        DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Property {
+  id        String   @id @default(cuid())
+  title     String
+  address   String
+  commune   String
+  price     Int      // CORRIGÉ : Int
+  createdAt DateTime @default(now())
+  imageUrl  String?
+  ownerId   String
+  owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
+  leases    Lease[]
+  incidents Incident[]
+  expenses  Expense[]
+  candidates Candidate[]
+}
+
+model Lease {
+  id            String    @id @default(cuid())
+  startDate     DateTime
+  endDate       DateTime?
+  depositAmount Int       // CORRIGÉ : Int
+  monthlyRent   Int       // CORRIGÉ : Int
+  isActive      Boolean   @default(true)
+  tenantId      String
+  tenant        User      @relation("TenantLeases", fields: [tenantId], references: [id])
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id])
+  payments      Payment[]
+  inventories   Inventory[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  amount    Int      // CORRIGÉ : Int
+  date      DateTime @default(now())
+  month     String
+  type      String   @default("LOYER")
+  leaseId   String
+  lease     Lease    @relation(fields: [leaseId], references: [id])
+}
+
+model Incident {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  createdAt   DateTime @default(now())
+  reporterId  String
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Int      // CORRIGÉ : Int
+  date        DateTime @default(now())
+  category    String
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  type           String
+  date           DateTime @default(now())
+  kitchenState   String?
+  kitchenPhoto   String?
+  livingState    String?
+  livingPhoto    String?
+  bathState      String?
+  bathPhoto      String?
+  generalComment String?
+  leaseId        String
+  lease          Lease    @relation(fields: [leaseId], references: [id])
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  address     String?
+  photo       String?
+  status      String   @default("NOUVEAU")
+  createdAt   DateTime @default(now())
+  agentId     String?
+  agent       User?    @relation("AgentLeads", fields: [agentId], references: [id])
+}
+
+model Candidate {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  email       String
+  income      Int      // CORRIGÉ : Int
+  status      String   @default("PENDING")
+  score       Int
+  createdAt   DateTime @default(now())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+}
+
+model Artisan {
+  id          String   @id @default(uuid())
+  name        String
+  job         String   
+  phone       String
+  location    String   
+  isVerified  Boolean  @default(true)
+  rating      Float    @default(5.0) // On garde Float pour une moyenne d'étoiles
+  createdAt   DateTime @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique 
+  keys      String   
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}

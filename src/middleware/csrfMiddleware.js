@@ -1,4 +1,4 @@
-// middleware/csrfMiddleware.js
+// CORRECTION AUDIT : Suppression exclusion add-lead
 const csrf = require('csurf');
 
 const csrfProtection = csrf({
@@ -11,14 +11,14 @@ const csrfProtection = csrf({
 
 const csrfMiddleware = (req, res, next) => {
     const excludedPaths = [
-        '/api/payment/notify',
-        '/agent/add-lead'
+        '/api/payment/notify' 
+        // L'ajout de lead a été retiré des exclusions pour sécurité
     ];
 
     if (
         excludedPaths.includes(req.path) || 
         req.path.startsWith('/inventory/') || 
-        req.path.startsWith('/apply/') // <-- Ajout important vu dans votre app.js
+        req.path.startsWith('/apply/')
     ) {
         return next();
     }
