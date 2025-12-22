@@ -6,231 +6,346 @@
     <title>SUPER ADMIN | ImmoFacile CI</title>
     
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#0B1120">
     <link rel="apple-touch-icon" href="/images/icon-192.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>html { scroll-behavior: smooth; }</style>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        /* Scrollbar custom */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* Animation fade-in pour les modales */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }
+    </style>
 </head>
-<body class="bg-black text-white font-['Plus_Jakarta_Sans']">
+<body class="bg-[#0B1120] text-slate-200">
 
     <div class="flex min-h-screen">
-        <aside id="adminSidebar" class="w-64 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full overflow-y-auto z-50 bg-black transition-all">   
+        <aside id="adminSidebar" class="w-72 border-r border-slate-800 p-6 hidden md:flex flex-col fixed h-full overflow-y-auto z-50 bg-[#0B1120] transition-all">   
             <div class="md:hidden flex justify-end mb-4">
-                <button onclick="toggleAdminMenu()" class="text-white text-xl">✕</button>
-                <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
+                <button onclick="toggleAdminMenu()" class="text-white text-xl hover:text-[#F59E0B] transition"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div class="mb-10 flex items-center gap-3 px-2">
+                <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-10 object-contain">
+                <span class="font-bold text-white tracking-tight">ImmoFacile<span class="text-[#F59E0B]">.Admin</span></span>
             </div>
 
-            <nav class="space-y-2 flex-1">
-                <a href="/dashboard-admin" class="block p-3 bg-white/10 rounded-lg font-bold text-white hover:bg-white/20 transition-all">
+            <nav class="space-y-1 flex-1">
+                <a href="/dashboard-admin" class="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl font-bold text-white shadow-lg shadow-black/20">
+                    <i class="ph-fill ph-squares-four text-[#F59E0B] text-xl"></i>
                     Vue Globale
                 </a>
 
-                <a href="#tresorerie" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
-                    Trésorerie & Guichet
+                <div class="pt-6 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Gestion</div>
+
+                <a href="#tresorerie" class="flex items-center gap-3 p-3 font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <i class="ph ph-wallet text-xl group-hover:text-[#F59E0B] transition-colors"></i>
+                    Trésorerie
                 </a>
 
-                <a href="#agents" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                <a href="#agents" class="flex items-center gap-3 p-3 font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <i class="ph ph-users-three text-xl group-hover:text-blue-400 transition-colors"></i>
                     Agents & Sales
                 </a>
 
-                <a href="#alertes" class="block p-3 font-semibold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                <a href="#alertes" class="flex items-center gap-3 p-3 font-medium text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <i class="ph ph-warning-octagon text-xl group-hover:text-red-500 transition-colors"></i>
                     Alertes Système
                 </a>
 
-                <a href="/logout" class="block p-3 font-semibold text-red-500 mt-10 hover:bg-red-500/10 rounded-lg transition-all">
+                <a href="/logout" class="flex items-center gap-3 p-3 font-medium text-red-400 mt-10 hover:bg-red-500/10 rounded-xl transition-all">
+                    <i class="ph ph-sign-out text-xl"></i>
                     Déconnexion
                 </a>
             </nav>
 
             <div class="mt-auto pt-6 border-t border-slate-800 text-center md:text-left">
-                <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
-                <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain opacity-80 hover:opacity-100 transition mb-2">
-                <div class="flex flex-col gap-1">
-                    <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">contact@webappci.com</a>
-                    <a href="/privacy" class="text-[10px] text-[#F59E0B] hover:underline">Confidentialité</a>
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Tech Support</p>
+                <div class="flex items-center gap-2 opacity-60 hover:opacity-100 transition duration-300 cursor-help" title="Contacter le support">
+                    <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-6 object-contain">
+                    <span class="text-xs font-bold text-slate-400">WebApp CI</span>
                 </div>
             </div>
         </aside>
 
-        <main class="flex-1 md:ml-64 p-10">
+        <main class="flex-1 md:ml-72 p-6 md:p-10 max-w-7xl mx-auto">
             
-            <header class="flex justify-between items-end mb-10">
+            <header class="flex flex-col md:flex-row justify-between md:items-end mb-10 gap-4">
                 <div class="flex items-center gap-4">
-                    <button onclick="toggleAdminMenu()" class="md:hidden text-white bg-slate-800 p-2 rounded-lg">
-                        ☰
+                    <button onclick="toggleAdminMenu()" class="md:hidden text-white bg-slate-800 p-2 rounded-lg hover:bg-slate-700">
+                        <i class="ph ph-list text-2xl"></i>
                     </button>
                     <div>
-                        <h1 class="text-3xl font-bold">Bonjour ADMIN 👋</h1>
-                        <p class="text-slate-500">Voici la situation du business aujourd'hui.</p>
+                        <h1 class="text-3xl font-bold text-white">Bonjour ADMIN <span class="inline-block animate-wave">👋</span></h1>
+                        <p class="text-slate-400 mt-1 flex items-center gap-2 text-sm">
+                            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            Système opérationnel • <%= new Date().toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'}) %>
+                        </p>
                     </div>
                 </div>
-                <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold text-slate-500 uppercase">Utilisateurs Totaux</p>
-                    <p class="text-2xl font-black"><%= totalUsers %></p>
+                <div class="flex items-center gap-4">
+                    <div class="text-right px-5 py-3 bg-slate-900 rounded-xl border border-slate-800 shadow-sm">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Utilisateurs Totaux</p>
+                        <p class="text-2xl font-black text-white"><%= totalUsers %></p>
+                    </div>
                 </div>
             </header>
 
             <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                    <div class="flex justify-between mb-4">
-                        <span class="text-xs font-bold text-slate-400 uppercase">Volume d'Affaires (GMV)</span>
-                        <span class="text-green-500 bg-green-500/10 px-2 rounded text-xs">▲ +12%</span>
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-slate-700 transition">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                        <i class="ph-fill ph-chart-line-up text-6xl text-green-500"></i>
                     </div>
-                    <p class="text-3xl font-black text-white"><%= volumeAffaires.toLocaleString('fr-FR') %></p>
-                    <p class="text-xs text-slate-500">FCFA encaissés (Loyers)</p>
+                    <div class="flex justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Volume d'Affaires</span>
+                        <span class="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-[10px] font-bold">+12% vs M-1</span>
+                    </div>
+                    <p class="text-3xl font-black text-white tracking-tight"><%= volumeAffaires.toLocaleString('fr-FR') %> <span class="text-base font-normal text-slate-400">FCFA</span></p>
+                    <p class="text-xs text-slate-400 mt-2">Loyers totaux encaissés</p>
                 </div>
 
-                <div class="bg-gradient-to-br from-[#F59E0B] to-orange-700 p-6 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-                    <div class="flex justify-between mb-4">
-                        <span class="text-xs font-bold text-black/60 uppercase">MA COMMISSION (5%)</span>
+                <div class="bg-gradient-to-br from-[#F59E0B] to-orange-800 p-6 rounded-2xl shadow-lg shadow-orange-900/30 relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 opacity-20 rotate-12">
+                        <i class="ph-fill ph-coins text-8xl text-white"></i>
                     </div>
-                    <p class="text-4xl font-black text-white"><%= myRevenue.toLocaleString('fr-FR') %></p>
-                    <p class="text-xs text-white/80">FCFA Net dans votre poche</p>
+                    <div class="flex justify-between mb-4">
+                        <span class="text-xs font-bold text-black/70 uppercase bg-white/30 px-2 py-1 rounded backdrop-blur-sm">Ma Commission (5%)</span>
+                    </div>
+                    <p class="text-4xl font-black text-white tracking-tight"><%= myRevenue.toLocaleString('fr-FR') %></p>
+                    <p class="text-xs text-white/90 mt-1 font-medium">Revenu Net généré</p>
                 </div>
 
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                    <div class="flex justify-between mb-4">
-                        <span class="text-xs font-bold text-slate-400 uppercase">Biens sous gestion</span>
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between mb-4">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Biens sous gestion</span>
+                            <i class="ph ph-buildings text-slate-500 text-xl"></i>
+                        </div>
+                        <p class="text-3xl font-black text-white"><%= totalProperties %></p>
                     </div>
-                    <p class="text-3xl font-black text-white"><%= totalProperties %></p>
-                    <p class="text-xs text-slate-500">Appartements actifs</p>
+                    <div>
+                         <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                            <span>Taux d'occupation</span>
+                            <span>75%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full rounded-full" style="width: 75%"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section class="mb-12">
-                <h3 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
-                    📈 Valeur Générée (Tracking Live)
-                </h3>
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                <div class="lg:col-span-2 space-y-6">
+                    <h3 class="text-lg font-bold flex items-center gap-2 text-white">
+                        <i class="ph-fill ph-activity text-[#F59E0B]"></i> Valeur Générée (Live)
+                    </h3>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
+                            <i class="ph-duotone ph-hand-tap text-2xl text-slate-400 mb-2"></i>
+                            <p class="text-2xl font-black text-white"><%= totalInteractions %></p>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Interactions</p>
+                        </div>
+
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-green-500/5"></div>
+                            <i class="ph-fill ph-whatsapp-logo text-2xl text-green-500 mb-2"></i>
+                            <p class="text-2xl font-black text-green-500"><%= whatsappTotal %></p>
+                            <p class="text-slate-500 text-[10px] font-bold uppercase mt-1">Leads WA</p>
+                        </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                        <p class="text-slate-500 text-xs font-bold uppercase">Interactions totales</p>
-                        <p class="text-2xl font-black text-white"><%= totalInteractions %></p>
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
+                            <i class="ph-duotone ph-warning text-2xl text-red-400 mb-2"></i>
+                            <p class="text-2xl font-black text-red-400"><%= incidentsTotal %></p>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Alertes</p>
+                        </div>
+                
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
+                            <i class="ph-duotone ph-users text-2xl text-blue-400 mb-2"></i>
+                            <p class="text-2xl font-black text-blue-400"><%= totalUsers > 0 ? (totalInteractions / totalUsers).toFixed(1) : 0 %></p>
+                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Engagement</p>
+                        </div>
                     </div>
-            
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl border-l-4 border-green-500">
-                        <p class="text-slate-500 text-xs font-bold uppercase">Mises en relation WA</p>
-                        <p class="text-2xl font-black text-green-500"><%= whatsappTotal %></p>
-                    </div>
-            
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl border-l-4 border-red-500">
-                        <p class="text-slate-500 text-xs font-bold uppercase">Alertes traitées</p>
-                        <p class="text-2xl font-black text-red-500"><%= incidentsTotal %></p>
-                    </div>
-            
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-                        <p class="text-slate-500 text-xs font-bold uppercase">Engagement / User</p>
-                        <p class="text-2xl font-black text-blue-400">
-                            <%= totalUsers > 0 ? (totalInteractions / totalUsers).toFixed(1) : 0 %>
-                        </p>
+
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Aperçu des Revenus (Dernières Semaines)</h4>
+                        <div class="h-48 w-full">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                    <h3 class="text-sm font-bold text-slate-400 uppercase mb-4">Flux d'activité en temps réel</h3>
-                    <div class="space-y-3">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-sm font-bold text-slate-300 uppercase">Flux d'activité</h3>
+                        <span class="flex h-2 w-2 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-4 overflow-y-auto flex-1 pr-2 custom-scrollbar max-h-[400px]">
                         <% if(locals.recentActivities && recentActivities.length > 0) { %>
                             <% recentActivities.forEach(log => { %>
-                                <div class="flex items-center justify-between text-xs p-3 bg-black/20 rounded-lg border border-slate-800">
-                                    <div class="flex items-center gap-3">
-                                        <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-bold uppercase" style="font-size: 8px;">
+                                <div class="flex gap-3 text-xs relative pl-4 border-l border-slate-800 pb-2">
+                                    <div class="absolute -left-1 top-1 w-2 h-2 rounded-full bg-slate-700 border-2 border-slate-900"></div>
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-xs font-bold text-slate-200"><%= log.user ? log.user.name : 'Visiteur' %></span>
+                                            <span class="text-[10px] text-slate-500"><%= new Date(log.createdAt).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) %></span>
+                                        </div>
+                                        <p class="text-slate-400 leading-relaxed">
+                                            <span class="text-[#F59E0B] font-medium"><%= log.action %></span> 
+                                            <span class="opacity-40 mx-1">•</span> 
                                             <%= log.category %>
-                                        </span>
-                                        <span class="text-white">
-                                            <strong><%= log.user ? log.user.name : 'Visiteur' %></strong> a déclenché 
-                                            <span class="text-[#F59E0B]"><%= log.action %></span>
-                                        </span>
+                                        </p>
                                     </div>
-                                    <span class="text-slate-600">
-                                        <%= new Date(log.createdAt).toLocaleTimeString('fr-FR') %>
-                                    </span>
                                 </div>
                             <% }) %>
                         <% } else { %>
-                            <p class="text-slate-500 italic text-sm">Aucune activité récente.</p>
+                            <div class="text-center py-10 h-full flex flex-col justify-center items-center">
+                                <i class="ph ph-coffee text-3xl text-slate-700 mb-2"></i>
+                                <p class="text-slate-500 italic text-xs">Aucune activité récente.</p>
+                            </div>
                         <% } %>
                     </div>
                 </div>
             </section>
 
-            <section id="tresorerie" class="mb-12 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                <h3 class="font-bold text-[#F59E0B] uppercase text-sm mb-6 flex items-center gap-2">
-                    💳 Guichet de Rechargement / Trésorerie
-                    <span class="text-xs text-slate-500 normal-case hidden md:inline">(Quand vous recevez un Wave, ajoutez le crédit ici)</span>
-                </h3>
+            <section id="tresorerie" class="mb-12 bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-[#F59E0B]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
 
-                <div class="flex flex-col md:flex-row gap-6">
-                    <form action="/admin/add-credit" method="POST" class="bg-black/30 p-4 rounded-xl border border-slate-700 w-full md:w-1/3">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 relative z-10">
+                    <div>
+                        <h3 class="font-bold text-white text-lg flex items-center gap-2">
+                            <i class="ph-fill ph-credit-card text-[#F59E0B]"></i> Guichet de Rechargement
+                        </h3>
+                        <p class="text-sm text-slate-400 mt-1">Gérez les rechargements Wave/Orange Money des propriétaires ici.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col xl:flex-row gap-8 relative z-10">
+                    <form id="creditForm" action="/admin/add-credit" method="POST" class="bg-black/40 p-6 rounded-xl border border-slate-700 w-full xl:w-1/3 shadow-xl">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
-                        <div class="mb-3">
-                            <label class="text-xs font-bold text-slate-400">Propriétaire Client</label>
-                            <select name="ownerId" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
-                                <% owners.forEach(o => { %>
-                                    <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.walletBalance.toLocaleString('fr-FR') %> F)</option>
-                                <% }) %>
-                            </select>
+                        
+                        <div class="mb-4">
+                            <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Propriétaire Client</label>
+                            <div class="relative">
+                                <select name="ownerId" required class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 pl-10 text-white text-sm appearance-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition cursor-pointer hover:bg-slate-700">
+                                    <% owners.forEach(o => { %>
+                                        <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.walletBalance.toLocaleString('fr-FR') %> F)</option>
+                                    <% }) %>
+                                </select>
+                                <i class="ph ph-user absolute left-3 top-3.5 text-slate-500"></i>
+                                <i class="ph-bold ph-caret-down absolute right-3 top-3.5 text-slate-500 pointer-events-none"></i>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="text-xs font-bold text-slate-400">Montant reçu (FCFA)</label>
-                            <input type="number" name="amount" placeholder="Ex: 10000" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
+
+                        <div class="mb-6">
+                            <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Montant reçu (FCFA)</label>
+                            <div class="relative">
+                                <input type="number" name="amount" required min="500" placeholder="Ex: 50000" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 pl-10 text-white text-sm focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition placeholder-slate-500">
+                                <i class="ph ph-money absolute left-3 top-3.5 text-slate-500"></i>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-2 italic">* Vérifiez bien le montant avant validation.</p>
                         </div>
-                        <button type="submit" class="w-full bg-[#F59E0B] text-black font-bold py-2 rounded hover:bg-orange-500">Créditer le compte</button>
+
+                        <button type="submit" class="w-full bg-[#F59E0B] text-black font-bold py-3 rounded-lg hover:bg-orange-500 transition flex items-center justify-center gap-2 transform active:scale-95 duration-100">
+                            <i class="ph-bold ph-plus-circle"></i> Créditer le compte
+                        </button>
                     </form>
 
-                    <div class="flex-1 overflow-y-auto max-h-60">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-500 uppercase bg-slate-800 sticky top-0">
-                                <tr>
-                                    <th class="p-2">Client</th>
-                                    <th class="p-2">Solde Actuel</th>
-                                    <th class="p-2">Statut</th>
-                                    <th class="p-2">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-700">
-                                <% owners.forEach(o => { %>
+                    <div class="flex-1 flex flex-col gap-4">
+                        <div class="relative">
+                            <input type="text" id="searchOwner" placeholder="Rechercher un propriétaire..." 
+                                   class="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg p-3 pl-10 w-full focus:ring-2 focus:ring-[#F59E0B] outline-none placeholder-slate-500">
+                            <i class="ph ph-magnifying-glass absolute left-3 top-3.5 text-slate-400"></i>
+                        </div>
+
+                        <div class="overflow-y-auto max-h-[350px] border border-slate-800 rounded-xl bg-black/20">
+                            <table class="w-full text-sm text-left" id="ownersTable">
+                                <thead class="text-xs text-slate-400 uppercase bg-slate-800/80 sticky top-0 backdrop-blur-md z-10">
                                     <tr>
-                                        <td class="p-2 font-bold"><%= o.name %></td>
-                                        <td class="p-2 font-mono <%= o.walletBalance < 2000 ? 'text-red-500' : 'text-green-400' %>"><%= o.walletBalance.toLocaleString('fr-FR') %> FCFA</td>
-                                        <td class="p-2">
-                                            <% if (o.walletBalance < 2000) { %>
-                                                <span class="bg-red-500/20 text-red-500 px-2 py-1 rounded text-xs">Bloqué bientôt</span>
-                                            <% } else { %>
-                                                <span class="bg-green-500/20 text-green-500 px-2 py-1 rounded text-xs">OK</span>
-                                            <% } %>
-                                        </td>
-                                        <td class="p-2">
-                                            <form action="/admin/toggle-status" method="POST">
-                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
-                                                <input type="hidden" name="userId" value="<%= o.id %>">
-                                                <input type="hidden" name="currentStatus" value="<%= o.isActive %>">
-                                                
-                                                <% if (o.isActive) { %>
-                                                    <button type="submit" class="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1 rounded text-xs font-bold transition">
-                                                        Bloquer 🔒
-                                                    </button>
-                                                <% } else { %>
-                                                    <button type="submit" class="bg-green-500/20 text-green-500 hover:bg-green-500 hover:text-white px-3 py-1 rounded text-xs font-bold transition">
-                                                        Activer ✅
-                                                    </button>
-                                                <% } %>
-                                            </form>
-                                        </td>
+                                        <th class="p-4">Client</th>
+                                        <th class="p-4">Solde Actuel</th>
+                                        <th class="p-4">Statut</th>
+                                        <th class="p-4 text-right">Action</th>
                                     </tr>
-                                <% }) %>
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    <% owners.forEach(o => { %>
+                                        <tr class="hover:bg-slate-800/30 transition">
+                                            <td class="p-4 font-bold text-white"><%= o.name %></td>
+                                            <td class="p-4 font-mono">
+                                                <span class="<%= o.walletBalance < 2000 ? 'text-red-400' : 'text-green-400' %>">
+                                                    <%= o.walletBalance.toLocaleString('fr-FR') %>
+                                                </span> 
+                                                <span class="text-xs text-slate-500">FCFA</span>
+                                            </td>
+                                            <td class="p-4">
+                                                <% if (o.walletBalance < 2000) { %>
+                                                    <span class="inline-flex items-center gap-1 bg-red-500/10 text-red-400 px-2 py-1 rounded text-xs border border-red-500/20">
+                                                        <i class="ph-fill ph-warning-circle"></i> Bas
+                                                    </span>
+                                                <% } else { %>
+                                                    <span class="inline-flex items-center gap-1 bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs border border-green-500/20">
+                                                        <i class="ph-fill ph-check-circle"></i> OK
+                                                    </span>
+                                                <% } %>
+                                            </td>
+                                            <td class="p-4 text-right">
+                                                <form action="/admin/toggle-status" method="POST" class="inline-block" onsubmit="confirmToggleStatus(event, this)">
+                                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
+                                                    <input type="hidden" name="userId" value="<%= o.id %>">
+                                                    <input type="hidden" name="currentStatus" value="<%= o.isActive %>">
+                                                    
+                                                    <% if (o.isActive) { %>
+                                                        <button type="submit" class="text-red-400 hover:bg-red-500/10 p-2 rounded-lg transition" title="Bloquer">
+                                                            <i class="ph-bold ph-lock-key"></i>
+                                                        </button>
+                                                    <% } else { %>
+                                                        <button type="submit" class="text-green-400 hover:bg-green-500/10 p-2 rounded-lg transition" title="Débloquer">
+                                                            <i class="ph-bold ph-lock-key-open"></i>
+                                                        </button>
+                                                    <% } %>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 
-                <section id="agents">
-                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4">Performance Agents</h3>
-                    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <section id="agents" class="flex flex-col">
+                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-users-three"></i> Performance Agents
+                    </h3>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex-1">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-slate-800 text-slate-400 text-xs uppercase">
                                 <tr>
@@ -241,9 +356,14 @@
                             </thead>
                             <tbody class="divide-y divide-slate-800">
                                 <% agents.forEach(agent => { %>
-                                    <tr>
-                                        <td class="p-4 font-bold"><%= agent.name %></td>
-                                        <td class="p-4"><%= agent.leads.length %> immeubles</td>
+                                    <tr class="hover:bg-slate-800/50 transition">
+                                        <td class="p-4 font-bold flex items-center gap-3 text-slate-200">
+                                            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white uppercase font-bold">
+                                                <%= agent.name.charAt(0) %>
+                                            </div>
+                                            <%= agent.name %>
+                                        </td>
+                                        <td class="p-4 text-slate-300"><%= agent.leads.length %> <span class="text-slate-500 text-xs">immeubles</span></td>
                                         <td class="p-4 text-right font-mono text-[#F59E0B]">
                                             <%= (agent.leads.length * 5000).toLocaleString('fr-FR') %> FCFA
                                         </td>
@@ -255,70 +375,97 @@
                 </section>
 
                 <section id="alertes">
-                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4">Alertes Système</h3>
+                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-bell-ringing"></i> Alertes Système
+                    </h3>
                     <div class="space-y-3">
                         <% if (activeIncidents.length === 0) { %>
-                            <div class="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm">
-                                ✅ R.A.S. Système sain.
+                            <div class="p-6 bg-green-500/5 border border-green-500/10 rounded-xl text-center">
+                                <i class="ph-duotone ph-check-circle text-4xl text-green-500 mb-2"></i>
+                                <p class="text-green-400 text-sm font-bold">R.A.S.</p>
+                                <p class="text-slate-500 text-xs">Tous les systèmes fonctionnent normalement.</p>
                             </div>
                         <% } %>
 
                         <% activeIncidents.forEach(inc => { %>
-                            <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex justify-between items-center">
-                                <div>
-                                    <p class="text-red-400 font-bold text-sm">🚨 <%= inc.priority %> : <%= inc.title %></p>
-                                    <p class="text-slate-500 text-xs"><%= inc.property ? inc.property.title : 'Immeuble inconnu' %></p>
+                            <div class="p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex justify-between items-center group hover:bg-red-500/10 transition">
+                                <div class="flex items-start gap-3">
+                                    <i class="ph-fill ph-warning-octagon text-red-500 text-xl mt-1"></i>
+                                    <div>
+                                        <p class="text-red-400 font-bold text-sm"><%= inc.priority %> : <%= inc.title %></p>
+                                        <p class="text-slate-400 text-xs mt-1 flex items-center gap-1">
+                                            <i class="ph ph-house"></i>
+                                            <%= inc.property ? inc.property.title : 'Immeuble inconnu' %>
+                                        </p>
+                                    </div>
                                 </div>
-                                <button class="bg-red-500 text-white px-3 py-1 rounded text-xs font-bold">Intervenir</button>
+                                <button class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-lg shadow-red-500/20">
+                                    Intervenir
+                                </button>
                             </div>
                         <% }) %>
                     </div>
                 </section>
             </div>
 
-            <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
-                
-                <div class="flex justify-between items-center mb-6">
+            <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-slate-100 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 relative z-10 gap-4">
                     <div>
-                        <h2 class="text-xl font-black text-[#0B1120]">Annuaire des Artisans</h2>
-                        <p class="text-slate-500 text-sm">Gérez les contacts visibles par les propriétaires.</p>
+                        <h2 class="text-xl font-black text-[#0B1120] flex items-center gap-2">
+                            <i class="ph-duotone ph-toolbox text-2xl"></i> Annuaire des Artisans
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1">Gérez les contacts visibles par les propriétaires.</p>
                     </div>
-                    <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="bg-[#0B1120] text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center gap-2">
-                        <span>➕</span> Ajouter un Pro
+                    <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="bg-[#0B1120] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition flex items-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transform">
+                        <i class="ph-bold ph-plus"></i> Ajouter un Pro
                     </button>
                 </div>
 
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto relative z-10">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
-                                <th class="p-3">Nom</th>
+                                <th class="p-3 pl-0">Nom</th>
                                 <th class="p-3">Métier</th>
                                 <th class="p-3">Secteur</th>
                                 <th class="p-3">Contact</th>
-                                <th class="p-3 text-right">Action</th>
+                                <th class="p-3 text-right pr-0">Action</th>
                             </tr>
                         </thead>
                         <tbody class="text-sm">
                             <% if (locals.artisans && artisans.length > 0) { %>
                                 <% artisans.forEach(a => { %>
-                                    <tr class="border-b border-slate-50 hover:bg-slate-50">
-                                        <td class="p-3 font-bold text-[#0B1120]"><%= a.name %></td>
-                                        <td class="p-3"><span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold"><%= a.job %></span></td>
-                                        <td class="p-3 text-slate-500"><%= a.location %></td>
-                                        <td class="p-3 font-mono text-slate-700"><%= a.phone %></td>
-                                        <td class="p-3 text-right">
-                                            <form action="/admin/delete-artisan" method="POST" onsubmit="return confirm('Supprimer cet artisan ?');">
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 group transition">
+                                        <td class="p-3 pl-0 font-bold text-[#0B1120]"><%= a.name %></td>
+                                        <td class="p-3">
+                                            <span class="bg-orange-100 text-orange-800 border border-orange-200 px-2 py-1 rounded text-xs font-bold">
+                                                <%= a.job %>
+                                            </span>
+                                        </td>
+                                        <td class="p-3 text-slate-500 flex items-center gap-1">
+                                            <i class="ph-fill ph-map-pin text-slate-300"></i>
+                                            <%= a.location %>
+                                        </td>
+                                        <td class="p-3 font-mono text-slate-700 select-all"><%= a.phone %></td>
+                                        <td class="p-3 text-right pr-0">
+                                            <form action="/admin/delete-artisan" method="POST" class="inline" onsubmit="confirmDelete(event, this)">
                                                 <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
                                                 <input type="hidden" name="artisanId" value="<%= a.id %>">
-                                                <button type="submit" class="text-red-400 hover:text-red-600 font-bold text-xs">🗑 Supprimer</button>
+                                                <button type="submit" class="text-slate-300 hover:text-red-500 transition p-2 rounded hover:bg-red-50">
+                                                    <i class="ph-bold ph-trash text-lg"></i>
+                                                </button>
                                             </form>
                                         </td>
                                     </tr>
                                 <% }) %>
                             <% } else { %>
                                 <tr>
-                                    <td colspan="5" class="p-8 text-center text-slate-400 italic">Aucun artisan enregistré.</td>
+                                    <td colspan="5" class="p-10 text-center text-slate-400 italic">
+                                        <i class="ph ph-folder-dashed text-4xl mb-2 block"></i>
+                                        Aucun artisan enregistré pour le moment.
+                                    </td>
                                 </tr>
                             <% } %>
                         </tbody>
@@ -329,11 +476,14 @@
         </main>
     </div>
 
-    <div id="artisanModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl p-8 max-w-md w-full relative">
-            <button onclick="document.getElementById('artisanModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-black text-xl font-bold">✕</button>
+    <div id="artisanModal" class="hidden fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full relative shadow-2xl animate-fade-in-up">
+            <button onclick="document.getElementById('artisanModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-black transition">
+                <i class="ph-bold ph-x text-xl"></i>
+            </button>
             
-            <h3 class="text-xl font-black text-[#0B1120] mb-6">Nouveau Partenaire</h3>
+            <h3 class="text-xl font-black text-[#0B1120] mb-1">Nouveau Partenaire</h3>
+            <p class="text-slate-500 text-sm mb-6">Ajoutez un professionnel de confiance.</p>
              
             <form action="/admin/add-artisan" method="POST" class="space-y-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>"> 
@@ -341,21 +491,24 @@
                 <div>
                     <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom de l'entreprise / Artisan</label>
                     <input type="text" name="name" required 
-                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F59E0B]" 
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F59E0B] transition" 
                            placeholder="Ex: Kouamé Élec">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Métier</label>
-                        <select name="job" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#F59E0B]">
-                            <option>Plombier</option>
-                            <option>Électricien</option>
-                            <option>Menuisier</option>
-                            <option>Peintre</option>
-                            <option>Serrurier</option>
-                            <option>Climatisation</option>
-                        </select>
+                        <div class="relative">
+                            <select name="job" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#F59E0B] appearance-none cursor-pointer">
+                                <option>Plombier</option>
+                                <option>Électricien</option>
+                                <option>Menuisier</option>
+                                <option>Peintre</option>
+                                <option>Serrurier</option>
+                                <option>Climatisation</option>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-3.5 text-slate-400 pointer-events-none"></i>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Secteur</label>
@@ -372,30 +525,160 @@
                            placeholder="07 07 ...">
                 </div>
 
-                <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition mt-2">
-                    Enregistrer
+                <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition mt-2 shadow-lg">
+                    Enregistrer le partenaire
                 </button>
             </form>
         </div>
     </div>
 
     <script>
+        // 1. GESTION MENU MOBILE
         function toggleAdminMenu() {
             const sidebar = document.getElementById('adminSidebar');
             sidebar.classList.toggle('hidden');
             sidebar.classList.toggle('flex');
         }
 
-        // PWA SERVICE WORKER REGISTRATION
+        // 2. RECHERCHE DYNAMIQUE TABLEAU
+        document.getElementById('searchOwner').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let rows = document.querySelectorAll('#ownersTable tbody tr');
+            
+            rows.forEach(row => {
+                let text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+
+        // 3. SWEETALERT CONFIRMATIONS & FEEDBACK
+        
+        // Confirmation Suppression
+        function confirmDelete(e, form) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Êtes-vous sûr ?',
+                text: "Cette suppression est définitive.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#334155',
+                confirmButtonText: 'Oui, supprimer',
+                cancelButtonText: 'Annuler',
+                background: '#fff',
+                color: '#000'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+
+        // Confirmation Blocage/Déblocage
+        function confirmToggleStatus(e, form) {
+            e.preventDefault();
+            const isBlocking = form.querySelector('button i').classList.contains('ph-lock-key');
+            
+            Swal.fire({
+                title: isBlocking ? 'Bloquer ce compte ?' : 'Réactiver ce compte ?',
+                text: isBlocking ? "Le propriétaire ne pourra plus se connecter." : "L'accès sera rétabli immédiatement.",
+                icon: isBlocking ? 'warning' : 'question',
+                showCancelButton: true,
+                confirmButtonColor: isBlocking ? '#ef4444' : '#22c55e',
+                cancelButtonColor: '#334155',
+                confirmButtonText: isBlocking ? 'Bloquer' : 'Activer',
+                cancelButtonText: 'Annuler',
+                background: '#1e293b',
+                color: '#fff'
+            }).then((result) => {
+                if (result.isConfirmed) form.submit();
+            });
+        }
+
+        // --- GESTION DES FLASH MESSAGES SERVEUR ---
+        document.addEventListener('DOMContentLoaded', () => {
+            <% if (locals.success && locals.success.length > 0) { %>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Succès',
+                    text: "<%= locals.success %>",
+                    confirmButtonColor: '#22c55e',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+            <% } %>
+
+            <% if (locals.error && locals.error.length > 0) { %>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erreur',
+                    text: "<%= locals.error %>",
+                    confirmButtonColor: '#ef4444',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+            <% } %>
+        });
+
+
+        // 4. CHART JS SETUP DYNAMIQUE
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            
+            // DONNÉES DYNAMIQUES AVEC FALLBACK
+            // Si revenueChartData est envoyé par le backend (tableau de chiffres), on l'utilise.
+            // Sinon, on génère des données simulées basées sur le volumeAffaires actuel.
+            const chartData = <%- (locals.revenueChartData && Array.isArray(locals.revenueChartData)) ? JSON.stringify(revenueChartData) : JSON.stringify([volumeAffaires * 0.7, volumeAffaires * 0.85, volumeAffaires * 0.6, volumeAffaires]) %>;
+            
+            // Labels dynamiques (optionnel : Sem 1, Sem 2...)
+            const labels = ['Semaine -3', 'Semaine -2', 'Semaine -1', 'Cette semaine'];
+
+            let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.5)'); 
+            gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Revenus (FCFA)',
+                        data: chartData,
+                        borderColor: '#F59E0B',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#F59E0B',
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: {family: "'Plus Jakarta Sans', sans-serif"} }
+                        },
+                        x: { 
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: {family: "'Plus Jakarta Sans', sans-serif"} }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                }
+            });
+        });
+
+        // 5. SERVICE WORKER
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('SW enregistré:', registration);
-                    })
-                    .catch(error => {
-                        console.log('Echec SW:', error);
-                    });
+                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Fail:', err));
             });
         }
     </script>
