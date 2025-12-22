@@ -3,67 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>À Louer : <%= property.title %></title>
     
+    <title>À Louer : <%= property.title %> | ImmoFacile</title>
+    <meta name="description" content="Découvrez ce bien à <%= property.commune %> pour <%= property.price.toLocaleString('fr-FR') %> FCFA.">
+    
+    <meta property="og:title" content="<%= property.title %> - <%= property.price.toLocaleString('fr-FR') %> FCFA">
+    <meta property="og:description" content="Bien situé à <%= property.commune %>. Cliquez pour voir les photos.">
+    <meta property="og:image" content="<%= (property.images && property.images.length > 0) ? property.images[0] : '/images/default-house.jpg' %>">
+    <meta property="og:type" content="website">
+
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#ffffff">
-    <link rel="apple-touch-icon" href="/icon.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; padding-bottom: 90px; }
+        
+        /* Masquer la scrollbar tout en gardant le scroll */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Snap Scroll pour le carrousel */
+        .snap-x-mandatory { scroll-snap-type: x mandatory; }
+        .snap-center { scroll-snap-align: center; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-['Plus_Jakarta_Sans']">
+<body class="bg-slate-50 text-slate-900">
 
-    <div class="max-w-md mx-auto bg-white min-h-screen shadow-xl overflow-hidden">
-        <div class="h-64 bg-slate-800 flex items-center justify-center text-white">
-            <span class="text-4xl">🏠</span>
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-2xl relative">
+        
+        <div class="relative h-80 bg-slate-200 group">
+            <% if (property.images && property.images.length > 0) { %>
+                <div id="imageSlider" class="flex overflow-x-auto w-full h-full snap-x-mandatory scrollbar-hide scroll-smooth">
+                    <% property.images.forEach((img, index) => { %>
+                        <img src="<%= img %>" alt="Photo <%= index + 1 %> du bien" class="w-full h-full object-cover flex-shrink-0 snap-center">
+                    <% }) %>
+                </div>
+                
+                <div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md text-white text-xs font-bold px-3 py-1 rounded-full border border-white/10">
+                    <span id="slideCounter">1</span> / <%= property.images.length %>
+                </div>
+            <% } else { %>
+                <div class="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                    <i class="ph ph-image text-5xl mb-2 opacity-50"></i>
+                    <span class="text-xs font-bold uppercase tracking-wider">Pas de photo</span>
+                </div>
+            <% } %>
+
+            <div class="absolute top-0 left-0 w-full p-4 flex justify-between items-start bg-gradient-to-b from-black/60 to-transparent">
+                <button onclick="history.back()" aria-label="Retour" class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition active:scale-90">
+                    <i class="ph-bold ph-arrow-left text-xl"></i>
+                </button>
+                <button onclick="shareProperty()" aria-label="Partager ce bien" class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition active:scale-90">
+                    <i class="ph-bold ph-share-network text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="absolute bottom-4 left-4 bg-[#0B1120]/90 backdrop-blur-md text-white px-4 py-2 rounded-xl border border-slate-700 shadow-xl">
+                <span class="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">Loyer mensuel</span>
+                <span class="text-xl font-black text-[#F59E0B]"><%= property.price.toLocaleString('fr-FR') %> F</span>
+            </div>
         </div>
 
-        <div class="p-6">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h1 class="text-2xl font-bold text-[#0B1120]"><%= property.title %></h1>
-                    <p class="text-slate-500"><%= property.address %>, <%= property.commune %></p>
+        <div class="p-6 -mt-6 bg-white rounded-t-[2rem] relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
+            
+            <div class="mb-8">
+                <div class="flex justify-between items-start mb-3">
+                    <span class="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wide">
+                        <%= property.type || 'Appartement' %>
+                    </span>
+                    <span class="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                        <i class="ph-fill ph-clock text-slate-400"></i> Publié récemment
+                    </span>
                 </div>
-                <div class="bg-[#F59E0B] text-white px-3 py-1 rounded-lg font-bold text-sm">
-                    <%= property.price.toLocaleString('fr-FR') %> FCFA
+                <h1 class="text-2xl font-black text-[#0B1120] leading-tight mb-2"><%= property.title %></h1>
+                <p class="text-slate-600 flex items-center gap-1.5 text-sm font-medium">
+                    <i class="ph-fill ph-map-pin text-[#F59E0B]"></i>
+                    <%= property.address %>, <%= property.commune %>
+                </p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-8">
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                    <i class="ph-duotone ph-bed text-2xl text-slate-500 mb-1"></i>
+                    <p class="font-bold text-[#0B1120] text-lg"><%= property.bedrooms || '-' %></p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Chambres</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                    <i class="ph-duotone ph-shower text-2xl text-slate-500 mb-1"></i>
+                    <p class="font-bold text-[#0B1120] text-lg"><%= property.bathrooms || '-' %></p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Douches</p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
+                    <i class="ph-duotone ph-ruler text-2xl text-slate-500 mb-1"></i>
+                    <p class="font-bold text-[#0B1120] text-lg"><%= property.surface || '-' %></p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wide">m²</p>
                 </div>
             </div>
 
-            <hr class="my-6 border-slate-100">
+            <div class="mb-10">
+                <h3 class="font-bold text-[#0B1120] mb-3 text-lg">À propos de ce bien</h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    <%= property.description || "Ce bien dispose de toutes les commodités nécessaires pour un confort optimal. Situé dans une zone accessible et sécurisée. Contactez-nous pour une visite." %>
+                </p>
+            </div>
 
-            <h2 class="font-bold mb-4">Postuler pour ce logement</h2>
-            <p class="text-sm text-slate-500 mb-6">Déposez votre dossier en 30 secondes. Notre IA analyse votre solvabilité instantanément.</p>
+            <hr class="border-dashed border-slate-200 my-8">
 
-            <form action="/apply/<%= property.id %>" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+            <div id="applyForm" class="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-3xl p-6 relative overflow-hidden shadow-sm">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
                 
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Votre Nom Complet</label>
-                    <input type="text" name="name" required class="w-full border border-slate-300 rounded-xl p-3 focus:border-[#F59E0B] outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Téléphone</label>
-                    <input type="tel" name="phone" required class="w-full border border-slate-300 rounded-xl p-3 focus:border-[#F59E0B] outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Email</label>
-                    <input type="email" name="email" required class="w-full border border-slate-300 rounded-xl p-3 focus:border-[#F59E0B] outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Revenus Mensuels (Salaires + Primes)</label>
-                    <input type="number" name="income" required placeholder="Ex: 450000" class="w-full border border-slate-300 rounded-xl p-3 focus:border-[#F59E0B] outline-none">
-                    <p class="text-[10px] text-slate-400 mt-1">Sera vérifié via relevés Mobile Money ou bulletins.</p>
-                </div>
+                <h2 class="font-black text-xl mb-2 relative z-10 text-[#0B1120]">Ce bien vous intéresse ?</h2>
+                <p class="text-xs text-slate-500 mb-6 relative z-10 font-medium">Remplissez ce formulaire. Notre IA analyse votre dossier en <span class="text-[#F59E0B] font-bold">temps réel</span>.</p>
 
-                <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl mt-4 hover:bg-slate-800 transition">
-                    Vérifier mon éligibilité
-                </button>
-            </form>
+                <form action="/apply/<%= property.id %>" method="POST" class="space-y-4 relative z-10">
+                    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    
+                    <div>
+                        <label for="name" class="sr-only">Nom complet</label>
+                        <div class="relative group">
+                            <i class="ph-duotone ph-user absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#F59E0B] transition"></i>
+                            <input type="text" id="name" name="name" required placeholder="Votre Nom Complet" 
+                                   class="w-full bg-white border border-slate-200 rounded-xl p-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition shadow-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="phone" class="sr-only">Téléphone</label>
+                            <div class="relative group">
+                                <i class="ph-duotone ph-phone absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#F59E0B] transition"></i>
+                                <input type="tel" id="phone" name="phone" required pattern="[0-9]{10}" title="Veuillez entrer un numéro à 10 chiffres (ex: 0707123456)" placeholder="07 07..." 
+                                       class="w-full bg-white border border-slate-200 rounded-xl p-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition shadow-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="email" class="sr-only">Email</label>
+                            <div class="relative group">
+                                <i class="ph-duotone ph-envelope absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#F59E0B] transition"></i>
+                                <input type="email" id="email" name="email" required placeholder="Email" 
+                                       class="w-full bg-white border border-slate-200 rounded-xl p-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition shadow-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="income" class="sr-only">Revenus Mensuels</label>
+                        <div class="relative group">
+                            <i class="ph-duotone ph-money absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#F59E0B] transition"></i>
+                            <input type="number" id="income" name="income" required min="10000" placeholder="Revenus Mensuels (FCFA)" 
+                                   class="w-full bg-white border border-slate-200 rounded-xl p-3 pl-10 text-sm text-slate-900 placeholder-slate-400 focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition shadow-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3 mt-2">
+                        <input type="checkbox" required id="consent" class="mt-1 w-4 h-4 text-[#F59E0B] border-slate-300 rounded focus:ring-[#F59E0B]">
+                        <label for="consent" class="text-xs text-slate-600 leading-tight">
+                            Je certifie l'exactitude des informations. Des justificatifs (Wave/Orange Money ou bulletins) seront demandés.
+                        </label>
+                    </div>
+
+                    <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition flex items-center justify-center gap-2 shadow-lg shadow-black/10 transform active:scale-[0.98]">
+                        <i class="ph-bold ph-paper-plane-right"></i> Vérifier mon éligibilité
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
+    <div class="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-200 p-4 pb-6 md:hidden flex items-center justify-between z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+        <div>
+            <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Loyer / Mois</p>
+            <p class="text-xl font-black text-[#0B1120]"><%= property.price.toLocaleString('fr-FR') %> F</p>
+        </div>
+        <button onclick="document.getElementById('applyForm').scrollIntoView({behavior: 'smooth'})" class="bg-[#F59E0B] text-black px-6 py-3 rounded-xl font-bold text-sm shadow-lg shadow-orange-500/20 active:scale-95 transition">
+            Postuler
+        </button>
+    </div>
+
     <script>
+        // --- 1. GESTION DU CARROUSEL ---
+        const slider = document.getElementById('imageSlider');
+        const counter = document.getElementById('slideCounter');
+        
+        if (slider) {
+            slider.addEventListener('scroll', () => {
+                const scrollPosition = slider.scrollLeft;
+                const width = slider.offsetWidth;
+                // Calcul de l'index actuel (arrondi)
+                const currentIndex = Math.round(scrollPosition / width) + 1;
+                counter.innerText = currentIndex;
+            });
+        }
+
+        // --- 2. PARTAGE SOCIAL ---
+        function shareProperty() {
+            if (navigator.share) {
+                navigator.share({
+                    title: '<%= property.title %>',
+                    text: 'Regarde ce bien sur ImmoFacile ! Loyer: <%= property.price.toLocaleString("fr-FR") %> F',
+                    url: window.location.href,
+                }).catch(err => console.log('Partage annulé'));
+            } else {
+                // Fallback pour Desktop
+                navigator.clipboard.writeText(window.location.href);
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Lien copié !',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+            }
+        }
+
+        // --- 3. GESTION DES MESSAGES SERVEUR (FLASH) ---
+        // Vérifie si le serveur a envoyé des messages de succès/erreur via locals
+        document.addEventListener('DOMContentLoaded', () => {
+            <% if (typeof success !== 'undefined' && success && success.length > 0) { %>
+                Swal.fire({
+                    title: 'Dossier Reçu ! 🎉',
+                    text: "<%= success %>",
+                    icon: 'success',
+                    confirmButtonText: 'Super',
+                    confirmButtonColor: '#0B1120'
+                });
+            <% } %>
+
+            <% if (typeof error !== 'undefined' && error && error.length > 0) { %>
+                Swal.fire({
+                    title: 'Oups...',
+                    text: "<%= error %>",
+                    icon: 'error',
+                    confirmButtonText: 'Réessayer',
+                    confirmButtonColor: '#ef4444'
+                });
+            <% } %>
+        });
+
+        // --- 4. SERVICE WORKER ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
         }

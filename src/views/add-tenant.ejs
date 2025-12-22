@@ -2,83 +2,202 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Nouveau Locataire | ImmoFacile CI</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="/icon.png">
-
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+        /* Force le calendrier sombre sur les navigateurs */
+        ::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+    </style>
 </head>
-<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4">
+<body class="bg-[#0B1120] text-slate-200 min-h-screen flex items-center justify-center p-4 md:p-8">
 
-    <div class="w-full max-w-lg">
+    <div class="w-full max-w-lg relative">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-[#F59E0B]/10 rounded-full blur-3xl -z-10 -mr-10 -mt-10 pointer-events-none"></div>
+
         <div class="mb-8">
-            <a href="/owner/dashboard" class="text-slate-500 hover:text-white text-sm flex items-center gap-2">
-                ← Retour au Dashboard
+            <a href="/owner/dashboard" class="inline-flex items-center gap-2 text-slate-400 hover:text-white transition text-sm font-bold bg-white/5 px-4 py-2 rounded-full mb-4 hover:bg-white/10">
+                <i class="ph-bold ph-arrow-left"></i> Retour
             </a>
-            <h1 class="text-3xl font-bold mt-4">Nouveau Bail</h1>
-            <p class="text-slate-400">Digitalisez un locataire en 30 secondes.</p>
+            <h1 class="text-3xl font-black text-white leading-tight">Nouveau Bail <span class="text-[#F59E0B]">.</span></h1>
+            <p class="text-slate-500 mt-1">Générez un contrat et digitalisez votre locataire.</p>
         </div>
 
-        <form action="/owner/add-tenant" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6 shadow-2xl">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 p-6 md:p-8 rounded-[2rem] shadow-2xl relative overflow-hidden">
             
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quel appartement ?</label>
-                <select name="propertyId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-                    <% if (locals.properties) { %>
-                        <% properties.forEach(function(prop) { %>
-                            <option value="<%= prop.id %>"><%= prop.title %> (<%= prop.price.toLocaleString('fr-FR') %> FCFA)</option>
-                        <% }); %>
-                    <% } %>
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
+            <form id="tenantForm" action="/owner/add-tenant" method="POST" class="space-y-6 relative z-10">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom du Locataire</label>
-                    <input type="text" name="tenantName" required placeholder="Ex: M. Diallo" 
-                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase mb-2">
+                        <i class="ph-fill ph-house text-[#F59E0B]"></i> Bien concerné
+                    </label>
+                    <div class="relative">
+                        <select id="propertySelect" name="propertyId" required onchange="updateRent()" 
+                                class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 pr-10 text-white focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] appearance-none transition cursor-pointer">
+                            <option value="" disabled selected>Choisir un appartement...</option>
+                            <% if (locals.properties && properties.length > 0) { %>
+                                <% properties.forEach(function(prop) { %>
+                                    <option value="<%= prop.id %>" data-price="<%= prop.price %>">
+                                        <%= prop.title %> 
+                                    </option>
+                                <% }); %>
+                            <% } else { %>
+                                <option disabled>Aucun bien disponible</option>
+                            <% } %>
+                        </select>
+                        <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"></i>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Téléphone</label>
-                    <input type="tel" name="tenantPhone" required placeholder="0707..." 
-                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-                </div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Loyer (FCFA)</label>
-                    <input type="number" name="monthlyRent" required placeholder="Montant" 
-                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom Complet</label>
+                        <div class="relative">
+                            <i class="ph-duotone ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="text" name="tenantName" required placeholder="Ex: M. Diallo" 
+                                   class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 pl-10 text-white focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition placeholder-slate-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Téléphone</label>
+                        <div class="relative">
+                            <i class="ph-duotone ph-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="tel" name="tenantPhone" required pattern="[0-9]{10}" title="Veuillez entrer un numéro valide à 10 chiffres (ex: 0707...)" placeholder="0707..." 
+                                   class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 pl-10 text-white focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition placeholder-slate-500">
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Caution (Mois)</label>
-                    <input type="number" name="depositMonths" placeholder="Ex: 2" required 
-                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white outline-none focus:border-[#F59E0B] transition">
-                    <p class="text-[10px] text-slate-500 mt-1">Calcul auto (ex: 2 mois = Loyer x 2).</p>
+
+                <div class="bg-[#0B1120]/50 p-4 rounded-xl border border-slate-700/50">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loyer Mensuel</label>
+                            <div class="relative">
+                                <input type="number" id="monthlyRent" name="monthlyRent" required placeholder="0" oninput="calculateTotal()"
+                                       class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-[#F59E0B] outline-none text-right font-mono font-bold">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">FCFA</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Caution (Mois)</label>
+                            <div class="relative">
+                                <input type="number" id="depositMonths" name="depositMonths" placeholder="2" required value="2" oninput="calculateTotal()"
+                                       class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-[#F59E0B] outline-none text-right font-mono font-bold">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">Mois</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-3 border-t border-slate-700 border-dashed">
+                        <span class="text-xs text-slate-400">Total à payer à l'entrée <br>(Caution + 1er mois)</span>
+                        <div class="text-right">
+                            <span id="totalEntryDisplay" class="text-xl font-black text-[#F59E0B]">0</span>
+                            <span class="text-xs text-[#F59E0B] font-bold">FCFA</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Date d'entrée</label>
-                <input type="date" name="startDate" required 
-                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-            </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Date d'entrée (Remise des clés)</label>
+                    <input type="date" name="startDate" required 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none cursor-pointer">
+                </div>
 
-            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition shadow-lg hover:shadow-orange-500/20">
-                Générer le Bail Numérique
-            </button>
-        </form>
+                <button type="submit" id="submitBtn" class="w-full bg-[#F59E0B] hover:bg-orange-500 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-widest transition shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transform active:scale-[0.98]">
+                    <i class="ph-bold ph-signature"></i> Créer le Bail
+                </button>
+            </form>
+        </div>
     </div>
 
     <script>
+        // 0. INIT DEFAULT VALUES
+        document.addEventListener('DOMContentLoaded', () => {
+            // Pré-remplir la date avec aujourd'hui
+            const dateInput = document.querySelector('input[name="startDate"]');
+            if (dateInput) {
+                dateInput.valueAsDate = new Date();
+            }
+        });
+
+        // 1. AUTO-FILL LOYER
+        function updateRent() {
+            const select = document.getElementById('propertySelect');
+            const rentInput = document.getElementById('monthlyRent');
+            
+            // Récupère l'option sélectionnée et son attribut data-price
+            const selectedOption = select.options[select.selectedIndex];
+            const price = selectedOption.getAttribute('data-price');
+            
+            if (price) {
+                rentInput.value = price;
+                calculateTotal(); // Recalcule immédiatement le total
+                
+                // Petit effet visuel pour montrer que ça a changé
+                rentInput.classList.add('bg-slate-700');
+                setTimeout(() => rentInput.classList.remove('bg-slate-700'), 300);
+            }
+        }
+
+        // 2. CALCULATEUR TEMPS RÉEL
+        function calculateTotal() {
+            const rent = parseInt(document.getElementById('monthlyRent').value) || 0;
+            const months = parseInt(document.getElementById('depositMonths').value) || 0;
+            
+            // Formule : (Loyer x Caution) + 1er Mois de Loyer
+            const total = (rent * months) + rent;
+            
+            document.getElementById('totalEntryDisplay').innerText = total.toLocaleString('fr-FR');
+        }
+
+        // 3. GESTION SUBMIT & FEEDBACK
+        document.getElementById('tenantForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('submitBtn');
+            const originalText = btn.innerHTML;
+            
+            // Feedback visuel chargement
+            btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Création...';
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            // On laisse le formulaire partir normalement (action POST)
+        });
+
+        // 4. FLASH MESSAGES
+        document.addEventListener('DOMContentLoaded', () => {
+            <% if (typeof locals.success !== 'undefined' && locals.success) { %>
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Bail Créé !',
+                    text: '<%= locals.success %>',
+                    background: '#1e293b',
+                    color: '#fff',
+                    confirmButtonColor: '#F59E0B'
+                }).then(() => {
+                    window.location.href = '/owner/dashboard';
+                });
+            <% } %>
+
+            <% if (typeof locals.error !== 'undefined' && locals.error) { %>
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Erreur',
+                    text: '<%= locals.error %>',
+                    background: '#1e293b',
+                    color: '#fff'
+                });
+            <% } %>
+        });
+
+        // 5. SERVICE WORKER
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
         }

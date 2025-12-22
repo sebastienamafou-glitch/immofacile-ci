@@ -1,87 +1,208 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CGU & Mentions Légales | ImmoFacile CI</title>
+    <title>Conditions Générales & Mentions Légales | ImmoFacile CI</title>
+    <meta name="description" content="Consultez les conditions générales d'utilisation et mentions légales de la plateforme ImmoFacile CI.">
     
+    <meta property="og:title" content="CGU - ImmoFacile CI">
+    <meta property="og:description" content="Conditions générales d'utilisation et mentions légales.">
+    <meta property="og:image" content="/images/immo_logo.png">
+
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#ffffff">
-    <link rel="apple-touch-icon" href="/icon.png">
+    <meta name="theme-color" content="#0B1120">
+    <link rel="icon" type="image/png" href="/images/immo_logo.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .print-break { page-break-inside: avoid; }
+        }
+        /* Scrollbar custom */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-['Plus_Jakarta_Sans'] p-6 md:p-12">
+<body class="bg-slate-50 text-slate-800">
 
-    <div class="max-w-4xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100">
-        
-        <div class="text-center mb-12 border-b border-slate-100 pb-8">
-            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 mx-auto mb-4 object-contain">
-            <h1 class="text-3xl font-black text-[#0B1120] mb-2">Conditions Générales d'Utilisation</h1>
-            <p class="text-slate-500">Mise à jour le : <%= new Date().toLocaleDateString('fr-FR') %></p>
-        </div>
-
-        <section class="mb-12">
-            <h2 class="text-xl font-black text-[#0B1120] mb-4 uppercase tracking-widest border-l-4 border-[#F59E0B] pl-4">1. Mentions Légales</h2>
-            <div class="bg-slate-50 p-6 rounded-2xl text-sm space-y-4">
-                <p><strong>Éditeur du service :</strong> L'application ImmoFacile CI est éditée par <strong>WebApp CI</strong>, entreprise de droit ivoirien.</p>
-                <p><strong>Siège social :</strong> Abidjan, Côte d'Ivoire Cocody/Palmeraie</p>
-                <p><strong>Contact :</strong> contact@webappci.com</p>
-                <p><strong>Hébergement :</strong> Ce site est hébergé par <strong>Vercel Inc.</strong> et les données sur <strong>Neon.tech</strong>.</p>
+    <header class="bg-[#0B1120] text-white pt-12 pb-24 relative overflow-hidden no-print">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-[#F59E0B]/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="max-w-5xl mx-auto px-6 relative z-10 text-center">
+            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-20 mx-auto mb-6 object-contain">
+            <h1 class="text-3xl md:text-5xl font-black mb-4 tracking-tight">Conditions Générales</h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                La transparence est notre priorité. Voici les règles qui encadrent l'utilisation de nos services.
+            </p>
+            <div class="mt-6 inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm font-medium border border-white/10 backdrop-blur-sm">
+                <i class="ph-fill ph-calendar-check text-[#F59E0B]"></i>
+                Dernière mise à jour : <%= new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) %>
             </div>
-        </section>
+        </div>
+    </header>
 
-        <div class="space-y-8 text-justify text-slate-600 leading-relaxed">
+    <div class="max-w-5xl mx-auto px-4 md:px-6 -mt-16 relative z-20 pb-20">
+        
+        <div class="flex flex-col lg:flex-row gap-8">
             
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 1 : Objet</h3>
-                <p>Les présentes CGU ont pour objet de définir les modalités de mise à disposition des services de l'application <strong>ImmoFacile CI</strong>, outil SaaS de gestion locative et immobilière.</p>
-            </section>
+            <aside class="hidden lg:block w-64 shrink-0 no-print">
+                <div class="sticky top-8 space-y-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-3">Sommaire</p>
+                    <a href="#mentions" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Mentions Légales</a>
+                    <a href="#objet" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Objet</a>
+                    <a href="#services" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Services</a>
+                    <a href="#economie" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Modèle Éco</a>
+                    <a href="#responsabilite" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Responsabilité</a>
+                    
+                    <div class="pt-6">
+                        <button onclick="window.print()" class="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition shadow-sm">
+                            <i class="ph-bold ph-printer"></i> Imprimer
+                        </button>
+                    </div>
+                </div>
+            </aside>
 
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 2 : Description des Services</h3>
-                <p>ImmoFacile CI fournit aux propriétaires bailleurs des outils technologiques pour :</p>
-                <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>Générer des contrats de bail et quittances numériques.</li>
-                    <li>Suivre les encaissements de loyers.</li>
-                    <li>Gérer les incidents techniques.</li>
-                </ul>
-                <p class="mt-2 text-[#F59E0B] font-bold">Important : ImmoFacile CI est un outil technique et n'agit pas en tant qu'agence immobilière. Le Propriétaire reste responsable de la gestion.</p>
-            </section>
+            <main class="flex-1 space-y-6">
 
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 3 : Modèle Économique</h3>
-                <p>L'accès aux services avancés fonctionne selon un modèle de <strong>crédit prépayé</strong>.</p>
-                <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>Le Propriétaire recharge son "Solde Service" via Mobile Money.</li>
-                    <li>Une commission de service (5%) est débitée à chaque transaction.</li>
-                    <li>En cas de solde insuffisant, les services sont suspendus.</li>
-                </ul>
-            </section>
+                <div class="lg:hidden flex gap-3 mb-4 no-print">
+                    <a href="/" class="flex-1 bg-white border border-slate-200 text-center py-3 rounded-xl font-bold shadow-sm">
+                        Retour
+                    </a>
+                    <button onclick="window.print()" class="flex-1 bg-white border border-slate-200 text-center py-3 rounded-xl font-bold shadow-sm">
+                        PDF / Print
+                    </button>
+                </div>
 
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 4 : Responsabilité</h3>
-                <p><strong>WebApp CI</strong> assure une disponibilité 24/7, sauf en cas de force majeure, panne des services tiers ou coupure internet.</p>
-            </section>
+                <section id="mentions" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                            <i class="ph-fill ph-buildings text-xl text-blue-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-[#0B1120]">Mentions Légales</h2>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 text-sm">
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Éditeur</p>
+                            <p class="font-bold text-slate-800 text-lg">WebApp CI</p>
+                            <p class="text-slate-600">Entreprise de droit ivoirien</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Siège Social</p>
+                            <p class="font-bold text-slate-800">Abidjan, Côte d'Ivoire</p>
+                            <p class="text-slate-600">Cocody / Palmeraie</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Contact</p>
+                            <a href="mailto:contact@webappci.com" class="font-bold text-[#F59E0B] hover:underline">contact@webappci.com</a>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Hébergement Tech</p>
+                            <p class="text-slate-800"><strong>Vercel Inc.</strong> (Frontend)</p>
+                            <p class="text-slate-800"><strong>Neon.tech</strong> (Base de données)</p>
+                        </div>
+                    </div>
+                </section>
 
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 5 : Données Personnelles</h3>
-                <p>Conformément à la loi n° 2013-450, voir notre <a href="/privacy" class="text-blue-600 underline">Politique de Confidentialité</a>.</p>
-            </section>
+                <div class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 space-y-10">
+                    
+                    <article id="objet" class="print-break">
+                        <h3 class="text-xl font-bold text-[#0B1120] mb-3 flex items-center gap-2">
+                            <span class="text-[#F59E0B]">01.</span> Objet
+                        </h3>
+                        <p class="text-slate-600 leading-relaxed text-justify">
+                            Les présentes Conditions Générales d'Utilisation (CGU) ont pour objet de définir les modalités de mise à disposition des services de l'application <strong>ImmoFacile CI</strong>, outil SaaS dédié à la gestion locative et immobilière simplifiée en Côte d'Ivoire.
+                        </p>
+                    </article>
 
-            <section>
-                <h3 class="text-lg font-bold text-[#0B1120] mb-2">Article 6 : Droit Applicable</h3>
-                <p>Soumis au droit ivoirien. Litiges portés devant les tribunaux d'Abidjan.</p>
-            </section>
+                    <article id="services" class="print-break">
+                        <h3 class="text-xl font-bold text-[#0B1120] mb-3 flex items-center gap-2">
+                            <span class="text-[#F59E0B]">02.</span> Description des Services
+                        </h3>
+                        <p class="text-slate-600 mb-4">ImmoFacile CI fournit aux propriétaires bailleurs des outils technologiques performants pour :</p>
+                        <ul class="grid sm:grid-cols-2 gap-3 mb-4">
+                            <li class="flex items-center gap-2 text-slate-700 bg-slate-50 p-2 rounded-lg">
+                                <i class="ph-fill ph-check-circle text-green-500"></i> Génération de baux
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-700 bg-slate-50 p-2 rounded-lg">
+                                <i class="ph-fill ph-check-circle text-green-500"></i> Quittances numériques
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-700 bg-slate-50 p-2 rounded-lg">
+                                <i class="ph-fill ph-check-circle text-green-500"></i> Suivi des loyers
+                            </li>
+                            <li class="flex items-center gap-2 text-slate-700 bg-slate-50 p-2 rounded-lg">
+                                <i class="ph-fill ph-check-circle text-green-500"></i> Gestion des incidents
+                            </li>
+                        </ul>
+                        <div class="bg-orange-50 border-l-4 border-[#F59E0B] p-4 rounded-r-lg">
+                            <p class="text-sm text-orange-800">
+                                <strong>Important :</strong> ImmoFacile CI est un outil purement technique et n'agit pas en tant qu'agence immobilière ou administrateur de biens. Le Propriétaire reste seul responsable de la gestion de ses biens.
+                            </p>
+                        </div>
+                    </article>
 
+                    <article id="economie" class="print-break">
+                        <h3 class="text-xl font-bold text-[#0B1120] mb-3 flex items-center gap-2">
+                            <span class="text-[#F59E0B]">03.</span> Modèle Économique
+                        </h3>
+                        <p class="text-slate-600 leading-relaxed mb-3">
+                            L'accès aux services avancés fonctionne selon un modèle de <strong>crédit prépayé</strong> transparent :
+                        </p>
+                        <ol class="list-decimal pl-5 space-y-2 text-slate-600 marker:text-[#F59E0B] marker:font-bold">
+                            <li>Le Propriétaire recharge son "Solde Service" via Mobile Money (Wave, Orange Money, MTN).</li>
+                            <li>Une commission de service fixe (5%) est débitée à chaque transaction de loyer enregistrée.</li>
+                            <li>En cas de solde insuffisant, l'accès aux services premium est temporairement suspendu jusqu'au rechargement.</li>
+                        </ol>
+                    </article>
+
+                    <article id="responsabilite" class="print-break">
+                        <h3 class="text-xl font-bold text-[#0B1120] mb-3 flex items-center gap-2">
+                            <span class="text-[#F59E0B]">04.</span> Responsabilité & Données
+                        </h3>
+                        <div class="space-y-4 text-slate-600 text-justify">
+                            <p>
+                                <strong>Disponibilité :</strong> WebApp CI s'engage à assurer une disponibilité 24/7 de la plateforme, sauf en cas de force majeure, de maintenance programmée, ou de panne inhérente aux services tiers (hébergeurs, FAI).
+                            </p>
+                            <p>
+                                <strong>Données Personnelles :</strong> Conformément à la loi n° 2013-450 relative à la protection des données à caractère personnel, nous nous engageons à sécuriser vos informations. Consultez notre <a href="/privacy" class="text-[#F59E0B] font-bold hover:underline">Politique de Confidentialité</a> pour plus de détails.
+                            </p>
+                        </div>
+                    </article>
+
+                    <article id="droit" class="print-break">
+                        <h3 class="text-xl font-bold text-[#0B1120] mb-3 flex items-center gap-2">
+                            <span class="text-[#F59E0B]">05.</span> Droit Applicable
+                        </h3>
+                        <p class="text-slate-600">
+                            Les présentes conditions sont soumises au droit ivoirien. Tout litige relatif à leur interprétation et/ou à leur exécution relève des tribunaux compétents d'Abidjan.
+                        </p>
+                    </article>
+
+                </div>
+
+                <div class="text-center pt-8 no-print">
+                    <p class="text-slate-400 text-sm mb-4">Vous avez des questions ?</p>
+                    <a href="mailto:support@immofacile.ci" class="inline-flex items-center gap-2 text-[#0B1120] font-bold border-b-2 border-[#F59E0B] hover:text-[#F59E0B] transition pb-0.5">
+                        <i class="ph-bold ph-envelope-simple"></i> Contacter le support juridique
+                    </a>
+                </div>
+
+            </main>
         </div>
-
-        <div class="mt-12 pt-8 border-t border-slate-200 text-center">
-            <a href="/" class="bg-[#0B1120] text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-800 transition">Retour à l'accueil</a>
-        </div>
-
     </div>
+
+    <a href="/" class="hidden lg:flex fixed bottom-8 right-8 bg-[#0B1120] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition z-50 group no-print">
+        <i class="ph-bold ph-house text-xl"></i>
+        <span class="max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-2 transition-all duration-300 ease-in-out whitespace-nowrap">Retour Accueil</span>
+    </a>
 
     <script>
         if ('serviceWorker' in navigator) {
