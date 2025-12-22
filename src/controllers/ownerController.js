@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { generateRandomPassword } = require('../utils/security'); 
 const { uploadFromBuffer } = require('../utils/cloudinary');
 const tracker = require('../utils/tracker'); // Ajout manquant pour postSubmitInventory
+const QRCode = require('qrcode');
 
 // --- GESTION LOCATAIRES ---
 
@@ -350,5 +351,38 @@ exports.postEndLease = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.redirect('/owner/dashboard?error=end_lease_failed');
+    }
+};
+
+exports.generatePoster = async (req, res) => {
+    try {
+        const propertyId = req.params.id;
+        
+        // Récupérer le bien
+        const property = await prisma.property.findUnique({
+            where: { id: propertyId, ownerId: req.session.user.id } // Sécurité
+        });
+
+        if (!property) return res.status(404).send("Bien introuvable");
+
+        // L'URL publique du bien (à adapter avec votre vrai domaine en prod)
+        const publicUrl = `${req.protocol}://${req.get('host')}/property/${property.id}`;
+
+        // Générer le QR Code en Data URL (Base64)
+        const qrCodeUrl = await QRCode.toDataURL(publicUrl, {
+            errorCorrectionLevel: 'H', // Haute résistance (si l'affiche est un peu abîmée)
+            width: 400,
+            margin: 2,
+            color: {
+                dark: '#0B1120', // Vos couleurs
+                light: '#FFFFFF'
+            }
+        });
+
+        res.render('poster', { property, qrCodeUrl });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Erreur génération affiche");
     }
 };

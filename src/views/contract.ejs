@@ -2,19 +2,21 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    [cite_start]<title>Bail d'Habitation - <%= locals.property ? property.title : 'Contrat' %> [cite: 638]</title>
+    [cite_start]<title>Bail d'Habitation - <%= locals.property ? property.title : 'Contrat' %> [cite: 206]</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#ffffff">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
         /* RESET & BASICS */
         body { 
-            font-family: 'Georgia', 'Times New Roman', serif; /* Plus élégant que Times standard */
-            line-height: 1.5; 
+            font-family: 'Georgia', 'Times New Roman', serif; [cite_start]/* Plus élégant que Times standard [cite: 208] */
+            line-height: 1.5;
             color: #1a1a1a; 
             max-width: 210mm; /* Largeur A4 exacte */
-            margin: 0 auto; 
+            margin: 0 auto;
             padding: 20mm; /* Marges d'impression standard */
             background: white;
             font-size: 11pt; /* Taille de lecture standard */
@@ -22,7 +24,7 @@
 
         /* TYPOGRAPHIE */
         h1 { 
-            text-align: center; 
+            text-align: center;
             font-size: 18pt; 
             text-transform: uppercase; 
             letter-spacing: 2px;
@@ -32,7 +34,7 @@
             padding: 10px;
         }
         h2 { 
-            font-size: 12pt; 
+            font-size: 12pt;
             text-transform: uppercase; 
             background: #f3f3f3; 
             padding: 5px 10px; 
@@ -57,7 +59,7 @@
             margin-bottom: 30px;
         }
         .party-box { 
-            width: 48%; 
+            width: 48%;
             padding: 15px; 
             border: 1px solid #ccc;
             background: #fdfdfd;
@@ -83,7 +85,7 @@
 
         /* SIGNATURES */
         .signature-section { 
-            margin-top: 50px; 
+            margin-top: 50px;
             page-break-inside: avoid; 
         }
         .signature-grid {
@@ -92,11 +94,11 @@
             gap: 30px;
         }
         .sign-box { 
-            flex: 1; 
+            flex: 1;
             height: 150px; 
             border: 1px solid #000; 
             padding: 10px; 
-            position: relative;
+            position: relative; /* Important pour le positionnement du tampon */
         }
         .sign-label {
             font-weight: bold;
@@ -110,25 +112,47 @@
             margin-bottom: 10px;
         }
 
+        /* TAMPON NUMERIQUE (NOUVEAU) */
+        .digital-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-10deg);
+            border: 3px solid #059669; /* Vert émeraude */
+            color: #059669;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            font-size: 14px;
+            opacity: 0.9;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            z-index: 10;
+            width: 80%;
+        }
+
         /* UI ECRAN SEULEMENT */
         @media screen {
             body { 
-                box-shadow: 0 0 20px rgba(0,0,0,0.1); 
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
                 margin-top: 40px; 
-                margin-bottom: 40px;
+                margin-bottom: 100px; /* Espace pour la barre fixe du bas */
             }
-            .action-bar {
+            .action-bar-top {
                 position: sticky;
                 top: 0;
-                background: #0B1120; /* Thème ImmoFacile */
+                background: #0B1120;
                 color: white;
                 padding: 15px;
                 text-align: center;
-                margin: -20mm -20mm 30px -20mm; /* Annule le padding du body */
+                margin: -20mm -20mm 30px -20mm;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                z-index: 40;
             }
             .btn {
                 background: #F59E0B;
@@ -154,9 +178,9 @@
 
         /* IMPRESSION */
         @media print { 
-            [cite_start].no-print { display: none !important; [cite: 630] } 
+            .no-print, #signAction, #signModal { display: none !important; } 
             body { 
-                box-shadow: none; 
+                box-shadow: none;
                 margin: 0; 
                 width: 100%;
                 padding: 0; 
@@ -165,7 +189,6 @@
                 margin: 20mm;
                 size: A4;
             }
-            /* Numérotation des pages */
             body { counter-reset: page; }
             .page-footer {
                 position: fixed;
@@ -185,7 +208,7 @@
 </head>
 <body>
 
-    <div class="action-bar no-print">
+    <div class="action-bar-top no-print">
         <a href="/owner/dashboard" class="btn btn-outline">← Retour Tableau de bord</a>
         <div>
             <span style="font-size: 0.9em; opacity: 0.8; margin-right: 15px;">Document généré le <%= new Date().toLocaleDateString('fr-FR') %></span>
@@ -201,17 +224,17 @@
     <div class="parties-container">
         <div class="party-box">
             <span class="party-role">Le Bailleur (Propriétaire)</span>
-            [cite_start]<strong><%= locals.owner ? owner.name : '____________________' %> [cite: 633]</strong><br>
-            [cite_start]<% if(locals.owner && owner.email) { %>Email : <%= owner.email %><br><% } [cite: 634] %>
-            [cite_start]<% if(locals.owner && owner.phone) { %>Tél : <%= owner.phone %><br><% } [cite: 635] %>
+            [cite_start]<strong><%= locals.owner ? owner.name : '____________________' %> [cite: 250]</strong><br>
+            [cite_start]<% if(locals.owner && owner.email) { %>Email : <%= owner.email %><br><% } [cite: 250] %>
+            [cite_start]<% if(locals.owner && owner.phone) { %>Tél : <%= owner.phone %><br><% } [cite: 250] %>
             <br>
             <em>Ci-après dénommé <strong>"LE BAILLEUR"</strong></em>
         </div>
 
         <div class="party-box">
             <span class="party-role">Le Preneur (Locataire)</span>
-            [cite_start]<strong><%= locals.tenant ? tenant.name : '____________________' %> [cite: 636]</strong><br>
-            [cite_start]<% if(locals.tenant && tenant.phone) { %>Tél : <%= tenant.phone %><br><% } [cite: 637] %>
+            [cite_start]<strong><%= locals.tenant ? tenant.name : '____________________' %> [cite: 252]</strong><br>
+            [cite_start]<% if(locals.tenant && tenant.phone) { %>Tél : <%= tenant.phone %><br><% } [cite: 252] %>
             <% if(locals.tenant && tenant.email) { %>Email : <%= tenant.email %><br><% } %>
             <br>
             <em>Ci-après dénommé <strong>"LE PRENEUR"</strong></em>
@@ -226,35 +249,33 @@
     <div class="property-details">
         <ul style="list-style-type: none; padding: 0;">
             <li>🏠 <strong>Type de bien :</strong> <%= locals.property ? property.type || 'Appartement/Maison' : '_______________' %></li>
-            <li>📍 <strong>Adresse :</strong> <%= locals.property ? (property.address + ', ' + property.commune) [cite_start]: '________________________________________' %> [cite: 639]</li>
+            <li>📍 <strong>Adresse :</strong> <%= locals.property ? (property.address + ', ' + property.commune) [cite_start]: '________________________________________' %> [cite: 255]</li>
             <li>🔑 <strong>Destination :</strong> Habitation bourgeoise exclusive. L'exercice de toute activité commerciale, artisanale ou libérale est strictement interdit sans accord écrit.</li>
         </ul>
     </div>
 
     <h2>ARTICLE 2 : DURÉE DU BAIL</h2>
     <p>
-        Le présent bail est consenti et accepté pour une durée de <strong>1 AN (un an)</strong> renouvelable par tacite reconduction.
-        <br>
+        Le présent bail est consenti et accepté pour une durée de <strong>1 AN (un an)</strong> renouvelable par tacite reconduction.<br>
         Il prend effet à compter du : <strong><%= new Date(startDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></strong>.
     </p>
 
     <h2>ARTICLE 3 : LOYER ET CHARGES</h2>
     <p>La présente location est consentie et acceptée moyennant un loyer mensuel de :</p>
     <p style="text-align: center; font-size: 1.2em; font-weight: bold; margin: 20px 0;">
-        [cite_start]<%= lease.monthlyRent.toLocaleString('fr-FR') %> Francs CFA [cite: 640]
+        [cite_start]<%= lease.monthlyRent.toLocaleString('fr-FR') %> Francs CFA [cite: 258]
     </p>
     <p>Le loyer est payable d'avance, mensuellement, au plus tard le <strong>05 de chaque mois</strong>, au domicile du Bailleur ou par tout moyen convenu (Mobile Money, virement).</p>
-    <p><em>Révision du loyer : Le loyer pourra être révisé à chaque renouvellement du contrat, conformément à la législation en vigueur, en fonction de l'indice de référence des loyers.</em></p>
+    <p><em>Révision du loyer : Le loyer pourra être révisé à chaque renouvellement du contrat, conformément à la législation en vigueur.</em></p>
 
     <h2>ARTICLE 4 : DÉPÔT DE GARANTIE (CAUTION)</h2>
     <p>
         Pour garantir l'exécution de ses obligations, le Preneur verse ce jour la somme de :<br>
-        [cite_start]<strong><%= lease.depositAmount.toLocaleString('fr-FR') %> FCFA</strong>[cite: 640], correspondant à <%= Math.round(lease.depositAmount / lease.monthlyRent) %> mois de loyer.
+        [cite_start]<strong><%= lease.depositAmount.toLocaleString('fr-FR') %> FCFA</strong>, correspondant à <%= Math.round(lease.depositAmount / lease.monthlyRent) %> mois de loyer. [cite: 260]
     </p>
-    <p>Cette somme ne porte pas intérêt et ne peut en aucun cas s'imputer sur le paiement des derniers mois de loyer. Elle sera restituée au Preneur en fin de bail, déduction faite des sommes dues (réparations locatives, charges, etc.), dans un délai maximum de 2 mois après la remise des clés.</p>
+    <p>Cette somme ne porte pas intérêt et ne peut en aucun cas s'imputer sur le paiement des derniers mois de loyer. Elle sera restituée au Preneur en fin de bail, déduction faite des sommes dues, dans un délai maximum de 2 mois après la remise des clés.</p>
 
     <h2>ARTICLE 5 : OBLIGATIONS DES PARTIES</h2>
-    
     <h3>5.1 Obligations du Preneur</h3>
     <ul>
         <li>Payer le loyer et les charges aux termes convenus.</li>
@@ -273,7 +294,7 @@
 
     <h2>ARTICLE 6 : CLAUSE RÉSOLUTOIRE</h2>
     <p>
-        [cite_start]À défaut de paiement d'un seul terme de loyer à son échéance ou des charges, ou en cas d'inexécution de l'une des clauses du bail, et <strong>un mois après un commandement de payer ou une sommation d'exécuter restés infructueux</strong>, le bail sera résilié de plein droit[cite: 641].
+        [cite_start]À défaut de paiement d'un seul terme de loyer à son échéance ou des charges, ou en cas d'inexécution de l'une des clauses du bail, et <strong>un mois après un commandement de payer ou une sommation d'exécuter restés infructueux</strong>, le bail sera résilié de plein droit. [cite: 264]
     </p>
     <p>Le Preneur devra libérer les lieux dès la résiliation acquise. À défaut, il pourra y être contraint par simple ordonnance de référé.</p>
 
@@ -287,18 +308,141 @@
             <div class="sign-box">
                 <div class="sign-label">LE BAILLEUR</div>
                 <div class="lu-et-approuve">"Lu et approuvé"</div>
+                
+                <% if(locals.lease && lease.signatureDate) { %>
+                <div class="digital-stamp">
+                    ✍️ SIGNÉ NUMÉRIQUEMENT<br>
+                    ID: <%= lease.id.substring(0,6).toUpperCase() %><br>
+                    DATE: <%= new Date(lease.signatureDate).toLocaleDateString('fr-FR') %>
                 </div>
+                <% } %>
+            </div>
             
             <div class="sign-box">
                 <div class="sign-label">LE PRENEUR</div>
                 <div class="lu-et-approuve">"Lu et approuvé"</div>
+
+                <% if(locals.lease && lease.signatureDate) { %>
+                <div class="digital-stamp">
+                    ✍️ SIGNÉ NUMÉRIQUEMENT<br>
+                    ID: <%= lease.id.substring(0,6).toUpperCase() %><br>
+                    DATE: <%= new Date(lease.signatureDate).toLocaleDateString('fr-FR') %>
                 </div>
+                <% } %>
+            </div>
         </div>
     </div>
 
     <div class="page-footer no-print">
-        ImmoFacile CI - Contrat de Bail Réf: <%= typeof lease !== 'undefined' ? lease.id.substring(0,8).toUpperCase() : 'N/A' %>
+        [cite_start]ImmoFacile CI - Contrat de Bail Réf: <%= typeof lease !== 'undefined' ? lease.id.substring(0,8).toUpperCase() : 'N/A' %> [cite: 269]
     </div>
+
+    <% if(locals.lease && !lease.signatureDate) { %>
+    <div id="signAction" class="fixed bottom-0 left-0 w-full bg-white p-4 border-t shadow-[0_-5px_20px_rgba(0,0,0,0.1)] flex justify-between items-center z-50 no-print">
+        <div class="pl-4">
+            <p class="text-xs text-slate-500 uppercase font-bold tracking-wider">Action requise</p>
+            <p class="font-bold text-[#0B1120] text-lg">Finaliser le bail</p>
+        </div>
+        <button onclick="startSigning()" class="bg-[#F59E0B] text-black px-8 py-3 rounded-xl font-bold hover:scale-105 transition shadow-lg flex items-center gap-2">
+            <span>✍️</span> Signer électroniquement
+        </button>
+    </div>
+
+    <div id="signModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center relative shadow-2xl">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-black">✕</button>
+            
+            <div class="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📱</div>
+            <h3 class="text-xl font-bold mb-2 text-gray-800">Signature Sécurisée</h3>
+            <p class="text-slate-500 text-sm mb-6">Pour valider ce contrat légalement, un code unique va être envoyé sur votre numéro WhatsApp.</p>
+            
+            <div id="step1">
+                <button onclick="sendCode()" class="w-full bg-[#0B1120] hover:bg-slate-800 text-white py-3 rounded-xl font-bold transition">
+                    Recevoir mon code
+                </button>
+            </div>
+
+            <div id="step2" class="hidden space-y-4">
+                <input type="text" id="otpInput" placeholder="ex: 123456" maxlength="6" class="w-full text-center text-2xl tracking-widest border-2 border-slate-200 rounded-xl p-3 focus:border-[#F59E0B] outline-none font-bold bg-slate-50">
+                <button onclick="confirmSign()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition shadow-lg">
+                    Valider la signature
+                </button>
+                <p id="errorMsg" class="text-red-500 text-xs hidden">Code incorrect, veuillez réessayer.</p>
+            </div>
+            
+            <button onclick="closeModal()" class="mt-6 text-xs text-slate-400 underline hover:text-slate-600">Annuler l'opération</button>
+        </div>
+    </div>
+
+    <script>
+        const leaseId = "<%= lease.id %>"; // ID injecté par EJS
+
+        function startSigning() {
+            document.getElementById('signModal').classList.remove('hidden');
+        }
+
+        async function sendCode() {
+            // Simulation d'envoi ou appel API réel
+            const btn = document.querySelector('#step1 button');
+            const originalText = btn.innerText;
+            btn.innerText = "Envoi en cours...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/lease/${leaseId}/sign-request`, { method: 'POST' });
+                if(res.ok) {
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+                    console.log("Code envoyé (Mode test)");
+                } else {
+                    alert("Erreur lors de l'envoi du code. Vérifiez votre connexion.");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erreur de connexion");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function confirmSign() {
+            const code = document.getElementById('otpInput').value;
+            const errorMsg = document.getElementById('errorMsg');
+            
+            if(!code) return;
+
+            try {
+                const res = await fetch(`/api/lease/sign-verify`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ otp: code, leaseId: leaseId })
+                });
+                
+                const data = await res.json();
+                if(data.success) {
+                    // Rechargement pour afficher le tampon
+                    window.location.reload(); 
+                } else {
+                    errorMsg.classList.remove('hidden');
+                    document.getElementById('otpInput').classList.add('border-red-500');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('signModal').classList.add('hidden');
+            // Reset modal state
+            document.getElementById('step1').classList.remove('hidden');
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('errorMsg').classList.add('hidden');
+            document.getElementById('otpInput').value = '';
+        }
+    </script>
+    <% } %>
 
 </body>
 </html>

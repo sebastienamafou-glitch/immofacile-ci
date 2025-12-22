@@ -7,6 +7,7 @@ const prisma = require('../prisma/client'); // Importation cruciale pour les sta
 const ownerController = require('../controllers/ownerController');
 const paymentController = require('../controllers/paymentController');
 
+
 // Import du Middleware
 const auth = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
@@ -47,6 +48,7 @@ router.get('/contract/:leaseId', auth.isOwner, ownerController.getContract);
 router.get('/receipt/:paymentId', auth.isOwner, ownerController.getReceipt);
 router.get('/formal-notice/:leaseId', auth.isOwner, ownerController.getFormalNotice);
 router.get('/inventory/:leaseId', auth.isOwner, ownerController.getInventory);
+router.get('/property/:id/poster', isOwner, ownerController.generatePoster);
 
 // --- ROUTES D'ACTION (POST) ---
 
