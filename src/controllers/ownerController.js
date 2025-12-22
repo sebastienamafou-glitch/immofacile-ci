@@ -97,6 +97,7 @@ exports.getDashboard = async (req, res) => {
     try {
         const userId = req.session.user.id;
 
+        // Récupération des données complexes
         const properties = await prisma.property.findMany({
             where: { ownerId: userId },
             include: { 
@@ -112,6 +113,7 @@ exports.getDashboard = async (req, res) => {
             orderBy: { createdAt: 'desc' }
         });
 
+        // Calcul des statistiques
         let stats = {
             totalRent: 0,
             totalDeposit: 0,
@@ -120,22 +122,32 @@ exports.getDashboard = async (req, res) => {
         };
 
         properties.forEach(prop => {
-            prop.leases.forEach(lease => {
+            // Sécurité : on vérifie que prop.leases est un tableau
+            (prop.leases || []).forEach(lease => {
                 if (lease.isActive) {
-                    stats.totalRent += lease.monthlyRent;
-                    stats.totalDeposit += lease.depositAmount;
+                    stats.totalRent += (lease.monthlyRent || 0);
+                    stats.totalDeposit += (lease.depositAmount || 0);
                 }
             });
-            prop.expenses.forEach(exp => {
-                stats.totalExpenses += exp.amount;
+            // Sécurité : on vérifie que prop.expenses est un tableau
+            (prop.expenses || []).forEach(exp => {
+                stats.totalExpenses += (exp.amount || 0);
             });
-            prop.incidents.forEach(inc => {
+            // Sécurité : on vérifie que prop.incidents est un tableau
+            (prop.incidents || []).forEach(inc => {
                 if (inc.status !== 'RESOLVED') stats.activeIncidents++;
             });
         });
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
+
+        // --- CORRECTION CRITIQUE ICI ---
+        // On s'assure que les valeurs ne sont jamais NULL pour éviter le crash .toLocaleString()
+        if (user) {
+            user.walletBalance = user.walletBalance || 0;
+            user.escrowBalance = user.escrowBalance || 0;
+        }
 
         res.render('dashboard-owner', { 
             user, 
@@ -144,12 +156,13 @@ exports.getDashboard = async (req, res) => {
             stats, 
             netIncome: stats.totalRent - stats.totalExpenses,
             activeIncidentsCount: stats.activeIncidents,
-            realEscrowBalance: user.escrowBalance || 0 
+            realEscrowBalance: user ? user.escrowBalance : 0 
         });
 
     } catch (error) {
-        console.error("Erreur Dashboard:", error);
-        res.status(500).send("Erreur lors du chargement du tableau de bord");
+        console.error("Erreur Critique Dashboard:", error);
+        // Au lieu d'une page blanche, on peut renvoyer vers l'aide ou une page simple
+        res.redirect('/owner/help'); 
     }
 };
 
