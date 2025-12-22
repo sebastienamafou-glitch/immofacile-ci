@@ -1,79 +1,192 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Politique de Confidentialité | ImmoFacile CI</title>
+    <meta name="description" content="Découvrez comment ImmoFacile CI protège, collecte et utilise vos données personnelles.">
     
+    <meta property="og:title" content="Confidentialité - ImmoFacile CI">
+    <meta property="og:description" content="Notre engagement pour la protection de vos données.">
+    <meta property="og:image" content="/images/immo_logo.png">
+
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#ffffff">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="apple-touch-icon" href="/icon.png">
+    <meta name="theme-color" content="#0B1120">
+    <link rel="icon" type="image/png" href="/images/immo_logo.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .print-break { page-break-inside: avoid; }
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-['Plus_Jakarta_Sans'] p-6 md:p-12">
+<body class="bg-slate-50 text-slate-800">
 
-    <div class="max-w-3xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100">
-        
-        <div class="text-center mb-10">
-            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-20 mx-auto mb-4 object-contain">
-            <h1 class="text-2xl font-bold text-[#0B1120]">Politique de Confidentialité</h1>
-            <p class="text-slate-500 text-sm">Dernière mise à jour : <%= new Date().toLocaleDateString('fr-FR') %></p>
+    <header class="bg-[#0B1120] text-white pt-12 pb-24 relative overflow-hidden no-print">
+        <div class="absolute top-0 left-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -ml-16 -mt-16 pointer-events-none"></div>
+        <div class="max-w-5xl mx-auto px-6 relative z-10 text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-white/10 rounded-2xl mb-6 backdrop-blur-md border border-white/10">
+                <i class="ph-fill ph-shield-check text-3xl text-[#F59E0B]"></i>
+            </div>
+            <h1 class="text-3xl md:text-5xl font-black mb-4 tracking-tight">Politique de Confidentialité</h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Votre confiance est notre actif le plus précieux. Voici comment nous sécurisons vos informations.
+            </p>
+            <div class="mt-6 inline-flex items-center gap-2 text-xs font-medium opacity-60">
+                <span>Mis à jour le : <%= new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) %></span>
+            </div>
         </div>
+    </header>
 
-        <div class="space-y-6 text-sm leading-relaxed text-slate-600">
-            <section>
-                <h2 class="text-lg font-bold text-[#0B1120] mb-2">1. Préambule</h2>
-                <p>L'application <strong>ImmoFacile CI</strong> est développée et maintenue par <strong>WebApp CI</strong>. Nous accordons une importance capitale à la protection de vos données personnelles.</p>
-            </section>
-
-            <section>
-                <h2 class="text-lg font-bold text-[#0B1120] mb-2">2. Données collectées</h2>
-                <p>Dans le cadre de l'utilisation de nos services, nous collectons les données suivantes :</p>
-                <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>Informations d'identité (Nom, Prénoms).</li>
-                    <li>Coordonnées (Numéro de téléphone, Email).</li>
-                    <li>Données financières relatives aux baux et paiements (pour la génération des quittances).</li>
-                    <li>Photos des biens immobiliers (État des lieux).</li>
-                </ul>
-            </section>
-
-            <section>
-                <h2 class="text-lg font-bold text-[#0B1120] mb-2">3. Utilisation des données</h2>
-                <p>Vos données sont utilisées exclusivement pour :</p>
-                <ul class="list-disc pl-5 mt-2 space-y-1">
-                    <li>La gestion locative (création de contrats, quittances).</li>
-                    <li>La communication entre propriétaires et locataires.</li>
-                    <li>L'amélioration de nos services.</li>
-                </ul>
-                <p class="mt-2 font-bold text-red-500">Aucune donnée n'est vendue à des tiers.</p>
-            </section>
-
-            <section>
-                <h2 class="text-lg font-bold text-[#0B1120] mb-2">4. Sécurité</h2>
-                <p>WebApp CI met en œuvre toutes les mesures techniques nécessaires pour sécuriser vos données (chiffrement des mots de passe, protocoles sécurisés HTTPS).</p>
-            </section>
-
-            <section>
-                <h2 class="text-lg font-bold text-[#0B1120] mb-2">5. Contact & Droits</h2>
-                <p>Conformément à la législation en vigueur en Côte d'Ivoire, vous disposez d'un droit d'accès, de rectification et de suppression de vos données.</p>
-                <p class="mt-2">Pour toute demande, contactez l'éditeur :</p>
-                <div class="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-4">
-                    <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-10 object-contain">
-                    <div>
-                        <p class="font-bold text-[#0B1120]">WebApp CI Support</p>
-                        <a href="mailto:contact@webappci.com" class="text-blue-600 hover:underline">contact@webappci.com</a>
+    <div class="max-w-5xl mx-auto px-4 md:px-6 -mt-16 relative z-20 pb-20">
+        
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <aside class="hidden lg:block w-64 shrink-0 no-print">
+                <div class="sticky top-8 space-y-2">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-3">Navigation</p>
+                    <a href="#donnees" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Données Collectées</a>
+                    <a href="#utilisation" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Utilisation</a>
+                    <a href="#partage" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Partage & Tiers</a>
+                    <a href="#securite" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Sécurité</a>
+                    <a href="#droits" class="block px-4 py-2 rounded-lg hover:bg-white hover:shadow-sm text-slate-600 hover:text-[#0B1120] transition font-medium border-l-2 border-transparent hover:border-[#F59E0B]">Vos Droits</a>
+                    
+                    <div class="pt-6">
+                        <button onclick="window.print()" class="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 transition shadow-sm">
+                            <i class="ph-bold ph-printer"></i> Imprimer
+                        </button>
                     </div>
                 </div>
-            </section>
-        </div>
+            </aside>
 
-        <div class="mt-10 text-center pt-6 border-t border-slate-100">
-            <a href="javascript:history.back()" class="text-[#F59E0B] font-bold hover:underline">Retour à l'application</a>
-        </div>
+            <main class="flex-1 space-y-6">
 
+                <div class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+                    <h2 class="text-xl font-bold text-[#0B1120] mb-4">Notre Engagement</h2>
+                    <p class="text-slate-600 leading-relaxed text-justify">
+                        L'application <strong>ImmoFacile CI</strong> est développée par <strong>WebApp CI</strong>. Nous nous engageons à respecter scrupuleusement la confidentialité de vos données personnelles, conformément à la loi n° 2013-450 relative à la protection des données à caractère personnel en Côte d'Ivoire.
+                    </p>
+                </div>
+
+                <article id="donnees" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <h3 class="text-lg font-bold text-[#0B1120] mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i class="ph-fill ph-database"></i></span>
+                        1. Les données que nous collectons
+                    </h3>
+                    <p class="text-slate-600 mb-4 text-sm">Nous limitons la collecte aux données strictement nécessaires au fonctionnement du service :</p>
+                    
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="font-bold text-slate-800 text-sm mb-2">👤 Identité & Contact</p>
+                            <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                                <li>Nom et Prénoms</li>
+                                <li>Numéro de téléphone (Identifiant unique)</li>
+                                <li>Adresse email</li>
+                            </ul>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <p class="font-bold text-slate-800 text-sm mb-2">🏠 Gestion Immobilière</p>
+                            <ul class="text-xs text-slate-600 space-y-1 list-disc pl-4">
+                                <li>Détails des biens (Adresse, Loyer)</li>
+                                <li>Contrats de bail</li>
+                                <li>Historique des paiements</li>
+                            </ul>
+                        </div>
+                    </div>
+                </article>
+
+                <article id="utilisation" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <h3 class="text-lg font-bold text-[#0B1120] mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center"><i class="ph-fill ph-gear"></i></span>
+                        2. Utilisation de vos données
+                    </h3>
+                    <ul class="space-y-3 text-slate-600 text-sm">
+                        <li class="flex gap-3">
+                            <i class="ph-fill ph-check-circle text-green-500 mt-0.5"></i>
+                            <div><strong>Exécution du contrat :</strong> Génération automatique des baux, quittances et états des lieux.</div>
+                        </li>
+                        <li class="flex gap-3">
+                            <i class="ph-fill ph-check-circle text-green-500 mt-0.5"></i>
+                            <div><strong>Communication :</strong> Envoi de notifications (SMS/WhatsApp/Email) pour les relances de loyer ou les incidents.</div>
+                        </li>
+                        <li class="flex gap-3">
+                            <i class="ph-fill ph-check-circle text-green-500 mt-0.5"></i>
+                            <div><strong>Amélioration :</strong> Analyse anonymisée des statistiques d'utilisation pour optimiser l'application.</div>
+                        </li>
+                    </ul>
+                    <div class="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg text-red-700 text-xs font-bold text-center">
+                        <i class="ph-fill ph-prohibit"></i> Nous ne vendons, ni ne louons vos données personnelles à aucun tiers.
+                    </div>
+                </article>
+
+                <article id="partage" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <h3 class="text-lg font-bold text-[#0B1120] mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i class="ph-fill ph-share-network"></i></span>
+                        3. Partage et Sous-traitance
+                    </h3>
+                    <p class="text-slate-600 text-sm mb-3">Vos données peuvent être hébergées par nos prestataires techniques de confiance, soumis aux mêmes obligations de sécurité :</p>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-600 text-sm">
+                        <li><strong>Vercel Inc. :</strong> Hébergement de l'application et des fonctions serveur.</li>
+                        <li><strong>Neon.tech :</strong> Hébergement sécurisé de la base de données (PostgreSQL).</li>
+                        <li><strong>Cloudinary :</strong> Stockage sécurisé des médias (photos des biens, états des lieux).</li>
+                    </ul>
+                </article>
+
+                <article id="securite" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <h3 class="text-lg font-bold text-[#0B1120] mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center"><i class="ph-fill ph-lock-key"></i></span>
+                        4. Sécurité des données
+                    </h3>
+                    <p class="text-slate-600 text-sm mb-4">Nous mettons en œuvre des mesures de sécurité robustes pour protéger vos informations contre tout accès non autorisé :</p>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 border border-slate-200">Chiffrement SSL/TLS</span>
+                        <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 border border-slate-200">Mots de passe hachés (Bcrypt)</span>
+                        <span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600 border border-slate-200">Sauvegardes quotidiennes</span>
+                    </div>
+                </article>
+
+                <article id="droits" class="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 print-break">
+                    <h3 class="text-lg font-bold text-[#0B1120] mb-4 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i class="ph-fill ph-gavel"></i></span>
+                        5. Vos Droits
+                    </h3>
+                    <p class="text-slate-600 text-sm mb-4">
+                        Vous disposez d'un droit d'accès, de rectification, de suppression et de portabilité de vos données. Vous pouvez exercer ces droits à tout moment en nous contactant.
+                    </p>
+                    
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex items-center gap-4">
+                        <div class="bg-white p-2 rounded-lg shadow-sm">
+                            <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain">
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-slate-400 uppercase">Délégué à la protection des données</p>
+                            <a href="mailto:contact@webappci.com" class="text-[#0B1120] font-bold hover:text-[#F59E0B] transition">contact@webappci.com</a>
+                        </div>
+                    </div>
+                </article>
+
+            </main>
+        </div>
+    </div>
+
+    <a href="/" class="hidden lg:flex fixed bottom-8 right-8 bg-[#0B1120] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition z-50 group no-print">
+        <i class="ph-bold ph-house text-xl"></i>
+        <span class="max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-2 transition-all duration-300 ease-in-out whitespace-nowrap">Retour Accueil</span>
+    </a>
+
+    <div class="lg:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 p-4 no-print z-50">
+        <a href="/" class="block w-full bg-[#0B1120] text-white text-center py-3 rounded-xl font-bold">Retour à l'application</a>
     </div>
 
     <script>
