@@ -6,6 +6,7 @@ const prisma = require('../prisma/client'); // Importation cruciale pour les sta
 // Imports des contrôleurs
 const ownerController = require('../controllers/ownerController');
 const paymentController = require('../controllers/paymentController');
+const { isOwner } = require('../middlewares/auth');
 
 
 // Import du Middleware
