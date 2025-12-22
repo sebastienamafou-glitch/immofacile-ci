@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solde Insuffisant | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4">
+
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl text-center">
+        
+        <div class="mb-6 relative inline-block">
+            <div class="absolute inset-0 bg-red-500/20 blur-xl rounded-full animate-pulse"></div>
+            <div class="relative bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto border border-red-500/30">
+                <span class="text-4xl">💸</span>
+            </div>
+        </div>
+
+        <h1 class="text-2xl font-black text-white mb-2">Solde Insuffisant</h1>
+        <p class="text-slate-400 text-sm mb-8">
+            Pour encaisser ce loyer, une commission de 5% est requise sur votre solde prépayé.
+        </p>
+
+        <div class="bg-slate-800/50 rounded-2xl p-6 border border-slate-700 mb-8 space-y-3">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+                <span class="text-xs font-bold text-slate-500 uppercase">Solde Actuel</span>
+                <span class="text-red-400 font-bold"><%= currentCredit.toLocaleString('fr-FR') %> FCFA</span>
+            </div>
+            <div class="flex justify-between items-center pt-1">
+                <span class="text-xs font-bold text-slate-500 uppercase">Commission Requise</span>
+                <span class="text-white font-bold"><%= commission.toLocaleString('fr-FR') %> FCFA</span>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <button onclick="document.getElementById('rechargeForm').submit()" class="w-full bg-[#F59E0B] hover:bg-yellow-400 text-[#0B1120] font-bold py-4 rounded-xl transition shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2">
+                <span>⚡️</span> Recharger maintenant
+            </button>
+            
+            <a href="/owner/dashboard" class="block w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-4 rounded-xl transition">
+                Annuler
+            </a>
+        </div>
+
+        <form id="rechargeForm" action="/api/payment/init" method="POST" class="hidden">
+            <% if (typeof csrfToken !== 'undefined') { %>
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <% } %>
+            <input type="hidden" name="amount" value="5000"> </form>
+
+    </div>
+
+</body>
+</html>

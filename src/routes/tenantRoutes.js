@@ -1,6 +1,7 @@
 // routes/tenantRoutes.js
 const express = require('express');
 const router = express.Router();
+const prisma = require('../prisma/client');
 const tenantController = require('../controllers/tenantController');
 const auth = require('../middleware/authMiddleware');
 const tracker = require('../utils/tracker');

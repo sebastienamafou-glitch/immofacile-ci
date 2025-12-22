@@ -287,7 +287,17 @@ exports.postEndLease = async (req, res) => {
         });
 
         const vacantProperties = await prisma.property.findMany({ where: { ownerId: req.session.user.id, leases: { none: { isActive: true } } } });
-        res.render('rehousing', { lease: updatedLease, tenant: updatedLease.tenant, vacantProperties });
+        
+        // --- CORRECTION AJOUTÉE ICI ---
+        const isGoodTenant = true; // Définit le statut pour éviter le crash ReferenceError
+        
+        res.render('rehousing', { 
+            lease: updatedLease, 
+            tenant: updatedLease.tenant, 
+            vacantProperties,
+            isGoodTenant: isGoodTenant // Variable passée à la vue
+        });
+
     } catch (error) {
         console.error(error);
         res.redirect('/owner/dashboard?error=end_lease_failed');
