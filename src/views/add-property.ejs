@@ -7,59 +7,141 @@
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="apple-touch-icon" href="/icon.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
-<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4">
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] min-h-screen p-4 md:p-8">
 
-    <div class="w-full max-w-lg">
-        <div class="mb-8">
-            <a href="/owner/dashboard" class="text-slate-500 hover:text-white text-sm flex items-center gap-2">
-                ← Retour au Dashboard
-            </a>
-            <h1 class="text-3xl font-bold mt-4">Nouveau Bien</h1>
-            <p class="text-slate-400">Ajoutez un actif à votre portefeuille.</p>
+    <div class="max-w-3xl mx-auto">
+        
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <a href="/owner/dashboard" class="text-slate-500 hover:text-white text-sm flex items-center gap-2 mb-2 transition">
+                    <i class="ph-bold ph-arrow-left"></i> Retour au Dashboard
+                </a>
+                <h1 class="text-3xl font-black text-white">Nouveau Bien</h1>
+                <p class="text-slate-400">Ajoutez un actif à votre portefeuille immobilier.</p>
+            </div>
         </div>
 
-        <form action="/owner/add-property" method="POST" class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] space-y-6 shadow-2xl">
+        <form action="/owner/add-property" method="POST" enctype="multipart/form-data" class="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-[2rem] space-y-8 shadow-2xl relative overflow-hidden">
+            
+            <div class="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
             <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
             
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom du bien</label>
-                <input type="text" name="title" required placeholder="Ex: Appartement 3 pièces - Résidence Akwaba" 
-                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-4 relative z-10">
+                <h3 class="text-sm font-bold text-[#F59E0B] uppercase tracking-widest flex items-center gap-2">
+                    <i class="ph-fill ph-house"></i> Le Bien
+                </h3>
+                
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Commune</label>
-                    <select name="commune" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
-                        <option value="Cocody">Cocody</option>
-                        <option value="Yopougon">Yopougon</option>
-                        <option value="Marcory">Marcory</option>
-                        <option value="Plateau">Plateau</option>
-                        <option value="Bingerville">Bingerville</option>
-                    </select>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Titre de l'annonce</label>
+                    <input type="text" name="title" required placeholder="Ex: Villa Duplex 5 pièces - Résidence Akwaba" 
+                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition placeholder-slate-600">
                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Loyer Mensuel (FCFA)</label>
+                        <input type="number" name="price" required placeholder="Ex: 250000" 
+                               class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition placeholder-slate-600 font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Type de bien</label>
+                        <select name="type" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition appearance-none">
+                            <option value="Appartement">Appartement</option>
+                            <option value="Villa">Villa Basse / Duplex</option>
+                            <option value="Studio">Studio / Garçonnière</option>
+                            <option value="Bureau">Local Commercial / Bureau</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-800 border-dashed">
+
+            <div class="space-y-4 relative z-10">
+                <h3 class="text-sm font-bold text-[#F59E0B] uppercase tracking-widest flex items-center gap-2">
+                    <i class="ph-fill ph-map-pin"></i> Localisation
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Commune</label>
+                        <select name="commune" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition">
+                            <option value="Cocody">Cocody</option>
+                            <option value="Marcory">Marcory</option>
+                            <option value="Yopougon">Yopougon</option>
+                            <option value="Plateau">Plateau</option>
+                            <option value="Bingerville">Bingerville</option>
+                            <option value="Abobo">Abobo</option>
+                            <option value="Koumassi">Koumassi</option>
+                            <option value="Treichville">Treichville</option>
+                            <option value="Port-Bouët">Port-Bouët</option>
+                            <option value="Adjamé">Adjamé</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quartier / Adresse Précise</label>
+                        <input type="text" name="address" required placeholder="Ex: Angré 8ème Tranche, Rue des Banques" 
+                               class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition placeholder-slate-600">
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-800 border-dashed">
+
+            <div class="space-y-4 relative z-10">
+                <h3 class="text-sm font-bold text-[#F59E0B] uppercase tracking-widest flex items-center gap-2">
+                    <i class="ph-fill ph-list-plus"></i> Détails & Photos
+                </h3>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">Chambres</label>
+                        <input type="number" name="bedrooms" placeholder="3" 
+                               class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white text-center focus:outline-none focus:border-[#F59E0B]">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">Douches</label>
+                        <input type="number" name="bathrooms" placeholder="2" 
+                               class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white text-center focus:outline-none focus:border-[#F59E0B]">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] md:text-xs font-bold text-slate-400 uppercase mb-2">Surface (m²)</label>
+                        <input type="number" name="surface" placeholder="150" 
+                               class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white text-center focus:outline-none focus:border-[#F59E0B]">
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Quartier / Adresse</label>
-                    <input type="text" name="address" required placeholder="Ex: Angré 8ème Tranche" 
-                           class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Description Complète</label>
+                    <textarea name="description" rows="4" placeholder="Décrivez les atouts : piscine, sécurité, groupe électrogène, proximité écoles..." 
+                              class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B] transition placeholder-slate-600"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Photos (Max 5)</label>
+                    <div class="border-2 border-dashed border-slate-700 bg-[#0B1120]/50 rounded-xl p-8 text-center hover:border-[#F59E0B] hover:bg-[#0B1120] transition cursor-pointer relative group">
+                        <input type="file" name="images" multiple accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                        <i class="ph-duotone ph-camera-plus text-4xl text-slate-500 group-hover:text-[#F59E0B] transition mb-2"></i>
+                        <p class="text-sm text-slate-400 group-hover:text-white transition font-medium">Touchez pour ajouter des photos</p>
+                        <p class="text-xs text-slate-600 mt-1">Format JPG, PNG (Max 5 Mo)</p>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Loyer Mensuel (FCFA)</label>
-                <input type="number" name="price" required placeholder="250000" 
-                       class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]">
+            <div class="pt-4">
+                <button type="submit" class="w-full bg-gradient-to-r from-[#F59E0B] to-orange-600 hover:from-orange-500 hover:to-orange-700 text-white font-black py-4 rounded-xl uppercase tracking-wider transition shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 group">
+                    <span>Publier le Bien</span>
+                    <i class="ph-bold ph-paper-plane-right group-hover:translate-x-1 transition-transform"></i>
+                </button>
             </div>
 
-            <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition shadow-lg hover:shadow-orange-500/20">
-                Enregistrer le Bien
-            </button>
         </form>
     </div>
 

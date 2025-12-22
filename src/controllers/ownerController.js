@@ -5,6 +5,8 @@ const { generateRandomPassword } = require('../utils/security');
 const { uploadFromBuffer } = require('../utils/cloudinary');
 const tracker = require('../utils/tracker'); // Ajout manquant pour postSubmitInventory
 const QRCode = require('qrcode');
+const cloudinary = require('../config/cloudinary');
+
 
 // --- GESTION LOCATAIRES ---
 
@@ -384,5 +386,45 @@ exports.generatePoster = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).send("Erreur génération affiche");
+    }
+};
+
+exports.postAddProperty = async (req, res) => {
+    try {
+        const { title, price, address, commune, description, bedrooms, bathrooms, surface } = req.body;
+        const ownerId = req.session.user.id;
+        
+        // GESTION DES IMAGES MULTIPLES
+        let imageUrls = [];
+        if (req.files && req.files.length > 0) {
+            // On suppose que vous avez un middleware multer qui a déjà uploadé sur Cloudinary
+            // ou qui met les fichiers dans req.files
+            imageUrls = req.files.map(file => file.path); 
+        }
+
+        // CRÉATION EN BASE DE DONNÉES
+        await prisma.property.create({
+            data: {
+                title,
+                address,
+                commune,
+                price: parseInt(price), // Conversion en entier
+                
+                // Nouveaux champs
+                description: description || "",
+                bedrooms: bedrooms ? parseInt(bedrooms) : null,
+                bathrooms: bathrooms ? parseInt(bathrooms) : null,
+                surface: surface ? parseInt(surface) : null,
+                images: imageUrls, // Tableau d'URL
+                
+                ownerId: ownerId
+            }
+        });
+
+        res.redirect('/owner/dashboard?success=property_created');
+
+    } catch (error) {
+        console.error(error);
+        res.redirect('/owner/add-property?error=creation_failed');
     }
 };
