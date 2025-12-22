@@ -1,6 +1,7 @@
 // controllers/tenantController.js
 const prisma = require('../prisma/client');
 const emailService = require('../utils/email');
+const pushService = require('../utils/pushService');
 
 exports.getDashboard = async (req, res) => {
     try {
@@ -20,14 +21,12 @@ exports.getDashboard = async (req, res) => {
             where: { isVerified: true }
         });
 
-        // 3. Rendu de la vue avec les variables globales
+        // 3. Rendu de la vue
         res.render('dashboard-tenant', {
             user: req.session.user, 
             lease: lease || null,
             payments: lease ? lease.payments : [], 
             artisans,
-            // Le csrfToken est injecté par le middleware global dans app.js, 
-            // mais on s'assure qu'il est passé si besoin explicitement
             csrfToken: req.csrfToken() 
         });
 
@@ -66,17 +65,31 @@ exports.postReportIssue = async (req, res) => {
             }
         });
 
-        // 3. ENVOYER L'EMAIL
-        // On vérifie que l'email du propriétaire existe avant d'envoyer
-        if (lease.property.owner && lease.property.owner.email) {
-            emailService.sendIncidentNotification(
-                lease.property.owner.email,  
-                lease.property.owner.name,   
-                lease.tenant.name,           
-                lease.property.title,        
-                title,                       
-                priority                     
-            ).catch(err => console.error("Erreur envoi email incident:", err));
+        // --- CORRECTION ICI ---
+        // La variable 'property' n'existait pas seule, elle est dans 'lease.property'
+        if (lease.property && lease.property.ownerId) {
+            
+            // A. NOTIFICATION PUSH (WEB)
+            const ownerId = lease.property.ownerId; 
+            
+            // On ne bloque pas le thread principal si la notif échoue (pas de await bloquant ou catch)
+            pushService.sendNotificationToUser(ownerId, {
+                title: "Urgence ImmoFacile 🚨",
+                body: `Nouveau signalement : ${title}`,
+                url: "/owner/dashboard#incidents"
+            }).catch(err => console.error("Erreur Push:", err));
+
+            // B. NOTIFICATION EMAIL
+            if (lease.property.owner.email) {
+                emailService.sendIncidentNotification(
+                    lease.property.owner.email,  
+                    lease.property.owner.name,   
+                    lease.tenant.name,           
+                    lease.property.title,        
+                    title,                       
+                    priority                     
+                ).catch(err => console.error("Erreur Email:", err));
+            }
         }
 
         res.redirect('/tenant/dashboard?success=incident_reported');

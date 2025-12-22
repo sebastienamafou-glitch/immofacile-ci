@@ -23,7 +23,7 @@ model User {
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
   
-  // FINANCES (CORRIGÉ AUDIT : Utilisation de Int pour éviter les erreurs d'arrondi)
+  // FINANCES
   walletBalance Int    @default(0) // Argent disponible
   escrowBalance Int    @default(0) // Argent bloqué (Cautions)
 
@@ -33,10 +33,10 @@ model User {
   reportedIncidents Incident[]          @relation("Reporter")
   leads             Lead[]              @relation("AgentLeads")
   transactions      CreditTransaction[] 
-  pushSubscriptions PushSubscription[]
   
-  // AJOUT CRUCIAL : Correction de l'erreur Vercel (Opposite relation field)
-  activityLogs      ActivityLog[]
+  // RELATIONS SYSTÈME
+  pushSubscriptions PushSubscription[] // Notifications Push
+  activityLogs      ActivityLog[]      // Logs d'activité
 }
 
 enum UserRole {
@@ -50,7 +50,7 @@ enum UserRole {
 
 model CreditTransaction {
   id          String   @id @default(cuid())
-  amount      Int      // CORRIGÉ : Int
+  amount      Int      
   description String   
   date        DateTime @default(now())
   
@@ -65,10 +65,9 @@ model Property {
   title     String
   address   String
   commune   String
-  price     Int      // CORRIGÉ : Int
+  price     Int      
   createdAt DateTime @default(now())
   imageUrl  String?
-  
   ownerId   String
   owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
 
@@ -82,8 +81,8 @@ model Lease {
   id            String    @id @default(cuid())
   startDate     DateTime
   endDate       DateTime?
-  depositAmount Int       // CORRIGÉ : Int
-  monthlyRent   Int       // CORRIGÉ : Int
+  depositAmount Int       
+  monthlyRent   Int       
   isActive      Boolean   @default(true)
 
   tenantId      String
@@ -100,7 +99,7 @@ model Lease {
 
 model Payment {
   id        String   @id @default(cuid())
-  amount    Int      // CORRIGÉ : Int
+  amount    Int      
   date      DateTime @default(now())
   month     String
   type      String   @default("LOYER")
@@ -127,7 +126,7 @@ model Incident {
 model Expense {
   id          String   @id @default(cuid())
   description String
-  amount      Int      // CORRIGÉ : Int
+  amount      Int      
   date        DateTime @default(now())
   category    String
   
@@ -171,7 +170,7 @@ model Candidate {
   name        String
   phone       String
   email       String
-  income      Int      // CORRIGÉ : Int
+  income      Int      
   status      String   @default("PENDING")
   score       Int
   createdAt   DateTime @default(now())
@@ -193,15 +192,19 @@ model Artisan {
   createdAt   DateTime @default(now())
 }
 
+// --- SYSTÈME DE NOTIFICATIONS (WEB PUSH) ---
+
 model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique 
-  keys      String   
+  keys      Json     // CORRIGÉ : Type Json pour PostgreSQL (au lieu de String)
   createdAt DateTime @default(now())
   
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // AJOUTÉ : Cascade pour nettoyer si user supprimé
 }
+
+// --- LOGS D'ACTIVITÉ ---
 
 model ActivityLog {
   id        String   @id @default(cuid())
