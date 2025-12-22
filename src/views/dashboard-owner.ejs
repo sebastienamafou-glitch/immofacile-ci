@@ -64,6 +64,11 @@
                     <span>🚪</span> Déconnexion
                 </a>
             </nav>
+            <nav class="space-y-4 flex-1">
+                <a href="/owner/help" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3 border-t border-slate-800/50 mt-4">
+                    <span class="text-blue-400">❓</span> Centre d'Aide
+                </a>
+            </nav>
 
             <div class="mt-auto pt-6 border-t border-slate-800">
                 <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
@@ -79,6 +84,48 @@
 
         <main class="flex-1 p-4 md:p-8 md:ml-64 w-full">
             
+            <% 
+                // Extraction des paramètres de l'URL pour l'affichage des nouveaux identifiants
+                const urlParams = new URLSearchParams(locals.queryString || '');
+                const newPass = urlParams.get('new_pass');
+                const newUser = urlParams.get('new_user');
+                const newPhone = urlParams.get('new_phone');
+            %>
+
+            <% if (newPass && newPhone) { %>
+                <div class="mb-8 p-6 bg-blue-600 rounded-[2rem] border-2 border-blue-400 shadow-2xl relative overflow-hidden animate-fade-in-down">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full"></div>
+                    
+                    <div class="relative z-10">
+                        <h3 class="text-xl font-black mb-2 flex items-center gap-2">
+                            🔑 Identifiants Locataire générés !
+                        </h3>
+                        <p class="text-sm opacity-90 mb-6">
+                            Le compte pour <strong><%= newUser %></strong> est prêt. Transmettez-lui ses accès immédiatement :
+                        </p>
+
+                        <div class="bg-[#0B1120]/50 p-4 rounded-2xl mb-6 border border-white/20">
+                            <p class="text-xs text-slate-400 uppercase font-bold mb-2">Accès sécurisés</p>
+                            <div class="grid grid-cols-1 gap-2 font-mono">
+                                <p class="text-white">Identifiant : <span class="font-bold text-[#F59E0B]"><%= newPhone %></span></p>
+                                <p class="text-white">Mot de passe : <span class="font-bold text-[#F59E0B]"><%= newPass %></span></p>
+                            </div>
+                        </div>
+
+            <% if (!isPaidThisMonth) { %>
+                        <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-3">
+                        <p class="text-[10px] text-red-400 font-bold uppercase mb-1">Retard détecté</p>
+                        <div class="flex gap-2">
+                            <a href="<%= trackingUrl %>" class="flex-1 bg-[#25D366] text-white text-[10px] py-2 rounded-lg text-center font-bold">
+                                WhatsApp
+                            </a>
+                            <a href="/owner/formal-notice/<%= activeLease.id %>" class="flex-1 bg-white/10 text-white text-[10px] py-2 rounded-lg text-center font-bold">
+                                Papier Officiel
+                            </a>
+                        </div>
+                        </div>
+                    <% } %>
+
             <header id="dashboard" class="mb-10 pt-4">
                 <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">La Météo des Revenus</h2>
                 

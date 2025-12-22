@@ -68,22 +68,19 @@ exports.postAddTenant = async (req, res) => {
             });
 
             // 4. LOGIQUE SÉQUESTRE (ENTRÉE)
-            // On enregistre que le propriétaire détient cette caution (dette envers le locataire)
-            // On augmente le solde "bloqué" (escrow) du propriétaire
             await tx.user.update({
                 where: { id: req.session.user.id },
                 data: {
                     escrowBalance: { increment: deposit }
                 }
             });
-            
-            // Note: Dans un système réel, on débitera aussi le locataire ici s'il a du solde.
         });
 
-        // 5. Feedback utilisateur
+        // 5. Feedback utilisateur avec ajout du téléphone pour WhatsApp
         let redirectUrl = '/owner/dashboard?success=tenant_added';
         if (tempPassword) {
-            redirectUrl += `&new_pass=${tempPassword}&new_user=${encodeURIComponent(tenantNameForRedirect)}`; 
+            // Mise à jour : Ajout du paramètre new_phone pour le lien WhatsApp
+            redirectUrl += `&new_pass=${tempPassword}&new_user=${encodeURIComponent(tenantNameForRedirect)}&new_phone=${tenantPhone}`; 
         }
         
         res.redirect(redirectUrl);
@@ -100,50 +97,43 @@ exports.getDashboard = async (req, res) => {
     try {
         const userId = req.session.user.id;
 
-        // 1. Récupération optimisée des données
         const properties = await prisma.property.findMany({
-    where: { ownerId: userId },
-    include: { 
-        leases: { 
+            where: { ownerId: userId },
             include: { 
-                tenant: true, 
-                // CORRECTION ICI : On trie les paiements par date croissante
-                payments: { orderBy: { date: 'asc' } } 
-            } 
-        },
-        incidents: { include: { reporter: true } },
-        expenses: true
-    }, 
-    orderBy: { createdAt: 'desc' }
-});
+                leases: { 
+                    include: { 
+                        tenant: true, 
+                        payments: { orderBy: { date: 'asc' } } 
+                    } 
+                },
+                incidents: { include: { reporter: true } },
+                expenses: true
+            }, 
+            orderBy: { createdAt: 'desc' }
+        });
 
-        // 2. Calculs Financiers
         let stats = {
             totalRent: 0,
-            totalDeposit: 0, // Sera calculé via les baux actifs
+            totalDeposit: 0,
             totalExpenses: 0,
             activeIncidents: 0
         };
 
         properties.forEach(prop => {
-            // Revenus & Caution
             prop.leases.forEach(lease => {
                 if (lease.isActive) {
                     stats.totalRent += lease.monthlyRent;
                     stats.totalDeposit += lease.depositAmount;
                 }
             });
-            // Dépenses
             prop.expenses.forEach(exp => {
                 stats.totalExpenses += exp.amount;
             });
-            // Incidents non résolus
             prop.incidents.forEach(inc => {
                 if (inc.status !== 'RESOLVED') stats.activeIncidents++;
             });
         });
 
-        // 3. Récupération données utilisateur & Artisans
         const user = await prisma.user.findUnique({ where: { id: userId } });
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
 
@@ -154,7 +144,6 @@ exports.getDashboard = async (req, res) => {
             stats, 
             netIncome: stats.totalRent - stats.totalExpenses,
             activeIncidentsCount: stats.activeIncidents,
-            // On peut afficher le vrai solde séquestre de la BDD pour vérification
             realEscrowBalance: user.escrowBalance || 0 
         });
 
@@ -170,30 +159,25 @@ exports.postAddProperty = async (req, res) => {
     const { title, commune, address, price } = req.body;
     
     try {
-        let imageUrl = null; // Par défaut pas d'image
+        let imageUrl = null; 
 
-        // 1. Vérifier si un fichier est présent (grâce au middleware corrigé)
         if (req.file) {
-            console.log("Image détectée, upload vers Cloudinary...");
             try {
-                // On envoie le buffer (mémoire) vers Cloudinary
                 const result = await uploadFromBuffer(req.file.buffer);
-                imageUrl = result.secure_url; // On récupère l'URL sécurisée (https)
+                imageUrl = result.secure_url; 
             } catch (uploadError) {
                 console.error("Erreur Cloudinary:", uploadError);
-                // On peut décider de continuer sans image ou de bloquer
                 return res.redirect('/owner/dashboard?error=image_upload_failed');
             }
         }
 
-        // 2. Création en base de données
         await prisma.property.create({
             data: {
                 title, 
                 commune, 
                 address,
                 price: parseFloat(price),
-                imageUrl: imageUrl, // AJOUT : On sauvegarde l'URL ici
+                imageUrl: imageUrl, 
                 ownerId: req.session.user.id
             }
         });
@@ -359,6 +343,38 @@ exports.getInventory = async (req, res) => {
     }
 };
 
+exports.postSubmitInventory = async (req, res) => {
+    const { leaseId, type, kitchenState, livingState, bathState, generalComment } = req.body;
+    
+    try {
+        // Logique d'upload multiple pour les photos (Cloudinary)
+        const kitchenPhoto = req.files['kitchenPhoto'] ? 
+            (await uploadFromBuffer(req.files['kitchenPhoto'][0].buffer)).secure_url : null;
+        const livingPhoto = req.files['livingPhoto'] ? 
+            (await uploadFromBuffer(req.files['livingPhoto'][0].buffer)).secure_url : null;
+
+        await prisma.inventory.create({
+            data: {
+                type, // 'ENTREE' ou 'SORTIE'
+                kitchenState,
+                kitchenPhoto,
+                livingState,
+                livingPhoto,
+                generalComment,
+                leaseId
+            }
+        });
+
+        // Tracking de l'inspection
+        await tracker.trackAction("INVENTORY_COMPLETED", "OWNER", req.session.user.id, { leaseId, type });
+
+        res.redirect(`/owner/dashboard?success=inventory_${type.toLowerCase()}_saved`);
+    } catch (error) {
+        console.error("Erreur enregistrement EDL:", error);
+        res.redirect('/owner/dashboard?error=inventory_failed');
+    }
+};
+
 // --- FIN DE BAIL & SÉQUESTRE (SORTIE) ---
 
 exports.postEndLease = async (req, res) => {
@@ -366,13 +382,10 @@ exports.postEndLease = async (req, res) => {
     const deductionAmount = parseFloat(deduction) || 0;
 
     try {
-        // Variables pour la vue de relogement
         let updatedLease = null;
         let isGoodTenant = false;
 
-        // Transaction : Clôture bail + Mouvement d'argent (Remboursement caution)
         await prisma.$transaction(async (tx) => {
-            // 1. Récupérer le bail (pour connaître la caution initiale)
             const lease = await tx.lease.findUnique({ 
                 where: { id: leaseId },
                 include: { tenant: true } 
@@ -380,29 +393,23 @@ exports.postEndLease = async (req, res) => {
 
             if (!lease) throw new Error("Bail introuvable");
 
-            // 2. Calculs
             const depositAmount = lease.depositAmount;
             const amountToReturn = depositAmount - deductionAmount;
 
-            // 3. Clôturer le bail
             updatedLease = await tx.lease.update({
                 where: { id: leaseId },
                 data: { isActive: false, endDate: new Date() },
                 include: { property: true, tenant: true }
             });
 
-            // 4. LOGIQUE SÉQUESTRE (SORTIE)
-            // A. On vide le compte séquestre du proprio pour ce montant
-            // B. On ajoute la retenue (deduction) au portefeuille disponible du proprio
             await tx.user.update({
                 where: { id: req.session.user.id },
                 data: {
-                    escrowBalance: { decrement: depositAmount }, // On libère la totalité de la dette
-                    walletBalance: { increment: deductionAmount } // On encaisse les réparations/impayés
+                    escrowBalance: { decrement: depositAmount }, 
+                    walletBalance: { increment: deductionAmount } 
                 }
             });
 
-            // C. On rend le reste au locataire (Wallet)
             if (amountToReturn > 0) {
                 await tx.user.update({
                     where: { id: lease.tenantId },
@@ -412,11 +419,9 @@ exports.postEndLease = async (req, res) => {
                 });
             }
 
-            // Définition bon locataire (si peu de retenues)
-            isGoodTenant = deductionAmount <= (depositAmount * 0.2); // Exemple: retenue < 20%
+            isGoodTenant = deductionAmount <= (depositAmount * 0.2); 
         });
 
-        // 5. Trouver d'autres biens vacants pour le relogement
         const vacantProperties = await prisma.property.findMany({
             where: { 
                 ownerId: req.session.user.id, 
@@ -437,3 +442,5 @@ exports.postEndLease = async (req, res) => {
         res.redirect('/owner/dashboard?error=end_lease_failed');
     }
 };
+
+

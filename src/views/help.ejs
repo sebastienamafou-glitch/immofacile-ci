@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Centre d'Aide | ImmoFacile CI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .faq-content { transition: all 0.3s ease-out; }
+    </style>
+</head>
+<body class="bg-[#0B1120] text-white">
+
+    <main class="max-w-2xl mx-auto p-6 pb-24">
+        <header class="mb-10">
+            <a href="/owner/dashboard" class="text-slate-400 text-sm mb-4 inline-block hover:text-white transition">← Retour au Dashboard</a>
+            <h1 class="text-3xl font-extrabold text-[#F59E0B]">Centre d'Aide</h1>
+            <p class="text-slate-400 mt-2 text-sm">Maîtrisez votre patrimoine avec ImmoFacile CI.</p>
+        </header>
+
+        <section class="mb-12 p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
+            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Votre impact sur la plateforme</h3>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-2xl font-black text-blue-500"><%= statsActions.reminders %></p>
+                    <p class="text-[9px] text-slate-400 uppercase mt-1">Accès Partagés</p>
+                </div>
+                <div class="border-x border-slate-800">
+                    <p class="text-2xl font-black text-[#F59E0B]"><%= statsActions.rentCollected %></p>
+                    <p class="text-[9px] text-slate-400 uppercase mt-1">Loyers Encaissés</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-black text-green-500"><%= statsActions.inventory %></p>
+                    <p class="text-[9px] text-slate-400 uppercase mt-1">EDL Sécurisés</p>
+                </div>
+            </div>
+            <p class="text-[10px] text-center text-slate-500 mt-6 italic">
+                "Chaque action enregistrée renforce votre protection juridique."
+            </p>
+        </section>
+
+        <section class="mb-12">
+            <h2 class="text-xl font-black mb-6 flex items-center gap-2">
+                <span class="bg-blue-600/20 text-blue-400 p-2 rounded-lg text-sm">⚙️</span>
+                Fonctionnement Global
+            </h2>
+            <div class="space-y-6 relative border-l-2 border-slate-800 ml-4 pl-8">
+                <div class="relative">
+                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
+                    <h4 class="font-bold text-sm mb-1">1. Configuration du Bien</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Enregistrez vos biens et baux. Le système calcule automatiquement la caution à bloquer dans votre **Séquestre**.</p>
+                </div>
+                <div class="relative">
+                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
+                    <h4 class="font-bold text-sm mb-1">2. Gestion Financière</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Une commission de 5% est prélevée par encaissement. Rechargez votre **Wallet** via CinetPay pour rester opérationnel.</p>
+                </div>
+                <div class="relative">
+                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
+                    <h4 class="font-bold text-sm mb-1">3. Automatisation & Suivi</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Le système détecte les impayés dès le 5 du mois et vous permet de relancer vos locataires par WhatsApp ou email.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-12 grid grid-cols-1 gap-4">
+            <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl">
+                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">⚖️ Sécurité Juridique</h4>
+                <p class="text-xs text-slate-400">États des lieux avec photos horodatées pour justifier chaque retenue sur caution.</p>
+            </div>
+            <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl">
+                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">📈 Transparence</h4>
+                <p class="text-xs text-slate-400">Visualisation immédiate de votre bénéfice net et des dépenses d'entretien.</p>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <h2 class="text-xl font-black mb-6">❓ Questions Fréquentes</h2>
+            
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <button onclick="toggleFaq(1)" class="w-full p-5 text-left flex justify-between items-center hover:bg-slate-800 transition text-sm">
+                    <span class="font-bold">Comment encaisser un loyer ?</span>
+                    <span id="icon-1">＋</span>
+                </button>
+                <div id="faq-1" class="hidden p-5 pt-0 text-xs text-slate-400 border-t border-slate-800 leading-relaxed">
+                    Dans "Mes Biens", cliquez sur <span class="text-blue-400 font-bold">"Encaisser"</span>. Le système génère la quittance, l'envoie au locataire et déduit la commission de votre Wallet.
+                </div>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <button onclick="toggleFaq(2)" class="w-full p-5 text-left flex justify-between items-center hover:bg-slate-800 transition text-sm">
+                    <span class="font-bold">Pourquoi mon séquestre est à 0 ?</span>
+                    <span id="icon-2">＋</span>
+                </button>
+                <div id="faq-2" class="hidden p-5 pt-0 text-xs text-slate-400 border-t border-slate-800 leading-relaxed">
+                    Le séquestre représente les cautions encaissées. Il s'incrémente automatiquement lorsque vous ajoutez un locataire avec un dépôt de garantie.
+                </div>
+            </div>
+        </section>
+
+        <footer class="mt-12 p-8 bg-gradient-to-br from-blue-900 to-[#0B1120] rounded-[2.5rem] border border-blue-500/30 text-center">
+            <p class="font-bold text-lg mb-4">Besoin d'aide personnalisée ?</p>
+            <a href="https://wa.me/2250707070707" target="_blank" class="inline-flex items-center gap-2 bg-[#25D366] text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:scale-105 transition">
+                📱 Support WhatsApp
+            </a>
+        </footer>
+    </main>
+
+    <script>
+        function toggleFaq(id) {
+            const content = document.getElementById(`faq-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            content.classList.toggle('hidden');
+            icon.innerText = content.classList.contains('hidden') ? '＋' : '－';
+        }
+    </script>
+</body>
+</html>

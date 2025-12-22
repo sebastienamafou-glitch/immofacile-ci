@@ -2,98 +2,124 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>État des Lieux Numérique</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>État des Lieux | ImmoFacile CI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .camera-btn:active { transform: scale(0.95); }
+    </style>
 </head>
-<body class="bg-slate-50 font-['Plus_Jakarta_Sans'] pb-20">
+<body class="bg-[#0B1120] text-white pb-20">
 
-    <div class="max-w-md mx-auto bg-white min-h-screen shadow-xl">
-        <div class="bg-[#0B1120] p-6 text-white rounded-b-3xl mb-6">
-            <h1 class="text-xl font-bold">État des Lieux : <%= type %></h1>
-            <p class="text-sm text-slate-400"><%= property.title %> • <%= tenant.name %></p>
+    <header class="sticky top-0 z-50 bg-[#0B1120]/80 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between">
+        <a href="/owner/dashboard" class="text-slate-400 text-sm">✕ Annuler</a>
+        <h1 class="text-sm font-bold uppercase tracking-widest text-[#F59E0B]">EDL <%= type %></h1>
+        <div class="w-10"></div>
+    </header>
+
+    <main class="p-4 max-w-md mx-auto">
+        <div class="mb-8 p-4 bg-slate-900 rounded-2xl border border-slate-800">
+            <p class="text-[10px] text-slate-500 uppercase font-bold">Bien & Locataire</p>
+            <p class="font-bold text-white"><%= property.title %></p>
+            <p class="text-xs text-slate-400">Locataire : <%= tenant.name %></p>
         </div>
 
-        <form action="/owner/inventory/<%= lease.id %>?_csrf=<%= csrfToken %>" method="POST" enctype="multipart/form-data" class="p-6 space-y-8">
+        <form action="/owner/submit-inventory" method="POST" enctype="multipart/form-data" class="space-y-10">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="leaseId" value="<%= lease.id %>">
             <input type="hidden" name="type" value="<%= type %>">
 
-            <div class="border-b border-slate-100 pb-6">
-                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🛋️ Le Salon</h3>
-                <div class="space-y-3">
-                    <label class="block text-xs font-bold text-slate-400 uppercase">État général</label>
-                    <select name="livingState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <option value="NEUF">Neuf / Excellent</option>
+            <section class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-blue-600/20 text-blue-400 p-2 rounded-lg text-xl">🍳</span>
+                    <h2 class="text-lg font-bold">Cuisine</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4">
+                    <select name="kitchenState" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm outline-none focus:border-blue-500">
+                        <option value="NEUF">État Neuf</option>
                         <option value="BON">Bon état</option>
-                        <option value="USAGÉ">Usagé / Vieillissant</option>
-                        <option value="DÉGRADÉ">Dégradé / À repeindre</option>
+                        <option value="MOYEN">État d'usage (Moyen)</option>
+                        <option value="DEGRADE">Dégradé / À réparer</option>
                     </select>
-                    
-                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
-                        <span class="text-2xl">📸</span>
-                        <p class="text-xs text-slate-500 mt-1">Photo du Salon</p>
-                        <input type="file" name="livingPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-living')">
-                    </label>
-                    <img id="preview-living" class="w-full h-32 object-cover rounded-xl hidden mt-2">
-                </div>
-            </div>
 
-            <div class="border-b border-slate-100 pb-6">
-                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🍳 La Cuisine</h3>
-                <div class="space-y-3">
-                    <label class="block text-xs font-bold text-slate-400 uppercase">État (Evier, Placards)</label>
-                    <select name="kitchenState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <label class="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-700 rounded-2xl bg-slate-900/50 active:bg-slate-800 transition camera-btn">
+                        <input type="file" name="kitchenPhoto" accept="image/*" capture="environment" class="absolute inset-0 opacity-0 cursor-pointer">
+                        <span class="text-2xl mb-2">📸</span>
+                        <span class="text-xs font-bold text-slate-400">Prendre une photo</span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-orange-600/20 text-orange-400 p-2 rounded-lg text-xl">🛋️</span>
+                    <h2 class="text-lg font-bold">Salon / Séjour</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4">
+                    <select name="livingState" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm outline-none focus:border-orange-500">
+                        <option value="NEUF">État Neuf</option>
                         <option value="BON">Bon état</option>
-                        <option value="NEUF">Neuf</option>
-                        <option value="SALE">Sale / Gras</option>
-                        <option value="CASSÉ">Éléments cassés</option>
+                        <option value="MOYEN">État d'usage (Moyen)</option>
+                        <option value="DEGRADE">Dégradé / À réparer</option>
                     </select>
-                    
-                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
-                        <span class="text-2xl">📸</span>
-                        <p class="text-xs text-slate-500 mt-1">Photo Cuisine</p>
-                        <input type="file" name="kitchenPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-kitchen')">
-                    </label>
-                    <img id="preview-kitchen" class="w-full h-32 object-cover rounded-xl hidden mt-2">
-                </div>
-            </div>
 
-            <div class="border-b border-slate-100 pb-6">
-                <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🚿 Salle d'Eau</h3>
-                <div class="space-y-3">
-                    <label class="block text-xs font-bold text-slate-400 uppercase">État (Robinetterie, WC)</label>
-                    <select name="bathState" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3">
-                        <option value="FONCTIONNEL">Fonctionnel</option>
-                        <option value="FUITE">Fuite détectée</option>
-                        <option value="CASSÉ">Cassé / Manquant</option>
+                    <label class="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-700 rounded-2xl bg-slate-900/50 active:bg-slate-800 transition camera-btn">
+                        <input type="file" name="livingPhoto" accept="image/*" capture="environment" class="absolute inset-0 opacity-0 cursor-pointer">
+                        <span class="text-2xl mb-2">📸</span>
+                        <span class="text-xs font-bold text-slate-400">Prendre une photo</span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <span class="bg-teal-600/20 text-teal-400 p-2 rounded-lg text-xl">🚿</span>
+                    <h2 class="text-lg font-bold">Salle de Bain</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 gap-4">
+                    <select name="bathState" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm outline-none focus:border-teal-500">
+                        <option value="NEUF">État Neuf</option>
+                        <option value="BON">Bon état</option>
+                        <option value="MOYEN">État d'usage (Moyen)</option>
+                        <option value="DEGRADE">Dégradé / À réparer</option>
                     </select>
-                    
-                    <label class="block w-full border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:bg-slate-50 transition">
-                        <span class="text-2xl">📸</span>
-                        <p class="text-xs text-slate-500 mt-1">Photo Douche/WC</p>
-                        <input type="file" name="bathPhoto" accept="image/*" capture="environment" class="hidden" onchange="preview(this, 'preview-bath')">
-                    </label>
-                    <img id="preview-bath" class="w-full h-32 object-cover rounded-xl hidden mt-2">
-                </div>
-            </div>
 
-            <button type="submit" class="w-full bg-[#0B1120] text-white py-4 rounded-xl font-bold shadow-lg hover:scale-105 transition">
-                Valider et Signer
+                    <label class="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-700 rounded-2xl bg-slate-900/50 active:bg-slate-800 transition camera-btn">
+                        <input type="file" name="bathPhoto" accept="image/*" capture="environment" class="absolute inset-0 opacity-0 cursor-pointer">
+                        <span class="text-2xl mb-2">📸</span>
+                        <span class="text-xs font-bold text-slate-400">Prendre une photo</span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <h2 class="text-sm font-bold text-slate-500 uppercase">Commentaire général</h2>
+                <textarea name="generalComment" rows="4" placeholder="Précisez ici les éventuels dégâts ou remarques particulières..." class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm outline-none focus:border-[#F59E0B]"></textarea>
+            </section>
+
+            <button type="submit" class="w-full bg-[#F59E0B] text-[#0B1120] font-black py-5 rounded-2xl shadow-xl shadow-orange-500/20 active:scale-95 transition">
+                🚀 VALIDER L'ÉTAT DES LIEUX
             </button>
         </form>
-    </div>
+    </main>
 
     <script>
-        function preview(input, id) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById(id).src = e.target.result;
-                    document.getElementById(id).classList.remove('hidden');
+        // Aperçu rapide du fichier sélectionné (UX mobile)
+        document.querySelectorAll('input[type="file"]').forEach(input => {
+            input.addEventListener('change', function(e) {
+                if (this.files && this.files[0]) {
+                    const label = this.parentElement;
+                    label.classList.remove('border-slate-700');
+                    label.classList.add('border-green-500', 'bg-green-500/10');
+                    label.querySelector('span:last-child').innerText = "✅ Image capturée";
                 }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
+            });
+        });
     </script>
 </body>
 </html>
