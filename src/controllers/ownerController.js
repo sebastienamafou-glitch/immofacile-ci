@@ -92,43 +92,83 @@ exports.getDashboard = async (req, res) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        let stats = { totalRent: 0, totalDeposit: 0, totalExpenses: 0, activeIncidents: 0 };
+        // --- NOUVEAU CALCUL YTD (Year to Date) ---
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1); // 1er Janvier
+
+        let stats = { 
+            totalMonthlyRent: 0, // Somme des loyers théoriques mensuels
+            totalDeposit: 0, 
+            totalExpensesMonth: 0, // Dépenses globales (ou du mois selon votre logique précédente)
+            activeIncidents: 0,
+            
+            // Les nouveaux compteurs réels
+            rentYTD: 0,      // Total encaissé en 2024
+            expensesYTD: 0   // Total décaissé en 2024
+        };
 
         properties.forEach(prop => {
+            // 1. Gestion des Baux et Paiements
             (prop.leases || []).forEach(lease => {
                 if (lease.isActive) {
-                    stats.totalRent += (lease.monthlyRent || 0);
+                    stats.totalMonthlyRent += (lease.monthlyRent || 0);
                     stats.totalDeposit += (lease.depositAmount || 0);
                 }
+
+                // Calcul des encaissements réels cette année (YTD)
+                if (lease.payments) {
+                    lease.payments.forEach(payment => {
+                        const payDate = new Date(payment.date || payment.createdAt);
+                        if (payDate >= startOfYear && payDate <= now) {
+                            stats.rentYTD += (payment.amount || 0);
+                        }
+                    });
+                }
             });
-            (prop.expenses || []).forEach(exp => { stats.totalExpenses += (exp.amount || 0); });
-            (prop.incidents || []).forEach(inc => { if (inc.status !== 'RESOLVED') stats.activeIncidents++; });
+
+            // 2. Gestion des Dépenses
+            (prop.expenses || []).forEach(exp => { 
+                stats.totalExpensesMonth += (exp.amount || 0); // Votre ancien total global
+
+                // Calcul des dépenses réelles cette année (YTD)
+                const expDate = new Date(exp.createdAt || exp.date); // Prisma utilise souvent createdAt
+                if (expDate >= startOfYear && expDate <= now) {
+                    stats.expensesYTD += (exp.amount || 0);
+                }
+            });
+
+            // 3. Incidents
+            (prop.incidents || []).forEach(inc => { 
+                if (inc.status !== 'RESOLVED') stats.activeIncidents++; 
+            });
         });
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
 
-        // SÉCURITÉ ANTI-CRASH
         if (user) {
             user.walletBalance = user.walletBalance || 0;
             user.escrowBalance = user.escrowBalance || 0;
         }
 
-        // --- C'EST ICI QUE LA CORRECTION EST APPLIQUÉE ---
         res.render('dashboard-owner', { 
             user, 
             properties, 
             artisans, 
             
-            // Correction : On envoie les variables séparées pour l'affichage
-            totalRent: stats.totalRent,
+            // Variables Mensuelles / Globales existantes
+            totalRent: stats.totalMonthlyRent,
             totalDeposit: stats.totalDeposit,
-            totalExpenses: stats.totalExpenses,
-            
-            netIncome: stats.totalRent - stats.totalExpenses,
+            totalExpenses: stats.totalExpensesMonth,
+            netIncome: stats.totalMonthlyRent - stats.totalExpensesMonth,
             activeIncidentsCount: stats.activeIncidents,
-            realEscrowBalance: user ? user.escrowBalance : 0 
-        }); // <--- Vérifiez bien que ces parenthèses et accolades sont présentes !
+            realEscrowBalance: user ? user.escrowBalance : 0,
+
+            // --- NOUVELLES VARIABLES ANNUELLES ---
+            totalRentYTD: stats.rentYTD,
+            totalExpensesYTD: stats.expensesYTD,
+            netIncomeYTD: stats.rentYTD - stats.expensesYTD // Bénéfice net annuel
+        });
 
     } catch (error) {
         console.error("Erreur Critique Dashboard:", error);

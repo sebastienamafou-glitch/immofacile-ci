@@ -31,22 +31,25 @@
 <body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans']">
 
     <div id="globalLoader" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120]/80 backdrop-blur-sm transition-opacity duration-300">
-    <div class="relative">
-        <div class="w-20 h-20 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin"></div>
-        <div class="absolute inset-0 flex items-center justify-center">
-            <span class="text-2xl animate-pulse">🏠</span>
+        <div class="relative">
+            <div class="w-20 h-20 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <span class="text-2xl animate-pulse">🏠</span>
+            </div>
         </div>
+        <p class="mt-4 text-white font-bold tracking-widest animate-pulse">TRAITEMENT EN COURS...</p>
     </div>
-    <p class="mt-4 text-white font-bold tracking-widest animate-pulse">TRAITEMENT EN COURS...</p>
-</div>
 
     <% 
-    /* --- FONCTIONS UTILITAIRES EJS --- */
-    // Fonction pour formater le numéro WhatsApp proprement (DRY)
+    /* --- FONCTIONS UTILITAIRES OPTIMISÉES --- */
+    
+    // Formatage lien WhatsApp robuste
     const formatWaLink = (phone, text = '') => {
         if (!phone) return '#';
-        let clean = phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
-        if (!clean.startsWith('225')) clean = '225' + clean;
+        // Garde uniquement les chiffres
+        let clean = phone.replace(/\D/g, ''); 
+        // Ajoute l'indicatif 225 si absent (format 10 chiffres)
+        if (clean.length === 10) clean = '225' + clean; 
         return `https://wa.me/${clean}${text ? '?text=' + encodeURIComponent(text) : ''}`;
     };
 
@@ -87,6 +90,7 @@
                 </a>
                 <a href="#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
                     <span>🔨</span> Artisans
+                </a>
                 
                 <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3 mt-4 border-t border-slate-800 pt-4">
                     <span>❓</span> Centre d'Aide
@@ -119,33 +123,72 @@
                     </div>
                 </div>
                 
+                <% 
+                    // Configuration des dates pour l'affichage
+                    const today = new Date();
+                    const currentMonthName = today.toLocaleString('fr-FR', { month: 'long' });
+                    const currentYear = today.getFullYear();
+                    
+                    // Récupération sécurisée des données du backend
+                    const monthlyRent = typeof totalRent !== 'undefined' ? Number(totalRent) : 0;
+                    const monthlyExpenses = typeof totalExpenses !== 'undefined' ? Number(totalExpenses) : 0;
+                    const monthlyNet = typeof netIncome !== 'undefined' ? Number(netIncome) : 0;
+
+                    // Récupération des données annuelles (YTD) - Si non dispo, fallback sur 0
+                    const annualRent = typeof totalRentYTD !== 'undefined' ? Number(totalRentYTD) : 0;
+                    const annualExpenses = typeof totalExpensesYTD !== 'undefined' ? Number(totalExpensesYTD) : 0;
+                %>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem] relative overflow-hidden group hover:border-blue-500/50 transition">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                            <span class="text-6xl">📈</span>
+                        </div>
+                        <p class="text-slate-400 text-xs mb-1 font-bold uppercase tracking-wider">
+                            Revenus <span class="text-blue-400"><%= currentMonthName %></span> (Théorique)
+                        </p>
+                        <p class="text-2xl font-black text-white mb-2">
+                            <%= formatMoney(monthlyRent) %> <span class="text-xs text-slate-500 font-normal">FCFA</span>
+                        </p>
+                        
+                        <div class="inline-flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
+                            <span class="text-[10px] text-slate-400">Total <%= currentYear %> :</span>
+                            <span class="text-[10px] font-bold text-green-400"><%= formatMoney(annualRent) %> FCFA</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem] relative overflow-hidden hover:border-red-500/50 transition">
+                        <div class="absolute top-0 right-0 p-4 opacity-10">
+                            <span class="text-6xl">💸</span>
+                        </div>
+                        <p class="text-slate-400 text-xs mb-1 font-bold uppercase tracking-wider">
+                            Dépenses Globales
+                        </p>
+                        <p class="text-2xl font-black text-red-500 mb-2">
+                            - <%= formatMoney(monthlyExpenses) %> <span class="text-xs text-red-900/50 font-normal">FCFA</span>
+                        </p>
+                         <div class="h-1 w-full bg-slate-800 rounded-full mt-3 overflow-hidden">
+                            <div class="h-full bg-red-500" style="width: <%= (monthlyRent > 0) ? Math.min((monthlyExpenses / monthlyRent) * 100, 100) : 0 %>%"></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-1 text-right">Cumul <%= currentYear %> : -<%= formatMoney(annualExpenses) %></p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-900 to-slate-900 border border-blue-500/30 p-5 rounded-[2rem] relative overflow-hidden shadow-lg shadow-blue-900/20">
+                        <p class="text-blue-200 text-xs mb-1 font-bold uppercase tracking-wider">Cashflow Net (Mois)</p>
+                        <p class="text-3xl font-black text-white tracking-tight">
+                            <%= formatMoney(monthlyNet) %>
+                        </p>
+                        <p class="text-xs text-blue-300/60 mt-1">Solde après charges</p>
+                    </div>
+
                     <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
-                        <p class="text-slate-400 text-xs mb-1">Revenus Bruts</p>
-                        <p class="text-2xl font-black text-white">
-                            <%= formatMoney(typeof totalRent !== 'undefined' ? totalRent : 0) %> 
+                        <p class="text-slate-400 text-xs mb-1 font-bold uppercase tracking-wider">Séquestre (Cautions)</p>
+                        <p class="text-2xl font-black text-[#F59E0B]">
+                            <%= formatMoney(typeof totalDeposit !== 'undefined' ? totalDeposit : 0) %> 
                             <span class="text-xs text-slate-500 font-normal">FCFA</span>
                         </p>
-                    </div>
-
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
-                        <p class="text-slate-400 text-xs mb-1">Dépenses du mois</p>
-                        <p class="text-2xl font-black text-red-500">
-                            - <%= formatMoney(typeof totalExpenses !== 'undefined' ? totalExpenses : 0) %>
-                        </p>
-                    </div>
-
-                    <div class="bg-gradient-to-br from-blue-900 to-slate-900 border border-blue-500/30 p-5 rounded-[2rem]">
-                        <p class="text-blue-200 text-xs mb-1 font-bold">BÉNÉFICE NET</p>
-                        <p class="text-2xl font-black text-white">
-                            <%= formatMoney(typeof netIncome !== 'undefined' ? netIncome : 0) %>
-                        </p>
-                    </div>
-
-                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
-                        <p class="text-slate-400 text-xs mb-1">Séquestre (Caution)</p>
-                        <p class="text-2xl font-black text-[#F59E0B]">
-                            <%= formatMoney(typeof totalDeposit !== 'undefined' ? totalDeposit : 0) %>
+                        <p class="text-[10px] text-slate-500 mt-2">
+                            ⚠️ Argent bloqué (Locataires)
                         </p>
                     </div>
                 </div>
@@ -245,10 +288,24 @@
                                     </div>
 
                                     <% 
-                                        const dateOptions = { month: 'long', year: 'numeric', timeZone: 'Africa/Abidjan' };
-                                        const currentMonthStr = new Date().toLocaleString('fr-FR', dateOptions);
-                                        const lastPayment = (activeLease.payments && activeLease.payments.length > 0) ? activeLease.payments[activeLease.payments.length - 1] : null;
-                                        const isPaidThisMonth = lastPayment && lastPayment.month.toLowerCase().includes(new Date().toLocaleString('fr-FR', { month: 'long' }).toLowerCase());
+                                        /* --- CORRECTIF LOGIQUE DE PAIEMENT --- */
+                                        const now = new Date();
+                                        const currentMonthStr = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+                                        
+                                        const lastPayment = (activeLease.payments && activeLease.payments.length > 0) 
+                                            ? activeLease.payments[activeLease.payments.length - 1] 
+                                            : null;
+
+                                        let isPaidThisMonth = false;
+                                        if (lastPayment) {
+                                            if (lastPayment.createdAt || lastPayment.date) {
+                                                const pDate = new Date(lastPayment.createdAt || lastPayment.date);
+                                                isPaidThisMonth = (pDate.getMonth() === now.getMonth()) && (pDate.getFullYear() === now.getFullYear());
+                                            } else if (lastPayment.month) {
+                                                // Fallback
+                                                isPaidThisMonth = lastPayment.month.toLowerCase().includes(now.toLocaleString('fr-FR', { month: 'long' }).toLowerCase());
+                                            }
+                                        }
                                     %>
 
                                     <% if (isPaidThisMonth) { %>
@@ -500,40 +557,40 @@
     </div>
 
     <div id="newTenantModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div class="bg-slate-900 border border-green-500/50 p-8 rounded-3xl w-full max-w-md relative shadow-[0_0_50px_rgba(34,197,94,0.2)]">
-        <button onclick="closeNewTenantModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
-        
-        <div class="text-center mb-6">
-            <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span class="text-3xl">🎉</span>
+        <div class="bg-slate-900 border border-green-500/50 p-8 rounded-3xl w-full max-w-md relative shadow-[0_0_50px_rgba(34,197,94,0.2)]">
+            <button onclick="closeNewTenantModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
+            
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-3xl">🎉</span>
+                </div>
+                <h2 class="text-xl font-bold text-white mb-2">Locataire Créé avec Succès !</h2>
+                <p class="text-slate-400 text-sm">Transmettez ces accès à votre locataire.</p>
             </div>
-            <h2 class="text-xl font-bold text-white mb-2">Locataire Créé avec Succès !</h2>
-            <p class="text-slate-400 text-sm">Transmettez ces accès à votre locataire.</p>
-        </div>
 
-        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4 mb-6">
-            <div>
-                <p class="text-[10px] uppercase text-slate-500 font-bold">Nom</p>
-                <p class="text-white font-bold text-lg" id="modalNewUser">...</p>
-            </div>
-            <div>
-                <p class="text-[10px] uppercase text-slate-500 font-bold">Identifiant (Tél)</p>
-                <p class="text-[#F59E0B] font-mono text-lg" id="modalNewPhone">...</p>
-            </div>
-            <div>
-                <p class="text-[10px] uppercase text-slate-500 font-bold">Mot de passe provisoire</p>
-                <div class="flex items-center justify-between bg-black/30 p-2 rounded-lg mt-1">
-                    <p class="text-green-400 font-mono text-xl tracking-widest" id="modalNewPass">...</p>
+            <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 space-y-4 mb-6">
+                <div>
+                    <p class="text-[10px] uppercase text-slate-500 font-bold">Nom</p>
+                    <p class="text-white font-bold text-lg" id="modalNewUser">...</p>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase text-slate-500 font-bold">Identifiant (Tél)</p>
+                    <p class="text-[#F59E0B] font-mono text-lg" id="modalNewPhone">...</p>
+                </div>
+                <div>
+                    <p class="text-[10px] uppercase text-slate-500 font-bold">Mot de passe provisoire</p>
+                    <div class="flex items-center justify-between bg-black/30 p-2 rounded-lg mt-1">
+                        <p class="text-green-400 font-mono text-xl tracking-widest" id="modalNewPass">...</p>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <a id="shareWaBtn" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 rounded-xl transition shadow-lg">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-            Envoyer sur WhatsApp
-        </a>
+            <a id="shareWaBtn" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 rounded-xl transition shadow-lg">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                Envoyer sur WhatsApp
+            </a>
+        </div>
     </div>
-</div>
 
     <script>
         // --- 1. Gestion du Menu Burger Mobile ---
@@ -589,9 +646,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('financeChart').getContext('2d');
             
-            // Récupération sécurisée des variables EJS
-            const revenus = <%= typeof totalRent !== 'undefined' ? totalRent : 0 %>;
-            const depenses = <%= typeof totalExpenses !== 'undefined' ? totalExpenses : 0 %>;
+            // Récupération sécurisée et typée des variables EJS
+            const revenus = Number('<%= typeof totalRent !== "undefined" ? totalRent : 0 %>');
+            const depenses = Number('<%= typeof totalExpenses !== "undefined" ? totalExpenses : 0 %>');
 
             new Chart(ctx, {
                 type: 'bar',
@@ -601,8 +658,8 @@
                         label: 'Montant (FCFA)',
                         data: [revenus, depenses],
                         backgroundColor: [
-                            'rgba(34, 197, 94, 0.7)', // Vert pour revenus
-                            'rgba(239, 68, 68, 0.7)'  // Rouge pour dépenses
+                            'rgba(34, 197, 94, 0.7)', // Vert
+                            'rgba(239, 68, 68, 0.7)'  // Rouge
                         ],
                         borderColor: [
                             'rgb(34, 197, 94)',
@@ -640,75 +697,75 @@
             });
         }
 
-        // --- 5. Détection Création Locataire (Pop-up) ---
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    
-    // Si l'URL contient ?success=tenant_added ET un mot de passe
-    if (urlParams.get('success') === 'tenant_added' && urlParams.get('new_pass')) {
-        
-        // 1. Remplir les champs
-        const name = urlParams.get('new_user');
-        const phone = urlParams.get('new_phone');
-        const pass = urlParams.get('new_pass');
+        // --- 5. Détection Création Locataire (Pop-up + Sécurité) ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Si l'URL contient ?success=tenant_added ET un mot de passe
+            if (urlParams.get('success') === 'tenant_added' && urlParams.get('new_pass')) {
+                
+                // 1. Remplir les champs
+                const name = urlParams.get('new_user');
+                const phone = urlParams.get('new_phone');
+                const pass = urlParams.get('new_pass');
 
-        document.getElementById('modalNewUser').innerText = name;
-        document.getElementById('modalNewPhone').innerText = phone;
-        document.getElementById('modalNewPass').innerText = pass;
+                document.getElementById('modalNewUser').innerText = name;
+                document.getElementById('modalNewPhone').innerText = phone;
+                document.getElementById('modalNewPass').innerText = pass;
 
-        // 2. Configurer le bouton WhatsApp
-        const waMsg = `Bonjour ${name}, bienvenue sur ImmoFacile ! Voici tes accès : \n\n📱 Identifiant: ${phone}\n🔑 Mot de passe: ${pass}\n\nConnecte-toi ici : https://immofacile-ci.vercel.app/login`;
-        
-        let cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
-        if (!cleanPhone.startsWith('225')) cleanPhone = '225' + cleanPhone;
-        
-        document.getElementById('shareWaBtn').href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`;
+                // 2. Configurer le bouton WhatsApp
+                const waMsg = `Bonjour ${name}, bienvenue sur ImmoFacile ! Voici tes accès : \n\n📱 Identifiant: ${phone}\n🔑 Mot de passe: ${pass}\n\nConnecte-toi ici : https://immofacile-ci.vercel.app/login`;
+                
+                let cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
+                if (cleanPhone.length === 10) cleanPhone = '225' + cleanPhone;
+                
+                document.getElementById('shareWaBtn').href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`;
 
-        // 3. Afficher le modal
-        document.getElementById('newTenantModal').classList.remove('hidden');
+                // 3. Afficher le modal
+                document.getElementById('newTenantModal').classList.remove('hidden');
 
-        // 4. Nettoyer l'URL pour ne pas réafficher le popup au rafraîchissement
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-});
-
-function closeNewTenantModal() {
-    document.getElementById('newTenantModal').classList.add('hidden');
-}
-
-// --- 6. Gestion du Spinner de Chargement ---
-document.addEventListener('DOMContentLoaded', function() {
-    const loader = document.getElementById('globalLoader');
-
-    // Fonction pour afficher le loader
-    window.showLoader = function() {
-        loader.classList.remove('hidden');
-    };
-
-    // Fonction pour cacher le loader
-    window.hideLoader = function() {
-        loader.classList.add('hidden');
-    };
-
-    // 1. Attacher le loader à tous les formulaires lors de la soumission
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function(e) {
-            // On vérifie si le formulaire est valide (champs requis remplis)
-            if (this.checkValidity()) {
-                showLoader();
+                // 4. --- CORRECTIF SÉCURITÉ ---
+                // Nettoyage immédiat de l'URL pour retirer le mot de passe de l'historique
+                if (window.history.replaceState) {
+                    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                    window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+                }
             }
         });
-    });
 
-    // 2. Sécurité : Cacher le loader si l'utilisateur revient en arrière (Back button)
-    window.addEventListener('pageshow', function(event) {
-        if (event.persisted) {
-            hideLoader();
+        function closeNewTenantModal() {
+            document.getElementById('newTenantModal').classList.add('hidden');
         }
-    });
-});
 
+        // --- 6. Gestion du Spinner de Chargement ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const loader = document.getElementById('globalLoader');
+
+            window.showLoader = function() {
+                loader.classList.remove('hidden');
+            };
+
+            window.hideLoader = function() {
+                loader.classList.add('hidden');
+            };
+
+            // 1. Attacher le loader à tous les formulaires
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    if (this.checkValidity()) {
+                        showLoader();
+                    }
+                });
+            });
+
+            // 2. Cacher le loader si on revient en arrière (Back button)
+            window.addEventListener('pageshow', function(event) {
+                if (event.persisted) {
+                    hideLoader();
+                }
+            });
+        });
     </script>
 </body>
 </html>
