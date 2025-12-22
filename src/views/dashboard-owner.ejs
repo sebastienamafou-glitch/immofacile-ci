@@ -7,10 +7,7 @@
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/png" href="/images/immo_logo.png">
-    <link rel="apple-touch-icon" href="/images/immo_logo.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
@@ -30,7 +27,7 @@
 
     <div class="md:hidden flex items-center justify-between p-4 bg-[#0B1120] border-b border-slate-800 sticky top-0 z-50">
         <img src="/images/immo_logo.png" alt="Logo" class="h-8">
-        <button onclick="toggleMenu()" class="text-white p-2 focus:outline-none rounded-lg hover:bg-slate-800 transition" id="burgerBtn">
+        <button onclick="toggleMenu()" class="text-white p-2 focus:outline-none rounded-lg hover:bg-slate-800 transition">
             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path id="burgerPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
             </svg>
@@ -38,7 +35,6 @@
     </div>
 
     <div class="flex min-h-screen">
-        
         <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-40 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col">
             <div class="mb-10 text-center md:text-left hidden md:block">
                 <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
@@ -60,24 +56,13 @@
                 <a href="#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
                     <span>🔨</span> Artisans
                 </a>
+                <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3 border-t border-slate-800/50 mt-4">
+                    <span class="text-blue-400">❓</span> Centre d'Aide
+                </a>
                 <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
                     <span>🚪</span> Déconnexion
                 </a>
             </nav>
-            <nav class="space-y-4 flex-1">
-                <a href="/owner/help" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3 border-t border-slate-800/50 mt-4">
-                    <span class="text-blue-400">❓</span> Centre d'Aide
-                </a>
-            </nav>
-
-            <div class="mt-auto pt-6 border-t border-slate-800">
-                <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
-                <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain opacity-80 mb-2">
-                <div class="flex flex-col gap-1">
-                    <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">contact@webappci.com</a>
-                    <a href="/privacy" class="text-[10px] text-[#F59E0B] hover:underline">Confidentialité</a>
-                </div>
-            </div>
         </aside>
 
         <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
@@ -85,78 +70,45 @@
         <main class="flex-1 p-4 md:p-8 md:ml-64 w-full">
             
             <% 
-                // Extraction des paramètres de l'URL pour l'affichage des nouveaux identifiants
-                const urlParams = new URLSearchParams(locals.queryString || '');
+                // Gestion sécurisée des paramètres URL
+                const query = locals.queryString || ''; 
+                const urlParams = new URLSearchParams(query);
                 const newPass = urlParams.get('new_pass');
                 const newUser = urlParams.get('new_user');
                 const newPhone = urlParams.get('new_phone');
             %>
 
             <% if (newPass && newPhone) { %>
-                <div class="mb-8 p-6 bg-blue-600 rounded-[2rem] border-2 border-blue-400 shadow-2xl relative overflow-hidden animate-fade-in-down">
-                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full"></div>
-                    
+                <div class="mb-8 p-6 bg-blue-600 rounded-[2rem] border-2 border-blue-400 shadow-2xl relative overflow-hidden">
                     <div class="relative z-10">
-                        <h3 class="text-xl font-black mb-2 flex items-center gap-2">
-                            🔑 Identifiants Locataire générés !
-                        </h3>
-                        <p class="text-sm opacity-90 mb-6">
-                            Le compte pour <strong><%= newUser %></strong> est prêt. Transmettez-lui ses accès immédiatement :
-                        </p>
-
-                        <div class="bg-[#0B1120]/50 p-4 rounded-2xl mb-6 border border-white/20">
-                            <p class="text-xs text-slate-400 uppercase font-bold mb-2">Accès sécurisés</p>
-                            <div class="grid grid-cols-1 gap-2 font-mono">
-                                <p class="text-white">Identifiant : <span class="font-bold text-[#F59E0B]"><%= newPhone %></span></p>
-                                <p class="text-white">Mot de passe : <span class="font-bold text-[#F59E0B]"><%= newPass %></span></p>
-                            </div>
+                        <h3 class="text-xl font-black mb-2 flex items-center gap-2">🔑 Identifiants générés !</h3>
+                        <p class="text-sm opacity-90 mb-6">Le compte pour <strong><%= newUser %></strong> est prêt.</p>
+                        <div class="bg-[#0B1120]/50 p-4 rounded-2xl mb-6 border border-white/20 font-mono">
+                            <p class="text-white">Identifiant : <span class="font-bold text-[#F59E0B]"><%= newPhone %></span></p>
+                            <p class="text-white">Mot de passe : <span class="font-bold text-[#F59E0B]"><%= newPass %></span></p>
                         </div>
-
-            <% if (!isPaidThisMonth) { %>
-                        <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-3">
-                        <p class="text-[10px] text-red-400 font-bold uppercase mb-1">Retard détecté</p>
-                        <div class="flex gap-2">
-                            <a href="<%= trackingUrl %>" class="flex-1 bg-[#25D366] text-white text-[10px] py-2 rounded-lg text-center font-bold">
-                                WhatsApp
-                            </a>
-                            <a href="/owner/formal-notice/<%= activeLease.id %>" class="flex-1 bg-white/10 text-white text-[10px] py-2 rounded-lg text-center font-bold">
-                                Papier Officiel
-                            </a>
-                        </div>
-                        </div>
-                    <% } %>
+                    </div>
+                </div>
+            <% } %>
 
             <header id="dashboard" class="mb-10 pt-4">
                 <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">La Météo des Revenus</h2>
-                
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
                         <p class="text-slate-400 text-xs mb-1">Revenus Bruts</p>
-                        <p class="text-2xl font-black text-white">
-                            <%= typeof totalRent !== 'undefined' ? totalRent.toLocaleString('fr-FR') : 0 %> 
-                            <span class="text-xs text-slate-500 font-normal">FCFA</span>
-                        </p>
+                        <p class="text-2xl font-black text-white"><%= (typeof stats !== 'undefined' ? stats.totalRent : 0).toLocaleString('fr-FR') %> <span class="text-xs text-slate-500 font-normal">FCFA</span></p>
                     </div>
-
                     <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
-                        <p class="text-slate-400 text-xs mb-1">Dépenses du mois</p>
-                        <p class="text-2xl font-black text-red-500">
-                            - <%= typeof totalExpenses !== 'undefined' ? totalExpenses.toLocaleString('fr-FR') : 0 %>
-                        </p>
+                        <p class="text-slate-400 text-xs mb-1">Dépenses</p>
+                        <p class="text-2xl font-black text-red-500">- <%= (typeof stats !== 'undefined' ? stats.totalExpenses : 0).toLocaleString('fr-FR') %></p>
                     </div>
-
                     <div class="bg-gradient-to-br from-blue-900 to-slate-900 border border-blue-500/30 p-5 rounded-[2rem]">
                         <p class="text-blue-200 text-xs mb-1 font-bold">BÉNÉFICE NET</p>
-                        <p class="text-2xl font-black text-white">
-                            <%= typeof netIncome !== 'undefined' ? netIncome.toLocaleString('fr-FR') : 0 %>
-                        </p>
+                        <p class="text-2xl font-black text-white"><%= (typeof netIncome !== 'undefined' ? netIncome : 0).toLocaleString('fr-FR') %></p>
                     </div>
-
                     <div class="bg-slate-900 border border-slate-800 p-5 rounded-[2rem]">
-                        <p class="text-slate-400 text-xs mb-1">Séquestre (Caution)</p>
-                        <p class="text-2xl font-black text-[#F59E0B]">
-                            <%= typeof totalDeposit !== 'undefined' ? totalDeposit.toLocaleString('fr-FR') : 0 %>
-                        </p>
+                        <p class="text-slate-400 text-xs mb-1">Séquestre</p>
+                        <p class="text-2xl font-black text-[#F59E0B]"><%= (typeof stats !== 'undefined' ? stats.totalDeposit : 0).toLocaleString('fr-FR') %></p>
                     </div>
                 </div>
 
@@ -165,12 +117,9 @@
                         <div>
                             <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Solde Disponible</p>
                             <div class="flex items-baseline gap-1">
-                                <span class="text-4xl font-black"><%= user.walletBalance.toLocaleString('fr-FR') %></span>
+                                <span class="text-4xl font-black"><%= (user.walletBalance || 0).toLocaleString('fr-FR') %></span>
                                 <span class="text-sm font-bold opacity-80">FCFA</span>
                             </div>
-                            <% if (user.walletBalance < 2000) { %>
-                                <p class="text-xs bg-black/20 inline-block px-2 py-1 rounded mt-2 font-bold text-red-100">⚠️ Solde critique</p>
-                            <% } %>
                         </div>
                         <button onclick="document.getElementById('rechargeModal').classList.remove('hidden')" class="w-full sm:w-auto bg-white text-orange-600 px-6 py-3 rounded-xl font-bold shadow-lg hover:scale-105 transition flex items-center justify-center gap-2">
                             <span>⚡️</span> Recharger
@@ -184,19 +133,16 @@
                 <h3 class="text-xl font-bold mb-4 text-red-500 flex items-center gap-2">🚨 Urgences en cours (<%= activeIncidentsCount %>)</h3>
                 <div class="grid gap-4">
                     <% properties.forEach(function(prop) { %>
-                        <% prop.incidents.forEach(function(inc) { %>
+                        <% (prop.incidents || []).forEach(function(inc) { %>
                             <% if (inc.status !== 'RESOLVED') { %>
                                 <div class="bg-red-500/10 border border-red-500/30 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div class="flex-1">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase"><%= inc.priority %></span>
-                                            <p class="font-bold text-white"><%= inc.title %></p>
-                                        </div>
+                                        <p class="font-bold text-white"><%= inc.title %></p>
                                         <p class="text-sm text-slate-400">Signalé par <%= inc.reporter.name %> • <%= prop.title %></p>
                                         <p class="text-xs text-slate-500 mt-2 italic">"<%= inc.description %>"</p>
                                     </div>
                                     <form action="/owner/resolve-incident" method="POST">
-                                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                        <% if (locals.csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
                                         <input type="hidden" name="incidentId" value="<%= inc.id %>">
                                         <button type="submit" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition">✅ Résoudre</button>
                                     </form>
@@ -209,82 +155,32 @@
             <% } %>
 
             <section id="biens" class="mb-10 pt-10 border-t border-slate-800">
-                <h3 class="text-xl font-bold mb-6 flex items-center gap-2">🏠 Mes Biens</h3>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold flex items-center gap-2">🏠 Mes Biens</h3>
+                    <a href="/owner/add-property" class="text-blue-400 font-bold text-sm">+ Nouveau</a>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <% properties.forEach(function(prop) { %>
-                        <% const activeLease = prop.leases.find(l => l.isActive === true); %>
+                        <% const activeLease = (prop.leases || []).find(l => l.isActive === true); %>
                         <div class="bg-slate-900/50 border border-slate-800 p-5 rounded-2xl hover:border-slate-700 transition">
                             <div class="flex justify-between items-start mb-4">
                                 <div class="flex items-center gap-3">
                                     <div class="w-3 h-3 <%= activeLease ? 'bg-green-500' : 'bg-slate-600' %> rounded-full"></div>
                                     <div>
                                         <p class="font-bold text-white text-sm"><%= prop.title %></p>
-                                        <p class="text-xs text-slate-500"><%= prop.commune %> • 
-                                            <span class="<%= activeLease ? 'text-green-400' : 'text-slate-500' %>">
-                                                <%= activeLease ? 'Loué à ' + activeLease.tenant.name : 'Vacant' %>
-                                            </span>
-                                        </p>
+                                        <p class="text-xs text-slate-500"><%= prop.commune %> • <span class="<%= activeLease ? 'text-green-400' : 'text-slate-500' %>"><%= activeLease ? 'Loué' : 'Vacant' %></span></p>
                                     </div>
                                 </div>
-                                <span class="text-xs font-bold <%= activeLease ? 'text-green-400' : 'text-slate-500' %>">
-                                    <%= activeLease ? '+' : '' %> <%= prop.price.toLocaleString('fr-FR') %> FCFA
-                                    <%= activeLease ? '' : '(Estimé)' %>
-                                </span>
+                                <span class="text-xs font-bold text-slate-500"><%= prop.price.toLocaleString('fr-FR') %> FCFA</span>
                             </div>
-
                             <% if (activeLease) { %>
-                                <div class="mt-4 pt-4 border-t border-slate-800 space-y-4">
-                                    <div class="flex justify-between items-center text-xs">
-                                        <span class="text-slate-500">📅 Entrée : <%= new Date(activeLease.startDate).toLocaleDateString('fr-FR') %></span>
-                                        <div class="flex gap-3">
-                                            <a href="/owner/contract/<%= activeLease.id %>" target="_blank" class="text-[#F59E0B] font-bold hover:underline">📜 Contrat</a>
-                                            <a href="/owner/inventory/<%= activeLease.id %>?type=ENTREE" target="_blank" class="text-slate-400 hover:text-white">📥 EDL</a>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <a href="/owner/formal-notice/<%= activeLease.id %>" target="_blank" class="text-center bg-red-600/20 text-red-500 border border-red-500/50 text-[10px] font-bold py-2 rounded-lg uppercase hover:bg-red-600/30 transition">⚖️ Huissier</a>
-                                        <button onclick="openExitModal('<%= activeLease.id %>', '<%= activeLease.tenant.name %>', '<%= activeLease.depositAmount %>')" class="bg-slate-800 text-slate-300 text-[10px] font-bold py-2 rounded-lg uppercase border border-slate-600 hover:bg-slate-700 transition">🚪 Sortie</button>
-                                    </div>
-
-                                    <% 
-                                        const dateOptions = { month: 'long', year: 'numeric', timeZone: 'Africa/Abidjan' };
-                                        const currentMonthStr = new Date().toLocaleString('fr-FR', dateOptions);
-                                        const lastPayment = (activeLease.payments && activeLease.payments.length > 0) ? activeLease.payments[activeLease.payments.length - 1] : null;
-                                        const isPaidThisMonth = lastPayment && lastPayment.month.toLowerCase().includes(new Date().toLocaleString('fr-FR', { month: 'long' }).toLowerCase());
-                                    %>
-
-                                    <% if (isPaidThisMonth) { %>
-                                        <div class="flex items-center justify-between bg-green-500/10 p-2 rounded-lg border border-green-500/20">
-                                            <span class="text-green-400 text-xs font-bold">✅ Loyer à jour</span>
-                                            <a href="/owner/receipt/<%= lastPayment.id %>" target="_blank" class="text-slate-400 text-xs underline hover:text-white">Quittance</a>
-                                        </div>
-                                    <% } else { %>
-                                        <div class="flex flex-col gap-2">
-                                            <form action="/owner/pay-rent" method="POST">
-                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                                                <input type="hidden" name="amount" value="<%= activeLease.monthlyRent %>">
-                                                <input type="hidden" name="month" value="<%= currentMonthStr %>">
-                                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg text-xs font-bold transition">
-                                                    💰 Encaisser <%= new Date().toLocaleString('fr-FR', { month: 'long' }) %>
-                                                </button>
-                                            </form>
-                                            
-                                            <% 
-                                                let waPhone = activeLease.tenant.phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
-                                                if (!waPhone.startsWith('225')) waPhone = '225' + waPhone;
-                                            %>
-                                            <a href="https://wa.me/<%= waPhone %>?text=Bonjour <%= activeLease.tenant.name %>, le loyer de <%= new Date().toLocaleString('fr-FR', { month: 'long' }) %> est attendu." target="_blank" class="w-full bg-[#25D366] hover:bg-[#20bd5a] py-2 rounded-lg text-xs font-bold text-center transition">
-                                                Relance WhatsApp
-                                            </a>
-                                        </div>
-                                    <% } %>
+                                <div class="mt-4 pt-4 border-t border-slate-800 flex gap-2">
+                                    <a href="/owner/contract/<%= activeLease.id %>" target="_blank" class="flex-1 bg-slate-800 text-slate-300 text-[10px] font-bold py-2 rounded-lg text-center">Contrat</a>
+                                    <button onclick="openExitModal('<%= activeLease.id %>', '<%= activeLease.tenant.name %>', '<%= activeLease.depositAmount %>')" class="flex-1 bg-red-900/20 text-red-400 border border-red-900/50 text-[10px] font-bold py-2 rounded-lg text-center">Sortie</button>
                                 </div>
                             <% } else { %>
                                 <div class="mt-4 pt-4 border-t border-slate-800">
-                                    <a href="/owner/add-tenant" class="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-900/20">
-                                        <span>👤</span> Ajouter un Locataire
-                                    </a>
+                                    <a href="/owner/add-tenant" class="block w-full bg-blue-600 text-white text-xs font-bold py-3 rounded-xl text-center hover:bg-blue-500">+ Ajouter un Locataire</a>
                                 </div>
                             <% } %>
                         </div>
@@ -297,17 +193,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <% let hasTenants = false; %>
                     <% properties.forEach(function(prop) { 
-                        prop.leases.forEach(function(lease) { 
+                        (prop.leases || []).forEach(function(lease) { 
                             if (lease.isActive) { 
                                 hasTenants = true; 
                                 let waPhone = lease.tenant.phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
                                 if (!waPhone.startsWith('225')) waPhone = '225' + waPhone;
-                            %>
+                    %>
                         <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between hover:border-slate-700 transition">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg">
-                                    <%= lease.tenant.name.charAt(0) %>
-                                </div>
+                                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg"><%= lease.tenant.name.charAt(0) %></div>
                                 <div>
                                     <p class="text-sm font-bold text-white"><%= lease.tenant.name %></p>
                                     <p class="text-[10px] text-slate-400"><%= lease.tenant.phone %></p>
@@ -318,49 +212,29 @@
                             </a>
                         </div>
                     <% } }); }); %>
-                    <% if (!hasTenants) { %> <div class="col-span-full text-center text-slate-500 py-4 italic">Aucun locataire actif pour le moment.</div> <% } %>
+                    <% if (!hasTenants) { %> <div class="col-span-full text-center text-slate-500 py-4 italic">Aucun locataire actif.</div> <% } %>
                 </div>
             </section>
 
             <section id="documents" class="mb-10 pt-10 border-t border-slate-800">
-                <h3 class="text-xl font-bold mb-6">📂 Documents Administratifs (Actifs)</h3>
+                <h3 class="text-xl font-bold mb-6">📂 Documents Administratifs</h3>
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-800 text-slate-400 text-xs uppercase font-bold">
-                            <tr>
-                                <th class="px-4 py-3">Document</th>
-                                <th class="px-4 py-3">Locataire</th>
-                                <th class="px-4 py-3 text-right">Action</th>
-                            </tr>
+                            <tr><th class="px-4 py-3">Document</th><th class="px-4 py-3">Locataire</th><th class="px-4 py-3 text-right">Action</th></tr>
                         </thead>
                         <tbody class="divide-y divide-slate-800">
-                            <% properties.forEach(prop => { 
-                                prop.leases.forEach(lease => { 
-                                    if(lease.isActive) { 
-                                %>
+                            <% properties.forEach(prop => { (prop.leases || []).forEach(lease => { if(lease.isActive) { %>
                                 <tr>
                                     <td class="px-4 py-3 flex items-center gap-2">📜 Contrat de bail <span class="text-slate-500 text-xs">- <%= prop.title %></span></td>
                                     <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
-                                    <td class="px-4 py-3 text-right">
-                                        <a href="/owner/contract/<%= lease.id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
-                                    </td>
+                                    <td class="px-4 py-3 text-right"><a href="/owner/contract/<%= lease.id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a></td>
                                 </tr>
                                 <tr>
                                     <td class="px-4 py-3">📥 État des lieux entrée</td>
                                     <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
-                                    <td class="px-4 py-3 text-right">
-                                        <a href="/owner/inventory/<%= lease.id %>?type=ENTREE" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
-                                    </td>
+                                    <td class="px-4 py-3 text-right"><a href="/owner/inventory/<%= lease.id %>?type=ENTREE" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a></td>
                                 </tr>
-                                <% if (lease.payments && lease.payments.length > 0) { %>
-                                    <tr>
-                                        <td class="px-4 py-3">💰 Dernière Quittance</td>
-                                        <td class="px-4 py-3 text-slate-400"><%= lease.tenant.name %></td>
-                                        <td class="px-4 py-3 text-right">
-                                            <a href="/owner/receipt/<%= lease.payments[lease.payments.length-1].id %>" target="_blank" class="text-blue-400 font-bold hover:underline">Voir</a>
-                                        </td>
-                                    </tr>
-                                <% } %>
                             <% } }) }) %>
                         </tbody>
                     </table>
@@ -375,22 +249,18 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <% if (locals.artisans && artisans.length > 0) { %>
                         <% artisans.forEach(artisan => { %>
-                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl group transition hover:border-[#F59E0B]/50 hover:bg-slate-800">
-                                <div class="flex justify-between items-start mb-2">
-                                    <h4 class="font-bold text-white group-hover:text-[#F59E0B] transition"><%= artisan.name %></h4>
-                                    <% if (artisan.isVerified) { %> <span class="bg-green-500/20 text-green-400 text-[8px] px-2 py-1 rounded-full uppercase">Vérifié</span> <% } %>
-                                </div>
+                            <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                                <h4 class="font-bold text-white"><%= artisan.name %></h4>
                                 <p class="text-[#F59E0B] text-xs mb-1"><%= artisan.job %></p>
                                 <p class="text-slate-500 text-[10px] mb-4">📍 <%= artisan.location %></p>
-                                <a href="tel:<%= artisan.phone %>" class="flex items-center justify-center gap-2 w-full bg-slate-800 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition text-slate-300">📞 Appeler</a>
+                                <a href="tel:<%= artisan.phone %>" class="block text-center bg-slate-800 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition text-slate-300">📞 Appeler</a>
                             </div>
                         <% }) %>
                     <% } else { %>
-                        <div class="col-span-full text-center text-slate-500 py-6 border border-dashed border-slate-800 rounded-2xl">Aucun artisan partenaire enregistré.</div>
+                        <div class="col-span-full text-center text-slate-500 py-6 border border-dashed border-slate-800 rounded-2xl">Aucun artisan partenaire.</div>
                     <% } %>
                 </div>
             </section>
-
         </main>
     </div>
 
@@ -406,12 +276,9 @@
     <div id="rechargeModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
         <div class="bg-slate-900 border border-slate-700 p-8 rounded-3xl w-full max-w-sm relative shadow-2xl">
             <button onclick="document.getElementById('rechargeModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
-            <div class="text-center mb-6">
-                <h2 class="text-xl font-bold text-white mb-2">Recharger mon compte</h2>
-                <p class="text-slate-400 text-sm">Paiement sécurisé via CinetPay</p>
-            </div>
+            <h2 class="text-xl font-bold text-white mb-2 text-center">Recharger mon compte</h2>
             <form action="/api/payment/init" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <% if (locals.csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
                 <select name="amount" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold outline-none focus:border-[#F59E0B]">
                     <option value="5000">5 000 FCFA</option>
                     <option value="10000" selected>10 000 FCFA</option>
@@ -429,7 +296,7 @@
             <h2 class="text-xl font-bold text-white mb-1">Départ Locataire</h2>
             <p id="exitTenantName" class="text-sm text-slate-500 mb-6"></p>
             <form action="/owner/end-lease" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <% if (locals.csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
                 <input type="hidden" name="leaseId" id="exitLeaseId">
                 <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
                     <p class="text-xs text-slate-400 uppercase">Caution versée</p>
@@ -449,7 +316,7 @@
             <button onclick="document.getElementById('expenseModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
             <h2 class="text-xl font-bold mb-6 text-white">Nouvelle dépense</h2>
             <form action="/owner/add-expense" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <% if (locals.csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
                 <select name="propertyId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-red-500">
                     <% properties.forEach(function(prop) { %> <option value="<%= prop.id %>"><%= prop.title %></option> <% }); %>
                 </select>
@@ -458,7 +325,7 @@
                     <option value="TAXE">Impôts & Taxes</option>
                     <option value="SYNDIC">Charges de copropriété</option>
                 </select>
-                <input type="text" name="description" placeholder="Description (ex: Plomberie)" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-red-500">
+                <input type="text" name="description" placeholder="Description" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-red-500">
                 <input type="number" name="amount" placeholder="Montant (FCFA)" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-red-500">
                 <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl mt-4 transition">Enregistrer</button>
             </form>
@@ -470,7 +337,7 @@
             <button onclick="document.getElementById('artisanModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
             <h2 class="text-xl font-bold mb-6 text-white text-center">Ajouter un Partenaire</h2>
             <form action="/owner/add-artisan" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <% if (locals.csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
                 <input type="text" name="name" placeholder="Nom complet" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-blue-500">
                 <select name="job" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-blue-500">
                     <option value="Plombier">Plombier</option>
@@ -487,43 +354,27 @@
                     <option value="Plateau">Plateau</option>
                     <option value="Angré">Angré</option>
                 </select>
-                <input type="tel" name="phone" placeholder="Téléphone (ex: 0707...)" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-blue-500">
+                <input type="tel" name="phone" placeholder="Téléphone" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white outline-none focus:border-blue-500">
                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl mt-4 transition">Enregistrer</button>
             </form>
         </div>
     </div>
 
     <script>
-        // Gestion du Menu Burger Mobile
         function toggleMenu() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('overlay');
             const burgerPath = document.getElementById('burgerPath');
-            
-            // Si le menu est fermé (a la classe 'closed')
             if (sidebar.classList.contains('closed')) {
-                sidebar.classList.remove('closed');
-                sidebar.classList.add('open');
-                overlay.classList.remove('hidden');
-                // Icone Croix
+                sidebar.classList.remove('closed'); sidebar.classList.add('open'); overlay.classList.remove('hidden');
                 burgerPath.setAttribute('d', 'M6 18L18 6M6 6l12 12');
             } else {
-                sidebar.classList.add('closed');
-                sidebar.classList.remove('open');
-                overlay.classList.add('hidden');
-                // Icone Burger
+                sidebar.classList.add('closed'); sidebar.classList.remove('open'); overlay.classList.add('hidden');
                 burgerPath.setAttribute('d', 'M4 6h16M4 12h16m-7 6h7');
             }
         }
+        function closeMenuMobile() { if (window.innerWidth < 768) toggleMenu(); }
 
-        // Ferme le menu quand on clique sur un lien (Mobile UX)
-        function closeMenuMobile() {
-            if (window.innerWidth < 768) {
-                toggleMenu();
-            }
-        }
-
-        // Ouverture Modal Départ Locataire
         function openExitModal(leaseId, tenantName, deposit) {
             document.getElementById('exitModal').classList.remove('hidden');
             document.getElementById('exitLeaseId').value = leaseId;
@@ -531,7 +382,6 @@
             document.getElementById('exitDepositDisplay').innerText = parseInt(deposit).toLocaleString('fr-FR') + " FCFA";
         }
 
-        // Installation Service Worker (PWA)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Erreur', err));
@@ -539,5 +389,4 @@
         }
     </script>
 </body>
-</html> ``.
-
+</html>

@@ -3,8 +3,9 @@ const prisma = require('../prisma/client');
 const bcrypt = require('bcryptjs');
 const { generateRandomPassword } = require('../utils/security'); 
 const { uploadFromBuffer } = require('../utils/cloudinary');
+const tracker = require('../utils/tracker'); // Ajout manquant pour postSubmitInventory
 
-// --- GESTION LOCATAIRES (AVEC SÉQUESTRE À L'ENTRÉE) ---
+// --- GESTION LOCATAIRES ---
 
 exports.getAddTenant = async (req, res) => {
     try {
@@ -19,22 +20,18 @@ exports.getAddTenant = async (req, res) => {
 };
 
 exports.postAddTenant = async (req, res) => {
-    // Récupération des données du formulaire
     const { propertyId, tenantName, tenantPhone, monthlyRent, depositMonths, startDate } = req.body;
     
     try {
         let tempPassword = null;
         let tenantNameForRedirect = '';
 
-        // Utilisation d'une transaction pour garantir la cohérence des données et des fonds
         await prisma.$transaction(async (tx) => {
-            // 1. Vérifier ou créer le locataire
             let tenant = await tx.user.findUnique({ where: { phone: tenantPhone } });
 
             if (!tenant) {
                 tempPassword = generateRandomPassword(10); 
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
                 tenant = await tx.user.create({
                     data: {
                         name: tenantName, 
@@ -46,16 +43,11 @@ exports.postAddTenant = async (req, res) => {
                         escrowBalance: 0
                     }
                 });
-                console.log(`🔐 CRITIQUE : Mot de passe généré pour ${tenantName} : ${tempPassword}`);
             }
-            
             tenantNameForRedirect = tenant.name;
-
-            // 2. Calculs financiers
             const rent = parseFloat(monthlyRent);
             const deposit = rent * parseFloat(depositMonths);
 
-            // 3. Création du Bail
             await tx.lease.create({
                 data: {
                     monthlyRent: rent,
@@ -67,22 +59,16 @@ exports.postAddTenant = async (req, res) => {
                 }
             });
 
-            // 4. LOGIQUE SÉQUESTRE (ENTRÉE)
             await tx.user.update({
                 where: { id: req.session.user.id },
-                data: {
-                    escrowBalance: { increment: deposit }
-                }
+                data: { escrowBalance: { increment: deposit } }
             });
         });
 
-        // 5. Feedback utilisateur avec ajout du téléphone pour WhatsApp
         let redirectUrl = '/owner/dashboard?success=tenant_added';
         if (tempPassword) {
-            // Mise à jour : Ajout du paramètre new_phone pour le lien WhatsApp
             redirectUrl += `&new_pass=${tempPassword}&new_user=${encodeURIComponent(tenantNameForRedirect)}&new_phone=${tenantPhone}`; 
         }
-        
         res.redirect(redirectUrl);
 
     } catch (error) {
@@ -96,64 +82,40 @@ exports.postAddTenant = async (req, res) => {
 exports.getDashboard = async (req, res) => {
     try {
         const userId = req.session.user.id;
-
-        // Récupération des données complexes
         const properties = await prisma.property.findMany({
             where: { ownerId: userId },
             include: { 
-                leases: { 
-                    include: { 
-                        tenant: true, 
-                        payments: { orderBy: { date: 'asc' } } 
-                    } 
-                },
+                leases: { include: { tenant: true, payments: { orderBy: { date: 'asc' } } } },
                 incidents: { include: { reporter: true } },
                 expenses: true
             }, 
             orderBy: { createdAt: 'desc' }
         });
 
-        // Calcul des statistiques
-        let stats = {
-            totalRent: 0,
-            totalDeposit: 0,
-            totalExpenses: 0,
-            activeIncidents: 0
-        };
+        let stats = { totalRent: 0, totalDeposit: 0, totalExpenses: 0, activeIncidents: 0 };
 
         properties.forEach(prop => {
-            // Sécurité : on vérifie que prop.leases est un tableau
             (prop.leases || []).forEach(lease => {
                 if (lease.isActive) {
                     stats.totalRent += (lease.monthlyRent || 0);
                     stats.totalDeposit += (lease.depositAmount || 0);
                 }
             });
-            // Sécurité : on vérifie que prop.expenses est un tableau
-            (prop.expenses || []).forEach(exp => {
-                stats.totalExpenses += (exp.amount || 0);
-            });
-            // Sécurité : on vérifie que prop.incidents est un tableau
-            (prop.incidents || []).forEach(inc => {
-                if (inc.status !== 'RESOLVED') stats.activeIncidents++;
-            });
+            (prop.expenses || []).forEach(exp => { stats.totalExpenses += (exp.amount || 0); });
+            (prop.incidents || []).forEach(inc => { if (inc.status !== 'RESOLVED') stats.activeIncidents++; });
         });
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
 
-        // --- CORRECTION CRITIQUE ICI ---
-        // On s'assure que les valeurs ne sont jamais NULL pour éviter le crash .toLocaleString()
+        // SÉCURITÉ ANTI-CRASH
         if (user) {
             user.walletBalance = user.walletBalance || 0;
             user.escrowBalance = user.escrowBalance || 0;
         }
 
         res.render('dashboard-owner', { 
-            user, 
-            properties, 
-            artisans,
-            stats, 
+            user, properties, artisans, stats, 
             netIncome: stats.totalRent - stats.totalExpenses,
             activeIncidentsCount: stats.activeIncidents,
             realEscrowBalance: user ? user.escrowBalance : 0 
@@ -161,7 +123,6 @@ exports.getDashboard = async (req, res) => {
 
     } catch (error) {
         console.error("Erreur Critique Dashboard:", error);
-        // Au lieu d'une page blanche, on peut renvoyer vers l'aide ou une page simple
         res.redirect('/owner/help'); 
     }
 };
@@ -170,50 +131,40 @@ exports.getDashboard = async (req, res) => {
 
 exports.postAddProperty = async (req, res) => {
     const { title, commune, address, price } = req.body;
-    
     try {
         let imageUrl = null; 
-
         if (req.file) {
             try {
                 const result = await uploadFromBuffer(req.file.buffer);
                 imageUrl = result.secure_url; 
-            } catch (uploadError) {
-                console.error("Erreur Cloudinary:", uploadError);
-                return res.redirect('/owner/dashboard?error=image_upload_failed');
-            }
+            } catch (err) { console.error(err); }
         }
 
         await prisma.property.create({
             data: {
-                title, 
-                commune, 
-                address,
+                title, commune, address,
                 price: parseFloat(price),
                 imageUrl: imageUrl, 
                 ownerId: req.session.user.id
             }
         });
-
         res.redirect('/owner/dashboard?success=property_created');
-
     } catch (error) {
-        console.error("Erreur création bien:", error);
+        console.error(error);
         res.redirect('/owner/dashboard?error=creation_failed');
     }
 };
 
-// --- GESTION DEPENSES & INCIDENTS ---
+// --- DEPENSES & INCIDENTS ---
 
 exports.postAddExpense = async (req, res) => {
-    const { propertyId, description, amount, category } = req.body;
     try {
         await prisma.expense.create({
             data: {
-                description,
-                category,
-                amount: parseFloat(amount),
-                propertyId
+                description: req.body.description,
+                category: req.body.category,
+                amount: parseFloat(req.body.amount),
+                propertyId: req.body.propertyId
             }
         });
         res.redirect('/owner/dashboard');
@@ -224,10 +175,9 @@ exports.postAddExpense = async (req, res) => {
 };
 
 exports.postResolveIncident = async (req, res) => {
-    const { incidentId } = req.body;
     try {
         await prisma.incident.update({
-            where: { id: incidentId },
+            where: { id: req.body.incidentId },
             data: { status: 'RESOLVED' }
         });
         res.redirect('/owner/dashboard');
@@ -237,16 +187,14 @@ exports.postResolveIncident = async (req, res) => {
     }
 };
 
-// --- GESTION ARTISANS ---
+// --- ARTISANS ---
 
 exports.postAddArtisan = async (req, res) => {
     try {
         await prisma.artisan.create({
             data: { 
-                name: req.body.name, 
-                job: req.body.job, 
-                phone: req.body.phone, 
-                location: req.body.location || 'Abidjan', 
+                name: req.body.name, job: req.body.job, 
+                phone: req.body.phone, location: req.body.location || 'Abidjan', 
                 isVerified: false 
             }
         });
@@ -257,7 +205,7 @@ exports.postAddArtisan = async (req, res) => {
     }
 };
 
-// --- DOCUMENTS PDF ---
+// --- DOCUMENTS ---
 
 exports.getContract = async (req, res) => {
     try {
@@ -265,47 +213,20 @@ exports.getContract = async (req, res) => {
             where: { id: req.params.leaseId },
             include: { tenant: true, property: { include: { owner: true } } }
         });
-
-        if (!lease || lease.property.ownerId !== req.session.user.id) {
-            return res.status(403).send("Accès refusé.");
-        }
-
-        res.render('contract', {
-            lease, 
-            tenant: lease.tenant,
-            property: lease.property, 
-            owner: lease.property.owner,
-            startDate: lease.startDate
-        });
-    } catch (error) {
-        console.error("Erreur contrat:", error);
-        res.status(500).send("Erreur génération contrat.");
-    }
+        if (!lease || lease.property.ownerId !== req.session.user.id) return res.status(403).send("Refusé");
+        res.render('contract', { lease, tenant: lease.tenant, property: lease.property, owner: lease.property.owner, startDate: lease.startDate });
+    } catch (e) { res.status(500).send("Erreur"); }
 };
 
 exports.getReceipt = async (req, res) => {
     try {
         const payment = await prisma.payment.findUnique({
             where: { id: req.params.paymentId },
-            include: { 
-                lease: { include: { tenant: true, property: { include: { owner: true } } } } 
-            }
+            include: { lease: { include: { tenant: true, property: { include: { owner: true } } } } }
         });
-
-        if (!payment || payment.lease.property.ownerId !== req.session.user.id) {
-            return res.status(403).send("Accès refusé.");
-        }
-
-        res.render('receipt', {
-            payment, 
-            tenant: payment.lease.tenant,
-            property: payment.lease.property, 
-            owner: payment.lease.property.owner
-        });
-    } catch (error) {
-        console.error("Erreur quittance:", error);
-        res.status(500).send("Erreur génération quittance.");
-    }
+        if (!payment || payment.lease.property.ownerId !== req.session.user.id) return res.status(403).send("Refusé");
+        res.render('receipt', { payment, tenant: payment.lease.tenant, property: payment.lease.property, owner: payment.lease.property.owner });
+    } catch (e) { res.status(500).send("Erreur"); }
 };
 
 exports.getFormalNotice = async (req, res) => {
@@ -314,194 +235,61 @@ exports.getFormalNotice = async (req, res) => {
             where: { id: req.params.leaseId },
             include: { tenant: true, property: { include: { owner: true } } }
         });
-
-        if (!lease || lease.property.ownerId !== req.session.user.id) {
-            return res.status(403).send("Accès refusé.");
-        }
-
-        res.render('formal-notice', {
-            lease, 
-            tenant: lease.tenant, 
-            property: lease.property,
-            owner: lease.property.owner, 
-            totalDue: lease.monthlyRent 
-        });
-    } catch (error) {
-        console.error("Erreur mise en demeure:", error);
-        res.status(500).send("Erreur génération document.");
-    }
+        if (!lease || lease.property.ownerId !== req.session.user.id) return res.status(403).send("Refusé");
+        res.render('formal-notice', { lease, tenant: lease.tenant, property: lease.property, owner: lease.property.owner, totalDue: lease.monthlyRent });
+    } catch (e) { res.status(500).send("Erreur"); }
 };
 
 exports.getInventory = async (req, res) => {
     try {
-        const type = req.query.type || 'ENTREE';
         const lease = await prisma.lease.findUnique({
             where: { id: req.params.leaseId },
             include: { property: true, tenant: true }
         });
-
-        if (!lease || lease.property.ownerId !== req.session.user.id) {
-            return res.status(403).send("Accès refusé.");
-        }
-
-        res.render('inventory', { 
-            lease, 
-            property: lease.property, 
-            tenant: lease.tenant, 
-            type 
-        });
-    } catch (error) {
-        console.error("Erreur état des lieux:", error);
-        res.redirect('/owner/dashboard');
-    }
+        if (!lease || lease.property.ownerId !== req.session.user.id) return res.status(403).send("Refusé");
+        res.render('inventory', { lease, property: lease.property, tenant: lease.tenant, type: req.query.type || 'ENTREE' });
+    } catch (e) { res.redirect('/owner/dashboard'); }
 };
 
 exports.postSubmitInventory = async (req, res) => {
-    const { leaseId, type, kitchenState, livingState, bathState, generalComment } = req.body;
-    
+    const { leaseId, type, kitchenState, livingState } = req.body;
     try {
-        // Logique d'upload multiple pour les photos (Cloudinary)
-        const kitchenPhoto = req.files['kitchenPhoto'] ? 
-            (await uploadFromBuffer(req.files['kitchenPhoto'][0].buffer)).secure_url : null;
-        const livingPhoto = req.files['livingPhoto'] ? 
-            (await uploadFromBuffer(req.files['livingPhoto'][0].buffer)).secure_url : null;
+        const kitchenPhoto = req.files['kitchenPhoto'] ? (await uploadFromBuffer(req.files['kitchenPhoto'][0].buffer)).secure_url : null;
+        const livingPhoto = req.files['livingPhoto'] ? (await uploadFromBuffer(req.files['livingPhoto'][0].buffer)).secure_url : null;
 
         await prisma.inventory.create({
-            data: {
-                type, // 'ENTREE' ou 'SORTIE'
-                kitchenState,
-                kitchenPhoto,
-                livingState,
-                livingPhoto,
-                generalComment,
-                leaseId
-            }
+            data: { type, kitchenState, kitchenPhoto, livingState, livingPhoto, leaseId }
         });
 
-        // Tracking de l'inspection
+        // TRACKING
         await tracker.trackAction("INVENTORY_COMPLETED", "OWNER", req.session.user.id, { leaseId, type });
 
-        res.redirect(`/owner/dashboard?success=inventory_${type.toLowerCase()}_saved`);
+        res.redirect(`/owner/dashboard?success=inventory_saved`);
     } catch (error) {
-        console.error("Erreur enregistrement EDL:", error);
+        console.error(error);
         res.redirect('/owner/dashboard?error=inventory_failed');
     }
 };
 
-// --- FIN DE BAIL & SÉQUESTRE (SORTIE) ---
-
 exports.postEndLease = async (req, res) => {
     const { leaseId, deduction } = req.body;
     const deductionAmount = parseFloat(deduction) || 0;
-
     try {
         let updatedLease = null;
-        let isGoodTenant = false;
-
         await prisma.$transaction(async (tx) => {
-            const lease = await tx.lease.findUnique({ 
-                where: { id: leaseId },
-                include: { tenant: true } 
-            });
-
-            if (!lease) throw new Error("Bail introuvable");
-
-            const depositAmount = lease.depositAmount;
-            const amountToReturn = depositAmount - deductionAmount;
-
+            const lease = await tx.lease.findUnique({ where: { id: leaseId }, include: { tenant: true } });
             updatedLease = await tx.lease.update({
                 where: { id: leaseId },
                 data: { isActive: false, endDate: new Date() },
                 include: { property: true, tenant: true }
             });
-
-            await tx.user.update({
-                where: { id: req.session.user.id },
-                data: {
-                    escrowBalance: { decrement: depositAmount }, 
-                    walletBalance: { increment: deductionAmount } 
-                }
-            });
-
-            if (amountToReturn > 0) {
-                await tx.user.update({
-                    where: { id: lease.tenantId },
-                    data: {
-                        walletBalance: { increment: amountToReturn }
-                    }
-                });
-            }
-
-            isGoodTenant = deductionAmount <= (depositAmount * 0.2); 
+            await tx.user.update({ where: { id: req.session.user.id }, data: { escrowBalance: { decrement: lease.depositAmount }, walletBalance: { increment: deductionAmount } } });
         });
 
-        const vacantProperties = await prisma.property.findMany({
-            where: { 
-                ownerId: req.session.user.id, 
-                leases: { none: { isActive: true } } 
-            }
-        });
-
-        res.render('rehousing', { 
-            lease: updatedLease, 
-            tenant: updatedLease.tenant, 
-            isGoodTenant, 
-            vacantProperties,
-            refundAmount: updatedLease.depositAmount - deductionAmount
-        });
-
+        const vacantProperties = await prisma.property.findMany({ where: { ownerId: req.session.user.id, leases: { none: { isActive: true } } } });
+        res.render('rehousing', { lease: updatedLease, tenant: updatedLease.tenant, vacantProperties });
     } catch (error) {
-        console.error("Erreur clôture bail:", error);
+        console.error(error);
         res.redirect('/owner/dashboard?error=end_lease_failed');
     }
 };
-
-// --- CENTRE D'AIDE & STATISTIQUES ---
-
-exports.getHelp = async (req, res) => {
-    try {
-        const userId = req.session.user.id;
-
-        // 1. Calculer le total des loyers encaissés (Somme de tous les paiements reçus)
-        const totalRentCollected = await prisma.payment.aggregate({
-            _sum: { amount: true },
-            where: {
-                lease: {
-                    property: { ownerId: userId }
-                }
-            }
-        });
-
-        // 2. Compter le nombre d'États des Lieux (EDL) sécurisés
-        const totalInventories = await prisma.inventory.count({
-            where: {
-                lease: {
-                    property: { ownerId: userId }
-                }
-            }
-        });
-
-        // 3. Compter les "Accès partagés" (Ici, on compte les locataires actifs comme proxy)
-        const activeTenants = await prisma.lease.count({
-            where: {
-                property: { ownerId: userId },
-                isActive: true
-            }
-        });
-
-        // 4. Préparation de l'objet pour la vue EJS
-        const statsActions = {
-            reminders: activeTenants,                 // Correspond à "Accès Partagés"
-            rentCollected: totalRentCollected._sum.amount || 0, // Total en FCFA
-            inventory: totalInventories               // Nombre d'EDL
-        };
-
-        res.render('help', { statsActions });
-
-    } catch (error) {
-        console.error("Erreur chargement page aide:", error);
-        // En cas d'erreur, on redirige vers le dashboard pour éviter de planter
-        res.redirect('/owner/dashboard');
-    }
-};
-
