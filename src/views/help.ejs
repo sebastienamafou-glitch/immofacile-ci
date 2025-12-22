@@ -5,115 +5,165 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Centre d'Aide | ImmoFacile CI</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .faq-content { transition: all 0.3s ease-out; }
+        /* Suppression de la transition inutile car on utilise le toggle hidden */
     </style>
 </head>
-<body class="bg-[#0B1120] text-white">
+<body class="bg-[#0B1120] text-slate-200 antialiased selection:bg-blue-500 selection:text-white">
 
     <main class="max-w-2xl mx-auto p-6 pb-24">
-        <header class="mb-10">
-            <a href="/owner/dashboard" class="text-slate-400 text-sm mb-4 inline-block hover:text-white transition">← Retour au Dashboard</a>
-            <h1 class="text-3xl font-extrabold text-[#F59E0B]">Centre d'Aide</h1>
-            <p class="text-slate-400 mt-2 text-sm">Maîtrisez votre patrimoine avec ImmoFacile CI.</p>
+        
+        <header class="mb-10 text-center">
+            <div class="flex justify-center mb-6">
+                <img src="/images/immo_logo.png" alt="Logo ImmoFacile" class="h-16 w-auto object-contain">
+            </div>
+            
+            <a href="/owner/dashboard" class="inline-flex items-center gap-2 text-slate-400 text-xs font-semibold mb-4 hover:text-white transition uppercase tracking-widest group">
+                <span class="group-hover:-translate-x-1 transition-transform">←</span> Retour au Dashboard
+            </a>
+            
+            <h1 class="text-3xl font-extrabold text-[#F59E0B] mt-2">Centre d'Aide</h1>
+            <p class="text-slate-400 mt-2 text-sm font-medium">ImmoFacile CI : Votre patrimoine, notre priorité.</p>
         </header>
-
-        <section class="mb-12 p-6 bg-slate-900/50 border border-slate-800 rounded-3xl">
-            <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">Votre impact sur la plateforme</h3>
-            <div class="grid grid-cols-3 gap-4 text-center">
-                <div>
-                    <p class="text-2xl font-black text-blue-500"><%= statsActions.reminders %></p>
-                    <p class="text-[9px] text-slate-400 uppercase mt-1">Accès Partagés</p>
+    
+        <section class="mb-12 p-6 bg-slate-900/50 border border-slate-800 rounded-3xl backdrop-blur-sm shadow-xl">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 text-center">Votre impact sur la plateforme</h3>
+            
+            <div class="grid grid-cols-3 gap-4 text-center divide-x divide-slate-800">
+                <div class="px-2">
+                    <p class="text-2xl font-black text-blue-500"><%= (statsActions && statsActions.reminders) || 0 %></p>
+                    <p class="text-xs text-slate-400 font-medium mt-1">Accès Partagés</p>
                 </div>
-                <div class="border-x border-slate-800">
-                    <p class="text-2xl font-black text-[#F59E0B]"><%= statsActions.rentCollected %></p>
-                    <p class="text-[9px] text-slate-400 uppercase mt-1">Loyers Encaissés</p>
+                <div class="px-2">
+                    <p class="text-2xl font-black text-[#F59E0B]">
+                        <%= (statsActions && statsActions.rentCollected ? statsActions.rentCollected : 0).toLocaleString('fr-FR') %> <span class="text-xs text-slate-500 align-top">FCFA</span>
+                    </p>
+                    <p class="text-xs text-slate-400 font-medium mt-1">Loyers Encaissés</p>
                 </div>
-                <div>
-                    <p class="text-2xl font-black text-green-500"><%= statsActions.inventory %></p>
-                    <p class="text-[9px] text-slate-400 uppercase mt-1">EDL Sécurisés</p>
+                <div class="px-2">
+                    <p class="text-2xl font-black text-green-500"><%= (statsActions && statsActions.inventory) || 0 %></p>
+                    <p class="text-xs text-slate-400 font-medium mt-1">EDL Sécurisés</p>
                 </div>
             </div>
-            <p class="text-[10px] text-center text-slate-500 mt-6 italic">
+            
+            <p class="text-xs text-center text-slate-500 mt-6 italic">
                 "Chaque action enregistrée renforce votre protection juridique."
             </p>
         </section>
 
         <section class="mb-12">
-            <h2 class="text-xl font-black mb-6 flex items-center gap-2">
-                <span class="bg-blue-600/20 text-blue-400 p-2 rounded-lg text-sm">⚙️</span>
+            <h2 class="text-xl font-black mb-6 flex items-center gap-3 text-white">
+                <span class="bg-blue-600/20 text-blue-400 p-2 rounded-lg text-lg ring-1 ring-blue-500/30">⚙️</span>
                 Fonctionnement Global
             </h2>
-            <div class="space-y-6 relative border-l-2 border-slate-800 ml-4 pl-8">
-                <div class="relative">
-                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
-                    <h4 class="font-bold text-sm mb-1">1. Configuration du Bien</h4>
-                    <p class="text-xs text-slate-400 leading-relaxed">Enregistrez vos biens et baux. Le système calcule automatiquement la caution à bloquer dans votre **Séquestre**.</p>
+            
+            <div class="space-y-8 relative border-l-2 border-slate-800 ml-3 pl-8">
+                <div class="relative group">
+                    <div class="absolute -left-[41px] top-1 w-5 h-5 bg-slate-800 rounded-full border-4 border-[#0B1120] group-hover:bg-blue-600 transition-colors"></div>
+                    <h4 class="font-bold text-sm text-white mb-1">1. Configuration du Bien</h4>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Enregistrez vos biens et baux. Le système calcule automatiquement la caution à bloquer dans votre <strong class="text-slate-200">Séquestre</strong>.
+                    </p>
                 </div>
-                <div class="relative">
-                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
-                    <h4 class="font-bold text-sm mb-1">2. Gestion Financière</h4>
-                    <p class="text-xs text-slate-400 leading-relaxed">Une commission de 5% est prélevée par encaissement. Rechargez votre **Wallet** via CinetPay pour rester opérationnel.</p>
+                
+                <div class="relative group">
+                    <div class="absolute -left-[41px] top-1 w-5 h-5 bg-slate-800 rounded-full border-4 border-[#0B1120] group-hover:bg-[#F59E0B] transition-colors"></div>
+                    <h4 class="font-bold text-sm text-white mb-1">2. Gestion Financière</h4>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Une commission de 5% est prélevée par encaissement. Rechargez votre <strong class="text-slate-200">Wallet</strong> via CinetPay pour rester opérationnel.
+                    </p>
                 </div>
-                <div class="relative">
-                    <div class="absolute -left-[41px] top-0 w-5 h-5 bg-blue-600 rounded-full border-4 border-[#0B1120]"></div>
-                    <h4 class="font-bold text-sm mb-1">3. Automatisation & Suivi</h4>
-                    <p class="text-xs text-slate-400 leading-relaxed">Le système détecte les impayés dès le 5 du mois et vous permet de relancer vos locataires par WhatsApp ou email.</p>
+                
+                <div class="relative group">
+                    <div class="absolute -left-[41px] top-1 w-5 h-5 bg-slate-800 rounded-full border-4 border-[#0B1120] group-hover:bg-green-500 transition-colors"></div>
+                    <h4 class="font-bold text-sm text-white mb-1">3. Automatisation & Suivi</h4>
+                    <p class="text-sm text-slate-400 leading-relaxed">
+                        Le système détecte les impayés dès le 5 du mois et vous permet de relancer vos locataires par WhatsApp ou email en un clic.
+                    </p>
                 </div>
             </div>
         </section>
 
-        <section class="mb-12 grid grid-cols-1 gap-4">
-            <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl">
-                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">⚖️ Sécurité Juridique</h4>
-                <p class="text-xs text-slate-400">États des lieux avec photos horodatées pour justifier chaque retenue sur caution.</p>
+        <section class="mb-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-slate-700 transition">
+                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">
+                    <span>⚖️</span> Sécurité Juridique
+                </h4>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    États des lieux avec photos horodatées pour justifier chaque retenue sur caution de manière incontestable.
+                </p>
             </div>
-            <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl">
-                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">📈 Transparence</h4>
-                <p class="text-xs text-slate-400">Visualisation immédiate de votre bénéfice net et des dépenses d'entretien.</p>
+            <div class="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl hover:border-slate-700 transition">
+                <h4 class="font-bold text-[#F59E0B] mb-2 flex items-center gap-2 text-sm">
+                    <span>📈</span> Transparence Totale
+                </h4>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Visualisation immédiate de votre bénéfice net, de votre cash-flow et des dépenses d'entretien en temps réel.
+                </p>
             </div>
         </section>
 
         <section class="space-y-4">
-            <h2 class="text-xl font-black mb-6">❓ Questions Fréquentes</h2>
+            <h2 class="text-xl font-black mb-6 text-white">❓ Questions Fréquentes</h2>
             
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                <button onclick="toggleFaq(1)" class="w-full p-5 text-left flex justify-between items-center hover:bg-slate-800 transition text-sm">
-                    <span class="font-bold">Comment encaisser un loyer ?</span>
-                    <span id="icon-1">＋</span>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 hover:border-slate-700">
+                <button onclick="toggleFaq('faq-1', 'icon-1')" aria-expanded="false" aria-controls="faq-1" class="w-full p-5 text-left flex justify-between items-center group">
+                    <span class="font-bold text-sm text-slate-200 group-hover:text-white transition">Comment encaisser un loyer ?</span>
+                    <span id="icon-1" class="text-slate-500 font-bold text-lg group-hover:text-white transition">＋</span>
                 </button>
-                <div id="faq-1" class="hidden p-5 pt-0 text-xs text-slate-400 border-t border-slate-800 leading-relaxed">
-                    Dans "Mes Biens", cliquez sur <span class="text-blue-400 font-bold">"Encaisser"</span>. Le système génère la quittance, l'envoie au locataire et déduit la commission de votre Wallet.
+                <div id="faq-1" class="hidden p-5 pt-0 text-sm text-slate-400 border-t border-slate-800 leading-relaxed bg-slate-900/50">
+                    Dans "Mes Biens", cliquez sur <span class="text-blue-400 font-bold">"Encaisser"</span>. Le système génère la quittance, l'envoie au locataire et déduit la commission de votre Wallet automatiquement.
                 </div>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                <button onclick="toggleFaq(2)" class="w-full p-5 text-left flex justify-between items-center hover:bg-slate-800 transition text-sm">
-                    <span class="font-bold">Pourquoi mon séquestre est à 0 ?</span>
-                    <span id="icon-2">＋</span>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 hover:border-slate-700">
+                <button onclick="toggleFaq('faq-2', 'icon-2')" aria-expanded="false" aria-controls="faq-2" class="w-full p-5 text-left flex justify-between items-center group">
+                    <span class="font-bold text-sm text-slate-200 group-hover:text-white transition">Pourquoi mon séquestre est à 0 ?</span>
+                    <span id="icon-2" class="text-slate-500 font-bold text-lg group-hover:text-white transition">＋</span>
                 </button>
-                <div id="faq-2" class="hidden p-5 pt-0 text-xs text-slate-400 border-t border-slate-800 leading-relaxed">
-                    Le séquestre représente les cautions encaissées. Il s'incrémente automatiquement lorsque vous ajoutez un locataire avec un dépôt de garantie.
+                <div id="faq-2" class="hidden p-5 pt-0 text-sm text-slate-400 border-t border-slate-800 leading-relaxed bg-slate-900/50">
+                    Le séquestre représente les <strong class="text-white">cautions encaissées</strong>. Il s'incrémente automatiquement uniquement lorsque vous validez l'entrée d'un locataire avec un dépôt de garantie payé.
                 </div>
             </div>
         </section>
 
-        <footer class="mt-12 p-8 bg-gradient-to-br from-blue-900 to-[#0B1120] rounded-[2.5rem] border border-blue-500/30 text-center">
-            <p class="font-bold text-lg mb-4">Besoin d'aide personnalisée ?</p>
-            <a href="https://wa.me/2250707070707" target="_blank" class="inline-flex items-center gap-2 bg-[#25D366] text-white px-10 py-4 rounded-2xl font-black shadow-xl hover:scale-105 transition">
-                📱 Support WhatsApp
+        <footer class="mt-12 p-8 bg-gradient-to-br from-blue-900/80 to-[#0B1120] rounded-[2.5rem] border border-blue-500/30 text-center shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+            
+            <p class="font-bold text-lg mb-6 text-white">Besoin d'aide personnalisée ?</p>
+            <a href="https://wa.me/2250707070707" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-3 bg-[#25D366] text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-green-900/20 hover:scale-105 hover:bg-[#20bd5a] transition duration-300">
+                <svg class="w-6 h-6 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
+                </svg>
+                Contacter le Support
             </a>
         </footer>
     </main>
 
     <script>
-        function toggleFaq(id) {
-            const content = document.getElementById(`faq-${id}`);
-            const icon = document.getElementById(`icon-${id}`);
-            content.classList.toggle('hidden');
-            icon.innerText = content.classList.contains('hidden') ? '＋' : '－';
+        function toggleFaq(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            const button = document.querySelector(`button[aria-controls="${contentId}"]`);
+            
+            // Toggle de la visibilité
+            const isHidden = content.classList.contains('hidden');
+            
+            if (isHidden) {
+                content.classList.remove('hidden');
+                icon.innerText = '－';
+                button.setAttribute('aria-expanded', 'true');
+                // Petit changement de couleur pour l'icône active
+                icon.classList.remove('text-slate-500');
+                icon.classList.add('text-[#F59E0B]');
+            } else {
+                content.classList.add('hidden');
+                icon.innerText = '＋';
+                button.setAttribute('aria-expanded', 'false');
+                icon.classList.add('text-slate-500');
+                icon.classList.remove('text-[#F59E0B]');
+            }
         }
     </script>
 </body>

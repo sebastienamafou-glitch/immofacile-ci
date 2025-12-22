@@ -443,4 +443,52 @@ exports.postEndLease = async (req, res) => {
     }
 };
 
+// --- CENTRE D'AIDE & STATISTIQUES ---
+
+exports.getHelp = async (req, res) => {
+    try {
+        const userId = req.session.user.id;
+
+        // 1. Calculer le total des loyers encaissés (Somme de tous les paiements reçus)
+        const totalRentCollected = await prisma.payment.aggregate({
+            _sum: { amount: true },
+            where: {
+                lease: {
+                    property: { ownerId: userId }
+                }
+            }
+        });
+
+        // 2. Compter le nombre d'États des Lieux (EDL) sécurisés
+        const totalInventories = await prisma.inventory.count({
+            where: {
+                lease: {
+                    property: { ownerId: userId }
+                }
+            }
+        });
+
+        // 3. Compter les "Accès partagés" (Ici, on compte les locataires actifs comme proxy)
+        const activeTenants = await prisma.lease.count({
+            where: {
+                property: { ownerId: userId },
+                isActive: true
+            }
+        });
+
+        // 4. Préparation de l'objet pour la vue EJS
+        const statsActions = {
+            reminders: activeTenants,                 // Correspond à "Accès Partagés"
+            rentCollected: totalRentCollected._sum.amount || 0, // Total en FCFA
+            inventory: totalInventories               // Nombre d'EDL
+        };
+
+        res.render('help', { statsActions });
+
+    } catch (error) {
+        console.error("Erreur chargement page aide:", error);
+        // En cas d'erreur, on redirige vers le dashboard pour éviter de planter
+        res.redirect('/owner/dashboard');
+    }
+};
 
