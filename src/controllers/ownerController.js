@@ -114,12 +114,21 @@ exports.getDashboard = async (req, res) => {
             user.escrowBalance = user.escrowBalance || 0;
         }
 
+        // --- C'EST ICI QUE LA CORRECTION EST APPLIQUÉE ---
         res.render('dashboard-owner', { 
-            user, properties, artisans, stats, 
+            user, 
+            properties, 
+            artisans, 
+            
+            // Correction : On envoie les variables séparées pour l'affichage
+            totalRent: stats.totalRent,
+            totalDeposit: stats.totalDeposit,
+            totalExpenses: stats.totalExpenses,
+            
             netIncome: stats.totalRent - stats.totalExpenses,
             activeIncidentsCount: stats.activeIncidents,
             realEscrowBalance: user ? user.escrowBalance : 0 
-        });
+        }); // <--- Vérifiez bien que ces parenthèses et accolades sont présentes !
 
     } catch (error) {
         console.error("Erreur Critique Dashboard:", error);
