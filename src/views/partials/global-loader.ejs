@@ -1,61 +1,63 @@
-<div id="globalLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0B1120]/80 backdrop-blur-sm transition-opacity duration-300 opacity-0">
-    <div class="w-16 h-16 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin mb-4"></div>
-    <p class="text-white font-bold animate-pulse text-sm tracking-widest">CHARGEMENT...</p>
+<div id="globalLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0B1120]/90 backdrop-blur-sm">
+    
+    <div class="relative flex justify-center items-center">
+        <div class="absolute animate-ping inline-flex h-16 w-16 rounded-full bg-[#F59E0B] opacity-20"></div>
+        <div class="w-16 h-16 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin"></div>
+    </div>
+    
+    <p class="text-white font-bold mt-4 animate-pulse text-sm tracking-widest uppercase">Chargement...</p>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const loader = document.getElementById('globalLoader');
 
-        // Fonction pour afficher le loader
+        // Force l'affichage immédiat
         window.showLoader = function() {
-            if (loader) {
-                loader.classList.remove('hidden');
-                // Petit délai pour permettre la transition CSS
-                setTimeout(() => loader.classList.remove('opacity-0'), 10);
-            }
+            if (loader) loader.classList.remove('hidden');
         };
 
-        // Fonction pour cacher le loader
+        // Cache immédiat
         window.hideLoader = function() {
-            if (loader) {
-                loader.classList.add('opacity-0');
-                setTimeout(() => loader.classList.add('hidden'), 300);
-            }
+            if (loader) loader.classList.add('hidden');
         };
 
-        // 1. Détecter le clic sur les liens de navigation (sauf les ancres # et les targets _blank)
-        document.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', function(e) {
-                const href = this.getAttribute('href');
-                const target = this.getAttribute('target');
+        // 1. Intercepte tous les clics sur les liens
+        document.body.addEventListener('click', function(e) {
+            // Trouve le lien parent le plus proche (au cas où on clique sur une icône dans le lien)
+            const link = e.target.closest('a');
+            
+            if (link) {
+                const href = link.getAttribute('href');
+                const target = link.getAttribute('target');
                 
-                // On affiche le loader seulement si c'est un vrai changement de page
-                if (href && href !== '#' && !href.startsWith('#') && target !== '_blank' && !href.startsWith('javascript')) {
+                // Si c'est un vrai lien interne, on affiche le loader
+                if (href && 
+                    !href.startsWith('#') && 
+                    !href.startsWith('javascript') && 
+                    target !== '_blank' &&
+                    !e.ctrlKey && !e.metaKey) { // Ignore Ctrl+Click (nouvel onglet)
+                    
                     showLoader();
                 }
-            });
+            }
         });
 
-        // 2. Détecter la soumission des formulaires
+        // 2. Intercepte les formulaires
         document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                // Si le formulaire est valide, on affiche le loader
+            form.addEventListener('submit', function() {
                 if (this.checkValidity()) {
                     showLoader();
                 }
             });
         });
 
-        // 3. Gérer le bouton "Retour" du navigateur (BFCache)
-        // Si on revient en arrière, la page est chargée depuis le cache, il faut cacher le loader
+        // 3. Gestion du bouton "Précédent" du navigateur
         window.addEventListener('pageshow', function(event) {
-            if (event.persisted) {
-                hideLoader();
-            }
+            hideLoader(); // Force le masquage si on revient en arrière
         });
         
-        // Sécurité : Cacher le loader au chargement initial (au cas où il resterait bloqué)
+        // Sécurité au chargement initial
         hideLoader();
     });
 </script>
