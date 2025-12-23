@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma/client');
+const { isOwner } = require('../middleware/auth');
 
 // Imports des contrôleurs
 const ownerController = require('../controllers/ownerController');
@@ -9,9 +10,9 @@ const paymentController = require('../controllers/paymentController');
 
 // Import Middleware unifié (Best Practice)
 // Assurez-vous que votre fichier authMiddleware.js exporte bien { isOwner } ou que vous utilisez le bon fichier.
-// Ici, je suppose que vous avez un fichier middlewares/auth.js comme vu dans les logs précédents.
-const { isOwner } = require('../middlewares/auth'); 
-const upload = require('../middlewares/upload'); // Assurez-vous que c'est le bon chemin pour multer/cloudinary
+// Ici, je suppose que vous avez un fichier middleware/auth.js comme vu dans les logs précédents.
+const upload = require('../middleware/upload'); // Assurez-vous que c'est le bon chemin pour multer/cloudinary
+
 
 // --- ROUTES D'AFFICHAGE (GET) ---
 
