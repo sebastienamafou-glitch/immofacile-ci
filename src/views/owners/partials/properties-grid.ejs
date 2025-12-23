@@ -1,0 +1,34 @@
+<section id="biens" class="mb-10 pt-10 border-t border-slate-800">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-bold flex items-center gap-2">🏠 Mes Biens</h3>
+        <a href="/owner/add-property" class="bg-[#F59E0B] text-[#0B1120] px-4 py-2 rounded-lg font-bold text-sm hover:scale-105 transition">+ Nouveau</a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <% properties.forEach(function(prop) { %>
+            <div class="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-700 transition group">
+                
+                <div class="h-40 w-full bg-slate-800 relative overflow-hidden">
+                    <% if (prop.images && prop.images.length > 0) { %>
+                        <img src="<%= prop.images[0] %>" alt="<%= prop.title %>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <% } else if (prop.imageUrl) { %>
+                        <img src="<%= prop.imageUrl %>" class="w-full h-full object-cover">
+                    <% } else { %>
+                        <div class="w-full h-full flex items-center justify-center text-4xl bg-slate-800 text-slate-700">🏠</div>
+                    <% } %>
+                    
+                    <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
+                        <span class="text-white font-bold text-xs"><%= prop.price.toLocaleString('fr-FR') %> FCFA</span>
+                    </div>
+                </div>
+
+                <div class="p-5">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-white text-lg"><%= prop.title %></h4>
+                        <span class="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded"><%= prop.commune %></span>
+                    </div>
+                    </div>
+            </div>
+        <% }); %>
+    </div>
+</section>

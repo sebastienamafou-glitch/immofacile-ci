@@ -105,7 +105,8 @@ exports.getDashboard = async (req, res) => {
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
         if (user) { user.walletBalance = user.walletBalance || 0; user.escrowBalance = user.escrowBalance || 0; }
 
-        res.render('dashboard-owner', { 
+        // --- MODIFICATION ICI : Rendu de la nouvelle vue refactorisée ---
+        res.render('owner/dashboard', { 
             user, properties, artisans, 
             totalRent: stats.totalMonthlyRent, totalDeposit: stats.totalDeposit, totalExpenses: stats.totalExpensesMonth,
             netIncome: stats.totalMonthlyRent - stats.totalExpensesMonth, activeIncidentsCount: stats.activeIncidents,
@@ -334,7 +335,9 @@ exports.getTaxSummary = async (req, res) => {
     }
 };
 
-exports.postWithdraw = async (req, res) => {
+// --- MODIFICATION ICI : Gestion correcte du modèle Withdrawal ---
+// Anciennement 'postWithdraw', renommé 'postRequestWithdrawal' pour la cohérence
+exports.postRequestWithdrawal = async (req, res) => {
     const { amount, paymentDetails } = req.body;
     const userId = req.session.user.id;
     const withdrawAmount = parseInt(amount);
@@ -347,7 +350,7 @@ exports.postWithdraw = async (req, res) => {
             return res.redirect('/owner/dashboard?error=insufficient_funds');
         }
 
-        // 2. Transaction atomique (Débit + Log)
+        // 2. Transaction atomique
         await prisma.$transaction(async (tx) => {
             // Débiter le portefeuille
             await tx.user.update({
@@ -355,7 +358,17 @@ exports.postWithdraw = async (req, res) => {
                 data: { walletBalance: { decrement: withdrawAmount } }
             });
 
-            // Enregistrer dans les logs d'activité (Piste d'audit)
+            // Créer l'enregistrement de retrait (Table Withdrawal)
+            await tx.withdrawal.create({
+                data: {
+                    amount: withdrawAmount,
+                    details: paymentDetails,
+                    status: 'PENDING',
+                    ownerId: userId
+                }
+            });
+
+            // (Optionnel) Enregistrer dans les logs d'activité
             await tx.activityLog.create({
                 data: {
                     action: 'WITHDRAWAL_REQUEST',
@@ -363,8 +376,7 @@ exports.postWithdraw = async (req, res) => {
                     userId: userId,
                     metadata: { 
                         amount: withdrawAmount, 
-                        destination: paymentDetails,
-                        status: 'PENDING' 
+                        destination: paymentDetails 
                     }
                 }
             });

@@ -1,0 +1,48 @@
+<section id="documents" class="mb-10 pt-10 border-t border-slate-800">
+    <h3 class="text-xl font-bold mb-6">📂 Documents Administratifs (Actifs)</h3>
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
+        <table class="w-full text-left text-sm min-w-[600px]">
+            <thead class="bg-slate-800 text-slate-400 text-xs uppercase font-bold">
+                <tr>
+                    <th class="px-4 py-3">Document</th>
+                    <th class="px-4 py-3">Locataire</th>
+                    <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+                <% if (typeof properties !== 'undefined') { %>
+                <% properties.forEach(prop => { 
+                    if(prop.leases) {
+                        prop.leases.forEach(lease => { 
+                            if(lease.isActive) { %>
+                        <tr class="searchable-item hover:bg-slate-800/50 transition">
+                            <td class="px-4 py-3 flex items-center gap-2 searchable-text">
+                                📜 Contrat de bail <span class="text-slate-500 text-xs">- <%= prop.title %></span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-400 searchable-text"><%= lease.tenant.name %></td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="/owner/contract/<%= lease.id %>" target="_blank" class="text-blue-400 font-bold hover:underline bg-blue-400/10 px-3 py-1 rounded-lg">Voir</a>
+                            </td>
+                        </tr>
+                        <tr class="searchable-item hover:bg-slate-800/50 transition">
+                            <td class="px-4 py-3">📥 État des lieux entrée</td>
+                            <td class="px-4 py-3 text-slate-400 searchable-text"><%= lease.tenant.name %></td>
+                            <td class="px-4 py-3 text-right">
+                                <a href="/owner/inventory/<%= lease.id %>?type=ENTREE" target="_blank" class="text-blue-400 font-bold hover:underline bg-blue-400/10 px-3 py-1 rounded-lg">Voir</a>
+                            </td>
+                        </tr>
+                        <% if (lease.payments && lease.payments.length > 0) { %>
+                            <tr class="searchable-item hover:bg-slate-800/50 transition">
+                                <td class="px-4 py-3">💰 Dernière Quittance</td>
+                                <td class="px-4 py-3 text-slate-400 searchable-text"><%= lease.tenant.name %></td>
+                                <td class="px-4 py-3 text-right">
+                                    <a href="/owner/receipt/<%= lease.payments[lease.payments.length-1].id %>" target="_blank" class="text-blue-400 font-bold hover:underline bg-blue-400/10 px-3 py-1 rounded-lg">Voir</a>
+                                </td>
+                            </tr>
+                        <% } %>
+                    <% } }) } }) %>
+                <% } %>
+            </tbody>
+        </table>
+    </div>
+</section>

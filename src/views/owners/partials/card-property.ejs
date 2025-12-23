@@ -1,0 +1,21 @@
+<div class="searchable-item bg-slate-900/50 border border-slate-800 p-0 rounded-2xl hover:border-slate-700 transition overflow-hidden group">
+    
+    <div class="h-32 w-full bg-slate-800 relative">
+        <% if (prop.images && prop.images.length > 0) { %>
+            <img src="<%= prop.images[0] %>" alt="<%= prop.title %>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+        <% } else if (prop.imageUrl) { %>
+            <img src="<%= prop.imageUrl %>" class="w-full h-full object-cover">
+        <% } else { %>
+            <div class="w-full h-full flex items-center justify-center text-4xl bg-slate-800">🏠</div>
+        <% } %>
+        
+        <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
+            <span class="text-white font-bold text-xs"><%= prop.price.toLocaleString('fr-FR') %> FCFA</span>
+        </div>
+    </div>
+
+    <div class="p-5">
+        <div class="flex justify-between items-start mb-4">
+             </div>
+        </div>
+</div>

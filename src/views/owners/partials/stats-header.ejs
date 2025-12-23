@@ -1,0 +1,30 @@
+<header id="dashboard" class="mb-10 pt-4">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest">La Météo des Revenus</h2>
+        </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
+            <canvas id="financeChart" height="200"></canvas>
+        </div>
+
+        <div class="p-6 bg-gradient-to-br from-[#F59E0B] to-orange-600 rounded-[2rem] shadow-xl text-white relative flex flex-col justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">Solde Disponible</p>
+                <div class="flex items-baseline gap-1 mb-4">
+                    <span class="text-4xl font-black"><%= (user.walletBalance || 0).toLocaleString('fr-FR') %></span>
+                    <span class="text-sm font-bold opacity-80">FCFA</span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3 mt-4">
+                <button onclick="document.getElementById('rechargeModal').classList.remove('hidden')" class="bg-white/20 hover:bg-white/30 text-white py-3 rounded-xl font-bold backdrop-blur-sm transition flex items-center justify-center gap-2">
+                    <span>⚡️</span> Dépôt
+                </button>
+                <button onclick="document.getElementById('withdrawModal').classList.remove('hidden')" class="bg-white text-orange-600 hover:bg-orange-50 py-3 rounded-xl font-bold shadow-lg transition flex items-center justify-center gap-2">
+                    <span>🏦</span> Retrait
+                </button>
+            </div>
+        </div>
+    </div>
+</header>

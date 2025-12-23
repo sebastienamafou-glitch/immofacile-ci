@@ -13,6 +13,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
@@ -71,8 +72,10 @@
             <% } %>
         </section>
 
+        <%- include('partials/payment-guide') %>
+
         <section class="mb-8">
-            <h2 class="text-lg font-bold mb-4">Mes Quittances</h2>
+            <h2 class="text-lg font-bold mb-4">Mes Quittances & Paiements</h2>
             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                 <% if (payments && payments.length > 0) { %>
                     <table class="w-full text-left">

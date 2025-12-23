@@ -1,0 +1,29 @@
+<section id="artisans" class="mb-10 pt-10 border-t border-slate-800">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-bold">🔨 Artisans Agréés</h3>
+        <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="text-blue-400 text-sm font-bold hover:text-blue-300 transition bg-blue-400/10 px-4 py-2 rounded-lg">+ Ajouter</button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <% if (typeof artisans !== 'undefined' && artisans.length > 0) { %>
+            <% artisans.forEach(artisan => { %>
+                <div class="searchable-item bg-slate-900 border border-slate-800 p-5 rounded-2xl group transition hover:border-[#F59E0B]/50 hover:bg-slate-800">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-bold text-white group-hover:text-[#F59E0B] transition searchable-text"><%= artisan.name %></h4>
+                        <% if (artisan.isVerified) { %> <span class="bg-green-500/20 text-green-400 text-[8px] px-2 py-1 rounded-full uppercase">Vérifié</span> <% } %>
+                    </div>
+                    <p class="text-[#F59E0B] text-xs mb-1 searchable-text"><%= artisan.job %></p>
+                    <p class="text-slate-500 text-[10px] mb-4 searchable-text">📍 <%= artisan.location %></p>
+                    <a href="tel:<%= artisan.phone %>" class="flex items-center justify-center gap-2 w-full bg-slate-800 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition text-slate-300">📞 Appeler</a>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <div class="col-span-full flex flex-col items-center justify-center py-10 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
+                <p class="text-4xl mb-2">👨‍🔧</p>
+                <p class="text-slate-500 font-medium mb-4">Aucun artisan partenaire</p>
+                <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="text-blue-400 font-bold hover:underline">
+                    + Ajouter mon premier artisan
+                </button>
+            </div>
+        <% } %>
+    </div>
+</section>

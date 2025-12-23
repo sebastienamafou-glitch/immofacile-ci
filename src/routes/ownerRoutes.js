@@ -60,6 +60,7 @@ router.post('/add-tenant', isOwner, ownerController.postAddTenant);
 router.post('/end-lease', isOwner, ownerController.postEndLease);
 
 // États des lieux avec photos multiples
+router.post('/withdraw', isOwner, ownerController.postRequestWithdrawal);
 router.post('/submit-inventory', isOwner, upload.fields([
     { name: 'kitchenPhoto', maxCount: 1 },
     { name: 'livingPhoto', maxCount: 1 },
