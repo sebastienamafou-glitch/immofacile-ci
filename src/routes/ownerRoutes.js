@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma/client');
-const { isOwner } = require('../middleware/auth');
+const { isOwner } = require('../middleware/authMiddleware');
 
 // Imports des contrôleurs
 const ownerController = require('../controllers/ownerController');
