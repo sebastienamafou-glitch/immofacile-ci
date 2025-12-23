@@ -3,7 +3,7 @@ const path = require('path');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const csrfMiddleware = require('./middleware/csrfMiddleware');
-const helmet = require('helmet'); // CORRECTION : Sécurité
+const helmet = require('helmet'); 
 const pg = require('pg');
 const pgSession = require('connect-pg-simple')(session);
 
@@ -22,9 +22,8 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1); 
 
-// CORRECTION : Helmet pour la sécurité des headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Désactivé temporairement pour éviter les conflits avec CDN Tailwind/Cloudinary en démo
+  contentSecurityPolicy: false, 
 }));
 
 app.set('view engine', 'ejs');
@@ -66,6 +65,13 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- ROUTES ---
+
+// Route publique pour les CGU/Mentions Légales (PLACÉE ICI POUR FONCTIONNER)
+app.get('/terms', (req, res) => {
+    res.render('terms'); 
+});
+
 app.use('/', authRoutes);
 app.use('/owner', ownerRoutes);
 app.use('/tenant', tenantRoutes);
@@ -73,6 +79,7 @@ app.use('/admin', adminRoutes);
 app.use('/agent', agentRoutes);
 app.use('/api', apiRoutes);
 
+// --- GESTION DES ERREURS (TOUJOURS À LA FIN) ---
 app.use((req, res) => {
     res.status(404).render('errors/404');
 });

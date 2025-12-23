@@ -24,7 +24,7 @@
     <script src="https://cdn.tailwindcss.com"></script> 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet"> 
 </head>
-<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex items-center justify-center min-h-screen p-4"> 
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] flex flex-col items-center justify-center min-h-screen p-4"> 
 
     <div class="w-full max-w-md">
         <div class="text-center mb-8">
@@ -34,14 +34,14 @@
 
         <div class="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] shadow-2xl">
       
-            <% if (error) { %> 
+            <% if (typeof error !== 'undefined' && error) { %> 
                 <div class="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-4 rounded-xl mb-6 text-center">
                     <%= error %> 
                 </div>
             <% } %>
 
             <form action="/login" method="POST" class="space-y-4">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
                 <div>
                     <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Email ou Téléphone</label> 
                     <input type="text" name="identifier" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]" placeholder="Votre identifiant"> 
@@ -52,18 +52,25 @@
                     <input type="password" name="password" required class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:outline-none focus:border-[#F59E0B]" placeholder="••••••••">
                 </div>
 
-                <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition mt-4">
+                <div class="flex justify-end pt-1">
+                    <a href="/forgot-password" class="text-xs text-[#F59E0B] hover:underline">Mot de passe oublié ?</a>
+                </div>
+
+                <button type="submit" class="w-full bg-[#F59E0B] hover:bg-orange-600 text-[#0B1120] font-black py-4 rounded-xl uppercase tracking-wider transition mt-4 shadow-lg shadow-orange-500/20">
                     Se connecter
                 </button>
             </form>
         </div>
-        <div class="flex justify-end mb-2">
-    <a href="/forgot-password" class="text-xs text-[#F59E0B] hover:underline">Mot de passe oublié ?</a>
-</div>
 
         <p class="text-center text-slate-500 text-sm mt-8">
-            Pas encore de compte ? <a href="/signup" class="text-[#F59E0B] hover:underline">S'inscrire</a>
+            Pas encore de compte ?
+            <a href="/signup" class="text-[#F59E0B] font-bold hover:underline">S'inscrire</a>
         </p>
+    </div>
+
+    <div class="mt-12 text-center border-t border-slate-800 pt-6 w-full max-w-md">
+        <a href="/terms" class="text-xs text-slate-600 hover:text-slate-400 transition">Mentions Légales & CGU</a>
+        <p class="text-[10px] text-slate-700 mt-2">© <%= new Date().getFullYear() %> ImmoFacile par WebappCi</p>
     </div>
 
 </body>
