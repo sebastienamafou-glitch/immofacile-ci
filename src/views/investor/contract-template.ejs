@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrat d'Investissement | ImmoFacile CI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Merriweather', serif; }
+        
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 25mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        @media print {
+            body { background: white; }
+            .no-print { display: none !important; }
+            .a4-page { 
+                width: 100%; 
+                margin: 0; 
+                padding: 20mm; 
+                box-shadow: none; 
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 py-10">
+
+    <div class="max-w-[210mm] mx-auto mb-6 flex justify-between items-center no-print px-4 md:px-0">
+        <a href="/investor/dashboard" class="flex items-center gap-2 text-slate-500 hover:text-[#0B1120] transition font-sans text-sm font-bold">
+            <span>←</span> Retour au Dashboard
+        </a>
+        <button onclick="window.print()" class="bg-[#0B1120] text-white px-6 py-3 rounded-lg font-sans font-bold text-sm hover:bg-[#F59E0B] hover:text-[#0B1120] transition shadow-lg flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            Télécharger / Imprimer
+        </button>
+    </div>
+
+    <div class="a4-page">
+        
+        <div class="text-center border-b-2 border-black pb-6 mb-8">
+            <h1 class="text-2xl font-black uppercase tracking-widest mb-2">Contrat de Prêt Participatif</h1>
+            <p class="text-sm italic text-slate-500">Immobilier & Crowdfunding</p>
+            <p class="text-xs font-bold mt-2 font-sans bg-slate-100 inline-block px-3 py-1 rounded">Réf : INV-<%= typeof investment !== 'undefined' ? investment.id : 'DRAFT' %></p>
+        </div>
+
+        <div class="space-y-6 text-sm text-justify leading-relaxed">
+            
+            <p>
+                <strong>ENTRE LES SOUSSIGNÉS :</strong>
+            </p>
+
+            <div class="pl-4 border-l-4 border-[#0B1120]">
+                <p><strong>1. La Société WebAppCI SARL</strong> (ci-après "L'Opérateur"),<br>
+                Société à Responsabilité Limitée au capital de 1.000.000 FCFA,<br>
+                Siège social : Abidjan, Cocody Palmeraie,<br>
+                RCCM : CI-ABJ-34989.</p>
+            </div>
+
+            <p class="text-center font-bold text-xs uppercase my-2">- ET -</p>
+
+            <div class="pl-4 border-l-4 border-[#F59E0B]">
+                <p><strong>2. L'Investisseur :</strong><br>
+                Nom & Prénoms : <span class="font-bold"><%= user.name %></span><br>
+                Téléphone : <%= user.phone %><br>
+                Email : <%= user.email %></p>
+                </div>
+
+            <p><strong>IL A ÉTÉ CONVENU CE QUI SUIT :</strong></p>
+
+            <div>
+                <h3 class="font-bold underline mb-2">Article 1 : Objet du Contrat</h3>
+                <p>Le présent contrat formalise l'investissement réalisé par l'Investisseur sur la plateforme <strong>ImmoFacile CI</strong>. Les fonds sont mis à disposition de l'Opérateur pour le financement de projets de rénovation, de construction ou de mise en location immobilière.</p>
+            </div>
+
+            <div>
+                <h3 class="font-bold underline mb-2">Article 2 : Caractéristiques de l'Investissement</h3>
+                <ul class="list-disc pl-5 space-y-1 mt-2">
+                    <li><strong>Projet concerné :</strong> <%= typeof investment !== 'undefined' ? investment.projectName : '[NOM DU PROJET]' %></li>
+                    <li><strong>Montant investi :</strong> <span class="font-bold"><%= typeof investment !== 'undefined' ? investment.amount.toLocaleString('fr-FR') : '0' %> FCFA</span></li>
+                    <li><strong>Taux de rendement cible (ROI) :</strong> <%= typeof investment !== 'undefined' ? investment.roiRate : '0' %> % par an</li>
+                    <li><strong>Durée de blocage :</strong> <%= typeof investment !== 'undefined' ? investment.duration : '12' %> mois</li>
+                </ul>
+            </div>
+
+            <div>
+                <h3 class="font-bold underline mb-2">Article 3 : Risques et Garanties</h3>
+                <p>L'Investisseur reconnaît avoir été informé que l'investissement immobilier comporte des risques, incluant la perte partielle ou totale du capital, l'absence de liquidité immédiate et la variation du rendement. L'Opérateur s'engage à une obligation de moyens pour la réussite du projet mais ne saurait garantir le capital.</p>
+            </div>
+
+            <div>
+                <h3 class="font-bold underline mb-2">Article 4 : Signature Électronique (Loi n° 2013-546)</h3>
+                <p>La validation de cet investissement par l'usage du code OTP (One-Time Password) et des identifiants personnels de l'Investisseur vaut signature électronique et consentement irrévocable au présent contrat, conformément à la législation ivoirienne sur les transactions électroniques.</p>
+            </div>
+
+        </div>
+
+        <div class="mt-16 flex justify-between items-start no-print-break">
+            
+            <div class="w-1/2 pr-4">
+                <p class="font-bold mb-4">Pour l'Opérateur (WebAppCI) :</p>
+                <img src="/images/logo_webappci.png" alt="Signature" class="h-12 opacity-50 mb-2">
+                <p class="text-[10px] text-slate-500">Signé numériquement par le Gérant.</p>
+            </div>
+
+            <div class="w-1/2 border border-slate-300 bg-slate-50 p-6 rounded text-center">
+                <p class="font-bold mb-2">L'Investisseur</p>
+                <p class="text-xs text-slate-500 mb-4">"Lu et approuvé"</p>
+                
+                <div class="border-2 border-green-500 text-green-600 font-bold font-sans text-xs inline-block px-4 py-2 rounded uppercase tracking-widest transform -rotate-3">
+                    Certifié par OTP
+                </div>
+                
+                <p class="text-[10px] text-slate-400 mt-4">
+                    Signé le : <%= new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %><br>
+                    ID Transaction : <%= typeof investment !== 'undefined' ? investment.id.split('-')[0] : 'PREVIEW' %>...
+                </p>
+            </div>
+
+        </div>
+
+        <div class="absolute bottom-10 left-0 w-full text-center px-10">
+            <div class="border-t border-slate-200 pt-4">
+                <p class="text-[10px] text-slate-400">
+                    ImmoFacile CI - Une marque de WebAppCI SARL • Capital 1.000.000 FCFA • Abidjan, Côte d'Ivoire.<br>
+                    Ce document est généré électroniquement et possède une valeur probante.
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -9,12 +9,14 @@ const pgSession = require('connect-pg-simple')(session);
 
 require('dotenv').config();
 
+// --- IMPORTS DES ROUTES ---
 const authRoutes = require('./routes/authRoutes');
 const ownerRoutes = require('./routes/ownerRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const agentRoutes = require('./routes/agentRoutes');
 const apiRoutes = require('./routes/apiRoutes');
+const investorRoutes = require('./routes/investorRoutes'); // 👈 C'EST CETTE LIGNE QUI MANQUAIT !
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -67,7 +69,7 @@ app.use((req, res, next) => {
 
 // --- ROUTES ---
 
-// Route publique pour les CGU/Mentions Légales (PLACÉE ICI POUR FONCTIONNER)
+// Route publique pour les CGU/Mentions Légales
 app.get('/terms', (req, res) => {
     res.render('terms'); 
 });
@@ -78,8 +80,9 @@ app.use('/tenant', tenantRoutes);
 app.use('/admin', adminRoutes);
 app.use('/agent', agentRoutes);
 app.use('/api', apiRoutes);
+app.use('/investor', investorRoutes); // Maintenant, ça marchera !
 
-// --- GESTION DES ERREURS (TOUJOURS À LA FIN) ---
+// --- GESTION DES ERREURS ---
 app.use((req, res) => {
     res.status(404).render('errors/404');
 });

@@ -62,7 +62,7 @@ exports.postAddTenant = async (req, res) => {
     }
 };
 
-// --- DASHBOARD ---
+// --- DASHBOARD (CORRIGÉ AVEC HELPERS) ---
 exports.getDashboard = async (req, res) => {
     try {
         const userId = req.session.user.id;
@@ -105,13 +105,25 @@ exports.getDashboard = async (req, res) => {
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
         if (user) { user.walletBalance = user.walletBalance || 0; user.escrowBalance = user.escrowBalance || 0; }
 
-        // --- MODIFICATION ICI : Rendu de la nouvelle vue refactorisée ---
+        // --- DÉFINITION DES HELPERS (Correction Erreur 500) ---
+        const helpers = {
+            formatMoney: (amount) => (amount || 0).toLocaleString('fr-FR'),
+            formatWaLink: (phone, text = '') => {
+                if (!phone) return '#';
+                let clean = phone.replace(/\D/g, '');
+                if (clean.length === 10) clean = '225' + clean;
+                return `https://wa.me/${clean}${text ? '?text=' + encodeURIComponent(text) : ''}`;
+            }
+        };
+
+        // --- RENDU DE LA VUE ---
         res.render('owner/dashboard', { 
             user, properties, artisans, 
             totalRent: stats.totalMonthlyRent, totalDeposit: stats.totalDeposit, totalExpenses: stats.totalExpensesMonth,
             netIncome: stats.totalMonthlyRent - stats.totalExpensesMonth, activeIncidentsCount: stats.activeIncidents,
             realEscrowBalance: user ? user.escrowBalance : 0,
-            totalRentYTD: stats.rentYTD, totalExpensesYTD: stats.expensesYTD, netIncomeYTD: stats.rentYTD - stats.expensesYTD 
+            totalRentYTD: stats.rentYTD, totalExpensesYTD: stats.expensesYTD, netIncomeYTD: stats.rentYTD - stats.expensesYTD,
+            ...helpers // Injection des fonctions dans la vue
         });
     } catch (error) {
         console.error("Erreur Critique Dashboard:", error);
@@ -119,23 +131,17 @@ exports.getDashboard = async (req, res) => {
     }
 };
 
-// --- GESTION BIENS (CORRIGÉ & FUSIONNÉ) ---
+// --- GESTION BIENS ---
 exports.postAddProperty = async (req, res) => {
     try {
         const { title, price, address, commune, description, bedrooms, bathrooms, surface } = req.body;
         const ownerId = req.session.user.id;
         
-        // GESTION DES IMAGES MULTIPLES
         let imageUrls = [];
-        
-        // Cas 1 : Multer a déjà uploadé sur Cloudinary (req.files contient les paths)
         if (req.files && req.files.length > 0) {
-            // Si req.files[0].path existe, c'est que l'upload est déjà fait
             if(req.files[0].path) {
                 imageUrls = req.files.map(file => file.path);
-            } 
-            // Cas 2 : Multer est en mémoire (req.files[0].buffer existe), il faut uploader manuellement
-            else if (req.files[0].buffer) {
+            } else if (req.files[0].buffer) {
                 for (const file of req.files) {
                     const result = await uploadFromBuffer(file.buffer);
                     imageUrls.push(result.secure_url);
@@ -143,7 +149,6 @@ exports.postAddProperty = async (req, res) => {
             }
         }
 
-        // CRÉATION EN BASE DE DONNÉES
         await prisma.property.create({
             data: {
                 title, address, commune,
@@ -152,7 +157,7 @@ exports.postAddProperty = async (req, res) => {
                 bedrooms: bedrooms ? parseInt(bedrooms) : null,
                 bathrooms: bathrooms ? parseInt(bathrooms) : null,
                 surface: surface ? parseInt(surface) : null,
-                images: imageUrls, // Tableau d'URL
+                images: imageUrls,
                 ownerId: ownerId
             }
         });
@@ -263,71 +268,41 @@ exports.generatePoster = async (req, res) => {
 exports.getTaxSummary = async (req, res) => {
     try {
         const userId = req.session.user.id;
-        // Par défaut l'année passée, ou l'année demandée via ?year=2024
         const selectedYear = parseInt(req.query.year) || (new Date().getFullYear() - 1);
-        
-        const startDate = new Date(selectedYear, 0, 1); // 1er Janvier
-        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59); // 31 Décembre
+        const startDate = new Date(selectedYear, 0, 1); 
+        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59);
 
-        // 1. Récupérer les biens et leurs revenus/dépenses sur la période
         const properties = await prisma.property.findMany({
             where: { ownerId: userId },
             include: {
-                // Récupérer les paiements (Loyer) via les baux
                 leases: {
                     include: {
-                        payments: {
-                            where: {
-                                date: { gte: startDate, lte: endDate } // Uniquement cette année
-                            }
-                        }
+                        payments: { where: { date: { gte: startDate, lte: endDate } } }
                     }
                 },
-                // Récupérer les dépenses (Réparations, taxes, etc.)
-                expenses: {
-                    where: {
-                        createdAt: { gte: startDate, lte: endDate } // Uniquement cette année
-                    }
-                }
+                expenses: { where: { createdAt: { gte: startDate, lte: endDate } } }
             }
         });
 
-        // 2. Calculer les totaux pour l'affichage
         let globalStats = { totalRevenue: 0, totalExpenses: 0, netIncome: 0 };
         
         const reportData = properties.map(prop => {
-            // Somme des loyers encaissés pour ce bien
             const revenue = prop.leases.reduce((totalLease, lease) => {
                 return totalLease + lease.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
             }, 0);
-
-            // Somme des dépenses pour ce bien
             const expense = prop.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-
             globalStats.totalRevenue += revenue;
             globalStats.totalExpenses += expense;
-
             return {
-                title: prop.title,
-                address: prop.address,
-                commune: prop.commune,
-                revenue,
-                expense,
-                net: revenue - expense
+                title: prop.title, address: prop.address, commune: prop.commune,
+                revenue, expense, net: revenue - expense
             };
         });
 
         globalStats.netIncome = globalStats.totalRevenue - globalStats.totalExpenses;
-
         const user = await prisma.user.findUnique({ where: { id: userId } });
 
-        res.render('tax-summary', { 
-            reportData, 
-            globalStats, 
-            year: selectedYear,
-            user,
-            currentDate: new Date().toLocaleDateString('fr-FR')
-        });
+        res.render('tax-summary', { reportData, globalStats, year: selectedYear, user, currentDate: new Date().toLocaleDateString('fr-FR') });
 
     } catch (error) {
         console.error("Erreur Récap Fiscal:", error);
@@ -343,25 +318,10 @@ exports.postRequestWithdrawal = async (req, res) => {
     try {
         await prisma.$transaction(async (tx) => {
             const user = await tx.user.findUnique({ where: { id: userId } });
-            if (user.walletBalance < value) {
-                throw new Error("Solde insuffisant");
-            }
-
-            await tx.user.update({
-                where: { id: userId },
-                data: { walletBalance: { decrement: value } }
-            });
-
-            await tx.withdrawal.create({
-                data: {
-                    amount: value,
-                    details: paymentDetails,
-                    status: 'PENDING',
-                    ownerId: userId
-                }
-            });
+            if (user.walletBalance < value) { throw new Error("Solde insuffisant"); }
+            await tx.user.update({ where: { id: userId }, data: { walletBalance: { decrement: value } } });
+            await tx.withdrawal.create({ data: { amount: value, details: paymentDetails, status: 'PENDING', ownerId: userId } });
         });
-
         res.redirect('/owner/dashboard?success=withdrawal_initiated');
     } catch (error) {
         console.error("Erreur Retrait:", error);

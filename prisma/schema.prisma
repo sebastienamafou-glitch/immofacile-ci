@@ -14,12 +14,12 @@ model User {
   email     String   @unique
   phone     String   @unique
   name      String?
-  role      UserRole @default(TENANT) // [cite: 2]
+  role      UserRole @default(TENANT)
   password  String
   createdAt DateTime @default(now())
   isActive  Boolean  @default(true) 
   resetPasswordToken   String?
-  resetPasswordExpires DateTime? // [cite: 3]
+  resetPasswordExpires DateTime?
   
   // FINANCES
   walletBalance Int    @default(0) // Argent disponible
@@ -29,9 +29,10 @@ model User {
   properties        Property[]          @relation("OwnerProperties")
   leasesAsTenant    Lease[]             @relation("TenantLeases")
   reportedIncidents Incident[]          @relation("Reporter")
-  leads             Lead[]              @relation("AgentLeads") // [cite: 4]
+  leads             Lead[]              @relation("AgentLeads")
   transactions      CreditTransaction[] 
-  withdrawals       Withdrawal[]        // Relation ajoutée
+  withdrawals       Withdrawal[]        
+  investments       Investment[]        // <-- Relation Investisseur ajoutée
   
   // RELATIONS SYSTÈME
   pushSubscriptions PushSubscription[] // Notifications Push
@@ -43,6 +44,7 @@ enum UserRole {
   TENANT
   ADMIN
   AGENT
+  INVESTOR // <-- Rôle Investisseur ajouté
 }
 
 // --- TRAÇABILITÉ DE L'ARGENT ---
@@ -51,11 +53,28 @@ model CreditTransaction {
   id          String   @id @default(cuid())
   amount      Int      
   description String   
-  
-  date        DateTime @default(now()) // [cite: 5]
+  date        DateTime @default(now())
   
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+}
+
+// --- NOUVEAU MODÈLE INVESTISSEMENT ---
+
+model Investment {
+  id          String   @id @default(cuid())
+  amount      Int      // Montant investi
+  roiRate     Float    // Taux promis (ex: 10.5)
+  duration    Int      // Durée en mois
+  startDate   DateTime @default(now())
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  
+  projectName String   // Ex: "Rénovation Villa Cocody"
+  
+  investorId  String
+  investor    User     @relation(fields: [investorId], references: [id])
+
+  createdAt   DateTime @default(now())
 }
 
 // --- MODÈLES IMMOBILIERS ---
@@ -68,10 +87,9 @@ model Property {
   price     Int      
   createdAt DateTime @default(now())
   
-  // Modification : Support de plusieurs images (Array) au lieu d'une seule String
   images    String[] 
 
-  ownerId   String // 
+  ownerId   String 
   owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
 
   leases    Lease[]
@@ -84,7 +102,7 @@ model Lease {
   id            String    @id @default(cuid())
   startDate     DateTime
   endDate       DateTime?
-  depositAmount Int        // [cite: 7]
+  depositAmount Int       
   monthlyRent   Int       
   isActive      Boolean   @default(true)
 
@@ -100,7 +118,7 @@ model Lease {
 
 // --- FINANCES, INCIDENTS ET ÉTAT DES LIEUX ---
 
-model Payment { // [cite: 8]
+model Payment {
   id        String   @id @default(cuid())
   amount    Int      
   date      DateTime @default(now())
@@ -113,7 +131,7 @@ model Payment { // [cite: 8]
 
 model Incident {
   id          String   @id @default(cuid())
-  title       String   // [cite: 9]
+  title       String   
   description String
   status      String   @default("OPEN")
   priority    String   @default("MEDIUM")
@@ -129,8 +147,7 @@ model Incident {
 model Expense {
   id          String   @id @default(cuid())
   description String
-  amount      Int      // [cite: 10]
-  
+  amount      Int      
   date        DateTime @default(now())
   category    String
   
@@ -144,13 +161,13 @@ model Inventory {
   date           DateTime @default(now())
   
   kitchenState   String?
-  kitchenPhoto   String? // [cite: 11]
+  kitchenPhoto   String?
   livingState    String?
   livingPhoto    String?
-  bathState      String? // [cite: 12]
+  bathState      String?
   bathPhoto      String?
   generalComment String?
-  leaseId        String // [cite: 13]
+  leaseId        String
   lease          Lease    @relation(fields: [leaseId], references: [id])
 }
 
@@ -161,12 +178,12 @@ model Lead {
   name        String
   phone       String
   address     String?
-  photo       String? // [cite: 14]
+  photo       String?
   status      String   @default("NOUVEAU")
   createdAt   DateTime @default(now())
   
   agentId     String?
-  agent       User?    @relation("AgentLeads", fields: [agentId], references: [id]) // [cite: 15]
+  agent       User?    @relation("AgentLeads", fields: [agentId], references: [id])
 }
 
 model Candidate {
@@ -179,7 +196,7 @@ model Candidate {
   score       Int
   createdAt   DateTime @default(now())
   
-  propertyId  String // [cite: 16]
+  propertyId  String
   property    Property @relation(fields: [propertyId], references: [id])
 }
 
@@ -193,7 +210,7 @@ model Artisan {
   location    String   
   isVerified  Boolean  @default(true)
   rating      Float    @default(5.0)
-  createdAt   DateTime @default(now()) // [cite: 17]
+  createdAt   DateTime @default(now())
 }
 
 // --- SYSTÈME DE NOTIFICATIONS (WEB PUSH) ---
@@ -210,15 +227,15 @@ model PushSubscription {
 
 // --- LOGS D'ACTIVITÉ ---
 
-model ActivityLog { // [cite: 18]
+model ActivityLog {
   id        String   @id @default(cuid())
   action    String   
   category  String  
   metadata  Json?
-  createdAt DateTime @default(now()) // [cite: 19]
+  createdAt DateTime @default(now())
   
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id]) // [cite: 20]
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 // --- MODÈLE DE RETRAIT ---

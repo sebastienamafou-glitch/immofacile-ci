@@ -1,14 +1,5 @@
 <!DOCTYPE html>
 <html lang="fr">
-<% 
-    const formatMoney = (amount) => (amount || 0).toLocaleString('fr-FR');
-    const formatWaLink = (phone, text = '') => {
-        if (!phone) return '#';
-        let clean = phone.replace(/\D/g, '');
-        if (clean.length === 10) clean = '225' + clean;
-        return `https://wa.me/${clean}${text ? '?text=' + encodeURIComponent(text) : ''}`;
-    };
-%>
 
 <head>
     <meta charset="UTF-8">
