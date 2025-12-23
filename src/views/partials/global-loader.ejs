@@ -1,0 +1,61 @@
+<div id="globalLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#0B1120]/80 backdrop-blur-sm transition-opacity duration-300 opacity-0">
+    <div class="w-16 h-16 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin mb-4"></div>
+    <p class="text-white font-bold animate-pulse text-sm tracking-widest">CHARGEMENT...</p>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const loader = document.getElementById('globalLoader');
+
+        // Fonction pour afficher le loader
+        window.showLoader = function() {
+            if (loader) {
+                loader.classList.remove('hidden');
+                // Petit délai pour permettre la transition CSS
+                setTimeout(() => loader.classList.remove('opacity-0'), 10);
+            }
+        };
+
+        // Fonction pour cacher le loader
+        window.hideLoader = function() {
+            if (loader) {
+                loader.classList.add('opacity-0');
+                setTimeout(() => loader.classList.add('hidden'), 300);
+            }
+        };
+
+        // 1. Détecter le clic sur les liens de navigation (sauf les ancres # et les targets _blank)
+        document.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                const target = this.getAttribute('target');
+                
+                // On affiche le loader seulement si c'est un vrai changement de page
+                if (href && href !== '#' && !href.startsWith('#') && target !== '_blank' && !href.startsWith('javascript')) {
+                    showLoader();
+                }
+            });
+        });
+
+        // 2. Détecter la soumission des formulaires
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                // Si le formulaire est valide, on affiche le loader
+                if (this.checkValidity()) {
+                    showLoader();
+                }
+            });
+        });
+
+        // 3. Gérer le bouton "Retour" du navigateur (BFCache)
+        // Si on revient en arrière, la page est chargée depuis le cache, il faut cacher le loader
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                hideLoader();
+            }
+        });
+        
+        // Sécurité : Cacher le loader au chargement initial (au cas où il resterait bloqué)
+        hideLoader();
+    });
+</script>
