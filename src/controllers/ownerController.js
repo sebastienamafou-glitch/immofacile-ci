@@ -5,7 +5,7 @@ const { generateRandomPassword } = require('../utils/security');
 const { uploadFromBuffer } = require('../utils/cloudinary');
 const tracker = require('../utils/tracker'); 
 const QRCode = require('qrcode');
-const cloudinary = require('../config/cloudinary');
+
 
 // --- GESTION LOCATAIRES ---
 exports.getAddTenant = async (req, res) => {
