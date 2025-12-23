@@ -1,11 +1,18 @@
 <script>
+    // --- SIGNATURE WEBAPPCI ---
+    console.log(
+        '%c ImmoFacile CI %c by WebAppCI ',
+        'background: #0B1120; color: #F59E0B; font-weight: bold; padding: 5px; border-radius: 3px 0 0 3px;',
+        'background: #F59E0B; color: #0B1120; font-weight: bold; padding: 5px; border-radius: 0 3px 3px 0;'
+    );
+    console.log('🔒 Application protégée par Copyright. Toute reproduction interdite.');
+
     // --- 1. Gestion du Menu Burger Mobile ---
     function toggleMenu() {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
         // Vérification si les éléments existent avant d'agir
         if(!sidebar || !overlay) return;
-
         if (sidebar.classList.contains('closed')) {
             sidebar.classList.remove('closed');
             sidebar.classList.add('open');
@@ -41,7 +48,6 @@
         if(!input) return;
         const filter = input.value.toUpperCase();
         const items = document.querySelectorAll('.searchable-item');
-
         items.forEach(item => {
             const text = item.innerText || item.textContent;
             if (text.toUpperCase().indexOf(filter) > -1) {

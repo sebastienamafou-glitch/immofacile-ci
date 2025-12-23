@@ -7,6 +7,7 @@
         <a href="#dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20">
             <span>📊</span> Tableau de bord
         </a>
+   
         <a href="#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
             <span>🏠</span> Mes Biens
         </a>
@@ -29,18 +30,24 @@
                 <span>❓</span> Centre d'Aide
             </a>
         </div>
-
+  
         <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
             <span>🚪</span> Déconnexion
         </a>
     </nav>
 
     <div class="mt-auto pt-6 border-t border-slate-800">
-        <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
-        <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain opacity-80 mb-2">
-        <div class="flex flex-col gap-1">
-            <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">contact@webappci.com</a>
-            <a href="/privacy" class="text-[10px] text-[#F59E0B] hover:underline">Confidentialité</a>
+        <div class="flex items-center gap-3 opacity-60 hover:opacity-100 transition duration-300">
+            <img src="/images/logo_webappci.png" alt="Logo WebAppCI" class="h-8 w-auto object-contain grayscale hover:grayscale-0">
+            <div>
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Made by</p>
+                <p class="text-xs font-black text-white">WebAppCI <span class="text-[#F59E0B]">©</span></p>
+            </div>
+        </div>
+        
+        <div class="flex flex-col gap-1 mt-3">
+            <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">Support Technique</a>
+            <p class="text-[9px] text-slate-600">v2.4.0 • Tous droits réservés</p>
         </div>
     </div>
 </aside>
