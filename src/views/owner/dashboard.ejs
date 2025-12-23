@@ -1,5 +1,15 @@
 <!DOCTYPE html>
 <html lang="fr">
+<% 
+    const formatMoney = (amount) => (amount || 0).toLocaleString('fr-FR');
+    const formatWaLink = (phone, text = '') => {
+        if (!phone) return '#';
+        let clean = phone.replace(/\D/g, '');
+        if (clean.length === 10) clean = '225' + clean;
+        return `https://wa.me/${clean}${text ? '?text=' + encodeURIComponent(text) : ''}`;
+    };
+%>
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,8 +17,7 @@
     
     <meta name="author" content="WebAppCI SARL">
     <meta name="copyright" content="WebAppCI SARL">
-    <meta name="generator" content="ImmoFacile Engine v2">
-
+    
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
     
@@ -28,18 +37,16 @@
 
         <main class="flex-1 p-4 md:p-8 md:ml-64 w-full">
             <%- include('partials/stats-header') %>
-
             <%- include('partials/properties-grid') %>
-
             <%- include('partials/section-tenants') %> 
             <%- include('partials/section-documents') %>
             <%- include('partials/section-artisans') %>
-            
         </main>
     </div>
 
-    <%- include('partials/modals') %>
+    <%- include('partials/fab-actions') %>
 
+    <%- include('partials/modals') %>
     <%- include('partials/scripts') %>
 
 </body>

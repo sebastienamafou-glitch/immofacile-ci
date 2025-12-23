@@ -1,26 +1,23 @@
 <script>
-    // --- SIGNATURE WEBAPPCI ---
-    console.log(
-        '%c ImmoFacile CI %c by WebAppCI ',
-        'background: #0B1120; color: #F59E0B; font-weight: bold; padding: 5px; border-radius: 3px 0 0 3px;',
-        'background: #F59E0B; color: #0B1120; font-weight: bold; padding: 5px; border-radius: 0 3px 3px 0;'
-    );
-    console.log('🔒 Application protégée par Copyright. Toute reproduction interdite.');
-
-    // --- 1. Gestion du Menu Burger Mobile ---
+    // ==========================================
+    // 1. GESTION DU MENU MOBILE (Burger)
+    // ==========================================
     function toggleMenu() {
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('overlay');
-        // Vérification si les éléments existent avant d'agir
-        if(!sidebar || !overlay) return;
-        if (sidebar.classList.contains('closed')) {
-            sidebar.classList.remove('closed');
-            sidebar.classList.add('open');
-            overlay.classList.remove('hidden');
-        } else {
-            sidebar.classList.add('closed');
-            sidebar.classList.remove('open');
-            overlay.classList.add('hidden');
+        
+        if (sidebar && overlay) {
+            if (sidebar.classList.contains('closed')) {
+                sidebar.classList.remove('closed');
+                sidebar.classList.add('open'); // Pour CSS perso si besoin
+                sidebar.style.transform = "translateX(0)";
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('closed');
+                sidebar.classList.remove('open');
+                sidebar.style.transform = ""; // Retour au CSS par défaut (hidden sur mobile)
+                overlay.classList.add('hidden');
+            }
         }
     }
 
@@ -30,24 +27,37 @@
         }
     }
 
-    // --- 2. Gestion des Modals ---
+    // ==========================================
+    // 2. GESTION DES MODALS (Popups)
+    // ==========================================
     function openExitModal(leaseId, tenantName, deposit) {
-        document.getElementById('exitModal').classList.remove('hidden');
-        document.getElementById('exitLeaseId').value = leaseId;
-        document.getElementById('exitTenantName').innerText = "Fin de bail pour : " + tenantName;
-        document.getElementById('exitDepositDisplay').innerText = (parseInt(deposit) || 0).toLocaleString('fr-FR') + " FCFA";
+        const modal = document.getElementById('exitModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.getElementById('exitLeaseId').value = leaseId;
+            document.getElementById('exitTenantName').innerText = "Fin de bail pour : " + tenantName;
+            
+            // Formatage propre du montant
+            const amount = parseInt(deposit) || 0;
+            document.getElementById('exitDepositDisplay').innerText = amount.toLocaleString('fr-FR') + " FCFA";
+        }
     }
 
     function closeNewTenantModal() {
-        document.getElementById('newTenantModal').classList.add('hidden');
+        const modal = document.getElementById('newTenantModal');
+        if (modal) modal.classList.add('hidden');
     }
 
-    // --- 3. Filtre de Recherche Global ---
+    // ==========================================
+    // 3. RECHERCHE GLOBALE (Filtre)
+    // ==========================================
     function filterAll() {
         const input = document.getElementById('globalSearch');
-        if(!input) return;
+        if (!input) return;
+        
         const filter = input.value.toUpperCase();
         const items = document.querySelectorAll('.searchable-item');
+
         items.forEach(item => {
             const text = item.innerText || item.textContent;
             if (text.toUpperCase().indexOf(filter) > -1) {
@@ -58,23 +68,31 @@
         });
     }
 
-    // --- 4. Initialisation Chart.js (Graphique) ---
+    // ==========================================
+    // 4. GRAPHIQUE FINANCIER (Chart.js)
+    // ==========================================
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('financeChart');
-        if(ctx) {
-            const context = ctx.getContext('2d');
+        if (ctx) {
+            // Récupération sécurisée des données EJS
             const revenus = Number('<%= typeof totalRent !== "undefined" ? totalRent : 0 %>');
             const depenses = Number('<%= typeof totalExpenses !== "undefined" ? totalExpenses : 0 %>');
 
-            new Chart(context, {
+            new Chart(ctx.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: ['Revenus', 'Dépenses'],
                     datasets: [{
                         label: 'Montant (FCFA)',
                         data: [revenus, depenses],
-                        backgroundColor: ['rgba(34, 197, 94, 0.7)', 'rgba(239, 68, 68, 0.7)'],
-                        borderColor: ['rgb(34, 197, 94)', 'rgb(239, 68, 68)'],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.7)', // Vert
+                            'rgba(239, 68, 68, 0.7)'  // Rouge
+                        ],
+                        borderColor: [
+                            'rgb(34, 197, 94)',
+                            'rgb(239, 68, 68)'
+                        ],
                         borderWidth: 1,
                         borderRadius: 8
                     }]
@@ -84,33 +102,88 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#ffffff', font: { weight: 'bold' } } }
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }, 
+                            ticks: { color: '#94a3b8' } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: '#ffffff', font: { weight: 'bold' } } 
+                        }
                     }
                 }
             });
         }
     });
 
-    // --- 5. Pop-up Succès Création Locataire ---
+    // ==========================================
+    // 5. LOADER (Indicateur de chargement)
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', function() {
+        const loader = document.getElementById('globalLoader');
+
+        window.showLoader = function() {
+            if (loader) loader.classList.remove('hidden');
+        };
+
+        window.hideLoader = function() {
+            if (loader) loader.classList.add('hidden');
+        };
+
+        // Attacher le loader à tous les formulaires lors de la soumission
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                // Si le formulaire est valide, on affiche le loader
+                if (this.checkValidity()) {
+                    showLoader();
+                }
+            });
+        });
+
+        // Cacher le loader si on revient en arrière avec le navigateur
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                hideLoader();
+            }
+        });
+    });
+
+    // ==========================================
+    // 6. POPUP SUCCÈS CRÉATION LOCATAIRE
+    // ==========================================
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
+        
         if (urlParams.get('success') === 'tenant_added' && urlParams.get('new_pass')) {
             const name = urlParams.get('new_user');
             const phone = urlParams.get('new_phone');
             const pass = urlParams.get('new_pass');
 
-            document.getElementById('modalNewUser').innerText = name;
-            document.getElementById('modalNewPhone').innerText = phone;
-            document.getElementById('modalNewPass').innerText = pass;
+            // Remplissage du modal
+            const elUser = document.getElementById('modalNewUser');
+            const elPhone = document.getElementById('modalNewPhone');
+            const elPass = document.getElementById('modalNewPass');
+            const elBtn = document.getElementById('shareWaBtn');
+            const elModal = document.getElementById('newTenantModal');
 
-            const waMsg = `Bonjour ${name}, bienvenue sur ImmoFacile ! Voici tes accès : \n\n📱 Identifiant: ${phone}\n🔑 Mot de passe: ${pass}\n\nConnecte-toi ici : https://immofacile-ci.vercel.app/login`;
-            let cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
-            if (cleanPhone.length === 10) cleanPhone = '225' + cleanPhone;
-            
-            document.getElementById('shareWaBtn').href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`;
-            document.getElementById('newTenantModal').classList.remove('hidden');
+            if (elUser) elUser.innerText = name;
+            if (elPhone) elPhone.innerText = phone;
+            if (elPass) elPass.innerText = pass;
 
+            // Lien WhatsApp
+            if (elBtn) {
+                const waMsg = `Bonjour ${name}, bienvenue sur ImmoFacile ! Voici tes accès : \n\n📱 Identifiant: ${phone}\n🔑 Mot de passe: ${pass}\n\nConnecte-toi ici : https://immofacile-ci.vercel.app/login`;
+                let cleanPhone = phone.replace(/\s+/g, '').replace(/^(\+)?/, '');
+                if (cleanPhone.length === 10) cleanPhone = '225' + cleanPhone;
+                elBtn.href = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`;
+            }
+
+            // Affichage
+            if (elModal) elModal.classList.remove('hidden');
+
+            // Nettoyage de l'URL (Sécurité)
             if (window.history.replaceState) {
                 const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
                 window.history.replaceState({path: cleanUrl}, '', cleanUrl);
@@ -118,10 +191,63 @@
         }
     });
 
-    // Service Worker
+    // ==========================================
+    // 7. NOTIFICATIONS PUSH (Web Push)
+    // ==========================================
+    const PUBLIC_VAPID_KEY = "<%= process.env.VAPID_PUBLIC_KEY || '' %>";
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    async function enableNotifications() {
+        if (!PUBLIC_VAPID_KEY) {
+            console.error('VAPID Key manquante');
+            Swal.fire('Erreur', 'Configuration serveur incomplète.', 'error');
+            return;
+        }
+
+        if ('serviceWorker' in navigator) {
+            try {
+                const register = await navigator.serviceWorker.ready;
+                const subscription = await register.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY)
+                });
+
+                // Envoi au backend
+                await fetch('/api/subscribe', {
+                    method: 'POST',
+                    body: JSON.stringify(subscription),
+                    headers: {
+                        'content-type': 'application/json',
+                        'CSRF-Token': "<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>"
+                    }
+                });
+
+                Swal.fire('Succès', 'Notifications activées !', 'success');
+            } catch (error) {
+                console.error('Erreur subscription:', error);
+                Swal.fire('Info', 'Veuillez autoriser les notifications dans votre navigateur.', 'info');
+            }
+        } else {
+            Swal.fire('Erreur', 'Votre navigateur ne supporte pas les notifications.', 'warning');
+        }
+    }
+
+    // Enregistrement final du Service Worker (PWA)
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW Erreur', err));
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => console.log('Service Worker enregistré ✅'))
+                .catch(err => console.log('Erreur Service Worker ❌', err));
         });
     }
 </script>
