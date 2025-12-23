@@ -1,9 +1,10 @@
-<div class="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-30 no-print">
-    <button onclick="document.getElementById('expenseModal').classList.remove('hidden')" class="bg-red-500 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-105 transition hover:bg-red-600 backdrop-blur-md border border-red-400/20">
-        <span>💸</span> <span class="hidden sm:inline">Dépense</span>
+<div class="md:hidden fixed bottom-6 right-6 flex flex-col items-end gap-3 z-30 no-print">
+    
+    <button onclick="document.getElementById('expenseModal').classList.remove('hidden')" class="bg-red-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center font-bold hover:scale-110 transition border-2 border-red-400/50 backdrop-blur-md">
+        <span class="text-2xl">💸</span>
     </button>
     
-    <a href="/owner/add-property" class="bg-[#F59E0B] text-[#0B1120] p-4 rounded-2xl shadow-2xl flex items-center gap-2 font-bold text-sm hover:scale-105 transition hover:bg-yellow-400">
-        <span class="text-xl">+</span> <span class="hidden sm:inline">Nouveau Bien</span>
+    <a href="/owner/add-property" class="bg-[#F59E0B] text-[#0B1120] w-16 h-16 rounded-full shadow-xl flex items-center justify-center font-bold text-3xl hover:scale-110 transition border-2 border-yellow-300">
+        +
     </a>
 </div>

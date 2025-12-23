@@ -1,15 +1,28 @@
 <header id="dashboard" class="mb-10 pt-4">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest">La Météo des Revenus</h2>
+        
+        <div class="hidden md:flex gap-3">
+            <button onclick="document.getElementById('expenseModal').classList.remove('hidden')" class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-500 hover:text-white transition flex items-center gap-2">
+                <span>💸</span> Déclarer Dépense
+            </button>
+            <button onclick="document.getElementById('rechargeModal').classList.remove('hidden')" class="bg-blue-600/10 border border-blue-600/50 text-blue-400 px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-600 hover:text-white transition flex items-center gap-2">
+                <span>⚡️</span> Recharger
+            </button>
         </div>
+    </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
             <canvas id="financeChart" height="200"></canvas>
         </div>
 
-        <div class="p-6 bg-gradient-to-br from-[#F59E0B] to-orange-600 rounded-[2rem] shadow-xl text-white relative flex flex-col justify-between">
-            <div>
+        <div class="p-6 bg-gradient-to-br from-[#F59E0B] to-orange-600 rounded-[2rem] shadow-xl text-white relative flex flex-col justify-between overflow-hidden group">
+            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition transform duration-500">
+                <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.15-1.46-3.27-3.4h1.96c.1 1.05 1.18 1.91 2.53 1.91 1.33 0 2.26-.86 2.26-1.9 0-1.02-.96-1.47-2.27-1.79l-1.46-.35c-2.12-.54-2.77-1.84-2.77-3.04 0-1.86 1.48-3 3.29-3.32V4h2.67v1.9c1.43.33 2.65 1.25 2.76 2.9h-1.86c-.1-1.03-1.05-1.57-2.13-1.57-1.22 0-2.02.77-2.02 1.62 0 .97.99 1.43 2.23 1.74l1.49.37c2.12.55 2.82 1.83 2.82 3.16 0 1.95-1.55 3.19-3.56 3.49z"/></svg>
+            </div>
+            
+            <div class="relative z-10">
                 <p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">Solde Disponible</p>
                 <div class="flex items-baseline gap-1 mb-4">
                     <span class="text-4xl font-black"><%= (user.walletBalance || 0).toLocaleString('fr-FR') %></span>
@@ -17,7 +30,7 @@
                 </div>
             </div>
             
-            <div class="grid grid-cols-2 gap-3 mt-4">
+            <div class="grid grid-cols-2 gap-3 mt-4 relative z-10">
                 <button onclick="document.getElementById('rechargeModal').classList.remove('hidden')" class="bg-white/20 hover:bg-white/30 text-white py-3 rounded-xl font-bold backdrop-blur-sm transition flex items-center justify-center gap-2">
                     <span>⚡️</span> Dépôt
                 </button>

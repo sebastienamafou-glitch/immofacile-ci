@@ -1,13 +1,17 @@
-<aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-40 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
+<aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
     <div class="mb-10 text-center md:text-left hidden md:block">
         <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
     </div>
 
     <nav class="space-y-4 flex-1">
-        <a href="#dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20">
+        <a href="/owner/dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20">
             <span>📊</span> Tableau de bord
         </a>
-   
+
+        <a href="/investor/dashboard" class="block p-3 bg-gradient-to-r from-purple-900 to-slate-900 border border-purple-500/30 text-purple-300 hover:text-white hover:border-purple-500 rounded-xl transition flex items-center gap-3 group">
+            <span class="group-hover:scale-110 transition">🚀</span> Espace Investisseur
+        </a>
+
         <a href="#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
             <span>🏠</span> Mes Biens
         </a>
@@ -30,7 +34,15 @@
                 <span>❓</span> Centre d'Aide
             </a>
         </div>
-  
+
+        <div class="mt-2 border-t border-slate-800 pt-2 space-y-1">
+            <a href="/terms" target="_blank" class="block p-2 text-xs text-slate-500 hover:text-white hover:bg-slate-900 rounded-lg transition flex items-center gap-2">
+                <span>⚖️</span> CGU / Mentions Légales
+            </a>
+            <a href="/privacy" target="_blank" class="block p-2 text-xs text-slate-500 hover:text-white hover:bg-slate-900 rounded-lg transition flex items-center gap-2">
+                <span>🔒</span> Confidentialité
+            </a>
+        </div>
         <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
             <span>🚪</span> Déconnexion
         </a>
@@ -44,12 +56,7 @@
                 <p class="text-xs font-black text-white">WebAppCI <span class="text-[#F59E0B]">©</span></p>
             </div>
         </div>
-        
-        <div class="flex flex-col gap-1 mt-3">
-            <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">Support Technique</a>
-            <p class="text-[9px] text-slate-600">v2.4.0 • Tous droits réservés</p>
-        </div>
     </div>
 </aside>
 
-<div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+<div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
