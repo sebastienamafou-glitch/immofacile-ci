@@ -8,7 +8,6 @@ const { isOwner } = require('../middleware/authMiddleware');
 const ownerController = require('../controllers/ownerController');
 const paymentController = require('../controllers/paymentController');
 
-
 const upload = require('../middleware/uploadMiddleware'); 
 
 // --- ROUTES D'AFFICHAGE (GET) ---
@@ -37,7 +36,7 @@ router.get('/help', isOwner, async (req, res) => {
 });
 
 // Formulaires et vues simples
-router.get('/add-property', isOwner, (req, res) => res.render('add-property')); // Utilise la nouvelle vue corrigée
+router.get('/add-property', isOwner, (req, res) => res.render('add-property'));
 router.get('/add-tenant', isOwner, ownerController.getAddTenant);
 
 // Documents & Justificatifs PDF
@@ -47,12 +46,12 @@ router.get('/formal-notice/:leaseId', isOwner, ownerController.getFormalNotice);
 router.get('/inventory/:leaseId', isOwner, ownerController.getInventory);
 router.get('/tax-summary', isOwner, ownerController.getTaxSummary);
 
-// Affiche QR Code (La route qui posait problème est corrigée ici par l'import global de isOwner)
+// Affiche QR Code
 router.get('/property/:id/poster', isOwner, ownerController.generatePoster);
 
 // --- ROUTES D'ACTION (POST) ---
 
-// Gestion des Biens (CORRIGÉ : upload.array pour photos multiples)
+// Gestion des Biens
 router.post('/add-property', isOwner, upload.array('images', 5), ownerController.postAddProperty);
 
 // Gestion des Locataires
@@ -60,7 +59,6 @@ router.post('/add-tenant', isOwner, ownerController.postAddTenant);
 router.post('/end-lease', isOwner, ownerController.postEndLease);
 
 // États des lieux avec photos multiples
-router.post('/withdraw', isOwner, ownerController.postRequestWithdrawal);
 router.post('/submit-inventory', isOwner, upload.fields([
     { name: 'kitchenPhoto', maxCount: 1 },
     { name: 'livingPhoto', maxCount: 1 },
@@ -70,7 +68,10 @@ router.post('/submit-inventory', isOwner, upload.fields([
 // Gestion Financière & Incidents
 router.post('/add-expense', isOwner, ownerController.postAddExpense);
 router.post('/pay-rent', isOwner, paymentController.postPayRent);
-router.post('/withdraw', isOwner, ownerController.postWithdraw);
+
+// --- CORRECTION ICI : Utilisation du bon nom de fonction ---
+router.post('/withdraw', isOwner, ownerController.postRequestWithdrawal); 
+
 router.post('/resolve-incident', isOwner, ownerController.postResolveIncident);
 router.post('/add-artisan', isOwner, ownerController.postAddArtisan);
 
