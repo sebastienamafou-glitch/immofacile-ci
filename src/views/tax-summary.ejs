@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Récapitulatif Fiscal <%= year %></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-print-color-adjust: exact; }
+        
+        /* Configuration spécifique pour l'impression */
+        @media print {
+            @page { margin: 20mm; size: A4; }
+            .no-print { display: none !important; } /* Masque les boutons */
+            body { background: white !important; color: black !important; }
+            .bg-slate-900, .bg-[#0B1120] { background-color: white !important; color: black !important; border: none !important; }
+            .text-white { color: black !important; }
+            .border-slate-800 { border-color: #e5e7eb !important; } /* Gris clair pour impression */
+            .shadow-lg { box-shadow: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 p-8 min-h-screen">
+
+    <div class="max-w-4xl mx-auto mb-8 flex justify-between items-center no-print">
+        <a href="/owner/dashboard" class="text-slate-500 hover:text-slate-800 flex items-center gap-2">
+            &larr; Retour
+        </a>
+        <div class="flex gap-4">
+            <form action="/owner/tax-summary" method="GET" class="flex gap-2">
+                <select name="year" class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
+                    <option value="<%= year %>"><%= year %></option>
+                    <option value="<%= year - 1 %>"><%= year - 1 %></option>
+                    <option value="<%= year - 2 %>"><%= year - 2 %></option>
+                </select>
+            </form>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M222,128a6,6,0,0,1-6,6H40a6,6,0,0,1,0-12H216A6,6,0,0,1,222,128ZM213.66,64H42.34A14.36,14.36,0,0,0,28,78.34V177.66A14.36,14.36,0,0,0,42.34,192H64v32a14,14,0,0,0,14,14H178a14,14,0,0,0,14-14V192h21.66A14.36,14.36,0,0,0,228,177.66V78.34A14.36,14.36,0,0,0,213.66,64ZM180,224H76V168h104Zm36-46.34a2.35,2.35,0,0,1-2.34,2.34H192V162a6,6,0,0,0-6-6H70a6,6,0,0,0-6,6v18H42.34a2.35,2.35,0,0,1-2.34-2.34V78.34a2.35,2.35,0,0,1,2.34-2.34H213.66a2.35,2.35,0,0,1,2.34,2.34ZM184,32H72a6,6,0,0,0,0,12H184a6,6,0,0,0,0-12Z"></path></svg>
+                Imprimer / PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto bg-white p-12 shadow-xl rounded-none border border-slate-200 print:border-0 print:p-0 print:shadow-none">
+        
+        <div class="flex justify-between items-start mb-12 border-b border-slate-200 pb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">Récapitulatif Fiscal Annuel</h1>
+                <p class="text-slate-500">Année fiscale : <span class="font-bold text-slate-900"><%= year %></span></p>
+                <p class="text-slate-500 text-sm mt-1">Généré le <%= currentDate %></p>
+            </div>
+            <div class="text-right">
+                <p class="font-bold text-xl"><%= user.name %></p>
+                <p class="text-slate-500 text-sm"><%= user.email %></p>
+                <p class="text-slate-500 text-sm mt-2">Propriétaire Bailleur</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6 mb-12">
+            <div class="bg-green-50 p-6 rounded-xl border border-green-100 print:bg-white print:border-slate-300">
+                <p class="text-sm font-bold text-green-700 uppercase mb-1">Total Revenus (Loyer)</p>
+                <p class="text-2xl font-bold text-green-900"><%= globalStats.totalRevenue.toLocaleString('fr-FR') %> FCFA</p>
+            </div>
+            <div class="bg-red-50 p-6 rounded-xl border border-red-100 print:bg-white print:border-slate-300">
+                <p class="text-sm font-bold text-red-700 uppercase mb-1">Total Dépenses</p>
+                <p class="text-2xl font-bold text-red-900"><%= globalStats.totalExpenses.toLocaleString('fr-FR') %> FCFA</p>
+            </div>
+            <div class="bg-blue-50 p-6 rounded-xl border border-blue-100 print:bg-white print:border-slate-300">
+                <p class="text-sm font-bold text-blue-700 uppercase mb-1">Revenu Net (Avant Impôt)</p>
+                <p class="text-2xl font-bold text-blue-900"><%= globalStats.netIncome.toLocaleString('fr-FR') %> FCFA</p>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-bold text-slate-900 mb-4 border-l-4 border-yellow-500 pl-3 uppercase">Détail par Propriété</h3>
+        <table class="w-full text-left border-collapse mb-12">
+            <thead>
+                <tr class="border-b-2 border-slate-900 text-xs uppercase text-slate-500">
+                    <th class="py-3 pr-4">Bien Immobilier</th>
+                    <th class="py-3 px-4 text-right text-green-700">Revenus Enc.</th>
+                    <th class="py-3 px-4 text-right text-red-700">Dépenses</th>
+                    <th class="py-3 pl-4 text-right font-bold text-slate-900">Résultat Net</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm">
+                <% reportData.forEach(function(item) { %>
+                <tr class="border-b border-slate-200">
+                    <td class="py-4 pr-4">
+                        <p class="font-bold text-slate-900"><%= item.title %></p>
+                        <p class="text-slate-500 text-xs"><%= item.address %>, <%= item.commune %></p>
+                    </td>
+                    <td class="py-4 px-4 text-right font-medium text-slate-700">
+                        <%= item.revenue.toLocaleString('fr-FR') %>
+                    </td>
+                    <td class="py-4 px-4 text-right font-medium text-slate-700">
+                        <%= item.expense.toLocaleString('fr-FR') %>
+                    </td>
+                    <td class="py-4 pl-4 text-right font-bold text-slate-900">
+                        <%= item.net.toLocaleString('fr-FR') %>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+
+        <div class="mt-16 pt-8 border-t border-slate-200 text-center text-xs text-slate-400">
+            <p>Document généré automatiquement via ImmoFacile CI.</p>
+            <p>Ce document est un récapitulatif de gestion et ne remplace pas une déclaration fiscale officielle.</p>
+        </div>
+
+    </div>
+
+</body>
+</html>

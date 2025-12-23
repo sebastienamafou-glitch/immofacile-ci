@@ -258,3 +258,122 @@ exports.generatePoster = async (req, res) => {
         res.render('poster', { property, qrCodeUrl });
     } catch (error) { console.error(error); res.status(500).send("Erreur génération affiche"); }
 };
+
+exports.getTaxSummary = async (req, res) => {
+    try {
+        const userId = req.session.user.id;
+        // Par défaut l'année passée, ou l'année demandée via ?year=2024
+        const selectedYear = parseInt(req.query.year) || (new Date().getFullYear() - 1);
+        
+        const startDate = new Date(selectedYear, 0, 1); // 1er Janvier
+        const endDate = new Date(selectedYear, 11, 31, 23, 59, 59); // 31 Décembre
+
+        // 1. Récupérer les biens et leurs revenus/dépenses sur la période
+        const properties = await prisma.property.findMany({
+            where: { ownerId: userId },
+            include: {
+                // Récupérer les paiements (Loyer) via les baux
+                leases: {
+                    include: {
+                        payments: {
+                            where: {
+                                date: { gte: startDate, lte: endDate } // Uniquement cette année
+                            }
+                        }
+                    }
+                },
+                // Récupérer les dépenses (Réparations, taxes, etc.)
+                expenses: {
+                    where: {
+                        createdAt: { gte: startDate, lte: endDate } // Uniquement cette année
+                    }
+                }
+            }
+        });
+
+        // 2. Calculer les totaux pour l'affichage
+        let globalStats = { totalRevenue: 0, totalExpenses: 0, netIncome: 0 };
+        
+        const reportData = properties.map(prop => {
+            // Somme des loyers encaissés pour ce bien
+            const revenue = prop.leases.reduce((totalLease, lease) => {
+                return totalLease + lease.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            }, 0);
+
+            // Somme des dépenses pour ce bien
+            const expense = prop.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+            globalStats.totalRevenue += revenue;
+            globalStats.totalExpenses += expense;
+
+            return {
+                title: prop.title,
+                address: prop.address,
+                commune: prop.commune,
+                revenue,
+                expense,
+                net: revenue - expense
+            };
+        });
+
+        globalStats.netIncome = globalStats.totalRevenue - globalStats.totalExpenses;
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
+        res.render('tax-summary', { 
+            reportData, 
+            globalStats, 
+            year: selectedYear,
+            user,
+            currentDate: new Date().toLocaleDateString('fr-FR')
+        });
+
+    } catch (error) {
+        console.error("Erreur Récap Fiscal:", error);
+        res.redirect('/owner/dashboard?error=tax_summary_failed');
+    }
+};
+
+exports.postWithdraw = async (req, res) => {
+    const { amount, paymentDetails } = req.body;
+    const userId = req.session.user.id;
+    const withdrawAmount = parseInt(amount);
+
+    try {
+        // 1. Vérifier le solde actuel
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+
+        if (!user || user.walletBalance < withdrawAmount) {
+            return res.redirect('/owner/dashboard?error=insufficient_funds');
+        }
+
+        // 2. Transaction atomique (Débit + Log)
+        await prisma.$transaction(async (tx) => {
+            // Débiter le portefeuille
+            await tx.user.update({
+                where: { id: userId },
+                data: { walletBalance: { decrement: withdrawAmount } }
+            });
+
+            // Enregistrer dans les logs d'activité (Piste d'audit)
+            await tx.activityLog.create({
+                data: {
+                    action: 'WITHDRAWAL_REQUEST',
+                    category: 'FINANCE',
+                    userId: userId,
+                    metadata: { 
+                        amount: withdrawAmount, 
+                        destination: paymentDetails,
+                        status: 'PENDING' 
+                    }
+                }
+            });
+        });
+
+        res.redirect('/owner/dashboard?success=withdrawal_initiated');
+
+    } catch (error) {
+        console.error("Erreur Retrait:", error);
+        res.redirect('/owner/dashboard?error=withdrawal_failed');
+    }
+};

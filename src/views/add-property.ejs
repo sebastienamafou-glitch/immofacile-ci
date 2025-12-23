@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajouter un Bien | ImmoFacile CI</title> [cite: 270, 271]
+    <title>Ajouter un Bien | ImmoFacile CI</title> 
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
@@ -18,13 +18,13 @@
     <div class="max-w-2xl mx-auto mb-6">
         <a href="/owner/dashboard" class="text-slate-500 hover:text-white text-sm flex items-center gap-2 transition">
             <i class="ph-bold ph-arrow-left"></i> Retour au Dashboard
-        </a> [cite: 272]
+        </a> 
     </div>
 
     <div class="max-w-2xl mx-auto bg-slate-900 p-8 rounded-3xl border border-slate-800">
         <h2 class="text-2xl font-bold text-white mb-6">Ajouter un nouveau bien</h2>
 
-        <form action="/owner/add-property" method="POST" enctype="multipart/form-data" class="space-y-6">
+        <form action="/owner/add-property?_csrf=<%= csrfToken %>" method="POST" enctype="multipart/form-data" class="space-y-6"></form>
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
             <div class="grid grid-cols-2 gap-4">

@@ -8,11 +8,8 @@ const { isOwner } = require('../middleware/authMiddleware');
 const ownerController = require('../controllers/ownerController');
 const paymentController = require('../controllers/paymentController');
 
-// Import Middleware unifié (Best Practice)
-// Assurez-vous que votre fichier authMiddleware.js exporte bien { isOwner } ou que vous utilisez le bon fichier.
-// Ici, je suppose que vous avez un fichier middleware/auth.js comme vu dans les logs précédents.
-const upload = require('../middleware/uploadMiddleware'); // Assurez-vous que c'est le bon chemin pour multer/cloudinary
 
+const upload = require('../middleware/uploadMiddleware'); 
 
 // --- ROUTES D'AFFICHAGE (GET) ---
 
@@ -48,6 +45,7 @@ router.get('/contract/:leaseId', isOwner, ownerController.getContract);
 router.get('/receipt/:paymentId', isOwner, ownerController.getReceipt);
 router.get('/formal-notice/:leaseId', isOwner, ownerController.getFormalNotice);
 router.get('/inventory/:leaseId', isOwner, ownerController.getInventory);
+router.get('/tax-summary', isOwner, ownerController.getTaxSummary);
 
 // Affiche QR Code (La route qui posait problème est corrigée ici par l'import global de isOwner)
 router.get('/property/:id/poster', isOwner, ownerController.generatePoster);
@@ -71,6 +69,7 @@ router.post('/submit-inventory', isOwner, upload.fields([
 // Gestion Financière & Incidents
 router.post('/add-expense', isOwner, ownerController.postAddExpense);
 router.post('/pay-rent', isOwner, paymentController.postPayRent);
+router.post('/withdraw', isOwner, ownerController.postWithdraw);
 router.post('/resolve-incident', isOwner, ownerController.postResolveIncident);
 router.post('/add-artisan', isOwner, ownerController.postAddArtisan);
 
