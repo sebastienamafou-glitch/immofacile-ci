@@ -1,0 +1,48 @@
+<aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-40 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
+    <div class="mb-10 text-center md:text-left hidden md:block">
+        <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
+    </div>
+
+    <nav class="space-y-4 flex-1">
+        <a href="#dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20">
+            <span>📊</span> Tableau de bord
+        </a>
+        <a href="#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+            <span>🏠</span> Mes Biens
+        </a>
+        <a href="#locataires" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+            <span>👥</span> Locataires
+        </a>
+        <a href="#documents" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+            <span>📂</span> Documents
+        </a>
+        <a href="#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+            <span>🔨</span> Artisans
+        </a>
+        
+        <div class="mt-4 border-t border-slate-800 pt-4 space-y-2">
+            <button onclick="enableNotifications()" class="w-full text-left block p-3 text-slate-400 hover:text-[#F59E0B] hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+                <span>🔔</span> Notifications
+            </button>
+
+            <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
+                <span>❓</span> Centre d'Aide
+            </a>
+        </div>
+
+        <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
+            <span>🚪</span> Déconnexion
+        </a>
+    </nav>
+
+    <div class="mt-auto pt-6 border-t border-slate-800">
+        <p class="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Développé par</p>
+        <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-8 object-contain opacity-80 mb-2">
+        <div class="flex flex-col gap-1">
+            <a href="mailto:contact@webappci.com" class="text-[10px] text-slate-400 hover:text-white">contact@webappci.com</a>
+            <a href="/privacy" class="text-[10px] text-[#F59E0B] hover:underline">Confidentialité</a>
+        </div>
+    </div>
+</aside>
+
+<div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
