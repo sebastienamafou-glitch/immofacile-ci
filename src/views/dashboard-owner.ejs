@@ -234,7 +234,7 @@
                                         <p class="text-sm text-slate-400">Signalé par <%= inc.reporter.name %> • <%= prop.title %></p>
                                         <p class="text-xs text-slate-500 mt-2 italic">"<%= inc.description %>"</p>
                                     </div>
-                                    <form action="/owner/resolve-incident" method="POST">
+                                    <form action="/owner/add-addresolve-incident" method="POST">
                                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                                         <input type="hidden" name="incidentId" value="<%= inc.id %>">
                                         <button type="submit" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-lg shadow-green-900/20">
@@ -310,7 +310,7 @@
                                         </div>
                                     <% } else { %>
                                         <div class="flex flex-col gap-2">
-                                            <form action="/owner/pay-rent" method="POST">
+                                            <form action="/owner/add-pay-rent" method="POST">
                                                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                                                 <input type="hidden" name="amount" value="<%= activeLease.monthlyRent %>">
                                                 <input type="hidden" name="month" value="<%= currentMonthStr %>">
@@ -487,7 +487,7 @@
             <button onclick="document.getElementById('exitModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white transition">✕</button>
             <h2 class="text-xl font-bold text-white mb-1">Départ Locataire</h2>
             <p id="exitTenantName" class="text-sm text-slate-500 mb-6"></p>
-            <form action="/owner/end-lease" method="POST" class="space-y-4">
+            <form action="/owner/add-end-lease" method="POST" class="space-y-4">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="leaseId" id="exitLeaseId">
                 <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
