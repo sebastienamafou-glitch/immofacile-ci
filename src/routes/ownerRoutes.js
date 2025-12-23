@@ -11,7 +11,7 @@ const paymentController = require('../controllers/paymentController');
 // Import Middleware unifié (Best Practice)
 // Assurez-vous que votre fichier authMiddleware.js exporte bien { isOwner } ou que vous utilisez le bon fichier.
 // Ici, je suppose que vous avez un fichier middleware/auth.js comme vu dans les logs précédents.
-const upload = require('../middleware/upload'); // Assurez-vous que c'est le bon chemin pour multer/cloudinary
+const upload = require('../middleware/uploadMiddleware'); // Assurez-vous que c'est le bon chemin pour multer/cloudinary
 
 
 // --- ROUTES D'AFFICHAGE (GET) ---
