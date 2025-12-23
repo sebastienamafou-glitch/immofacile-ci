@@ -335,55 +335,34 @@ exports.getTaxSummary = async (req, res) => {
     }
 };
 
-// --- MODIFICATION ICI : Gestion correcte du modèle Withdrawal ---
-// Anciennement 'postWithdraw', renommé 'postRequestWithdrawal' pour la cohérence
 exports.postRequestWithdrawal = async (req, res) => {
     const { amount, paymentDetails } = req.body;
     const userId = req.session.user.id;
-    const withdrawAmount = parseInt(amount);
+    const value = parseInt(amount);
 
     try {
-        // 1. Vérifier le solde actuel
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-
-        if (!user || user.walletBalance < withdrawAmount) {
-            return res.redirect('/owner/dashboard?error=insufficient_funds');
-        }
-
-        // 2. Transaction atomique
         await prisma.$transaction(async (tx) => {
-            // Débiter le portefeuille
+            const user = await tx.user.findUnique({ where: { id: userId } });
+            if (user.walletBalance < value) {
+                throw new Error("Solde insuffisant");
+            }
+
             await tx.user.update({
                 where: { id: userId },
-                data: { walletBalance: { decrement: withdrawAmount } }
+                data: { walletBalance: { decrement: value } }
             });
 
-            // Créer l'enregistrement de retrait (Table Withdrawal)
             await tx.withdrawal.create({
                 data: {
-                    amount: withdrawAmount,
+                    amount: value,
                     details: paymentDetails,
                     status: 'PENDING',
                     ownerId: userId
                 }
             });
-
-            // (Optionnel) Enregistrer dans les logs d'activité
-            await tx.activityLog.create({
-                data: {
-                    action: 'WITHDRAWAL_REQUEST',
-                    category: 'FINANCE',
-                    userId: userId,
-                    metadata: { 
-                        amount: withdrawAmount, 
-                        destination: paymentDetails 
-                    }
-                }
-            });
         });
 
         res.redirect('/owner/dashboard?success=withdrawal_initiated');
-
     } catch (error) {
         console.error("Erreur Retrait:", error);
         res.redirect('/owner/dashboard?error=withdrawal_failed');
