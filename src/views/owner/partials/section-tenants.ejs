@@ -10,7 +10,12 @@
                             👤
                         </div>
                         <div>
-                            <h3 class="font-bold text-[#0B1120]"><%= lease.tenant.name %></h3>
+                            <h3 class="font-bold text-[#0B1120] flex items-center gap-2">
+                                <%= lease.tenant.name %>
+                                <% if (lease.tenant.tenantProfile && lease.tenant.tenantProfile.idCardStatus === 'VALIDATED') { %>
+                                    <span title="Identité Vérifiée par IA" class="text-blue-500 text-[10px]">✅</span>
+                                    <% } %>
+                            </h3>
                             <p class="text-xs text-slate-500 font-bold"><%= lease.property.title %></p>
                         </div>
                     </div>
