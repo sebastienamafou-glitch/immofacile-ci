@@ -5,6 +5,8 @@ const prisma = require('../prisma/client');
 const tenantController = require('../controllers/tenantController');
 const auth = require('../middleware/authMiddleware');
 const tracker = require('../utils/tracker');
+const kycController = require('../controllers/kycController');
+const upload = require('../middleware/uploadMiddleware');
 
 // Dashboard Locataire
 router.get('/dashboard', auth.isTenant, tenantController.getDashboard);
@@ -15,6 +17,7 @@ router.get('/report-issue', auth.isTenant, (req, res) => res.render('report-issu
 
 // 2. Traiter le formulaire
 router.post('/report-issue', auth.isTenant, tenantController.postReportIssue);
+router.post('/upload-kyc', auth.isTenant, upload.single('idCard'), kycController.uploadIdCard);
 
 router.get('/contact-artisan/:id', auth.isTenant, async (req, res) => {
     const { id } = req.params;

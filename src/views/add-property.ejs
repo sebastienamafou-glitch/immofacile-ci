@@ -73,10 +73,18 @@
                 </div>
 
                 <div>
-                    <label class="text-xs font-bold text-slate-500 uppercase mb-2 block">Description Complète</label>
-                    <textarea name="description" rows="4" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none"></textarea>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase block">Description Complète</label>
+                        <button type="button" id="btnMagicAI" class="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded-full flex items-center gap-1 transition shadow-lg shadow-purple-500/30">
+                            <span>✨</span> Générer avec l'IA
+                        </button>
+                    </div>
+                    
+                    <textarea id="descField" name="description" rows="6" placeholder="Décrivez votre bien..." 
+                        class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none transition"></textarea>
+                    
+                    <p class="text-[10px] text-slate-500 mt-1 italic text-right">Astuce : Remplissez le type, la commune et les pièces avant de cliquer sur ✨</p>
                 </div>
-
                 <div>
                     <div class="flex justify-between items-end mb-2">
                         <label class="text-xs font-bold text-slate-500 uppercase block">Photos du bien</label>
@@ -84,9 +92,8 @@
                     </div>
                     
                     <div class="border-2 border-dashed border-slate-700 bg-[#0B1120]/50 rounded-2xl p-4">
-                        
                         <div id="previewGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 empty:hidden">
-                            </div>
+                        </div>
 
                         <label class="cursor-pointer group flex flex-col items-center justify-center p-6 border border-slate-700 border-dashed rounded-xl hover:bg-slate-800/50 hover:border-[#F59E0B] transition">
                             <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition">
@@ -109,18 +116,15 @@
     </div>
 
     <script>
-        // On utilise DataTransfer pour manipuler la liste des fichiers comme une base de données
         const dt = new DataTransfer();
-        const inputSource = document.getElementById('imageInput'); // Celui sur lequel on clique
-        const inputFinal = document.getElementById('finalInput');   // Celui qui part au serveur
+        const inputSource = document.getElementById('imageInput');
+        const inputFinal = document.getElementById('finalInput');
         const previewGrid = document.getElementById('previewGrid');
         const counter = document.getElementById('counter');
 
         inputSource.addEventListener('change', function() {
-            // Ajouter les nouveaux fichiers au DataTransfer existant
             for (let i = 0; i < this.files.length; i++) {
                 const file = this.files[i];
-                // Vérification basique anti-doublon (par nom)
                 let isDuplicate = false;
                 for (let j = 0; j < dt.files.length; j++) {
                     if (dt.files[j].name === file.name && dt.files[j].size === file.size) {
@@ -132,19 +136,12 @@
                     dt.items.add(file);
                 }
             }
-
-            // Mettre à jour l'input final et l'affichage
             updateFiles();
-            
-            // Réinitialiser l'input source pour permettre de ré-ajouter le même fichier si on l'a supprimé
             this.value = '';
         });
 
         function updateFiles() {
-            // 1. Synchroniser l'input final avec notre objet DataTransfer
             inputFinal.files = dt.files;
-
-            // 2. Mettre à jour le compteur
             if (dt.files.length > 0) {
                 counter.classList.remove('hidden');
                 counter.innerText = `${dt.files.length} photo(s) prête(s) à l'envoi`;
@@ -152,9 +149,7 @@
                 counter.classList.add('hidden');
             }
 
-            // 3. Régénérer la grille d'affichage
             previewGrid.innerHTML = '';
-            
             for (let i = 0; i < dt.files.length; i++) {
                 const file = dt.files[i];
                 const reader = new FileReader();
@@ -162,24 +157,20 @@
                 reader.onload = function(e) {
                     const div = document.createElement('div');
                     div.className = 'relative aspect-square rounded-xl overflow-hidden border border-slate-700 bg-black group thumb-animate';
-
-                    // Image
+                    
                     const img = document.createElement('img');
                     img.src = e.target.result;
                     img.className = 'w-full h-full object-cover opacity-80 group-hover:opacity-100 transition';
                     
-                    // Bouton Supprimer (X)
                     const removeBtn = document.createElement('button');
                     removeBtn.innerHTML = '✕';
-                    removeBtn.type = 'button'; // Important pour ne pas submit le form
+                    removeBtn.type = 'button';
                     removeBtn.className = 'absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 shadow-lg transform hover:scale-110 transition';
                     
-                    // Action de suppression
                     removeBtn.onclick = function() {
-                        dt.items.remove(i); // Enlever du DataTransfer
-                        updateFiles(); // Tout rafraîchir
+                        dt.items.remove(i);
+                        updateFiles();
                     };
-
                     div.appendChild(img);
                     div.appendChild(removeBtn);
                     previewGrid.appendChild(div);
@@ -187,6 +178,71 @@
                 reader.readAsDataURL(file);
             }
         }
+    </script>
+
+    <script>
+        document.getElementById('btnMagicAI').addEventListener('click', async function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            // 1. Récupération des données du formulaire
+            const type = document.querySelector('input[name="title"]')?.value || "Bien immobilier";
+            const pieces = document.querySelector('input[name="bedrooms"]')?.value || "Non spécifié";
+            const commune = document.querySelector('select[name="commune"]')?.value;
+            const details = document.querySelector('input[name="address"]')?.value;
+
+            if (!commune) {
+                alert("Veuillez sélectionner au moins une commune.");
+                return;
+            }
+
+            // 2. Animation de chargement
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Rédaction en cours...';
+            document.getElementById('descField').classList.add('opacity-50');
+
+            try {
+                // 3. Appel API
+                const response = await fetch('/api/ai/generate-ad', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': document.querySelector('input[name="_csrf"]').value
+                    },
+                    body: JSON.stringify({ type, pieces, commune, details })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 4. Effet "Machine à écrire" pour le remplissage
+                    const textarea = document.getElementById('descField');
+                    textarea.value = "";
+                    let i = 0;
+                    const speed = 10;
+                    
+                    function typeWriter() {
+                        if (i < data.description.length) {
+                            textarea.value += data.description.charAt(i);
+                            i++;
+                            setTimeout(typeWriter, speed);
+                        }
+                    }
+                    typeWriter();
+                } else {
+                    alert("Erreur IA : " + data.error);
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert("Impossible de contacter l'assistant IA.");
+            } finally {
+                // Rétablissement du bouton
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                document.getElementById('descField').classList.remove('opacity-50');
+            }
+        });
     </script>
 
 </body>

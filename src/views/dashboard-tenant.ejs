@@ -7,7 +7,6 @@
     <meta name="author" content="WebAppCI SARL">
     <meta name="copyright" content="WebAppCI SARL">
     <meta name="generator" content="ImmoFacile Engine v2">
-   
     
     <title>Mon Espace Locataire | ImmoFacile CI</title>
     <link rel="manifest" href="/manifest.json">
@@ -19,6 +18,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
         if ('serviceWorker' in navigator) {
@@ -31,6 +31,14 @@
     </script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-['Plus_Jakarta_Sans']">
+
+    <div id="globalLoader" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="relative flex justify-center items-center">
+            <div class="absolute animate-ping inline-flex h-16 w-16 rounded-full bg-[#F59E0B] opacity-20"></div>
+            <div class="w-16 h-16 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin"></div>
+        </div>
+        <p class="text-white font-bold mt-4 animate-pulse text-sm tracking-widest uppercase">Analyse IA en cours...</p>
+    </div>
 
     <div class="max-w-4xl mx-auto p-6">
         
@@ -45,36 +53,176 @@
             <a href="/logout" class="text-red-500 text-sm font-bold hover:underline">Déconnexion</a>
         </header>
 
+        <% if (lease && lease.status === 'PENDING_FEES') { %>
+            
+            <section class="mb-8">
+                <div class="bg-slate-900 text-white p-8 rounded-3xl shadow-2xl border border-[#F59E0B] relative overflow-hidden">
+                    <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-[#F59E0B] rounded-full opacity-20 blur-3xl"></div>
+
+                    <div class="relative z-10 text-center">
+                        <div class="w-20 h-20 bg-[#F59E0B] text-black rounded-full flex items-center justify-center text-4xl mx-auto mb-6 font-bold shadow-lg">
+                            🔒
+                        </div>
+                        
+                        <h2 class="text-2xl font-black mb-2">Dernière étape !</h2>
+                        <p class="text-slate-300 mb-8 max-w-md mx-auto">
+                            Votre dossier a été accepté pour le logement <strong><%= lease.property.title %></strong>. 
+                            Pour finaliser la signature et activer votre bail, veuillez régler les frais de dossier sécurisé.
+                        </p>
+
+                        <div class="max-w-md mx-auto bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-0.5 mb-8 shadow-lg transform hover:scale-[1.02] transition duration-300">
+                            <div class="bg-slate-900 rounded-[10px] p-4 text-center">
+                                <p class="text-slate-400 text-[10px] uppercase font-bold mb-3 tracking-widest">Pourquoi ces frais ?</p>
+
+                                <div class="flex justify-between items-end border-b border-slate-700/50 pb-3 mb-3 border-dashed">
+                                    <div class="text-left">
+                                        <span class="block text-xs text-red-400 line-through decoration-red-500 decoration-2 opacity-70">Agence Classique</span>
+                                        <span class="text-[10px] text-slate-500">1 mois de loyer</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-lg text-red-400 font-bold opacity-70"><%= lease.monthlyRent.toLocaleString('fr-FR') %> FCFA</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-between items-center">
+                                    <div class="text-left">
+                                        <span class="block text-xs text-green-400 font-bold">Avec ImmoFacile</span>
+                                        <span class="text-[10px] text-slate-500">Frais fixes & sécurisés</span>
+                                    </div>
+                                <div class="text-right">
+                                    <span class="text-xl text-green-400 font-black">20 000 FCFA</span>
+                                </div>
+                            </div>
+                        <div class="mt-3 bg-green-500/10 py-1.5 rounded-lg border border-green-500/20">
+                            <p class="text-green-400 font-bold text-xs">
+                                🎉 Vous économisez : <span class="text-sm border-b border-green-400 border-dashed"><%= (lease.monthlyRent - 20000).toLocaleString('fr-FR') %> FCFA</span>
+                            </p>
+                        </div>
+                    </div>
+                        </div>    
+                        <div class="bg-white/10 backdrop-blur-md p-4 rounded-xl max-w-xs mx-auto mb-8 border border-white/10">
+                            <div class="flex justify-between items-center mb-2 text-sm text-slate-400">
+                                <span>Vérification KYC (Mindee)</span>
+                                <span>Inclus ✅</span>
+                            </div>
+                            <div class="flex justify-between items-center mb-2 text-sm text-slate-400">
+                                <span>Rédaction Bail Numérique</span>
+                                <span>Inclus ✅</span>
+                            </div>
+                            <div class="h-px bg-white/10 my-3"></div>
+                            <div class="flex justify-between items-center text-xl font-bold">
+                                <span>Total à régler</span>
+                                <span class="text-[#F59E0B]">20 000 FCFA</span>
+                            </div>
+                        </div>
+
+                        <form action="/api/payment/pay-fees" method="POST">
+                            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                            <input type="hidden" name="leaseId" value="<%= lease.id %>">
+                            <div class="mb-6 text-left bg-white/5 p-4 rounded-xl border border-white/10 max-w-sm mx-auto">
+                                <label class="flex items-start gap-3 cursor-pointer">
+                                    <input type="checkbox" required class="mt-1 w-4 h-4 rounded border-slate-500 text-[#F59E0B] focus:ring-[#F59E0B] bg-slate-800">
+                                    <span class="text-[11px] text-slate-300 leading-tight">
+                                        J'accepte de payer les <strong>frais de dossier de 20 000 FCFA</strong> pour la sécurisation de mon bail et la vérification de mon identité. J'ai lu et j'accepte les <a href="/terms" target="_blank" class="underline text-[#F59E0B]">CGU</a>.
+                                    </span>
+                                </label>
+                            </div>
+                            <button type="submit" class="bg-[#F59E0B] hover:bg-yellow-400 text-[#0B1120] font-black py-4 px-10 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 flex items-center gap-3 mx-auto">
+                                <span>💳</span> Payer et Signer le Bail
+                            </button>
+                        </form>
+                        
+                        <p class="text-[10px] text-slate-500 mt-4 uppercase tracking-widest">Paiement sécurisé par Wave / Orange Money</p>
+                    </div>
+                </div>
+            </section>
+
+        <% } else { %>
+
+            <section class="mb-8">
+                <h2 class="text-lg font-bold mb-4">Mon Logement</h2>
+                <% if (lease) { %>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <p class="font-bold text-lg"><%= lease.property.title %></p>
+                                <p class="text-slate-500"><%= lease.property.address %></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-[#F59E0B]"><%= lease.monthlyRent.toLocaleString('fr-FR') %> FCFA / mois</p>
+                                <a href="/contract/<%= lease.id %>" target="_blank" class="text-xs text-blue-600 hover:underline mt-1 block">📄 Télécharger mon Bail</a>
+                                <a href="/report-issue" class="text-xs text-red-600 hover:underline mt-1 block">🚨 Signaler un Problème</a>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 border-t border-slate-100 pt-4">
+                            <p class="text-xs text-slate-400 mb-2">Vous souhaitez quitter le logement ?</p>
+                            <a href="https://wa.me/<%= lease.property.owner.phone.replace(/\s+/g, '') %>?text=Bonjour, je souhaite donner mon préavis de départ..."
+                               target="_blank"
+                               class="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1">
+                                📤 Envoyer mon préavis (WhatsApp)
+                            </a>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
+                        <p class="text-slate-500">Aucun bail actif associé à ce compte.</p>
+                    </div>
+                <% } %>
+            </section>
+
+        <% } %>
         <section class="mb-8">
-            <h2 class="text-lg font-bold mb-4">Mon Logement</h2>
-            <% if (lease) { %>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                🪪 Vérification d'Identité
+                <% if (user.tenantProfile?.idCardStatus === 'VERIFIED') { %>
+                    <span class="bg-green-100 text-green-600 text-[10px] px-2 py-1 rounded-full uppercase font-bold">Vérifié ✅</span>
+                <% } else { %>
+                    <span class="bg-orange-100 text-orange-600 text-[10px] px-2 py-1 rounded-full uppercase font-bold animate-pulse">Action Requise ⚠️</span>
+                <% } %>
+            </h2>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                
+                <% if (user.tenantProfile?.idCardStatus === 'VERIFIED') { %>
+                    <div class="flex items-center gap-4 text-green-600">
+                        <div class="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-2xl">🎉</div>
                         <div>
-                            <p class="font-bold text-lg"><%= lease.property.title %></p>
-                            <p class="text-slate-500"><%= lease.property.address %></p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold text-[#F59E0B]"><%= lease.monthlyRent.toLocaleString('fr-FR') %> FCFA / mois</p>
-                            <a href="/contract/<%= lease.id %>" target="_blank" class="text-xs text-blue-600 hover:underline mt-1 block">📄 Télécharger mon Bail</a>
-                            <a href="/report-issue" class="text-xs text-red-600 hover:underline mt-1 block">🚨 Signaler un Problème</a>
+                            <p class="font-bold">Votre identité est confirmée !</p>
+                            <p class="text-sm text-slate-500">Vous bénéficiez du badge de confiance "Locataire Certifié".</p>
                         </div>
                     </div>
-                    
-                    <div class="mt-4 border-t border-slate-100 pt-4">
-                        <p class="text-xs text-slate-400 mb-2">Vous souhaitez quitter le logement ?</p>
-                        <a href="https://wa.me/<%= lease.property.owner.phone.replace(/\s+/g, '') %>?text=Bonjour, je souhaite donner mon préavis de départ pour le logement <%= lease.property.title %> à compter de ce jour, conformément au bail."
-                           target="_blank"
-                           class="text-xs font-bold text-slate-500 hover:text-red-500 flex items-center gap-1">
-                            📤 Envoyer mon préavis (WhatsApp)
-                        </a>
+
+                <% } else { %>
+                    <div class="flex flex-col md:flex-row items-center gap-6">
+                        <div class="flex-1">
+                            <h3 class="font-bold text-[#0B1120] mb-2">Prouvez votre identité en 3 secondes</h3>
+                            <p class="text-sm text-slate-500 mb-4">
+                                Prenez en photo votre <strong>CNI</strong> ou <strong>Passeport</strong>.
+                                Notre Intelligence Artificielle validera votre dossier instantanément.
+                            </p>
+                            <ul class="text-xs text-slate-400 space-y-1 mb-4">
+                                <li>✅ Augmente votre Score de Solvabilité (+50 pts)</li>
+                                <li>✅ Rassure votre propriétaire</li>
+                                <li>🔒 Données chiffrées et sécurisées</li>
+                            </ul>
+                        </div>
+
+                        <div class="w-full md:w-auto">
+                            <form id="kycForm" class="flex flex-col items-center">
+                                <label class="cursor-pointer group relative w-full md:w-48 h-32 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center hover:border-[#F59E0B] hover:bg-orange-50 transition">
+                                    <div class="text-3xl mb-2 group-hover:scale-110 transition">📷</div>
+                                    <span class="text-xs font-bold text-slate-500 group-hover:text-[#F59E0B]">Ajouter ma pièce</span>
+                                    <input type="file" name="idCard" accept="image/*" class="hidden" required onchange="handleFileSelect(this)">
+                                </label>
+                                <button type="submit" class="mt-3 w-full bg-[#0B1120] text-white text-xs font-bold py-3 rounded-xl hover:bg-slate-800 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Lancer l'analyse IA ⚡️
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            <% } else { %>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 text-center">
-                    <p class="text-slate-500">Aucun bail actif associé à ce compte.</p>
-                </div>
-            <% } %>
+                <% } %>
+            </div>
         </section>
 
         <%- include('partials/payment-guide') %>
@@ -165,6 +313,71 @@
         </footer>
 
     </div>
+
+    <script>
+        // UX : Change le texte quand un fichier est sélectionné
+        function handleFileSelect(input) {
+            const label = input.previousElementSibling;
+            if (input.files && input.files[0]) {
+                label.innerText = "Fichier : " + input.files[0].name;
+                label.classList.add("text-[#F59E0B]");
+            }
+        }
+
+        // Envoi du formulaire en AJAX (sans recharger la page)
+        const kycForm = document.getElementById('kycForm');
+        if (kycForm) {
+            kycForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // 1. Afficher le loader
+                document.getElementById('globalLoader').classList.remove('hidden');
+
+                const formData = new FormData(kycForm);
+
+                try {
+                    const response = await fetch('/tenant/upload-kyc', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    // 2. Masquer le loader
+                    document.getElementById('globalLoader').classList.add('hidden');
+
+                    if (result.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Identité Validée !',
+                            text: result.message,
+                            confirmButtonColor: '#0B1120'
+                        }).then(() => {
+                            window.location.reload(); // Pour mettre à jour le statut visuel
+                        });
+                    } else if (result.status === 'pending') {
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Reçu !',
+                            text: result.message,
+                            confirmButtonColor: '#0B1120'
+                        });
+                    } else {
+                        throw new Error(result.error || "Erreur inconnue");
+                    }
+
+                } catch (error) {
+                    document.getElementById('globalLoader').classList.add('hidden');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oups...',
+                        text: "L'analyse a échoué. Veuillez réessayer avec une photo plus nette.",
+                        confirmButtonColor: '#ef4444'
+                    });
+                }
+            });
+        }
+    </script>
 
 </body>
 </html>

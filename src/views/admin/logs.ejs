@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Logs Système | Admin ImmoFacile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans'] p-8">
+
+    <div class="max-w-7xl mx-auto">
+        
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">📡 Tour de Contrôle</h1>
+                <p class="text-slate-400">Suivi de l'activité des utilisateurs en temps réel.</p>
+            </div>
+            <a href="/admin/dashboard" class="text-slate-500 hover:text-white transition">← Retour Dashboard</a>
+        </div>
+
+        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 mb-6 flex flex-wrap gap-4 justify-between items-center shadow-lg">
+            
+            <div class="flex gap-2">
+                <a href="/admin/logs" 
+                   class="px-4 py-2 rounded-lg text-sm font-bold <%= currentFilter === 'ALL' ? 'bg-white text-black' : 'bg-slate-800 text-slate-400 hover:bg-slate-700' %>">
+                   Tout
+                </a>
+                <a href="/admin/logs?role=TENANT" 
+                   class="px-4 py-2 rounded-lg text-sm font-bold <%= currentFilter === 'TENANT' ? 'bg-[#F59E0B] text-black' : 'bg-slate-800 text-slate-400 hover:bg-slate-700' %>">
+                   Locataires
+                </a>
+                <a href="/admin/logs?role=OWNER" 
+                   class="px-4 py-2 rounded-lg text-sm font-bold <%= currentFilter === 'OWNER' ? 'bg-purple-500 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700' %>">
+                   Propriétaires
+                </a>
+            </div>
+
+            <a href="/admin/logs/export?role=<%= currentFilter === 'ALL' ? '' : currentFilter %>" 
+               class="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg font-bold transition shadow-lg shadow-green-900/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Exporter CSV
+            </a>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden shadow-2xl">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-800 text-xs uppercase text-slate-400 font-bold">
+                    <tr>
+                        <th class="p-4">Date</th>
+                        <th class="p-4">Utilisateur</th>
+                        <th class="p-4">Rôle</th>
+                        <th class="p-4">Action</th>
+                        <th class="p-4">Détails (Metadata)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700 text-sm">
+                    <% logs.forEach(function(log) { %>
+                        <tr class="hover:bg-slate-800/50 transition">
+                            <td class="p-4 text-slate-400 whitespace-nowrap">
+                                <%= new Date(log.createdAt).toLocaleString('fr-FR') %>
+                            </td>
+                            
+                            <td class="p-4 font-bold text-white">
+                                <% if (log.user) { %>
+                                    <%= log.user.name %>
+                                    <div class="text-xs text-slate-500 font-normal"><%= log.user.email %></div>
+                                <% } else { %>
+                                    <span class="italic text-slate-600">Anonyme / Système</span>
+                                <% } %>
+                            </td>
+
+                            <td class="p-4">
+                                <% if (log.category === 'TENANT') { %>
+                                    <span class="bg-[#F59E0B]/20 text-[#F59E0B] px-2 py-1 rounded text-xs font-bold">LOCATAIRE</span>
+                                <% } else if (log.category === 'OWNER') { %>
+                                    <span class="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs font-bold">PROPRIO</span>
+                                <% } else { %>
+                                    <span class="bg-slate-700 text-slate-300 px-2 py-1 rounded text-xs font-bold"><%= log.category %></span>
+                                <% } %>
+                            </td>
+
+                            <td class="p-4 font-mono text-blue-400">
+                                <%= log.action %>
+                            </td>
+
+                            <td class="p-4 text-xs text-slate-500 font-mono max-w-xs truncate" title="<%= JSON.stringify(log.metadata) %>">
+                                <%= JSON.stringify(log.metadata) %>
+                            </td>
+                        </tr>
+                    <% }); %>
+                    
+                    <% if (logs.length === 0) { %>
+                        <tr>
+                            <td colspan="5" class="p-8 text-center text-slate-500 italic">Aucune activité enregistrée pour ce filtre.</td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+        
+        <p class="text-center text-slate-500 text-xs mt-6">Affichage des 50 dernières actions. Utilisez l'export pour tout voir.</p>
+
+    </div>
+
+</body>
+</html>

@@ -33,3 +33,10 @@ exports.isAdmin = (req, res, next) => {
     if (req.session.user.role === 'ADMIN') return next();
     return res.redirect('/login');
 };
+
+exports.isArtisan = (req, res, next) => {
+    if (!req.session || !req.session.user) return res.redirect('/login');
+    if (req.session.user.role === 'ARTISAN') return next();
+    // Redirection par défaut si mauvais rôle
+    return res.redirect('/login');
+};

@@ -22,15 +22,15 @@
 
     <style>
         body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
+            font-family: 'Plus Jakarta Sans', sans-serif;
         }
         
         /* Masquer la scrollbar tout en gardant le scroll */
         .no-scrollbar::-webkit-scrollbar { 
-            display: none; 
+            display: none;
         }
         .no-scrollbar { 
-            -ms-overflow-style: none; 
+            -ms-overflow-style: none;
             scrollbar-width: none; 
         }
     </style>
@@ -234,7 +234,61 @@
             </div>
         </section>
 
-        <section class="mb-20 px-4 md:px-0">
+        <section class="py-16 bg-white border-t border-slate-100">
+            <div class="max-w-4xl mx-auto px-6">
+                <h2 class="text-3xl font-black text-center text-slate-900 mb-10">Pourquoi choisir ImmoFacile ?</h2>
+                
+                <div class="overflow-x-auto rounded-3xl shadow-lg border border-slate-100">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50/50">
+                                <th class="p-4 border-b-2 border-slate-100"></th>
+                                <th class="p-4 border-b-2 border-slate-100 text-center text-slate-400 font-bold opacity-50">Agence Classique</th>
+                                <th class="p-4 border-b-2 border-slate-100 text-center text-slate-400 font-bold opacity-50">Démarcheur</th>
+                                <th class="p-4 border-b-2 border-[#F59E0B] text-center bg-[#F59E0B]/10 text-[#B45309] font-black text-lg">
+                                    ImmoFacile
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm bg-white">
+                            <tr class="border-b border-slate-50 hover:bg-slate-50/30 transition">
+                                <td class="p-4 font-bold text-slate-700">Coût Locataire</td>
+                                <td class="p-4 text-center text-slate-500">1 mois de loyer<br>(ex: 150.000F)</td>
+                                <td class="p-4 text-center text-slate-500">5.000F / visite</td>
+                                <td class="p-4 text-center bg-[#F59E0B]/5 font-bold text-[#0B1120] border-x border-[#F59E0B]/20">
+                                    20 000 FCFA<br><span class="text-[10px] text-green-600 font-normal">Au succès uniquement</span>
+                                </td>
+                            </tr>
+                            
+                            <tr class="border-b border-slate-50 hover:bg-slate-50/30 transition">
+                                <td class="p-4 font-bold text-slate-700">Sécurité</td>
+                                <td class="p-4 text-center text-red-500 font-bold">Variable</td>
+                                <td class="p-4 text-center text-red-600 font-black">Risquée ⚠️</td>
+                                <td class="p-4 text-center bg-[#F59E0B]/5 font-bold text-green-600 border-x border-[#F59E0B]/20">
+                                    100% Vérifié (IA) ✅
+                                </td>
+                            </tr>
+        
+                            <tr class="hover:bg-slate-50/30 transition">
+                                <td class="p-4 font-bold text-slate-700">Paiement Loyer</td>
+                                <td class="p-4 text-center text-slate-500">Espèces / Chèque</td>
+                                <td class="p-4 text-center text-slate-500">Main à main</td>
+                                <td class="p-4 text-center bg-[#F59E0B]/5 font-bold text-[#0B1120] border-x border-b border-[#F59E0B]/20 rounded-b-xl">
+                                    Wave / Orange / MTN 📲
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-12 text-center">
+                    <a href="/signup" class="inline-block bg-[#0B1120] text-white font-bold py-4 px-8 rounded-full shadow-xl hover:scale-105 transition transform border border-white/10">
+                        Commencer maintenant 🚀
+                    </a>
+                </div>
+            </div>
+        </section>
+        <section class="mb-20 px-4 md:px-0 mt-20">
             <div class="bg-[#0B1120] rounded-[3rem] p-12 md:p-24 text-center relative overflow-hidden shadow-2xl">
                 
                 <div class="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-screen filter blur-[80px] opacity-30 -translate-x-1/2 -translate-y-1/2"></div>
@@ -280,7 +334,9 @@
             </div>
         </footer>
 
-    </div> <script>
+    </div> 
+
+    <script>
         function toggleMenu() {
             const menu = document.getElementById('mobileMenu');
             const iconOpen = document.getElementById('iconOpen');

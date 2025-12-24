@@ -2,6 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma/client'); // Nécessaire pour les requêtes DB
+const aiController = require('../controllers/aiController');
+const { isOwner } = require('../middleware/authMiddleware');
+const serviceController = require('../controllers/serviceController');
 
 // Import des contrôleurs
 const paymentController = require('../controllers/paymentController');
@@ -11,7 +14,6 @@ const paymentController = require('../controllers/paymentController');
 // Notification CinetPay
 // Cette route reçoit les confirmations de paiement des serveurs CinetPay
 router.post('/payment/notify', paymentController.webhookCinetPay);
-
 
 // --- 2. API UTILITAIRES (DONNÉES PUBLIQUES) ---
 
@@ -64,5 +66,17 @@ router.get('/property/:id/status', async (req, res) => {
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
+
+// Route pour générer la description (Protégée propriétaire)
+router.post('/ai/generate-ad', isOwner, aiController.generateDescription);
+
+// Route pour le Chatbot Juridique
+router.post('/ai/legal-help', isOwner, aiController.askLegalBot);
+
+// Route pour trouver un agent
+router.post('/services/request-agent', isOwner, serviceController.requestAgent);
+
+// Route pour virer un agent
+router.post('/services/revoke-agent', isOwner, serviceController.revokeAgent);
 
 module.exports = router;

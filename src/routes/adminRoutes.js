@@ -18,4 +18,10 @@ router.post('/toggle-status', adminController.postToggleStatus);
 router.post('/add-artisan', adminController.postAddArtisan);
 router.post('/delete-artisan', adminController.postDeleteArtisan);
 
+// Afficher le tableau de bord des logs
+router.get('/logs', isAdmin, adminController.getLogs);
+
+// Télécharger le CSV
+router.get('/logs/export', isAdmin, adminController.exportLogsCsv);
+
 module.exports = router;

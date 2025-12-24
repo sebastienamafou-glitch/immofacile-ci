@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Espace Artisan | ImmoFacile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen pb-20">
+
+    <div class="bg-[#0B1120] p-6 border-b border-slate-800 sticky top-0 z-20">
+        <div class="flex justify-between items-center">
+            <h1 class="text-xl font-bold">🔨 Mes Missions</h1>
+            <a href="/logout" class="text-red-400 text-sm">Déconnexion</a>
+        </div>
+        <p class="text-slate-400 text-xs mt-1">Bonjour, <%= artisan.name %></p>
+    </div>
+
+    <div class="p-4 space-y-4">
+        <% if (missions.length === 0) { %>
+            <div class="text-center py-10 text-slate-500">
+                <p class="text-4xl mb-2">✅</p>
+                <p>Aucune mission en cours.</p>
+                <p class="text-xs">Profitez de votre pause !</p>
+            </div>
+        <% } %>
+
+        <% missions.forEach(mission => { %>
+            <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-lg">
+                <div class="flex justify-between items-start mb-3">
+                    <span class="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase">
+                        <%= mission.priority || 'Urgent' %>
+                    </span>
+                    <span class="text-xs text-slate-400"><%= new Date(mission.createdAt).toLocaleDateString() %></span>
+                </div>
+
+                <h3 class="font-bold text-lg mb-1"><%= mission.title %></h3>
+                <p class="text-slate-400 text-sm mb-4"><%= mission.description %></p>
+
+                <div class="bg-slate-900/50 p-3 rounded-xl mb-4 text-sm space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span>📍</span>
+                        <a href="https://maps.google.com/?q=<%= mission.property.address %>" target="_blank" class="text-blue-400 underline">
+                            <%= mission.property.address %>, <%= mission.property.commune %>
+                        </a>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span>📞</span>
+                        <a href="tel:<%= mission.reporter.phone %>" class="text-white font-bold">
+                            <%= mission.reporter.phone %> (Locataire)
+                        </a>
+                    </div>
+                </div>
+
+                <form action="/artisan/complete-mission" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="incidentId" value="<%= mission.id %>">
+                    
+                    <label class="block w-full text-center border-2 border-dashed border-slate-600 rounded-xl p-3 mb-3 text-xs text-slate-400 cursor-pointer hover:border-white transition">
+                        📷 Ajouter photo preuve
+                        <input type="file" name="proof" class="hidden">
+                    </label>
+
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition">
+                        ✅ Marquer comme Terminé
+                    </button>
+                </form>
+            </div>
+        <% }) %>
+    </div>
+
+</body>
+</html>

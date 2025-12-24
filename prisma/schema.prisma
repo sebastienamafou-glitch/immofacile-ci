@@ -15,6 +15,8 @@ model User {
   phone     String   @unique
   name      String?
   role      UserRole @default(TENANT)
+  address   String?  
+  commune   String?
   password  String
   createdAt DateTime @default(now())
   isActive  Boolean  @default(true) 
@@ -22,21 +24,29 @@ model User {
   resetPasswordExpires DateTime?
   
   // FINANCES
-  walletBalance Int    @default(0) // Argent disponible
-  escrowBalance Int    @default(0) // Argent bloqué (Cautions)
+  walletBalance Int    @default(0) 
+  escrowBalance Int    @default(0) 
 
-  // Relations
+  // RELATIONS PRINCIPALES
   properties        Property[]          @relation("OwnerProperties")
+  
+  // MODIFICATION ICI : Relation Agent/Manager (au lieu de Visiteur)
+  managedProperties Property[]          @relation("AgentProperties") 
+
   leasesAsTenant    Lease[]             @relation("TenantLeases")
   reportedIncidents Incident[]          @relation("Reporter")
   leads             Lead[]              @relation("AgentLeads")
   transactions      CreditTransaction[] 
   withdrawals       Withdrawal[]        
-  investments       Investment[]        // <-- Relation Investisseur ajoutée
+  investments       Investment[]        
   
+  // PROFILS SPÉCIFIQUES
+  artisanProfile    Artisan?
+  tenantProfile     TenantProfile?      
+
   // RELATIONS SYSTÈME
-  pushSubscriptions PushSubscription[] // Notifications Push
-  activityLogs      ActivityLog[]      // Logs d'activité
+  pushSubscriptions PushSubscription[] 
+  activityLogs      ActivityLog[]      
 }
 
 enum UserRole {
@@ -44,7 +54,8 @@ enum UserRole {
   TENANT
   ADMIN
   AGENT
-  INVESTOR // <-- Rôle Investisseur ajouté
+  INVESTOR
+  ARTISAN 
 }
 
 // --- TRAÇABILITÉ DE L'ARGENT ---
@@ -54,22 +65,23 @@ model CreditTransaction {
   amount      Int      
   description String   
   date        DateTime @default(now())
-  
+ 
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 }
 
-// --- NOUVEAU MODÈLE INVESTISSEMENT ---
+// --- MODÈLE INVESTISSEMENT ---
 
 model Investment {
   id          String   @id @default(cuid())
-  amount      Int      // Montant investi
-  roiRate     Float    // Taux promis (ex: 10.5)
-  duration    Int      // Durée en mois
-  startDate   DateTime @default(now())
-  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  amount      Int      
+  roiRate     Float    
+  duration    Int      
   
-  projectName String   // Ex: "Rénovation Villa Cocody"
+  startDate   DateTime @default(now())
+  status      String   @default("ACTIVE") 
+  
+  projectName String   
   
   investorId  String
   investor    User     @relation(fields: [investorId], references: [id])
@@ -84,13 +96,18 @@ model Property {
   title     String
   address   String
   commune   String
-  price     Int      
+  price     Int  
   createdAt DateTime @default(now())
   
   images    String[] 
 
+  // Le Propriétaire (Celui qui possède le bien)
   ownerId   String 
   owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
+
+  // MODIFICATION ICI : L'Agent / Gestionnaire assigné (Celui qui gère le bien)
+  managedById String?
+  manager     User?    @relation("AgentProperties", fields: [managedById], references: [id])
 
   leases    Lease[]
   incidents Incident[]
@@ -99,12 +116,14 @@ model Property {
 }
 
 model Lease {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   startDate     DateTime
   endDate       DateTime?
   depositAmount Int       
   monthlyRent   Int       
-  isActive      Boolean   @default(true)
+  
+  status        LeaseStatus @default(PENDING_FEES) 
+  isActive      Boolean     @default(false)
 
   tenantId      String
   tenant        User      @relation("TenantLeases", fields: [tenantId], references: [id])
@@ -116,24 +135,36 @@ model Lease {
   inventories   Inventory[]
 }
 
+enum LeaseStatus {
+  PENDING_FEES
+  ACTIVE
+  TERMINATED
+}
+
 // --- FINANCES, INCIDENTS ET ÉTAT DES LIEUX ---
 
 model Payment {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   amount    Int      
-  date      DateTime @default(now())
-  month     String
-  type      String   @default("LOYER")
+  date      DateTime    @default(now())
+  
+  month     String?
+  type      PaymentType @default(LOYER)
   
   leaseId   String
-  lease     Lease    @relation(fields: [leaseId], references: [id])
+  lease     Lease       @relation(fields: [leaseId], references: [id])
+}
+
+enum PaymentType {
+  LOYER
+  FRAIS_DOSSIER
 }
 
 model Incident {
   id          String   @id @default(cuid())
   title       String   
   description String
-  status      String   @default("OPEN")
+  status      String   @default("OPEN") 
   priority    String   @default("MEDIUM")
   createdAt   DateTime @default(now())
   
@@ -142,6 +173,9 @@ model Incident {
 
   propertyId  String
   property    Property @relation(fields: [propertyId], references: [id])
+
+  assignedToId String?
+  assignedTo   Artisan? @relation(fields: [assignedToId], references: [id])
 }
 
 model Expense {
@@ -211,6 +245,11 @@ model Artisan {
   isVerified  Boolean  @default(true)
   rating      Float    @default(5.0)
   createdAt   DateTime @default(now())
+
+  userId      String?   @unique
+  user        User?     @relation(fields: [userId], references: [id])
+  
+  incidents   Incident[]
 }
 
 // --- SYSTÈME DE NOTIFICATIONS (WEB PUSH) ---
@@ -243,10 +282,26 @@ model ActivityLog {
 model Withdrawal {
   id        String   @id @default(cuid())
   amount    Int
-  details   String   // Numéro ou RIB
+  details   String   
   status    String   @default("PENDING")
   createdAt DateTime @default(now())
   
   ownerId   String
   owner     User     @relation(fields: [ownerId], references: [id])
+}
+
+// --- EXTENSION PROFIL LOCATAIRE & KYC ---
+
+model TenantProfile {
+  id            String   @id @default(cuid())
+  
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  
+  idCardUrl     String?
+  idCardStatus  String    @default("PENDING") 
+  
+  extractedData Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

@@ -1,5 +1,6 @@
 // controllers/adminController.js
 const prisma = require('../prisma/client');
+const { Parser } = require('json2csv');
 
 exports.getDashboard = async (req, res) => {
     try {
@@ -174,5 +175,87 @@ exports.postDeleteArtisan = async (req, res) => {
     } catch (error) {
         console.error("Erreur suppression artisan:", error);
         res.redirect('/admin/dashboard?error=delete_failed');
+    }
+};
+
+// 1. Afficher les Logs (Vue)
+exports.getLogs = async (req, res) => {
+    try {
+        const { role, limit } = req.query; // ex: ?role=TENANT
+
+        // Construction du filtre dynamique
+        let whereClause = {};
+        
+        // Si on filtre par "TENANT", on regarde soit la catégorie du log, soit le rôle du user
+        if (role) {
+            whereClause = {
+                OR: [
+                    { category: role.toUpperCase() }, // ex: "TENANT" stocké par le tracker
+                    { user: { role: role.toUpperCase() } } // ex: Le User est un TENANT
+                ]
+            };
+        }
+
+        const logs = await prisma.activityLog.findMany({
+            where: whereClause,
+            include: {
+                user: {
+                    select: { name: true, email: true, role: true, phone: true }
+                }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit ? parseInt(limit) : 50 // Par défaut les 50 derniers
+        });
+
+        res.render('admin/logs', { 
+            logs, 
+            currentFilter: role || 'ALL',
+            user: req.session.user
+        });
+
+    } catch (error) {
+        console.error("Erreur Logs Admin:", error);
+        res.status(500).send("Erreur serveur");
+    }
+};
+
+// 2. Exporter en CSV (Téléchargement)
+exports.exportLogsCsv = async (req, res) => {
+    try {
+        const { role } = req.query;
+        
+        let whereClause = {};
+        if (role) {
+            whereClause = { category: role.toUpperCase() };
+        }
+
+        const logs = await prisma.activityLog.findMany({
+            where: whereClause,
+            include: { user: true },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Transformation des données pour le CSV (Aplatir l'objet)
+        const csvData = logs.map(log => ({
+            Date: log.createdAt.toISOString(),
+            Utilisateur: log.user ? log.user.name : 'Système/Anonyme',
+            Email: log.user ? log.user.email : 'N/A',
+            Role: log.category,
+            Action: log.action,
+            Details: log.metadata ? JSON.stringify(log.metadata) : ''
+        }));
+
+        // Génération du fichier
+        const json2csvParser = new Parser();
+        const csv = json2csvParser.parse(csvData);
+
+        // Envoi au navigateur
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`logs_immofacile_${role || 'all'}_${Date.now()}.csv`);
+        return res.send(csv);
+
+    } catch (error) {
+        console.error("Erreur Export CSV:", error);
+        res.status(500).send("Erreur lors de l'export");
     }
 };
