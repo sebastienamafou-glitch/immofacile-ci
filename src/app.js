@@ -24,6 +24,7 @@ const investorRoutes = require('./routes/investorRoutes');
 const artisanRoutes = require('./routes/artisanRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -103,6 +104,7 @@ app.use('/investor', investorRoutes);
 app.use('/artisan', artisanRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/chat', chatRoutes);
+app.use('/', publicRoutes);
 
 
 // --- GESTION DES ERREURS ---
