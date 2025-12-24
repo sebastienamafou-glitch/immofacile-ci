@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
-const { isOwner } = require('../middleware/authMiddleware'); // Protection
+
+// 👇 CORRECTION ICI : Ajout de 'isTenant' dans l'import
+const { isOwner, isTenant } = require('../middleware/authMiddleware'); 
 
 // 1. Initialiser le paiement (Bouton "Recharger" du dashboard)
 // Route: POST /api/payment/recharge
@@ -16,7 +18,8 @@ router.post('/notify', paymentController.webhookCinetPay);
 // Route: POST /api/payment/pay-rent
 router.post('/pay-rent', isOwner, paymentController.postPayRent);
 
-// Route pour payer les frais
+// 4. Route pour payer les frais (Locataire)
+// ✅ Maintenant "isTenant" est reconnu car importé en haut
 router.post('/pay-fees', isTenant, paymentController.payApplicationFees);
 
 module.exports = router;
