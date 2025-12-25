@@ -19,18 +19,20 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; scroll-behavior: smooth; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.03); transition: all 0.3s ease; }
+        .glass-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.1); }
     </style>
 </head>
 <body class="bg-[#0B1120] text-slate-200 custom-scrollbar">
 
-    <div id="globalLoader" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120]/90 backdrop-blur-md transition-opacity">
-        <div class="w-16 h-16 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin"></div>
+    <div id="globalLoader" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120] transition-opacity duration-500">
+        <div class="w-16 h-16 border-4 border-slate-800 border-t-[#F59E0B] rounded-full animate-spin"></div>
         <p class="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest animate-pulse">Chargement V4...</p>
     </div>
 
     <div class="flex min-h-screen">
-        <%- include('partials/sidebar') %>
+        <%- include('../partials/sidebar') %>
 
         <main class="flex-1 md:ml-72 p-6 lg:p-10 max-w-7xl mx-auto w-full">
             
@@ -44,13 +46,13 @@
                           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <span>Compte Actif • Portefeuille Sécurisé</span>
+                        <span>Espace Propriétaire V4 • Actif</span>
                     </p>
                 </div>
 
-                <div class="bg-gradient-to-r from-blue-900 to-slate-900 p-1 rounded-2xl shadow-2xl w-full md:w-auto">
-                    <div class="bg-[#0B1120] rounded-xl px-6 py-4 flex items-center gap-6 relative overflow-hidden">
-                        <div class="absolute right-0 top-0 p-4 opacity-10">
+                <div class="bg-gradient-to-r from-blue-900 to-slate-900 p-0.5 rounded-2xl shadow-2xl w-full md:w-auto hover:shadow-blue-900/20 transition group">
+                    <div class="bg-[#0B1120] rounded-2xl px-6 py-4 flex items-center gap-6 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
                             <i class="ph-fill ph-wallet text-6xl text-blue-500"></i>
                         </div>
                         <div>
@@ -60,97 +62,325 @@
                             </p>
                         </div>
                         <div class="h-10 w-px bg-slate-800"></div>
-                        <button class="flex flex-col items-center gap-1 text-blue-400 hover:text-white transition group">
-                            <i class="ph-bold ph-download-simple text-xl group-hover:-translate-y-1 transition-transform"></i>
-                            <span class="text-[9px] font-bold uppercase">Retrait</span>
+                        <button onclick="requestWithdrawal()" class="flex flex-col items-center gap-1 text-blue-400 hover:text-white transition group/btn">
+                            <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover/btn:bg-blue-500 transition">
+                                <i class="ph-bold ph-download-simple"></i>
+                            </div>
+                            <span class="text-[9px] font-bold uppercase mt-1">Retrait</span>
                         </button>
                     </div>
                 </div>
             </header>
 
-            <div class="mb-12">
-                <%- include('partials/stats-header') %>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-[#F59E0B]">
+                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Revenus (Mois)</p>
+                    <p class="text-2xl font-black text-white"><%= totalRent ? totalRent.toLocaleString('fr-FR') : '0' %> <span class="text-sm font-normal text-slate-500">F</span></p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-blue-500">
+                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Dépôts / Caution</p>
+                    <p class="text-2xl font-black text-white"><%= totalDeposit ? totalDeposit.toLocaleString('fr-FR') : '0' %> <span class="text-sm font-normal text-slate-500">F</span></p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-red-500">
+                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Dépenses</p>
+                    <p class="text-2xl font-black text-white"><%= totalExpenses ? totalExpenses.toLocaleString('fr-FR') : '0' %> <span class="text-sm font-normal text-slate-500">F</span></p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-emerald-500">
+                    <p class="text-slate-400 text-xs font-bold uppercase mb-1">Résultat Net</p>
+                    <p class="text-2xl font-black text-emerald-400"><%= netIncome ? netIncome.toLocaleString('fr-FR') : '0' %> <span class="text-sm font-normal text-emerald-600/50">F</span></p>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
                 
                 <div class="lg:col-span-2 space-y-8">
+                    
                     <section id="properties" class="scroll-mt-24">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                                <i class="ph-fill ph-house-line text-blue-500"></i> Vos Biens
+                                <i class="ph-fill ph-house-line text-blue-500"></i> Vos Biens Immobiliers
                             </h3>
-                            <a href="/properties" class="text-xs font-bold text-slate-400 hover:text-white transition">Voir tout</a>
+                            <a href="/owner/add-property" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                                <i class="ph-bold ph-plus"></i> Ajouter un bien
+                            </a>
                         </div>
-                        <%- include('partials/properties-grid') %>
+
+                        <% if (properties && properties.length > 0) { %>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <% properties.forEach(prop => { %>
+                                    <div class="glass-card rounded-2xl overflow-hidden group">
+                                        <div class="h-32 bg-slate-800 relative">
+                                            <% if (prop.images && prop.images.length > 0) { %>
+                                                <img src="<%= prop.images[0] %>" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition">
+                                            <% } else { %>
+                                                <div class="flex items-center justify-center h-full text-slate-600"><i class="ph-duotone ph-image text-4xl"></i></div>
+                                            <% } %>
+                                            <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] font-bold text-white border border-white/10">
+                                                <%= prop.price.toLocaleString('fr-FR') %> F
+                                            </div>
+                                        </div>
+                                        <div class="p-4">
+                                            <h4 class="font-bold text-white truncate"><%= prop.title %></h4>
+                                            <p class="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                                                <i class="ph-fill ph-map-pin text-slate-500"></i> <%= prop.commune %>
+                                            </p>
+                                            <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
+                                                <span class="text-[10px] font-bold <%= prop.leases && prop.leases.some(l => l.isActive) ? 'text-emerald-400' : 'text-orange-400' %> uppercase tracking-wider">
+                                                    <%= prop.leases && prop.leases.some(l => l.isActive) ? 'Loué' : 'Vacant' %>
+                                                </span>
+                                                <a href="/property/<%= prop.id %>" class="text-xs text-blue-400 hover:text-white font-bold">Gérer</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } else { %>
+                            <div class="text-center py-10 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                                <i class="ph-duotone ph-house text-4xl text-slate-600 mb-3"></i>
+                                <p class="text-sm text-slate-500">Aucun bien enregistré.</p>
+                            </div>
+                        <% } %>
                     </section>
 
                     <section id="tenants" class="scroll-mt-24">
-                        <%- include('partials/section-tenants') %>
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="ph-fill ph-users text-purple-500"></i> Locataires Actifs
+                            </h3>
+                            <a href="/owner/add-tenant" class="text-xs font-bold text-slate-400 hover:text-white transition">Nouveau bail +</a>
+                        </div>
+
+                        <div class="glass-panel rounded-2xl overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-900/50 text-slate-500 text-[10px] uppercase font-bold border-b border-white/5">
+                                    <tr>
+                                        <th class="p-4">Locataire</th>
+                                        <th class="p-4">Bien Loué</th>
+                                        <th class="p-4 text-right">Loyer</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    <% let hasTenants = false; %>
+                                    <% properties.forEach(prop => { %>
+                                        <% if (prop.leases) { %>
+                                            <% prop.leases.forEach(lease => { %>
+                                                <% if (lease.isActive && lease.tenant) { hasTenants = true; %>
+                                                    <tr class="hover:bg-white/5 transition">
+                                                        <td class="p-4">
+                                                            <p class="font-bold text-white"><%= lease.tenant.name %></p>
+                                                            <a href="tel:<%= lease.tenant.phone %>" class="text-xs text-slate-400 hover:text-blue-400 font-mono"><%= lease.tenant.phone %></a>
+                                                        </td>
+                                                        <td class="p-4 text-slate-300 text-xs"><%= prop.title %></td>
+                                                        <td class="p-4 text-right font-mono font-bold text-emerald-400">
+                                                            <%= lease.monthlyRent.toLocaleString('fr-FR') %> F
+                                                        </td>
+                                                    </tr>
+                                                <% } %>
+                                            <% }) %>
+                                        <% } %>
+                                    <% }) %>
+                                    
+                                    <% if (!hasTenants) { %>
+                                        <tr><td colspan="3" class="p-6 text-center text-slate-500 text-xs italic">Aucun locataire actif pour le moment.</td></tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
                 </div>
 
                 <div class="space-y-8">
-                    <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl text-slate-900">
-                        <h3 class="font-black text-lg mb-4 flex items-center gap-2">
-                            <i class="ph-duotone ph-toolbox text-orange-500"></i> Artisans Utiles
-                        </h3>
-                        <%- include('partials/section-artisans') %>
+                    
+                    <div id="artisans" class="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl text-slate-900 scroll-mt-24">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-black text-lg flex items-center gap-2">
+                                <i class="ph-duotone ph-toolbox text-orange-500"></i> Artisans
+                            </h3>
+                            <button onclick="addArtisanModal()" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-200 transition"><i class="ph-bold ph-plus"></i></button>
+                        </div>
+                        <div class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                            <% if (artisans && artisans.length > 0) { %>
+                                <% artisans.forEach(a => { %>
+                                    <div class="flex items-center justify-between p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition group">
+                                        <div>
+                                            <p class="font-bold text-sm"><%= a.name %></p>
+                                            <p class="text-[10px] text-slate-500 uppercase font-bold tracking-wide"><%= a.job %></p>
+                                        </div>
+                                        <a href="tel:<%= a.phone %>" class="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:scale-110 transition">
+                                            <i class="ph-fill ph-phone"></i>
+                                        </a>
+                                    </div>
+                                <% }) %>
+                            <% } else { %>
+                                <p class="text-xs text-slate-400 text-center py-4">Annuaire vide.</p>
+                            <% } %>
+                        </div>
                     </div>
 
                     <div class="glass-card rounded-3xl p-6">
                         <h3 class="font-bold text-white mb-4 flex items-center gap-2">
                             <i class="ph-duotone ph-files text-purple-400"></i> Documents
                         </h3>
-                        <%- include('partials/section-documents') %>
+                        <div class="space-y-2">
+                            <a href="/owner/tax-summary" class="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition text-left group">
+                                <i class="ph-file-text text-blue-400 text-xl group-hover:scale-110 transition"></i>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-200">Relevé Fiscal</p>
+                                    <p class="text-[10px] text-slate-500">Pour déclaration d'impôts</p>
+                                </div>
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="glass-card rounded-3xl p-6 border-emerald-500/20">
-                        <%- include('../partials/section-investments') %>
+                    <div class="glass-panel p-6 rounded-3xl border border-red-500/20">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                            <h3 class="font-bold text-red-400 text-sm uppercase tracking-wide">Incidents en cours</h3>
+                        </div>
+                        <p class="text-3xl font-black text-white"><%= activeIncidentsCount || 0 %></p>
+                        <p class="text-xs text-slate-500 mt-1">Requêtes locataires non résolues.</p>
+                        <% if(activeIncidentsCount > 0) { %>
+                            <a href="/owner/incidents" class="block mt-4 text-center text-xs font-bold bg-red-500/10 text-red-400 py-2 rounded-lg hover:bg-red-500 hover:text-white transition">Voir les détails</a>
+                        <% } %>
                     </div>
+
                 </div>
             </div>
 
         </main>
     </div>
 
-    <%- include('partials/fab-actions') %>
-
-    <%- include('partials/modals') %>
-    
     <script>
-        // 1. POLLING NOTIFICATIONS PROPRIÉTAIRE (V4)
-        async function pollOwnerNotifications() {
-            // Simulation : Dans un cas réel, appeler /api/owner/notifications
-            // Ici on vérifie juste si le solde a bougé récemment (exemple)
-            try {
-                // Logique de polling légère
-            } catch (e) { console.log("Polling Owner silent"); }
-        }
-        setInterval(pollOwnerNotifications, 60000);
-
-        // 2. INITIALISATION
-        document.addEventListener('DOMContentLoaded', () => {
-            // Loader
+        // 1. Loader Disparition
+        window.addEventListener('load', () => {
             const loader = document.getElementById('globalLoader');
             if(loader) {
                 setTimeout(() => {
-                    loader.classList.add('opacity-0');
+                    loader.style.opacity = '0';
                     setTimeout(() => loader.style.display = 'none', 500);
-                }, 800);
+                }, 600);
             }
-
-            // Flash Messages V4
-            <% if (locals.success && locals.success.length > 0) { %>
-                Swal.fire({
-                    toast: true, position: 'top-end', icon: 'success',
-                    title: "<%= locals.success %>",
-                    showConfirmButton: false, timer: 3000, background: '#1e293b', color: '#fff'
-                });
-            <% } %>
         });
+
+        // 2. Demande de Retrait (CONNECTÉ AU BACKEND)
+        async function requestWithdrawal() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Effectuer un retrait',
+                html:
+                    '<label class="block text-left text-xs text-slate-400 mb-1">Montant (FCFA)</label>' +
+                    '<input id="swal-amount" type="number" class="swal2-input" placeholder="Ex: 50000" style="margin-top:0">' +
+                    '<label class="block text-left text-xs text-slate-400 mt-3 mb-1">Numéro Wave/OM</label>' +
+                    '<input id="swal-details" class="swal2-input" placeholder="07 00 00 00 00" style="margin-top:0">',
+                background: '#1e293b', 
+                color: '#fff',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Valider la demande',
+                confirmButtonColor: '#3b82f6',
+                cancelButtonColor: '#64748b',
+                preConfirm: () => {
+                    const amount = document.getElementById('swal-amount').value;
+                    const details = document.getElementById('swal-details').value;
+                    if (!amount || amount < 1000) {
+                        Swal.showValidationMessage('Le montant minimum est de 1000 FCFA');
+                        return false;
+                    }
+                    if (!details) {
+                        Swal.showValidationMessage('Veuillez entrer un numéro de paiement');
+                        return false;
+                    }
+                    return { amount: amount, paymentDetails: details };
+                }
+            });
+
+            if (formValues) {
+                // SOUMISSION REELLE AU BACKEND
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/owner/request-withdrawal'; // Route confirmée par ownerController
+
+                // Injection CSRF
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_csrf';
+                csrfInput.value = '<%= csrfToken %>';
+                form.appendChild(csrfInput);
+
+                // Données
+                for (const key in formValues) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = formValues[key];
+                    form.appendChild(input);
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // 3. Modal Ajout Artisan (CONNECTÉ AU BACKEND)
+        async function addArtisanModal() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Nouvel Artisan',
+                html:
+                    '<input id="swal-name" class="swal2-input" placeholder="Nom">' +
+                    '<input id="swal-job" class="swal2-input" placeholder="Métier (Plombier...)">' +
+                    '<input id="swal-phone" class="swal2-input" placeholder="Téléphone">',
+                background: '#fff', color: '#000',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonColor: '#0B1120',
+                preConfirm: () => {
+                    return {
+                        name: document.getElementById('swal-name').value,
+                        job: document.getElementById('swal-job').value,
+                        phone: document.getElementById('swal-phone').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/owner/add-artisan'; // Route confirmée par ownerController
+                
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_csrf';
+                csrfInput.value = '<%= csrfToken %>';
+                form.appendChild(csrfInput);
+
+                for (const key in formValues) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = formValues[key];
+                    form.appendChild(input);
+                }
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // 4. Gestion des Retours Serveur (Flash Messages)
+        <% if (typeof success !== 'undefined' && success) { %>
+            Swal.fire({ 
+                toast: true, position: 'top-end', icon: 'success', 
+                title: 'Succès', text: '<%= success === "withdrawal_initiated" ? "Demande de retrait envoyée." : "Opération réussie." %>', 
+                showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
+            });
+        <% } %>
+        
+        <% if (typeof error !== 'undefined' && error) { %>
+            Swal.fire({ 
+                toast: true, position: 'top-end', icon: 'error', 
+                title: 'Erreur', text: '<%= error === "withdrawal_failed" ? "Solde insuffisant ou erreur." : "Une erreur est survenue." %>', 
+                showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
+            });
+        <% } %>
     </script>
-    <%- include('partials/scripts') %>
 
 </body>
 </html>
