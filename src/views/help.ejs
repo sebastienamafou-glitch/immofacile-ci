@@ -14,15 +14,28 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        
         .glass-panel {
             background: rgba(30, 41, 59, 0.4);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        
+        .glass-card { 
+            background: rgba(30, 41, 59, 0.4); 
+            border: 1px solid rgba(255,255,255,0.03); 
+            transition: all 0.3s ease; 
+        }
+        .glass-card:hover { 
+            background: rgba(30, 41, 59, 0.7); 
+            border-color: rgba(255,255,255,0.1); 
+            transform: translateY(-2px); 
+        }
+
         /* Animation pour le badge système */
         @keyframes pulse-green {
             0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
@@ -30,253 +43,295 @@
             100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
         .status-dot { animation: pulse-green 2s infinite; }
+        
+        /* Animation Accordéon */
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] summary ~ * { animation: sweep .3s ease-in-out; }
+        @keyframes sweep { 0% {opacity: 0; transform: translateY(-10px)} 100% {opacity: 1; transform: translateY(0)} }
     </style>
 </head>
-<body class="bg-[#0B1120] text-slate-200 antialiased min-h-screen pb-12">
+<body class="bg-[#0B1120] text-slate-200 antialiased min-h-screen">
 
-    <header class="relative bg-gradient-to-b from-blue-900/20 to-[#0B1120] pt-10 pb-16 px-6 border-b border-white/5">
-        <div class="max-w-4xl mx-auto text-center relative z-10">
-            <a href="/owner/dashboard" class="inline-flex items-center gap-2 text-slate-400 hover:text-white transition text-sm font-bold mb-6 bg-white/5 px-4 py-1.5 rounded-full">
-                <i class="ph-bold ph-arrow-left"></i> Retour Dashboard
-            </a>
+    <div class="flex min-h-screen">
+        <%- include('partials/sidebar') %>
+
+        <main class="flex-1 md:ml-72 p-4 md:p-6 lg:p-10 w-full relative z-20">
             
-            <h1 class="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">Comment pouvons-nous vous aider ?</h1>
-            <p class="text-slate-400 mb-8 max-w-xl mx-auto">Documentation, tutoriels et assistance technique pour gérer vos biens immobiliers.</p>
+            <div class="text-center mb-12 relative">
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest mb-6">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    Support Officiel V4
+                </span>
+                
+                <h1 class="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">Comment pouvons-nous vous aider ?</h1>
+                <p class="text-slate-400 mb-8 max-w-xl mx-auto">Documentation, tutoriels, conformité juridique et assistance technique pour gérer vos biens immobiliers.</p>
 
-            <div class="relative max-w-lg mx-auto group">
-                <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl group-focus-within:text-[#F59E0B] transition"></i>
-                <input type="text" id="helpSearch" onkeyup="filterHelp()" placeholder="Rechercher une réponse (ex: caution, contrat...)" 
-                       class="w-full bg-slate-800/80 border border-slate-700 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] transition shadow-2xl">
-            </div>
-        </div>
-
-        <div class="absolute top-0 right-0 w-64 h-64 bg-[#F59E0B]/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-4 md:px-6 -mt-8 relative z-20">
-        
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <aside class="hidden lg:block lg:col-span-3">
-                <div class="sticky top-8 space-y-6">
-                    <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
-                        <div class="w-3 h-3 bg-green-500 rounded-full status-dot"></div>
-                        <div>
-                            <p class="text-xs font-bold text-green-400 uppercase">Système OK</p>
-                            <p class="text-[10px] text-slate-500">Tous les services actifs</p>
-                        </div>
+                <div class="mt-8 max-w-xl mx-auto relative group">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl opacity-30 group-hover:opacity-60 transition duration-500 blur"></div>
+                    <div class="relative flex items-center bg-[#0B1120] rounded-2xl p-2 border border-white/10">
+                        <i class="ph-bold ph-magnifying-glass text-slate-400 text-xl ml-4 group-focus-within:text-[#F59E0B] transition"></i>
+                        <input type="text" id="helpSearch" onkeyup="filterHelp()" placeholder="Rechercher (ex: caution, contrat scellé...)" 
+                               class="w-full bg-transparent border-none text-white px-4 py-3 focus:ring-0 outline-none placeholder-slate-500 font-medium">
+                        <span class="hidden md:block text-[10px] bg-slate-800 text-slate-400 px-2 py-1 rounded border border-slate-700 mr-2">CTRL+K</span>
                     </div>
-
-                    <nav class="space-y-1">
-                        <a href="#impact" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/50 text-white font-bold border border-slate-700">
-                            <i class="ph-fill ph-chart-bar text-[#F59E0B]"></i> Statistiques
-                        </a>
-                        <a href="#guides" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
-                            <i class="ph-bold ph-book-open"></i> Guides Rapides
-                        </a>
-                        <a href="#faq" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
-                            <i class="ph-bold ph-question"></i> FAQ
-                        </a>
-                        <a href="#contact" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
-                            <i class="ph-bold ph-headset"></i> Support
-                        </a>
-                    </nav>
                 </div>
-            </aside>
-
-            <div class="lg:col-span-9 space-y-12">
-
-                <section id="impact">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-                            <div class="absolute -right-4 -bottom-4 opacity-10 rotate-12 group-hover:scale-110 transition">
-                                <i class="ph-fill ph-users-three text-8xl text-white"></i>
-                            </div>
-                            <p class="text-xs text-slate-400 font-bold uppercase mb-1">Total Locataires</p>
-                            <p class="text-3xl font-black text-white"><%= (statsActions && statsActions.reminders) || 0 %></p>
-                        </div>
-                        <div class="bg-gradient-to-br from-[#F59E0B] to-orange-700 p-6 rounded-2xl shadow-lg relative overflow-hidden">
-                            <p class="text-xs text-black/60 font-bold uppercase mb-1">Loyers Encaissés</p>
-                            <p class="text-3xl font-black text-white">
-                                <%= (statsActions && statsActions.rentCollected ? statsActions.rentCollected : 0).toLocaleString('fr-FR') %> <span class="text-lg font-medium opacity-80">F</span>
-                            </p>
-                        </div>
-                        <div class="glass-panel p-6 rounded-2xl relative overflow-hidden group">
-                            <div class="absolute -right-4 -bottom-4 opacity-10 rotate-12 group-hover:scale-110 transition">
-                                <i class="ph-fill ph-files text-8xl text-green-500"></i>
-                            </div>
-                            <p class="text-xs text-slate-400 font-bold uppercase mb-1">Documents Générés</p>
-                            <p class="text-3xl font-black text-green-500"><%= (statsActions && statsActions.inventory) || 0 %></p>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="guides">
-                    <h2 class="text-xl font-black text-white mb-6 flex items-center gap-2">
-                        <i class="ph-fill ph-rocket-launch text-[#F59E0B]"></i> Raccourcis Rapides
-                    </h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 searchable-container">
-    
-                        <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-blue-500 transition group">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="bg-blue-500/20 text-blue-400 p-2 rounded-lg"><i class="ph-bold ph-user-plus text-xl"></i></div>
-                                    <h3 class="font-bold text-white">Nouveau Locataire</h3>
-                                </div>
-                                <p class="text-sm text-slate-400 mb-4 search-text">Créez un bail numérique conforme (Loi 2024) et validez le dossier via l'IA.</p>
-                            </div>
-                            <a href="/owner/add-tenant" class="text-blue-400 font-bold text-sm hover:underline">Commencer &rarr;</a>
-                        </div>
-                    
-                        <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#F59E0B] transition group">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="bg-orange-500/20 text-[#F59E0B] p-2 rounded-lg"><i class="ph-bold ph-detective text-xl"></i></div>
-                                    <h3 class="font-bold text-white">Déléguer une Visite</h3>
-                                </div>
-                                <p class="text-sm text-slate-400 mb-4 search-text">Pas sur place ? Trouvez un Agent Certifié dans le quartier pour gérer les clés.</p>
-                            </div>
-                            <a href="/owner/dashboard#properties" class="text-[#F59E0B] font-bold text-sm hover:underline">Trouver un agent &rarr;</a>
-                        </div>
-                    
-                        <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-purple-500 transition group">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="bg-purple-500/20 text-purple-400 p-2 rounded-lg"><i class="ph-bold ph-chart-line-up text-xl"></i></div>
-                                    <h3 class="font-bold text-white">Mes Investissements</h3>
-                                </div>
-                                <p class="text-sm text-slate-400 mb-4 search-text">Suivez le ROI de vos chantiers et la rentabilité de vos biens.</p>
-                            </div>
-                            <a href="/investor/dashboard" class="text-purple-400 font-bold text-sm hover:underline">Voir mon ROI &rarr;</a>
-                        </div>
-                    
-                    </div>
-                </section>
-
-                <section id="faq">
-                    <h2 class="text-xl font-black text-white mb-6 flex items-center gap-2">
-                        <i class="ph-fill ph-question text-[#F59E0B]"></i> Questions Fréquentes
-                    </h2>
-                    
-                    <div class="space-y-3 searchable-container">
-                        
-                        <div class="search-item bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                            <button onclick="toggleFaq(this)" class="w-full p-4 text-left flex justify-between items-center group hover:bg-slate-800/50 transition">
-                                <span class="font-bold text-sm text-slate-200 search-text">La signature WhatsApp est-elle légale ?</span>
-                                <i class="ph-bold ph-caret-down text-slate-500 transition-transform duration-300"></i>
-                            </button>
-                            <div class="hidden p-4 pt-0 text-sm text-slate-400 border-t border-slate-800/50 search-text">
-                                <strong>Oui.</strong> Nous utilisons un procédé de signature électronique par OTP (Code Unique) conforme à la <strong>Loi n° 2013-546</strong> sur les transactions électroniques en Côte d'Ivoire. Chaque contrat possède un certificat d'audit numérique.
-                            </div>
-                        </div>
-                        
-                        <div class="search-item bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                            <button onclick="toggleFaq(this)" class="w-full p-4 text-left flex justify-between items-center group hover:bg-slate-800/50 transition">
-                                <span class="font-bold text-sm text-slate-200 search-text">Qui sont les Agents Certifiés ?</span>
-                                <i class="ph-bold ph-caret-down text-slate-500 transition-transform duration-300"></i>
-                            </button>
-                            <div class="hidden p-4 pt-0 text-sm text-slate-400 border-t border-slate-800/50 search-text">
-                                Ce sont des professionnels indépendants vérifiés (Identité + Casier judiciaire) par ImmoFacile. Ils sont notés après chaque intervention. En cas de problème, ImmoFacile couvre la réassignation.
-                            </div>
-                        </div>
-
-                        <div class="search-item bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                            <button onclick="toggleFaq(this)" class="w-full p-4 text-left flex justify-between items-center group hover:bg-slate-800/50 transition">
-                                <span class="font-bold text-sm text-slate-200 search-text">Comment recharger mon solde ?</span>
-                                <i class="ph-bold ph-caret-down text-slate-500 transition-transform duration-300"></i>
-                            </button>
-                            <div class="hidden p-4 pt-0 text-sm text-slate-400 border-t border-slate-800/50 search-text">
-                                Cliquez sur le bouton orange <strong>"Recharger"</strong> dans le tableau de bord. Le paiement est sécurisé par CinetPay (Mobile Money, Carte). Le solde est mis à jour instantanément.
-                            </div>
-                        </div>
-
-                        <div class="search-item bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                            <button onclick="toggleFaq(this)" class="w-full p-4 text-left flex justify-between items-center group hover:bg-slate-800/50 transition">
-                                <span class="font-bold text-sm text-slate-200 search-text">Pourquoi mon séquestre est à 0 ?</span>
-                                <i class="ph-bold ph-caret-down text-slate-500 transition-transform duration-300"></i>
-                            </button>
-                            <div class="hidden p-4 pt-0 text-sm text-slate-400 border-t border-slate-800/50 search-text">
-                                Le séquestre ne compte que les <strong>cautions réellement encaissées</strong> lors de la création d'un bail via l'application. Si vous avez ajouté vos biens manuellement, le montant peut être à 0.
-                            </div>
-                        </div>
-                        
-                        <div class="search-item bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-                            <button onclick="toggleFaq(this)" class="w-full p-4 text-left flex justify-between items-center group hover:bg-slate-800/50 transition">
-                                <span class="font-bold text-sm text-slate-200 search-text">Comment modifier un contrat ?</span>
-                                <i class="ph-bold ph-caret-down text-slate-500 transition-transform duration-300"></i>
-                            </button>
-                            <div class="hidden p-4 pt-0 text-sm text-slate-400 border-t border-slate-800/50 search-text">
-                                Pour des raisons légales, un contrat signé ne peut être modifié. Vous devez terminer le bail actuel (Sortie) et en créer un nouveau avec les nouvelles conditions.
-                            </div>
-                        </div>
-
-                    </div>
-                    
-                    <div id="noResults" class="hidden text-center py-10">
-                        <i class="ph-duotone ph-magnifying-glass text-4xl text-slate-600 mb-2"></i>
-                        <p class="text-slate-500">Aucun résultat trouvé pour cette recherche.</p>
-                    </div>
-                </section>
-
-                <section id="contact" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    
-                    <div class="bg-gradient-to-br from-[#25D366]/10 to-slate-900 p-6 rounded-3xl border border-green-500/20 text-center relative overflow-hidden flex flex-col justify-center items-center">
-                        <div class="bg-green-500/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                            <i class="ph-fill ph-whatsapp-logo text-3xl text-[#25D366]"></i>
-                        </div>
-                        <h3 class="text-xl font-bold text-white mb-2">Assistance Live</h3>
-                        <p class="text-slate-400 text-sm mb-6">Pour les urgences ou questions rapides.</p>
-                        <a href="https://wa.me/2250707070707" target="_blank" class="w-full bg-[#25D366] text-[#0B1120] py-3 rounded-xl font-bold hover:bg-[#20bd5a] transition">
-                            Ouvrir WhatsApp
-                        </a>
-                    </div>
-                
-                    <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                            <i class="ph-bold ph-envelope-simple"></i> Ouvrir un ticket
-                        </h3>
-                        <form action="/report-issue" method="POST" class="space-y-3">
-                            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
-                            <input type="hidden" name="priority" value="LOW"> 
-                            <select name="category" class="w-full bg-[#0B1120] border border-slate-700 rounded-lg p-3 text-sm text-slate-300 focus:border-blue-500 outline-none">
-                                <option value="TECH">Problème Technique</option>
-                                <option value="BILLING">Facturation / Paiement</option>
-                                <option value="LEGAL">Question Juridique</option>
-                            </select>
-                            
-                            <textarea name="description" rows="3" required placeholder="Décrivez votre problème..." class="w-full bg-[#0B1120] border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none"></textarea>
-                            
-                            <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition border border-slate-700">
-                                Envoyer ma demande
-                            </button>
-                        </form>
-                    </div>
-                
-                </section>
-
             </div>
-        </div>
-    </main>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+                <aside class="hidden lg:block lg:col-span-3">
+                    <div class="sticky top-8 space-y-6">
+                        <div class="glass-panel p-4 rounded-xl flex items-center gap-3">
+                            <div class="w-3 h-3 bg-green-500 rounded-full status-dot"></div>
+                            <div>
+                                <p class="text-xs font-bold text-green-400 uppercase">Système OK</p>
+                                <p class="text-[10px] text-slate-500">Tous les services actifs</p>
+                            </div>
+                        </div>
+
+                        <nav class="space-y-1">
+                            <a href="#securite" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800/50 text-white font-bold border border-slate-700">
+                                <i class="ph-fill ph-shield-check text-[#F59E0B]"></i> Sécurité
+                            </a>
+                            <a href="#guides" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
+                                <i class="ph-bold ph-book-open"></i> Guides Rapides
+                            </a>
+                            <a href="#faq" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
+                                <i class="ph-bold ph-question"></i> FAQ
+                            </a>
+                            <a href="#contact" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition">
+                                <i class="ph-bold ph-headset"></i> Support
+                            </a>
+                        </nav>
+                    </div>
+                </aside>
+
+                <div class="lg:col-span-9 space-y-12">
+
+                    <section id="securite">
+                        <h2 class="text-xl font-black text-white mb-6 flex items-center gap-2">
+                            <i class="ph-fill ph-shield-check text-[#F59E0B]"></i> Sécurité & Conformité
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                    <i class="ph-fill ph-lock-key text-6xl text-emerald-500"></i>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4 border border-emerald-500/20">
+                                    <i class="ph-bold ph-shield-check text-2xl"></i>
+                                </div>
+                                <h3 class="text-white font-bold text-lg mb-2">Fonds Sécurisés</h3>
+                                <p class="text-sm text-slate-400 leading-relaxed">
+                                    Chaque transaction Wave/Orange Money est tracée en temps réel. Votre solde disponible est garanti et auditable.
+                                </p>
+                            </div>
+            
+                            <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                    <i class="ph-fill ph-gavel text-6xl text-blue-500"></i>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 border border-blue-500/20">
+                                    <i class="ph-bold ph-certificate text-2xl"></i>
+                                </div>
+                                <h3 class="text-white font-bold text-lg mb-2">Baux Scellés (Loi 2024)</h3>
+                                <p class="text-sm text-slate-400 leading-relaxed">
+                                    Conformément à la Loi 2024-1115, chaque bail généré possède une empreinte cryptographique <strong>SHA-256</strong> unique infalsifiable.
+                                </p>
+                            </div>
+            
+                            <div class="glass-card p-6 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                                    <i class="ph-fill ph-fingerprint text-6xl text-purple-500"></i>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-4 border border-purple-500/20">
+                                    <i class="ph-bold ph-user-focus text-2xl"></i>
+                                </div>
+                                <h3 class="text-white font-bold text-lg mb-2">Confidentialité</h3>
+                                <p class="text-sm text-slate-400 leading-relaxed">
+                                    Vos données sont cloisonnées. Seuls les administrateurs accrédités ont un accès en lecture seule aux logs.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="guides">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+                            <div class="glass-panel p-6 rounded-2xl relative overflow-hidden group">
+                                <div class="absolute -right-4 -bottom-4 opacity-10 rotate-12 group-hover:scale-110 transition">
+                                    <i class="ph-fill ph-users-three text-8xl text-white"></i>
+                                </div>
+                                <p class="text-xs text-slate-400 font-bold uppercase mb-1">Total Locataires</p>
+                                <p class="text-3xl font-black text-white"><%= (typeof statsActions !== 'undefined' && statsActions.reminders) || 0 %></p>
+                            </div>
+                            <div class="bg-gradient-to-br from-[#F59E0B] to-orange-700 p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                                <p class="text-xs text-black/60 font-bold uppercase mb-1">Loyers Encaissés</p>
+                                <p class="text-3xl font-black text-white">
+                                    <%= (typeof statsActions !== 'undefined' && statsActions.rentCollected ? statsActions.rentCollected : 0).toLocaleString('fr-FR') %> <span class="text-lg font-medium opacity-80">F</span>
+                                </p>
+                            </div>
+                            <div class="glass-panel p-6 rounded-2xl relative overflow-hidden group">
+                                <div class="absolute -right-4 -bottom-4 opacity-10 rotate-12 group-hover:scale-110 transition">
+                                    <i class="ph-fill ph-files text-8xl text-green-500"></i>
+                                </div>
+                                <p class="text-xs text-slate-400 font-bold uppercase mb-1">Documents Générés</p>
+                                <p class="text-3xl font-black text-green-500"><%= (typeof statsActions !== 'undefined' && statsActions.inventory) || 0 %></p>
+                            </div>
+                        </div>
+
+                        <h2 class="text-xl font-black text-white mb-6 flex items-center gap-2">
+                            <i class="ph-fill ph-rocket-launch text-[#F59E0B]"></i> Raccourcis Rapides
+                        </h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 searchable-container">
+                            <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-blue-500 transition group">
+                                <div>
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="bg-blue-500/20 text-blue-400 p-2 rounded-lg"><i class="ph-bold ph-user-plus text-xl"></i></div>
+                                        <h3 class="font-bold text-white">Nouveau Locataire</h3>
+                                    </div>
+                                    <p class="text-sm text-slate-400 mb-4 search-text">Créez un bail numérique conforme (Loi 2024) et validez le dossier via l'IA.</p>
+                                </div>
+                                <a href="/owner/add-tenant" class="text-blue-400 font-bold text-sm hover:underline">Commencer &rarr;</a>
+                            </div>
+                        
+                            <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-[#F59E0B] transition group">
+                                <div>
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="bg-orange-500/20 text-[#F59E0B] p-2 rounded-lg"><i class="ph-bold ph-detective text-xl"></i></div>
+                                        <h3 class="font-bold text-white">Déléguer une Visite</h3>
+                                    </div>
+                                    <p class="text-sm text-slate-400 mb-4 search-text">Pas sur place ? Trouvez un Agent Certifié dans le quartier pour gérer les clés.</p>
+                                </div>
+                                <a href="/owner/dashboard#properties" class="text-[#F59E0B] font-bold text-sm hover:underline">Trouver un agent &rarr;</a>
+                            </div>
+                            
+                            <div class="search-item bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between hover:border-purple-500 transition group">
+                                <div>
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="bg-purple-500/20 text-purple-400 p-2 rounded-lg"><i class="ph-bold ph-chart-line-up text-xl"></i></div>
+                                        <h3 class="font-bold text-white">Mes Investissements</h3>
+                                    </div>
+                                    <p class="text-sm text-slate-400 mb-4 search-text">Suivez le ROI de vos chantiers et la rentabilité de vos biens.</p>
+                                </div>
+                                <a href="/investor/dashboard" class="text-purple-400 font-bold text-sm hover:underline">Voir mon ROI &rarr;</a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="faq">
+                        <h2 class="text-xl font-black text-white mb-6 flex items-center gap-2">
+                            <i class="ph-fill ph-question text-[#F59E0B]"></i> Questions Fréquentes
+                        </h2>
+                        
+                        <div class="space-y-4 searchable-container">
+                            
+                            <details class="search-item group glass-panel rounded-2xl open:bg-slate-900/80 transition-colors duration-300">
+                                <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-white text-base">
+                                    <span class="search-text">Comment recharger mon compte Propriétaire ?</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <i class="ph-bold ph-caret-down text-blue-500"></i>
+                                    </span>
+                                </summary>
+                                <div class="text-slate-400 px-6 pb-6 text-sm leading-relaxed search-text">
+                                    <p class="mb-4">Le rechargement de votre solde pour les paiements de commissions ou travaux se fait via le <strong>Guichet de Rechargement V4</strong> :</p>
+                                    <ol class="list-decimal pl-5 space-y-2 marker:text-blue-500">
+                                        <li>Contactez un administrateur ou effectuez un dépôt Wave/Orange Money sur le numéro officiel.</li>
+                                        <li>L'administrateur validera la transaction dans le système.</li>
+                                        <li>Votre solde sera mis à jour instantanément et vous recevrez une notification.</li>
+                                    </ol>
+                                </div>
+                            </details>
+
+                            <details class="search-item group glass-panel rounded-2xl open:bg-slate-900/80 transition-colors duration-300">
+                                <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-white text-base">
+                                    <span class="search-text">Qu'est-ce que le "Scellement de Bail" ?</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <i class="ph-bold ph-caret-down text-blue-500"></i>
+                                    </span>
+                                </summary>
+                                <div class="text-slate-400 px-6 pb-6 text-sm leading-relaxed search-text">
+                                    <p>C'est une technologie de sécurité avancée. Lorsqu'un bail est créé, le système génère une empreinte numérique unique (Hash SHA-256) basée sur le montant, la date et les parties prenantes. Si une seule lettre du contrat est modifiée ultérieurement, l'empreinte ne correspondra plus, prouvant la falsification. Cela garantit l'intégrité juridique du document.</p>
+                                </div>
+                            </details>
+
+                            <details class="search-item group glass-panel rounded-2xl open:bg-slate-900/80 transition-colors duration-300">
+                                <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-white text-base">
+                                    <span class="search-text">Comment retirer mes revenus locatifs ?</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <i class="ph-bold ph-caret-down text-blue-500"></i>
+                                    </span>
+                                </summary>
+                                <div class="text-slate-400 px-6 pb-6 text-sm leading-relaxed search-text">
+                                    <p>Allez dans votre Tableau de Bord et cliquez sur le bouton <strong>"Retrait"</strong> situé dans la carte de votre portefeuille. Les demandes sont traitées sous 24h ouvrées. Un code de transfert vous sera envoyé par SMS.</p>
+                                </div>
+                            </details>
+
+                            <details class="search-item group glass-panel rounded-2xl open:bg-slate-900/80 transition-colors duration-300">
+                                <summary class="flex justify-between items-center font-bold cursor-pointer list-none p-6 text-white text-base">
+                                    <span class="search-text">La signature WhatsApp est-elle légale ?</span>
+                                    <span class="transition group-open:rotate-180">
+                                        <i class="ph-bold ph-caret-down text-blue-500"></i>
+                                    </span>
+                                </summary>
+                                <div class="text-slate-400 px-6 pb-6 text-sm leading-relaxed search-text">
+                                    <strong>Oui.</strong> Nous utilisons un procédé de signature électronique par OTP (Code Unique) conforme à la <strong>Loi n° 2013-546</strong> sur les transactions électroniques en Côte d'Ivoire. Chaque contrat possède un certificat d'audit numérique.
+                                </div>
+                            </details>
+                            
+                        </div>
+                        
+                        <div id="noResults" class="hidden text-center py-10">
+                            <i class="ph-duotone ph-magnifying-glass text-4xl text-slate-600 mb-2"></i>
+                            <p class="text-slate-500">Aucun résultat trouvé pour cette recherche.</p>
+                        </div>
+                    </section>
+
+                    <section id="contact" class="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+        
+                        <div class="bg-gradient-to-br from-[#25D366]/10 to-slate-900 p-6 rounded-3xl border border-green-500/20 text-center relative overflow-hidden flex flex-col justify-center items-center">
+                            <div class="bg-green-500/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                                <i class="ph-fill ph-whatsapp-logo text-3xl text-[#25D366]"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-white mb-2">Assistance Live</h3>
+                            <p class="text-slate-400 text-sm mb-6">Pour les urgences ou questions rapides.</p>
+                            <a href="https://wa.me/2250707070707" target="_blank" class="w-full bg-[#25D366] text-[#0B1120] py-3 rounded-xl font-bold hover:bg-[#20bd5a] transition">
+                                Ouvrir WhatsApp
+                            </a>
+                        </div>
+                    
+                        <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800">
+                            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                <i class="ph-bold ph-envelope-simple"></i> Ouvrir un ticket
+                            </h3>
+                            <form action="/report-issue" method="POST" class="space-y-3">
+                                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                                <input type="hidden" name="priority" value="LOW"> 
+                                <select name="category" class="w-full bg-[#0B1120] border border-slate-700 rounded-lg p-3 text-sm text-slate-300 focus:border-blue-500 outline-none">
+                                    <option value="TECH">Problème Technique</option>
+                                    <option value="BILLING">Facturation / Paiement</option>
+                                    <option value="LEGAL">Question Juridique</option>
+                                </select>
+                                
+                                <textarea name="description" rows="3" required placeholder="Décrivez votre problème..." class="w-full bg-[#0B1120] border border-slate-700 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none"></textarea>
+                                
+                                <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition border border-slate-700">
+                                    Envoyer ma demande
+                                </button>
+                            </form>
+                        </div>
+                    
+                    </section>
+
+                </div>
+            </div>
+        </main>
+    </div>
 
     <script>
-        // 1. GESTION FAQ ACCORDION
-        function toggleFaq(button) {
-            const content = button.nextElementSibling;
-            const icon = button.querySelector('i');
-            
-            if (content.classList.contains('hidden')) {
-                content.classList.remove('hidden');
-                icon.style.transform = 'rotate(180deg)';
-                button.classList.add('bg-slate-800');
-            } else {
-                content.classList.add('hidden');
-                icon.style.transform = 'rotate(0deg)';
-                button.classList.remove('bg-slate-800');
-            }
-        }
-
-        // 2. MOTEUR DE RECHERCHE CLIENT-SIDE
+        // MOTEUR DE RECHERCHE CLIENT-SIDE
         function filterHelp() {
             const input = document.getElementById('helpSearch');
             const filter = input.value.toLowerCase();
@@ -284,12 +339,12 @@
             let hasResults = false;
 
             items.forEach(item => {
-                const text = item.querySelector('.search-text').textContent.toLowerCase(); // Cherche dans le titre et la description
-                // Cherche aussi dans le titre h3 si existant
+                const text = item.querySelector('.search-text').textContent.toLowerCase(); 
                 const title = item.querySelector('h3') ? item.querySelector('h3').textContent.toLowerCase() : '';
                 
                 if (text.includes(filter) || title.includes(filter)) {
                     item.style.display = "";
+                    if(item.tagName === 'DETAILS') item.open = true; // Ouvrir l'accordéon si trouvé
                     hasResults = true;
                 } else {
                     item.style.display = "none";
@@ -302,7 +357,7 @@
             }
         }
         
-        // 3. SERVICE WORKER
+        // SERVICE WORKER
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
         }

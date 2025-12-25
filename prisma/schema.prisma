@@ -100,6 +100,9 @@ model Property {
   title       String
   address     String
   commune     String
+  bedrooms    Int      @default(0) 
+  bathrooms   Int      @default(0) 
+  surface     Float?   
   price       Int
   description String?
   latitude    Float?  @default(5.359952)

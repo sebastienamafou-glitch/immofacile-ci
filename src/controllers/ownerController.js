@@ -172,19 +172,21 @@ exports.postAddProperty = async (req, res) => {
         }
 
         const newProperty = await prisma.property.create({
-            data: {
-                title, address, commune,
-                price: parseInt(price),
-                description: description || "", // Sécurisé par le schéma V3
-                bedrooms: bedrooms ? parseInt(bedrooms) : null,
-                bathrooms: bathrooms ? parseInt(bathrooms) : null,
-                surface: surface ? parseInt(surface) : null,
-                images: imageUrls,
-                ownerId: ownerId,
-                // V3: Assignation de l'agent si sélectionné
-                managedById: agentId && agentId.length > 0 ? agentId : null 
-            }
-        });
+    data: {
+        title, 
+        address, 
+        commune,
+        price: parseInt(price, 10), // Base 10 forcée
+        description: description || "",
+        // Sécurisation contre les valeurs vides "" qui feraient planter le parseInt
+        bedrooms: bedrooms ? parseInt(bedrooms, 10) : null,
+        bathrooms: bathrooms ? parseInt(bathrooms, 10) : null,
+        surface: surface ? parseInt(surface, 10) : null,
+        images: imageUrls,
+        ownerId: ownerId,
+        managedById: agentId && agentId.length > 0 ? agentId : null
+    }
+});
 
         // V3: Notification Push à l'agent
         if (agentId) {

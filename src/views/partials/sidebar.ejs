@@ -1,105 +1,155 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 border-r border-white/5 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 transition-transform duration-300 flex flex-col custom-scrollbar backdrop-blur-xl">
     
     <div class="mb-10 px-2 relative group">
-        <a href="/admin/dashboard" class="flex items-center gap-4">
-            <div class="relative w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all duration-500 ring-1 ring-white/10">
-                <i class="ph-fill ph-buildings text-white text-2xl drop-shadow-md"></i>
-                <div class="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        <a href="<%= user.role === 'ADMIN' ? '/admin/dashboard' : '/owner/dashboard' %>" class="flex items-center gap-4">
+            <div class="relative w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-white/10 group-hover:scale-105 transition-transform duration-300 ring-1 ring-white/20">
+                <img src="/images/immo_logo.png" alt="Logo" class="w-8 h-8 object-contain">
             </div>
             <div>
-                <span class="block text-white font-black text-xl tracking-tighter uppercase leading-none">ImmoFacile</span>
-                <span class="text-[10px] font-bold text-blue-400 tracking-[0.2em] uppercase bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20 mt-1 inline-block">Admin V4</span>
+                <span class="block text-white font-black text-xl tracking-tighter uppercase leading-none">ImmoFacile<span class="text-[#F59E0B]">.V4</span></span>
+                <span class="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-1 inline-block">
+                    <%= user.role === 'ADMIN' ? 'Super Admin' : 'Espace Client' %>
+                </span>
             </div>
         </a>
     </div>
 
-    <nav class="space-y-2 flex-1">
+    <nav class="space-y-1 flex-1 flex flex-col">
+        
         <% let dashboardUrl = user.role === 'ADMIN' ? '/admin/dashboard' : (user.role === 'INVESTOR' ? '/investor/dashboard' : '/owner/dashboard'); %>
-        <a href="<%= dashboardUrl %>" class="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-600/20 to-blue-900/10 text-blue-100 rounded-2xl font-bold border border-blue-500/30 mb-8 transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-900/20 group relative overflow-hidden">
-            <div class="absolute inset-0 bg-blue-500/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-            <i class="ph-fill ph-squares-four text-xl text-blue-400 group-hover:text-white transition-colors"></i>
+        <a href="<%= dashboardUrl %>" class="flex items-center gap-4 p-3.5 bg-white/5 text-white rounded-xl font-bold border border-white/10 mb-8 transition-all hover:bg-white/10 hover:shadow-lg hover:shadow-black/20 group relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <i class="ph-fill ph-squares-four text-[#F59E0B] text-xl group-hover:scale-110 transition-transform"></i>
             <span class="relative z-10">Vue Globale</span>
-            <i class="ph-bold ph-caret-right ml-auto text-blue-500/50 group-hover:translate-x-1 transition-transform"></i>
         </a>
 
-        <div class="px-4 mt-6 mb-3 flex items-center gap-3">
-            <span class="h-px w-8 bg-slate-800"></span>
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Opérations</span>
+        <% if (user.role === 'ADMIN') { %>
+            
+            <div class="px-3 mt-6 mb-3 flex items-center gap-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gestion Trésorerie</span>
+            </div>
+            
+            <a href="#tresorerie" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] group-hover:bg-[#F59E0B] group-hover:text-black transition-all">
+                    <i class="ph-bold ph-wallet"></i>
+                </div>
+                <span class="font-medium text-sm">Rechargements</span>
+            </a>
+
+            <div class="px-3 mt-6 mb-3 flex items-center gap-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Opérations</span>
+            </div>
+
+            <a href="#agents" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-users-three"></i>
+                </div>
+                <span class="font-medium text-sm">Agents & Sales</span>
+            </a>
+
+            <a href="#artisans" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:bg-orange-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-toolbox"></i>
+                </div>
+                <span class="font-medium text-sm">Annuaire Artisans</span>
+            </a>
+
+            <div class="px-3 mt-6 mb-3 flex items-center gap-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Système</span>
+            </div>
+
+            <a href="/admin/logs" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-scroll"></i>
+                </div>
+                <span class="font-medium text-sm">Logs d'audit</span>
+            </a>
+
+            <button onclick="checkSystemHealth()" class="w-full flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group text-left">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all relative">
+                    <i class="ph-bold ph-activity relative z-10"></i>
+                    <span class="absolute w-full h-full bg-emerald-500/30 rounded-lg animate-ping opacity-0 group-hover:opacity-100"></span>
+                </div>
+                <span class="font-medium text-sm">Santé Système</span>
+            </button>
+
+        <% } else { %>
+            
+            <div class="px-3 mt-6 mb-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mon Espace</span>
+            </div>
+
+            <a href="#properties" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-house"></i>
+                </div>
+                <span class="font-medium text-sm">Mes Biens</span>
+            </a>
+
+            <a href="#tenants" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-users"></i>
+                </div>
+                <span class="font-medium text-sm">Locataires</span>
+            </a>
+
+            <% if (user.role === 'INVESTOR') { %>
+                <a href="/investor/opportunities" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all">
+                        <i class="ph-bold ph-trend-up"></i>
+                    </div>
+                    <span class="font-medium text-sm">Opportunités ROI</span>
+                </a>
+            <% } %>
+
+            <button onclick="exportMyData()" class="w-full flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group text-left">
+                <div class="w-8 h-8 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] group-hover:bg-[#F59E0B] group-hover:text-black transition-all">
+                    <i class="ph-bold ph-file-arrow-down"></i>
+                </div>
+                <span class="font-medium text-sm">Mes Documents</span>
+            </button>
+        <% } %>
+
+        <div class="px-3 mt-auto mb-2 pt-4 border-t border-white/5">
+            <a href="/help" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-all shadow-[0_0_10px_rgba(236,72,153,0.1)] group-hover:shadow-[0_0_15px_rgba(236,72,153,0.4)]">
+                    <i class="ph-bold ph-life-buoy"></i>
+                </div>
+                <span class="font-medium text-sm">Centre d'Aide</span>
+                <i class="ph-bold ph-arrow-up-right ml-auto text-xs opacity-0 group-hover:opacity-100 transition-opacity text-slate-500"></i>
+            </a>
         </div>
-        
-        <a href="#tresorerie" class="flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5">
-            <div class="w-8 h-8 rounded-lg bg-[#F59E0B]/10 flex items-center justify-center text-[#F59E0B] group-hover:bg-[#F59E0B] group-hover:text-black transition-all">
-                <i class="ph-bold ph-wallet"></i>
-            </div>
-            <span class="font-medium text-sm">Trésorerie</span>
-        </a>
 
-        <a href="#agents" class="flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5">
-            <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                <i class="ph-bold ph-users-three"></i>
-            </div>
-            <span class="font-medium text-sm">Agents & Sales</span>
-        </a>
-
-        <a href="#artisans" class="flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5">
-            <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:bg-orange-500 group-hover:text-white transition-all">
-                <i class="ph-bold ph-toolbox"></i>
-            </div>
-            <span class="font-medium text-sm">Annuaire Pro</span>
-        </a>
-
-        <div class="px-4 mt-8 mb-3 flex items-center gap-3">
-            <span class="h-px w-8 bg-slate-800"></span>
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maintenance</span>
-        </div>
-        
-        <button onclick="checkSystemHealth()" class="w-full flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5 text-left">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all relative">
-                <i class="ph-bold ph-activity relative z-10"></i>
-                <span class="absolute w-full h-full bg-emerald-500/30 rounded-lg animate-ping opacity-0 group-hover:opacity-100"></span>
-            </div>
-            <span class="font-medium text-sm">Santé Système</span>
-            <span class="ml-auto w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]"></span>
-        </button>
-
-        <a href="#alertes" class="flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5">
-            <div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 group-hover:bg-red-500 group-hover:text-white transition-all">
-                <i class="ph-bold ph-warning-octagon"></i>
-            </div>
-            <span class="font-medium text-sm">Alertes</span>
-            <span class="ml-auto text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 font-mono group-hover:bg-red-500/20 group-hover:text-red-400 transition">Live</span>
-        </a>
-
-        <a href="/admin/logs" class="flex items-center gap-4 p-3.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all group border border-transparent hover:border-white/5">
-            <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-all">
-                <i class="ph-bold ph-scroll"></i>
-            </div>
-            <span class="font-medium text-sm">Audit & Logs</span>
-        </a>
     </nav>
 
-    <div class="mt-auto pt-8 border-t border-white/5">
-        <div class="relative bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-5 rounded-2xl overflow-hidden group hover:border-blue-500/30 transition-colors">
-            <div class="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition"></div>
-            
-            <div class="flex items-center gap-3 mb-3 relative z-10">
-                <div class="bg-blue-500/20 p-2 rounded-lg">
-                    <i class="ph-fill ph-shield-check text-blue-400 text-lg"></i>
-                </div>
+    <div class="mt-auto pt-6 border-t border-white/5">
+        
+        <div class="flex flex-wrap gap-x-4 gap-y-2 px-1 mb-4 text-[10px] font-medium text-slate-500">
+            <a href="/terms" class="hover:text-white transition-colors">CGU</a>
+            <a href="/privacy" class="hover:text-white transition-colors">Confidentialité</a>
+        </div>
+
+        <div class="relative bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-4 rounded-xl overflow-hidden group hover:border-blue-500/30 transition-colors mb-4">
+            <div class="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition"></div>
+            <div class="flex items-center gap-3 relative z-10">
+                <i class="ph-fill ph-shield-check text-blue-500 text-xl"></i>
                 <div>
-                    <span class="block text-[10px] font-black text-white tracking-widest uppercase">Sécurité V4</span>
-                    <span class="block text-[9px] text-emerald-400 font-mono mt-0.5">SHA-256 ACTIVE</span>
+                    <span class="block text-[9px] font-black text-white tracking-widest uppercase">Sécurité V4</span>
+                    <span class="block text-[8px] text-slate-500 mt-0.5">Loi 2024-1115 • SHA-256</span>
                 </div>
             </div>
-            <p class="text-[10px] text-slate-500 leading-relaxed font-medium relative z-10">
-                Conforme Loi 2024-1115.<br>Tous les baux sont scellés.
-            </p>
         </div>
         
-        <a href="/logout" class="flex items-center justify-center gap-3 p-4 mt-4 text-red-400 hover:text-white hover:bg-red-600 rounded-2xl transition-all font-bold text-sm border border-transparent hover:border-red-500 shadow-lg hover:shadow-red-900/20 group">
-            <i class="ph-bold ph-sign-out text-lg group-hover:-translate-x-1 transition-transform"></i>
+        <a href="/logout" class="flex items-center gap-4 p-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition-all font-bold text-sm group mb-6">
+            <i class="ph-bold ph-sign-out text-xl group-hover:-translate-x-1 transition-transform"></i>
             <span>Déconnexion</span>
         </a>
+
+        <div class="flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity duration-300 pb-2">
+            <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-5 object-contain grayscale hover:grayscale-0 transition-all">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by WebApp CI</span>
+        </div>
+
     </div>
 </aside>
 
@@ -110,10 +160,8 @@
             html: '<span class="text-sm text-slate-400">Interrogation du Dispatcher (iad1)</span>',
             allowOutsideClick: false,
             background: '#0B1120', color: '#fff',
-            didOpen: () => Swal.showLoading(),
-            customClass: { popup: 'border border-slate-700 rounded-3xl' }
+            didOpen: () => Swal.showLoading()
         });
-
         try {
             const res = await fetch('/api/system/status');
             const data = await res.json();
@@ -127,17 +175,31 @@
                             <div class="flex justify-between text-sm"><span class="text-slate-400">Biens Gérés</span> <span class="text-white font-mono font-bold">${data.stats.properties}</span></div>
                             <div class="flex justify-between text-sm"><span class="text-slate-400">Baux Impayés</span> <span class="text-orange-400 font-mono font-bold">${data.stats.unpaidBails}</span></div>
                         </div>
-                        <div class="mt-4 text-[10px] text-slate-500 uppercase tracking-widest">Latence: <span class="text-emerald-500">24ms</span> • Region: iad1</div>
                     `,
-                    icon: 'success',
-                    background: '#0B1120', color: '#fff',
-                    confirmButtonText: 'Fermer',
-                    confirmButtonColor: '#2563eb',
-                    customClass: { popup: 'border border-slate-700 rounded-3xl' }
+                    icon: 'success', background: '#0B1120', color: '#fff', confirmButtonColor: '#2563eb'
                 });
             }
         } catch (e) {
             Swal.fire({ title: 'Erreur', text: 'Dispatcher inaccessible', icon: 'error', background: '#0B1120', color: '#fff' });
+        }
+    }
+
+    async function exportMyData() {
+        Swal.fire({ title: 'Génération...', didOpen: () => Swal.showLoading(), background: '#0B1120', color: '#fff' });
+        try {
+            const res = await fetch('/investor/export');
+            const data = await res.json();
+            if (data.success) {
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `portefeuille_v4_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                Swal.close();
+            }
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'Erreur', text: 'Export impossible', background: '#0B1120', color: '#fff' });
         }
     }
 </script>
