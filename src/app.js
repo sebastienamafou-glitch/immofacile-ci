@@ -9,6 +9,7 @@ const helmet = require('helmet');
 const pg = require('pg');
 const pgSession = require('connect-pg-simple')(session);
 const rateLimit = require('express-rate-limit'); // 🟢 1. IMPORT DU LIMITEUR
+const auth = require('./middleware/authMiddleware');
 
 
 // --- IMPORTS DES ROUTES ---
