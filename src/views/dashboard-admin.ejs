@@ -3,66 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SUPER ADMIN | ImmoFacile CI</title>
+    <title>SUPER ADMIN | ImmoFacile V4</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; scroll-behavior: smooth; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        /* Animation Pulse pour le statut Live */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        .live-indicator::before {
+            content: '';
+            position: absolute;
+            width: 100%; height: 100%;
+            background-color: inherit;
+            border-radius: 50%;
+            z-index: -1;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
     </style>
 </head>
-<body class="bg-[#0B1120] text-slate-200">
+<body class="bg-[#0B1120] text-slate-200 custom-scrollbar">
 
     <div class="flex min-h-screen">
         <%- include('partials/sidebar') %>
 
-        <main class="flex-1 md:ml-72 p-6 md:p-10 max-w-7xl mx-auto w-full">
-            <header class="flex justify-between items-end mb-10">
+        <main class="flex-1 md:ml-64 p-6 lg:p-10 max-w-7xl mx-auto w-full">
+            
+            <header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-white uppercase">Bonjour ADMIN 👋</h1>
+                    <h1 class="text-3xl font-black text-white uppercase tracking-tight">Bonjour ADMIN 👋</h1>
                     <p class="text-slate-400 mt-1 flex items-center gap-2 text-sm">
-                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        Système opérationnel • <%= new Date().toLocaleDateString('fr-FR', {day:'numeric', month:'long'}) %> 
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Système V4 Opérationnel • <%= new Date().toLocaleDateString('fr-FR', {day:'numeric', month:'long'}) %>
                     </p>
                 </div>
-                <div class="bg-slate-900 px-5 py-3 rounded-xl border border-slate-800 shadow-sm">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Utilisateurs Totaux</p>
-                    <p class="text-2xl font-black text-white"><%= totalUsers %></p> 
+                <div class="bg-slate-900 px-6 py-4 rounded-2xl border border-slate-800 shadow-xl flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Utilisateurs</p>
+                        <p class="text-2xl font-black text-white"><%= totalUsers %></p>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
+                        <i class="ph-bold ph-users"></i>
+                    </div>
                 </div>
             </header>
 
             <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden group hover:border-slate-700 transition">
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition">
                     <div class="flex justify-between mb-2">
                         <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Volume d'Affaires</span>
-                        <span class="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-[10px] font-bold">+12% vs M-1</span> 
+                        <span class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded text-[10px] font-bold">+12%</span>
                     </div>
-                    <p class="text-3xl font-black text-white tracking-tight"><%= volumeAffaires.toLocaleString('fr-FR') %> <span class="text-base font-normal text-slate-400">FCFA</span></p> 
-                    <p class="text-xs text-slate-400 mt-2">Loyers totaux encaissés</p>
+                    <p class="text-3xl font-black text-white tracking-tight"><%= volumeAffaires.toLocaleString('fr-FR') %> <span class="text-base font-normal text-slate-500">FCFA</span></p>
+                    <p class="text-xs text-slate-500 mt-2">Loyers totaux encaissés</p>
                 </div>
 
-                <div class="bg-gradient-to-br from-[#F59E0B] to-orange-800 p-6 rounded-2xl shadow-lg relative overflow-hidden">
-                    <span class="text-xs font-bold text-black/70 uppercase bg-white/30 px-2 py-1 rounded backdrop-blur-sm">Ma Commission (5%)</span> 
-                    <p class="text-4xl font-black text-white tracking-tight mt-4"><%= myRevenue.toLocaleString('fr-FR') %></p> 
-                    <p class="text-xs text-white/90 mt-1 font-medium">Revenu Net généré</p>
+                <div class="bg-gradient-to-br from-[#F59E0B] to-orange-900 p-6 rounded-3xl shadow-lg relative overflow-hidden text-white">
+                    <div class="absolute right-0 top-0 p-6 opacity-10 transform translate-x-2 -translate-y-2">
+                        <i class="ph-fill ph-crown text-8xl"></i>
+                    </div>
+                    <span class="text-xs font-bold bg-white/20 px-2 py-1 rounded backdrop-blur-md">Ma Commission (5%)</span>
+                    <p class="text-4xl font-black mt-4"><%= myRevenue.toLocaleString('fr-FR') %></p>
+                    <p class="text-xs opacity-80 mt-1 font-medium">Revenu Net généré</p>
                 </div>
 
-                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-between">
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
                     <div class="flex justify-between mb-4">
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Biens sous gestion</span>
-                        <i class="ph ph-buildings text-slate-500 text-xl"></i> 
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Biens Gérés</span>
+                        <i class="ph-duotone ph-buildings text-slate-500 text-2xl"></i>
                     </div>
-                    <p class="text-3xl font-black text-white"><%= totalProperties %></p> 
+                    <p class="text-3xl font-black text-white"><%= totalProperties %></p>
                     <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-4">
-                        <div class="bg-blue-500 h-full rounded-full" style="width: 75%"></div> 
+                        <div class="bg-blue-500 h-full rounded-full" style="width: 75%"></div>
                     </div>
                 </div>
             </section>
@@ -70,184 +98,402 @@
             <section class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
                 <div class="lg:col-span-2 space-y-6">
                     <h3 class="text-lg font-bold flex items-center gap-2 text-white">
-                        <i class="ph-fill ph-activity text-[#F59E0B]"></i> Valeur Générée (Live) 
+                        <i class="ph-fill ph-activity text-[#F59E0B]"></i> Valeur Générée (Live)
                     </h3>
+                    
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center hover:bg-slate-800/50 transition">
                             <i class="ph-duotone ph-hand-tap text-2xl text-slate-400 mb-2"></i>
-                            <p class="text-2xl font-black text-white"><%= totalInteractions %></p> 
-                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Interactions</p>
+                            <p class="text-2xl font-black text-white"><%= totalInteractions %></p>
+                            <p class="text-slate-500 text-[10px] font-bold uppercase">Interactions</p>
                         </div>
-                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
-                            <i class="ph-fill ph-whatsapp-logo text-2xl text-green-500 mb-2"></i>
-                            <p class="text-2xl font-black text-green-500"><%= whatsappTotal %></p> 
-                            <p class="text-slate-500 text-[10px] font-bold uppercase mt-1">Leads WA</p>
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center hover:bg-slate-800/50 transition">
+                            <i class="ph-fill ph-whatsapp-logo text-2xl text-emerald-500 mb-2"></i>
+                            <p class="text-2xl font-black text-emerald-500"><%= whatsappTotal %></p>
+                            <p class="text-slate-500 text-[10px] font-bold uppercase">Leads WA</p>
                         </div>
-                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
-                            <i class="ph-duotone ph-warning text-2xl text-red-400 mb-2"></i>
-                            <p class="text-2xl font-black text-red-400"><%= incidentsTotal %></p> 
-                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Alertes</p>
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center hover:bg-slate-800/50 transition">
+                            <i class="ph-duotone ph-warning-octagon text-2xl text-red-400 mb-2"></i>
+                            <p class="text-2xl font-black text-red-400"><%= incidentsTotal %></p>
+                            <p class="text-slate-500 text-[10px] font-bold uppercase">Alertes</p>
                         </div>
-                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center">
+                        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center hover:bg-slate-800/50 transition">
                             <i class="ph-duotone ph-users text-2xl text-blue-400 mb-2"></i>
-                            <p class="text-2xl font-black text-blue-400"><%= totalUsers > 0 ? (totalInteractions / totalUsers).toFixed(1) : 0 %></p> 
-                            <p class="text-slate-400 text-[10px] font-bold uppercase mt-1">Engagement</p>
+                            <p class="text-2xl font-black text-blue-400"><%= totalUsers > 0 ? (totalInteractions / totalUsers).toFixed(1) : 0 %></p>
+                            <p class="text-slate-500 text-[10px] font-bold uppercase">Engagement</p>
                         </div>
                     </div>
 
-                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-                        <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Aperçu des Revenus</h4>
-                        <div class="h-48 w-full">
-                            <canvas id="revenueChart"></canvas> 
+                    <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase mb-6 flex justify-between">
+                            Aperçu des Revenus
+                            <span class="text-orange-500"><i class="ph-bold ph-trend-up"></i> Croissance</span>
+                        </h4>
+                        <div class="h-56 w-full">
+                            <canvas id="revenueChart"></canvas>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 h-full flex flex-col">
-                    <h3 class="text-sm font-bold text-slate-300 uppercase mb-6 flex justify-between items-center">
-                        Flux d'activité
-                        <span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
-                    </h3>
-                    <div class="space-y-4 overflow-y-auto flex-1 custom-scrollbar max-h-[400px]">
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-sm font-bold text-slate-300 uppercase">Flux d'activité</h3>
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-0 overflow-y-auto flex-1 custom-scrollbar max-h-[450px]">
                         <% if(locals.recentActivities && recentActivities.length > 0) { %>
-                            <% recentActivities.forEach(log => { %>
-                                <div class="flex gap-3 text-xs relative pl-4 border-l border-slate-800 pb-2">
-                                    <div class="absolute -left-1 top-1 w-2 h-2 rounded-full bg-slate-700 border-2 border-slate-900"></div>
+                            <% recentActivities.forEach((log, index) => { %>
+                                <div class="relative pl-6 pb-6 border-l border-slate-800 last:border-0 last:pb-0 group">
+                                    <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-slate-800 border-2 border-slate-600 group-hover:border-[#F59E0B] group-hover:bg-[#F59E0B] transition"></div>
                                     <div>
                                         <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-xs font-bold text-slate-200"><%= log.user ? log.user.name : 'Visiteur' %></span> 
-                                            <span class="text-[10px] text-slate-500"><%= new Date(log.createdAt).toLocaleTimeString('fr-FR') %></span>
+                                            <span class="text-xs font-bold text-slate-200"><%= log.user ? log.user.name : 'Système' %></span>
+                                            <span class="text-[10px] text-slate-500"><%= new Date(log.createdAt).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) %></span>
                                         </div>
-                                        <p class="text-slate-400"><span class="text-[#F59E0B]"><%= log.action %></span> • <%= log.category %></p> 
+                                        <p class="text-xs text-slate-400 leading-relaxed">
+                                            <span class="text-[#F59E0B] font-semibold"><%= log.action %></span> 
+                                            <span class="text-slate-600 mx-1">•</span> 
+                                            <%= log.category %>
+                                        </p>
                                     </div>
                                 </div>
                             <% }) %>
                         <% } else { %>
-                            <p class="text-slate-500 italic text-xs text-center py-10">Aucune activité récente.</p> 
+                            <div class="text-center py-10 flex flex-col items-center">
+                                <i class="ph-duotone ph-coffee text-4xl text-slate-700 mb-3"></i>
+                                <p class="text-slate-500 text-xs italic">Aucune activité récente.</p>
+                            </div>
                         <% } %>
                     </div>
                 </div>
             </section>
 
-            <section id="tresorerie" class="mb-12 bg-slate-900 border border-slate-800 p-8 rounded-2xl relative overflow-hidden">
-                <h3 class="font-bold text-white text-lg mb-6 flex items-center gap-2">
-                    <i class="ph-fill ph-credit-card text-[#F59E0B]"></i> Guichet de Rechargement 
-                </h3>
-                <div class="flex flex-col xl:flex-row gap-8">
-                    <form action="/admin/add-credit" method="POST" class="bg-black/40 p-6 rounded-xl border border-slate-700 w-full xl:w-1/3">
+            <section id="tresorerie" class="mb-12 bg-slate-900 border border-slate-800 p-8 rounded-3xl relative overflow-hidden scroll-mt-20">
+                <div class="absolute top-0 right-0 w-96 h-96 bg-[#F59E0B]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 relative z-10">
+                    <div>
+                        <h3 class="font-bold text-white text-xl flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-black shadow-lg">
+                                <i class="ph-bold ph-wallet"></i>
+                            </div>
+                            Guichet de Rechargement
+                        </h3>
+                        <p class="text-sm text-slate-400 mt-2 ml-1">Gérez les rechargements Wave/Orange Money des propriétaires.</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col xl:flex-row gap-8 relative z-10">
+                    <form action="/admin/add-credit" method="POST" class="bg-black/40 backdrop-blur-md p-6 rounded-2xl border border-slate-700 w-full xl:w-1/3 shadow-2xl">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                        <div class="mb-4">
-                            <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Propriétaire Client</label>
-                            <select name="ownerId" required class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white">
-                                <% owners.forEach(o => { %>
-                                    <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.walletBalance.toLocaleString('fr-FR') %> F)</option> 
-                                <% }) %>
-                            </select>
+                        <div class="mb-5">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-wider">Propriétaire Client</label>
+                            <div class="relative">
+                                <select name="ownerId" required class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 pl-10 text-white text-sm appearance-none focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition cursor-pointer">
+                                    <% owners.forEach(o => { %>
+                                        <option value="<%= o.id %>"><%= o.name %> (Solde: <%= o.walletBalance.toLocaleString('fr-FR') %> F)</option>
+                                    <% }) %>
+                                </select>
+                                <i class="ph-bold ph-user absolute left-3 top-3.5 text-slate-500"></i>
+                                <i class="ph-bold ph-caret-down absolute right-3 top-3.5 text-slate-500 pointer-events-none"></i>
+                            </div>
                         </div>
+
                         <div class="mb-6">
-                            <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Montant reçu (FCFA)</label>
-                            <input type="number" name="amount" required min="500" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white" placeholder="Ex: 50000"> 
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-2 block tracking-wider">Montant reçu (FCFA)</label>
+                            <div class="relative">
+                                <input type="number" name="amount" required min="500" placeholder="Ex: 50000" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 pl-10 text-white text-sm focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition placeholder-slate-600">
+                                <i class="ph-bold ph-money absolute left-3 top-3.5 text-slate-500"></i>
+                            </div>
                         </div>
-                        <button type="submit" class="w-full bg-[#F59E0B] text-black font-bold py-3 rounded-lg hover:bg-orange-500 transition">Créditer le compte</button> 
+
+                        <button type="submit" class="w-full bg-[#F59E0B] text-black font-black py-4 rounded-xl hover:bg-orange-500 transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-95 duration-200">
+                            <i class="ph-bold ph-plus-circle"></i> CRÉDITER LE COMPTE
+                        </button>
                     </form>
-                    <div class="flex-1 overflow-x-auto border border-slate-800 rounded-xl bg-black/20">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-400 uppercase bg-slate-800/80">
-                                <tr><th class="p-4">Client</th><th class="p-4">Solde Actuel</th><th class="p-4">Statut</th><th class="p-4 text-right">Action</th></tr> 
-                            </thead>
-                            <tbody class="divide-y divide-slate-800">
-                                <% owners.forEach(o => { %>
-                                    <tr class="hover:bg-slate-800/30 transition">
-                                        <td class="p-4 font-bold text-white"><%= o.name %></td> 
-                                        <td class="p-4 font-mono <%= o.walletBalance < 2000 ? 'text-red-400' : 'text-green-400' %>"><%= o.walletBalance.toLocaleString('fr-FR') %> F</td> 
-                                        <td class="p-4">
-                                            <span class="inline-flex items-center gap-1 <%= o.isActive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-400' %> px-2 py-1 rounded text-xs">
-                                                <i class="ph-fill <%= o.isActive ? 'ph-check-circle' : 'ph-warning-circle' %>"></i> <%= o.isActive ? 'OK' : 'Bas' %> 
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-right">
-                                            <form action="/admin/toggle-status" method="POST" class="inline">
-                                                <input type="hidden" name="userId" value="<%= o.id %>">
-                                                <input type="hidden" name="currentStatus" value="<%= o.isActive %>">
-                                                <button type="submit" class="<%= o.isActive ? 'text-red-400' : 'text-green-400' %> hover:bg-slate-700 p-2 rounded-lg">
-                                                    <i class="ph-bold <%= o.isActive ? 'ph-lock-key' : 'ph-lock-key-open' %>"></i> 
-                                                </button>
-                                            </form>
-                                        </td>
+
+                    <div class="flex-1 flex flex-col gap-4">
+                        <div class="relative">
+                            <input type="text" id="searchOwner" placeholder="Rechercher un propriétaire..." class="bg-slate-800 border border-slate-700 text-white text-sm rounded-xl p-3 pl-10 w-full focus:ring-1 focus:ring-[#F59E0B] outline-none placeholder-slate-500 transition">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-3.5 text-slate-400"></i>
+                        </div>
+
+                        <div class="overflow-y-auto max-h-[350px] border border-slate-800 rounded-2xl bg-slate-900/50">
+                            <table class="w-full text-sm text-left" id="ownersTable">
+                                <thead class="text-[10px] text-slate-400 uppercase bg-slate-800/90 sticky top-0 backdrop-blur-md z-10">
+                                    <tr>
+                                        <th class="p-4">Client</th>
+                                        <th class="p-4">Solde Actuel</th>
+                                        <th class="p-4">Statut</th>
+                                        <th class="p-4 text-right">Action</th>
                                     </tr>
-                                <% }) %>
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody class="divide-y divide-slate-800">
+                                    <% owners.forEach(o => { %>
+                                        <tr class="hover:bg-slate-800/50 transition">
+                                            <td class="p-4 font-bold text-white"><%= o.name %></td>
+                                            <td class="p-4 font-mono">
+                                                <span class="<%= o.walletBalance < 2000 ? 'text-red-400' : 'text-emerald-400' %> font-bold">
+                                                    <%= o.walletBalance.toLocaleString('fr-FR') %> F
+                                                </span>
+                                            </td>
+                                            <td class="p-4">
+                                                <span class="inline-flex items-center gap-1 <%= o.isActive ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20' %> px-2 py-1 rounded text-[10px] font-bold border">
+                                                    <%= o.isActive ? 'ACTIF' : 'BLOQUÉ' %>
+                                                </span>
+                                            </td>
+                                            <td class="p-4 text-right">
+                                                <form action="/admin/toggle-status" method="POST" class="inline-block" onsubmit="confirmToggleStatus(event, this)">
+                                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                    <input type="hidden" name="userId" value="<%= o.id %>">
+                                                    <input type="hidden" name="currentStatus" value="<%= o.isActive %>">
+                                                    <button type="submit" class="<%= o.isActive ? 'text-slate-400 hover:text-red-400' : 'text-slate-400 hover:text-emerald-400' %> transition p-1" title="<%= o.isActive ? 'Bloquer' : 'Activer' %>">
+                                                        <i class="ph-bold <%= o.isActive ? 'ph-lock-key' : 'ph-lock-key-open' %> text-lg"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                <section id="agents" class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4 flex items-center gap-2"><i class="ph-fill ph-users-three"></i> Performance Agents</h3> 
-                    <table class="w-full text-left text-sm">
-                        <tbody class="divide-y divide-slate-800">
-                            <% agents.forEach(agent => { %>
-                                <tr>
-                                    <td class="p-4 font-bold text-slate-200"><%= agent.name %></td> 
-                                    <td class="p-4 text-slate-300"><%= agent.leads.length %> leads</td>
-                                    <td class="p-4 text-right font-mono text-[#F59E0B]"><%= (agent.leads.length * 5000).toLocaleString() %> F</td> 
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
+                <section id="agents" class="bg-slate-900 border border-slate-800 rounded-3xl p-8 scroll-mt-20">
+                    <h3 class="font-bold text-slate-200 uppercase text-xs mb-6 flex items-center gap-2">
+                        <i class="ph-fill ph-users-three text-blue-500"></i> Performance Agents
+                    </h3>
+                    <div class="overflow-hidden rounded-xl border border-slate-800">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-800 text-slate-400 text-[10px] uppercase">
+                                <tr><th class="p-4">Agent</th><th class="p-4">Leads</th><th class="p-4 text-right">Com. Due</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800 bg-slate-900/50">
+                                <% agents.forEach(agent => { %>
+                                    <tr>
+                                        <td class="p-4 font-bold flex items-center gap-3 text-white">
+                                            <div class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px]"><%= agent.name.charAt(0) %></div>
+                                            <%= agent.name %>
+                                        </td>
+                                        <td class="p-4 text-slate-400"><%= agent.leads.length %></td>
+                                        <td class="p-4 text-right font-mono text-[#F59E0B] font-bold"><%= (agent.leads.length * 5000).toLocaleString('fr-FR') %> F</td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
-                <section id="alertes" class="space-y-3">
-                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4 flex items-center gap-2"><i class="ph-fill ph-bell-ringing"></i> Alertes Système</h3> 
-                    <% if (activeIncidents.length === 0) { %>
-                        <div class="p-6 bg-green-500/5 border border-green-500/10 rounded-xl text-center"><p class="text-green-400 text-sm font-bold">R.A.S.</p></div> 
-                    <% } %>
-                    <% activeIncidents.forEach(inc => { %>
-                        <div class="p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex justify-between items-center">
-                            <div class="flex items-start gap-3"><i class="ph-fill ph-warning-octagon text-red-500 text-xl"></i><div><p class="text-red-400 font-bold text-sm"><%= inc.title %></p></div></div> 
-                        </div>
-                    <% }) %>
+
+                <section id="alertes" class="scroll-mt-20">
+                    <h3 class="font-bold text-slate-400 uppercase text-xs mb-4 flex items-center gap-2">
+                        <i class="ph-fill ph-bell-ringing text-red-500"></i> Alertes Système
+                    </h3>
+                    <div class="space-y-3">
+                        <% if (activeIncidents.length === 0) { %>
+                            <div class="p-8 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl text-center flex flex-col items-center justify-center h-48">
+                                <i class="ph-duotone ph-check-circle text-4xl text-emerald-500 mb-2"></i>
+                                <p class="text-emerald-400 text-sm font-bold">R.A.S.</p>
+                                <p class="text-slate-500 text-xs">Tous les systèmes sont nominaux.</p>
+                            </div>
+                        <% } else { %>
+                            <% activeIncidents.forEach(inc => { %>
+                                <div class="p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex justify-between items-center group hover:bg-red-500/10 transition cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <i class="ph-fill ph-warning-octagon text-red-500 text-xl mt-0.5"></i>
+                                        <div>
+                                            <p class="text-red-400 font-bold text-sm"><%= inc.priority %> : <%= inc.title %></p>
+                                            <p class="text-slate-500 text-xs mt-1"><%= inc.property ? inc.property.title : 'Système' %></p>
+                                        </div>
+                                    </div>
+                                    <i class="ph-bold ph-caret-right text-slate-600"></i>
+                                </div>
+                            <% }) %>
+                        <% } %>
+                    </div>
                 </section>
             </div>
 
-            <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-xl text-slate-900 mb-12">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-black flex items-center gap-2"><i class="ph-duotone ph-toolbox text-2xl text-orange-500"></i> Annuaire des Artisans</h2> 
-                    <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="bg-[#0B1120] text-white px-5 py-2.5 rounded-xl font-bold text-sm">Ajouter un Pro</button> 
+            <section id="artisans" class="bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl relative overflow-hidden mb-12 scroll-mt-20">
+                <div class="flex justify-between items-center mb-8 relative z-10">
+                    <div>
+                        <h2 class="text-xl font-black text-[#0B1120] flex items-center gap-2">
+                            <i class="ph-duotone ph-toolbox text-2xl text-orange-600"></i> Annuaire des Artisans
+                        </h2>
+                        <p class="text-slate-500 text-sm mt-1 ml-9">Contacts visibles par les propriétaires.</p>
+                    </div>
+                    <button onclick="document.getElementById('artisanModal').classList.remove('hidden')" class="bg-[#0B1120] text-white px-5 py-3 rounded-xl font-bold text-sm hover:scale-105 transition flex items-center gap-2 shadow-xl">
+                        <i class="ph-bold ph-plus"></i> Ajouter un Pro
+                    </button>
                 </div>
-                <table class="w-full text-left">
-                    <thead class="text-xs font-bold text-slate-400 uppercase border-b border-slate-100">
-                        <tr><th class="p-3 pl-0">Nom</th><th class="p-3">Métier</th><th class="p-3">Secteur</th><th class="p-3">Contact</th><th class="p-3 text-right">Action</th></tr> 
-                    </thead>
-                    <tbody class="text-sm">
-                        <% artisans.forEach(a => { %>
-                            <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
-                                <td class="p-3 pl-0 font-bold"><%= a.name %></td> 
-                                <td class="p-3"><span class="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold"><%= a.job %></span></td> 
-                                <td class="p-3 text-slate-500"><%= a.location %></td> 
-                                <td class="p-3 font-mono"><%= a.phone %></td> 
-                                <td class="p-3 text-right">
-                                    <form action="/admin/delete-artisan" method="POST"><input type="hidden" name="artisanId" value="<%= a.id %>"><button type="submit" class="text-slate-300 hover:text-red-500"><i class="ph-bold ph-trash text-lg"></i></button></form> 
-                                </td>
+
+                <div class="overflow-x-auto relative z-10">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+                                <th class="p-3 pl-0">Nom</th>
+                                <th class="p-3">Métier</th>
+                                <th class="p-3">Secteur</th>
+                                <th class="p-3">Contact</th>
+                                <th class="p-3 text-right pr-0">Action</th>
                             </tr>
-                        <% }) %>
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="text-sm text-slate-700">
+                            <% if (locals.artisans && artisans.length > 0) { %>
+                                <% artisans.forEach(a => { %>
+                                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition group">
+                                        <td class="p-4 pl-0 font-bold text-[#0B1120]"><%= a.name %></td>
+                                        <td class="p-4"><span class="bg-orange-100 text-orange-800 border border-orange-200 px-2 py-1 rounded text-xs font-bold uppercase"><%= a.job %></span></td>
+                                        <td class="p-4 text-slate-500"><i class="ph-fill ph-map-pin text-slate-300 mr-1"></i><%= a.location %></td>
+                                        <td class="p-4 font-mono font-bold select-all"><%= a.phone %></td>
+                                        <td class="p-4 text-right pr-0">
+                                            <form action="/admin/delete-artisan" method="POST" class="inline" onsubmit="confirmDelete(event, this)">
+                                                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                                <input type="hidden" name="artisanId" value="<%= a.id %>">
+                                                <button type="submit" class="text-slate-300 hover:text-red-500 transition p-2 rounded hover:bg-red-50">
+                                                    <i class="ph-bold ph-trash text-lg"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="5" class="p-10 text-center text-slate-400 italic bg-slate-50 rounded-xl mt-4">
+                                        <i class="ph-duotone ph-folder-dashed text-4xl mb-2 block opacity-50"></i>
+                                        Aucun artisan enregistré.
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
         </main>
     </div>
 
+    <div id="artisanModal" class="hidden fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-md transition-opacity">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full relative shadow-2xl animate-fade-in-up">
+            <button onclick="document.getElementById('artisanModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-black transition">
+                <i class="ph-bold ph-x text-xl"></i>
+            </button>
+            <h3 class="text-xl font-black text-[#0B1120] mb-1">Nouveau Partenaire</h3>
+            <p class="text-slate-500 text-sm mb-6">Ajoutez un professionnel de confiance.</p>
+            <form action="/admin/add-artisan" method="POST" class="space-y-4">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nom</label>
+                    <input type="text" name="name" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:border-[#F59E0B] outline-none" placeholder="Ex: Kouamé Élec">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Métier</label>
+                        <select name="job" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none cursor-pointer">
+                            <option>Plombier</option><option>Électricien</option><option>Menuisier</option><option>Peintre</option><option>Climatisation</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Secteur</label>
+                        <input type="text" name="location" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none" placeholder="Ex: Cocody">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Téléphone</label>
+                    <input type="tel" name="phone" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none" placeholder="07 07 ...">
+                </div>
+                <button type="submit" class="w-full bg-[#0B1120] text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition shadow-lg mt-2">Enregistrer</button>
+            </form>
+        </div>
+    </div>
+
     <script>
+        // 1. POLLING LIVE (Mise à jour V4)
+        async function pollNotifications() {
+            try {
+                const res = await fetch('/api/system/status');
+                const data = await res.json();
+                if (data.success && data.stats.unpaidBails > 0) {
+                    Swal.fire({
+                        toast: true, position: 'top-end', icon: 'warning',
+                        title: `Finance: ${data.stats.unpaidBails} baux impayés`,
+                        showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff'
+                    });
+                }
+            } catch (e) { console.warn('Polling off'); }
+        }
+        setInterval(pollNotifications, 30000);
+
+        // 2. SEARCH FILTER
+        document.getElementById('searchOwner').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            document.querySelectorAll('#ownersTable tbody tr').forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+            });
+        });
+
+        // 3. CONFIRMATIONS
+        function confirmToggleStatus(e, form) {
+            e.preventDefault();
+            const isBlocking = form.querySelector('button i').classList.contains('ph-lock-key');
+            Swal.fire({
+                title: isBlocking ? 'Bloquer ce compte ?' : 'Réactiver ?',
+                icon: 'question', showCancelButton: true, confirmButtonColor: isBlocking ? '#ef4444' : '#10b981',
+                confirmButtonText: 'Oui', background: '#1e293b', color: '#fff'
+            }).then((res) => { if (res.isConfirmed) form.submit(); });
+        }
+
+        function confirmDelete(e, form) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Supprimer ?', text: "Irréversible.", icon: 'warning',
+                showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Supprimer',
+                background: '#fff', color: '#000'
+            }).then((res) => { if (res.isConfirmed) form.submit(); });
+        }
+
+        // 4. FLASH MESSAGES
+        document.addEventListener('DOMContentLoaded', () => {
+            pollNotifications();
+            <% if (locals.success && locals.success.length > 0) { %>
+                Swal.fire({ icon: 'success', title: 'Succès', text: "<%= locals.success %>", background: '#1e293b', color: '#fff', timer: 2000, showConfirmButton: false });
+            <% } %>
+            <% if (locals.error && locals.error.length > 0) { %>
+                Swal.fire({ icon: 'error', title: 'Erreur', text: "<%= locals.error %>", background: '#1e293b', color: '#fff' });
+            <% } %>
+        });
+
+        // 5. CHART INITIALIZATION
         document.addEventListener('DOMContentLoaded', function() {
             const ctx = document.getElementById('revenueChart').getContext('2d');
-            const chartData = <%- JSON.stringify([volumeAffaires * 0.7, volumeAffaires * 0.85, volumeAffaires * 0.6, volumeAffaires]) %>; 
+            const chartData = <%- (locals.revenueChartData && Array.isArray(locals.revenueChartData)) ? JSON.stringify(revenueChartData) : JSON.stringify([volumeAffaires * 0.7, volumeAffaires * 0.85, volumeAffaires * 0.6, volumeAffaires]) %>;
+            
+            let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(245, 158, 11, 0.5)'); 
+            gradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+
             new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: ['Sem-3', 'Sem-2', 'Sem-1', 'Aujourd\'hui'],
-                    datasets: [{ label: 'Revenus (FCFA)', data: chartData, borderColor: '#F59E0B', tension: 0.4 }] 
+                    datasets: [{
+                        label: 'Revenus (FCFA)', data: chartData,
+                        borderColor: '#F59E0B', backgroundColor: gradient, borderWidth: 2,
+                        pointBackgroundColor: '#fff', pointBorderColor: '#F59E0B', pointRadius: 4,
+                        fill: true, tension: 0.4
+                    }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } },
+                    interaction: { intersect: false, mode: 'index' }
+                }
             });
         });
     </script>
