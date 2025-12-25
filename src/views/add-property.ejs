@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajouter un Bien | ImmoFacile CI</title>
+    <title>Ajouter un Bien | [cite_start]ImmoFacile CI [cite: 166]</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -131,6 +133,32 @@
                     
                     <input type="hidden" name="latitude" id="lat" value="5.359952">
                     <input type="hidden" name="longitude" id="lng" value="-4.008256">
+                </div>
+
+                <div class="mb-8 border-t border-slate-800 pt-6">
+                    <label class="text-xs font-bold text-slate-500 uppercase mb-3 block flex items-center gap-2">
+                        <i class="ph-fill ph-detective text-[#F59E0B] text-lg"></i> Déléguer la gestion (Optionnel)
+                    </label>
+                    <p class="text-xs text-slate-400 mb-4">Choisissez un Agent Certifié pour gérer les visites et les clés à votre place.</p>
+                    
+                    <div class="relative">
+                        <select name="agentId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none appearance-none cursor-pointer">
+                            <option value="">-- Gérer moi-même (Pas d'agent) --</option>
+                            
+                            <% if (typeof agents !== 'undefined' && agents.length > 0) { %>
+                                <% agents.forEach(agent => { %>
+                                    <option value="<%= agent.id %>">
+                                        <%= agent.name %> (<%= agent.commune || 'Toutes zones' %>)
+                                    </option>
+                                <% }) %>
+                            <% } else { %>
+                                <option value="" disabled>Aucun agent disponible pour le moment</option>
+                            <% } %>
+                        </select>
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                            <i class="ph-bold ph-caret-down text-lg"></i>
+                        </div>
+                    </div>
                 </div>
                 <button type="submit" class="w-full bg-[#F59E0B] hover:bg-yellow-400 text-[#0B1120] font-black py-4 rounded-xl shadow-lg transition transform hover:scale-[1.01]">
                     Publier le bien
@@ -272,7 +300,6 @@
     <script>
         // Initialisation de la carte sur Abidjan (Cocody par défaut)
         const map = L.map('mapSelector').setView([5.359952, -4.008256], 13);
-
         // Ajout des tuiles OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'

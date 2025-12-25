@@ -8,10 +8,8 @@ const csrfMiddleware = require('./middleware/csrfMiddleware');
 const helmet = require('helmet'); 
 const pg = require('pg');
 const pgSession = require('connect-pg-simple')(session);
-
-// --- SERVICES ---
-// Correction de la ligne 9 : Syntaxe corrigée pour lancer le script cron
-require('./services/cronService');
+const rateLimit = require('express-rate-limit'); // 🟢 1. IMPORT DU LIMITEUR
+const signatureRoutes = require('./routes/signatureRoutes');
 
 // --- IMPORTS DES ROUTES ---
 const authRoutes = require('./routes/authRoutes');
@@ -25,26 +23,83 @@ const artisanRoutes = require('./routes/artisanRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const publicRoutes = require('./routes/publicRoutes');
+const cronRoutes = require('./routes/cronRoutes'); // Route pour le Cron Vercel
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-// Configuration Proxy
+// Configuration Proxy (Nécessaire pour Vercel/Heroku et le Rate Limiting)
 app.set('trust proxy', 1); 
 
-// Sécurité Helmet
-app.use(helmet({
-  contentSecurityPolicy: false, 
-}));
+// --- SÉCURITÉ HELMET (Audit Validé ✅) ---
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        
+        // Scripts autorisés (Frontend, CinetPay, Analytics...)
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'", // Requis pour les scripts dans les vues EJS
+          "cdn.tailwindcss.com",
+          "unpkg.com",         // Phosphor Icons / Leaflet
+          "cdn.jsdelivr.net",  // Chart.js / SweetAlert2
+          "checkout.cinetpay.com"
+        ],
+        
+        // Styles autorisés
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "fonts.googleapis.com",
+          "cdn.jsdelivr.net",
+          "unpkg.com"
+        ],
+        
+        // Images autorisées (Cloudinary, Cartes, QR Codes base64)
+        imgSrc: [
+          "'self'",
+          "data:",
+          "res.cloudinary.com", 
+          "*.openstreetmap.org",
+          "tile.openstreetmap.org"
+        ],
+        
+        // Connexions API autorisées (CinetPay, Mindee, OpenAI)
+        connectSrc: [
+          "'self'",
+          "api-checkout.cinetpay.com",
+          "api.mindee.net",
+          "api.openai.com",
+          "overpass-api.de"
+        ],
+        
+        // iFrames autorisées (Widget de paiement)
+        frameSrc: [
+          "'self'",
+          "checkout.cinetpay.com"
+        ],
+        
+        fontSrc: [
+          "'self'",
+          "fonts.gstatic.com"
+        ],
+        
+        upgradeInsecureRequests: [], 
+      },
+    },
+    // Désactive cette policy spécifique si elle bloque le chargement d'images cross-origin
+    crossOriginEmbedderPolicy: false, 
+  })
+);
 
 // Configuration des Vues (EJS)
 app.set('view engine', 'ejs');
-// On suppose que vos vues sont dans 'src/views' (car app.js est dans src)
 app.set('views', path.join(__dirname, 'views'));
 
 // Configuration des Fichiers Statiques
-// 'public' est à la racine, donc on remonte d'un niveau (..) depuis 'src'
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Parsers
@@ -52,7 +107,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-// Base de données
+// Base de données (Pooling)
 const pgPool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: IS_PROD ? { rejectUnauthorized: false } : false
@@ -72,7 +127,7 @@ app.use(session({
     cookie: { 
         secure: IS_PROD, 
         httpOnly: true,  
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 jours
         sameSite: 'lax'
     }
 }));
@@ -86,6 +141,18 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- 🟢 2. CONFIGURATION DU BOUCLIER OPENAI ---
+const aiLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 heure (en millisecondes)
+    max: 5, // Max 5 requêtes par IP par heure
+    message: { 
+        status: 429,
+        error: "Quota IA dépassé. Veuillez réessayer dans une heure pour générer une nouvelle annonce." 
+    },
+    standardHeaders: true, 
+    legacyHeaders: false,
+});
+
 // --- DÉFINITION DES ROUTES ---
 
 // Route publique CGU
@@ -93,30 +160,37 @@ app.get('/terms', (req, res) => {
     res.render('terms'); 
 });
 
-// Routes principales
+// 🟢 3. APPLICATION DU BOUCLIER (Protège les routes /api/ai)
+app.use('/api/ai', aiLimiter);
+
+// Routes Applicatives
 app.use('/', authRoutes);
 app.use('/owner', ownerRoutes);
 app.use('/tenant', tenantRoutes);
 app.use('/admin', adminRoutes);
 app.use('/agent', agentRoutes);
-app.use('/api', apiRoutes);
 app.use('/investor', investorRoutes);
 app.use('/artisan', artisanRoutes);
-app.use('/api/payment', paymentRoutes);
 app.use('/chat', chatRoutes);
-app.use('/', publicRoutes);
+app.use('/api/signature', signatureRoutes);
 
+// Routes API & Systèmes
+app.use('/api', apiRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/cron', cronRoutes); // Route Cron sécurisée
+
+// Routes Publiques (Landing page, etc.)
+app.use('/', publicRoutes);
 
 // --- GESTION DES ERREURS ---
 app.use((req, res) => {
-    // Vérifiez que 'views/errors/404.ejs' existe bien
     res.status(404).render('errors/404');
 });
 
 // Démarrage du serveur
 if (require.main === module) {
     app.listen(PORT, () => {
-        console.log(`✅ ImmoFacile-CI opérationnel sur le port ${PORT}`);
+        console.log(`✅ ImmoFacile-CI V3 opérationnel sur le port ${PORT}`);
     });
 }
 

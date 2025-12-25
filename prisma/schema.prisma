@@ -1,3 +1,5 @@
+// schema.prisma - VERSION COMPLÈTE CORRIGÉE (V3 + V4 Signature)
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,38 +17,35 @@ model User {
   phone     String   @unique
   name      String?
   role      UserRole @default(TENANT)
-  address   String?  
+  address   String?
   commune   String?
   password  String
   createdAt DateTime @default(now())
-  isActive  Boolean  @default(true) 
+  isActive  Boolean  @default(true)
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
   
   // FINANCES
-  walletBalance Int    @default(0) 
-  escrowBalance Int    @default(0) 
+  walletBalance Int    @default(0)
+  escrowBalance Int    @default(0)
 
   // RELATIONS PRINCIPALES
   properties        Property[]          @relation("OwnerProperties")
-  
-  // MODIFICATION ICI : Relation Agent/Manager (au lieu de Visiteur)
-  managedProperties Property[]          @relation("AgentProperties") 
-
+  managedProperties Property[]          @relation("AgentProperties")
   leasesAsTenant    Lease[]             @relation("TenantLeases")
   reportedIncidents Incident[]          @relation("Reporter")
   leads             Lead[]              @relation("AgentLeads")
-  transactions      CreditTransaction[] 
-  withdrawals       Withdrawal[]        
-  investments       Investment[]        
+  transactions      CreditTransaction[]
+  withdrawals       Withdrawal[]       
+  investments       Investment[]       
   
   // PROFILS SPÉCIFIQUES
   artisanProfile    Artisan?
-  tenantProfile     TenantProfile?      
+  tenantProfile     TenantProfile?
 
   // RELATIONS SYSTÈME
-  pushSubscriptions PushSubscription[] 
-  activityLogs      ActivityLog[]      
+  pushSubscriptions PushSubscription[]
+  activityLogs      ActivityLog[]
 }
 
 enum UserRole {
@@ -62,70 +61,71 @@ enum UserRole {
 
 model CreditTransaction {
   id          String   @id @default(cuid())
-  amount      Int      
-  description String   
+  amount      Int
+  description String
   date        DateTime @default(now())
- 
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+}
+
+model Withdrawal {
+  id        String   @id @default(cuid())
+  amount    Int
+  details   String
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
 }
 
 // --- MODÈLE INVESTISSEMENT ---
 
 model Investment {
   id          String   @id @default(cuid())
-  amount      Int      
-  roiRate     Float    
-  duration    Int      
-  
+  amount      Int
+  roiRate     Float
+  duration    Int
   startDate   DateTime @default(now())
-  status      String   @default("ACTIVE") 
-  
-  projectName String   
-  
+  status      String   @default("ACTIVE")
+  projectName String
   investorId  String
   investor    User     @relation(fields: [investorId], references: [id])
-
   createdAt   DateTime @default(now())
 }
 
 // --- MODÈLES IMMOBILIERS ---
 
 model Property {
-  id        String   @id @default(cuid())
-  title     String
-  address   String
-  commune   String
-  price     Int  
+  id          String   @id @default(cuid())
+  title       String
+  address     String
+  commune     String
+  price       Int
   description String?
-  latitude  Float?  @default(5.359952)
-  longitude Float?  @default(-4.008256)
-  createdAt DateTime @default(now())
-  
-  images    String[] 
+  latitude    Float?  @default(5.359952)
+  longitude   Float?  @default(-4.008256)
+  createdAt   DateTime @default(now())
+  images      String[]
 
-  // Le Propriétaire (Celui qui possède le bien)
-  ownerId   String 
-  owner     User     @relation("OwnerProperties", fields: [ownerId], references: [id])
+  ownerId     String
+  owner       User     @relation("OwnerProperties", fields: [ownerId], references: [id])
 
-  // MODIFICATION ICI : L'Agent / Gestionnaire assigné (Celui qui gère le bien)
   managedById String?
   manager     User?    @relation("AgentProperties", fields: [managedById], references: [id])
 
-  leases    Lease[]
-  incidents Incident[]
-  expenses  Expense[]
-  candidates Candidate[]
+  leases      Lease[]
+  incidents   Incident[]
+  expenses    Expense[]
+  candidates  Candidate[]
 }
 
 model Lease {
   id            String      @id @default(cuid())
   startDate     DateTime
   endDate       DateTime?
-  depositAmount Int       
-  monthlyRent   Int       
-  
-  status        LeaseStatus @default(PENDING_FEES) 
+  depositAmount Int
+  monthlyRent   Int
+  status        LeaseStatus @default(PENDING_FEES)
   isActive      Boolean     @default(false)
 
   tenantId      String
@@ -136,6 +136,9 @@ model Lease {
 
   payments      Payment[]
   inventories   Inventory[]
+  
+  // Relation V4 Scellement
+  signatureProof SignatureProof?
 }
 
 enum LeaseStatus {
@@ -148,12 +151,10 @@ enum LeaseStatus {
 
 model Payment {
   id        String      @id @default(cuid())
-  amount    Int      
+  amount    Int
   date      DateTime    @default(now())
-  
   month     String?
   type      PaymentType @default(LOYER)
-  
   leaseId   String
   lease     Lease       @relation(fields: [leaseId], references: [id])
 }
@@ -165,9 +166,9 @@ enum PaymentType {
 
 model Incident {
   id          String   @id @default(cuid())
-  title       String   
+  title       String
   description String
-  status      String   @default("OPEN") 
+  status      String   @default("OPEN")
   priority    String   @default("MEDIUM")
   createdAt   DateTime @default(now())
   
@@ -184,10 +185,9 @@ model Incident {
 model Expense {
   id          String   @id @default(cuid())
   description String
-  amount      Int      
+  amount      Int
   date        DateTime @default(now())
   category    String
-  
   propertyId  String
   property    Property @relation(fields: [propertyId], references: [id])
 }
@@ -196,7 +196,6 @@ model Inventory {
   id             String   @id @default(cuid())
   type           String
   date           DateTime @default(now())
-  
   kitchenState   String?
   kitchenPhoto   String?
   livingState    String?
@@ -208,17 +207,15 @@ model Inventory {
   lease          Lease    @relation(fields: [leaseId], references: [id])
 }
 
-// --- GESTION DES PROSPECTS (LEADS) ET CANDIDATS ---
+// --- GESTION DES PROSPECTS ET CANDIDATS ---
 
 model Lead {
   id          String   @id @default(cuid())
   name        String
   phone       String
   address     String?
-  photo       String?
   status      String   @default("NOUVEAU")
   createdAt   DateTime @default(now())
-  
   agentId     String?
   agent       User?    @relation("AgentLeads", fields: [agentId], references: [id])
 }
@@ -228,11 +225,10 @@ model Candidate {
   name        String
   phone       String
   email       String
-  income      Int      
+  income      Int
   status      String   @default("PENDING")
   score       Int
   createdAt   DateTime @default(now())
-  
   propertyId  String
   property    Property @relation(fields: [propertyId], references: [id])
 }
@@ -242,69 +238,61 @@ model Candidate {
 model Artisan {
   id          String   @id @default(uuid())
   name        String
-  job         String   
+  job         String
   phone       String
-  location    String   
+  location    String
   isVerified  Boolean  @default(true)
   rating      Float    @default(5.0)
   createdAt   DateTime @default(now())
-
-  userId      String?   @unique
-  user        User?     @relation(fields: [userId], references: [id])
-  
+  userId      String?  @unique
+  user        User?    @relation(fields: [userId], references: [id])
   incidents   Incident[]
 }
 
-// --- SYSTÈME DE NOTIFICATIONS (WEB PUSH) ---
+// --- SYSTÈME & LOGS ---
 
 model PushSubscription {
   id        String   @id @default(cuid())
-  endpoint  String   @unique 
-  keys      Json     
+  endpoint  String   @unique
+  keys      Json
   createdAt DateTime @default(now())
-  
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) 
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
-// --- LOGS D'ACTIVITÉ ---
 
 model ActivityLog {
-  id        String   @id @default(cuid())
-  action    String   
-  category  String  
-  metadata  Json?
-  createdAt DateTime @default(now())
-  
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  id          String   @id @default(cuid())
+  action      String
+  category    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }
-
-// --- MODÈLE DE RETRAIT ---
-
-model Withdrawal {
-  id        String   @id @default(cuid())
-  amount    Int
-  details   String   
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
-  
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id])
-}
-
-// --- EXTENSION PROFIL LOCATAIRE & KYC ---
 
 model TenantProfile {
   id            String   @id @default(cuid())
-  
   userId        String   @unique
   user          User     @relation(fields: [userId], references: [id])
-  
   idCardUrl     String?
-  idCardStatus  String    @default("PENDING") 
-  
+  idCardStatus  String   @default("PENDING")
   extractedData Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// --- MODÈLE REGISTRE DE PREUVES DE SIGNATURE (V4) ---
+
+model SignatureProof {
+  id           String    @id @default(uuid())
+  leaseId      String    @unique
+  documentHash String    // Empreinte SHA-256 du bail
+  ownerSigned  Boolean   @default(false)
+  tenantSigned Boolean   @default(false)
+  ownerOtp     String?   // Le code envoyé par SMS
+  tenantOtp    String?
+  ownerIp      String?
+  tenantIp     String?
+  signedAt     DateTime?
+  lease        Lease     @relation(fields: [leaseId], references: [id])
 }

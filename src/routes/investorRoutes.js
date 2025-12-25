@@ -1,18 +1,19 @@
+// src/routes/investorRoutes.js
 const express = require('express');
 const router = express.Router();
 const investorController = require('../controllers/investorController');
+const auth = require('../middleware/authMiddleware'); // Assurez-vous d'avoir un middleware isInvestor
 
-// Middleware pour vérifier si c'est un investisseur
+// Middleware de sécurité spécifique (si vous ne l'avez pas déjà dans authMiddleware)
 const isInvestor = (req, res, next) => {
-    if (req.session.user && req.session.user.role === 'INVESTOR') {
+    if (req.session.user && (req.session.user.role === 'INVESTOR' || req.session.user.role === 'ADMIN')) {
         return next();
     }
-    // Si c'est un proprio qui veut voir, on peut être souple ou rediriger
-    if (req.session.user) return next(); 
-    res.redirect('/login');
+    return res.redirect('/auth/login');
 };
 
+// Routes
 router.get('/dashboard', isInvestor, investorController.getDashboard);
-// router.get('/opportunities', isInvestor, investorController.getOpportunities); // À faire plus tard
+router.get('/opportunities', isInvestor, investorController.getOpportunities);
 
 module.exports = router;

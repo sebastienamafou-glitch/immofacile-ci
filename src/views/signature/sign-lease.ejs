@@ -1,0 +1,90 @@
+<%- include('../partials/header') %>
+
+<div class="max-w-4xl mx-auto py-10 px-4">
+    <div class="bg-white shadow-xl rounded-lg overflow-hidden">
+        <div class="bg-blue-600 p-6 text-white">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i class="ph-fill ph-pen-nib mr-3"></i> Signature Électronique du Bail
+            </h1>
+            <p class="opacity-80">Document certifié par scellement numérique SHA-256</p>
+        </div>
+
+        <div class="p-8">
+            <div class="mb-8 border-2 border-dashed border-gray-200 rounded-lg p-6 bg-gray-50 max-h-96 overflow-y-auto">
+                <h3 class="font-bold text-lg mb-4 text-center border-b pb-2">CONTRAT DE BAIL À USAGE D'HABITATION</h3>
+                <div class="text-sm text-gray-700 leading-relaxed" id="document-preview">
+                    <p>Le présent bail est conclu entre <strong><%= lease.property.owner.name %></strong> (Bailleur)</p>
+                    <p>et <strong><%= lease.tenant.name %></strong> (Locataire).</p>
+                    <p class="mt-4"><strong>Objet :</strong> <%= lease.property.title %> sis à <%= lease.property.address %>, <%= lease.property.commune %>.</p>
+                    <p><strong>Loyer mensuel :</strong> <%= lease.monthlyRent.toLocaleString() %> XOF</p>
+                    <p class="mt-4 italic">En cliquant sur "Initier la signature", un code OTP vous sera envoyé au <%= user.phone %>.</p>
+                </div>
+            </div>
+
+            <div id="signature-workflow" class="space-y-6">
+                <div id="step-init">
+                    <button onclick="initiateSignature()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg transition duration-300 flex items-center justify-center">
+                        <i class="ph ph-paper-plane-tilt mr-2"></i> RECEVOIR MON CODE DE SIGNATURE PAR SMS
+                    </button>
+                </div>
+
+                <div id="step-verify" class="hidden animate-pulse-once">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Entrez le code OTP reçu par SMS :</label>
+                    <div class="flex space-x-4">
+                        <input type="text" id="otp-input" maxlength="6" placeholder="000000" 
+                               class="flex-1 border-2 border-blue-100 rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:border-blue-500 outline-none">
+                        <button onclick="verifySignature()" class="bg-green-600 hover:bg-green-700 text-white px-8 rounded-lg font-bold">
+                            SCELLER LE BAIL
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2 text-center">
+                        En signant, vous acceptez l'empreinte numérique du document : <span id="display-hash" class="font-mono text-blue-600">Calcul en cours...</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    const leaseId = "<%= lease.id %>";
+
+    async function initiateSignature() {
+        const res = await fetch('/api/signature/initiate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leaseId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            document.getElementById('step-init').classList.add('hidden');
+            document.getElementById('step-verify').classList.remove('hidden');
+            document.getElementById('display-hash').innerText = data.hash.substring(0, 16) + "...";
+            Swal.fire('SMS Envoyé', 'Veuillez vérifier votre téléphone', 'success');
+        } else {
+            Swal.fire('Erreur', data.error, 'error');
+        }
+    }
+
+    async function verifySignature() {
+        const otp = document.getElementById('otp-input').value;
+        const res = await fetch('/api/signature/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leaseId, otp })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire('Félicitations !', 'Le bail a été scellé numériquement.', 'success')
+            .then(() => window.location.href = '/dashboard');
+        } else {
+            Swal.fire('Erreur', data.error, 'error');
+        }
+    }
+</script>
+
+<%- include('../partials/footer') %>

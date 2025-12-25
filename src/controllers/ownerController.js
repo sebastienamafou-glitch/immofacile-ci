@@ -5,9 +5,10 @@ const { generateRandomPassword } = require('../utils/security');
 const { uploadFromBuffer } = require('../utils/cloudinary');
 const tracker = require('../utils/tracker'); 
 const QRCode = require('qrcode');
+const pushService = require('../utils/pushService'); // Import du service Push
+const sealing = require('../utils/sealingService');
 
-
-// --- GESTION LOCATAIRES ---
+// --- 1. GESTION LOCATAIRES ---
 exports.getAddTenant = async (req, res) => {
     try {
         const properties = await prisma.property.findMany({
@@ -51,6 +52,10 @@ exports.postAddTenant = async (req, res) => {
                 data: { escrowBalance: { increment: deposit } }
             });
         });
+        
+        // Log pour V3
+        await tracker.trackAction("TENANT_ADDED", "OWNER", req.session.user.id, { propertyId, tenantPhone });
+
         let redirectUrl = '/owner/dashboard?success=tenant_added';
         if (tempPassword) {
             redirectUrl += `&new_pass=${tempPassword}&new_user=${encodeURIComponent(tenantNameForRedirect)}&new_phone=${tenantPhone}`; 
@@ -62,7 +67,7 @@ exports.postAddTenant = async (req, res) => {
     }
 };
 
-// --- DASHBOARD (CORRIGÉ AVEC HELPERS) ---
+// --- 2. DASHBOARD (AVEC KPIS V3) ---
 exports.getDashboard = async (req, res) => {
     try {
         const userId = req.session.user.id;
@@ -71,7 +76,8 @@ exports.getDashboard = async (req, res) => {
             include: { 
                 leases: { include: { tenant: true, payments: { orderBy: { date: 'asc' } } } },
                 incidents: { include: { reporter: true } },
-                expenses: true
+                expenses: true,
+                manager: true // V3: On récupère l'agent gestionnaire si assigné
             }, 
             orderBy: { createdAt: 'desc' }
         });
@@ -105,7 +111,6 @@ exports.getDashboard = async (req, res) => {
         const artisans = await prisma.artisan.findMany({ orderBy: { rating: 'desc' } });
         if (user) { user.walletBalance = user.walletBalance || 0; user.escrowBalance = user.escrowBalance || 0; }
 
-        // --- DÉFINITION DES HELPERS (Correction Erreur 500) ---
         const helpers = {
             formatMoney: (amount) => (amount || 0).toLocaleString('fr-FR'),
             formatWaLink: (phone, text = '') => {
@@ -116,14 +121,13 @@ exports.getDashboard = async (req, res) => {
             }
         };
 
-        // --- RENDU DE LA VUE ---
         res.render('owner/dashboard', { 
             user, properties, artisans, 
             totalRent: stats.totalMonthlyRent, totalDeposit: stats.totalDeposit, totalExpenses: stats.totalExpensesMonth,
             netIncome: stats.totalMonthlyRent - stats.totalExpensesMonth, activeIncidentsCount: stats.activeIncidents,
             realEscrowBalance: user ? user.escrowBalance : 0,
             totalRentYTD: stats.rentYTD, totalExpensesYTD: stats.expensesYTD, netIncomeYTD: stats.rentYTD - stats.expensesYTD,
-            ...helpers // Injection des fonctions dans la vue
+            ...helpers 
         });
     } catch (error) {
         console.error("Erreur Critique Dashboard:", error);
@@ -131,10 +135,28 @@ exports.getDashboard = async (req, res) => {
     }
 };
 
-// --- GESTION BIENS ---
+// --- 3. GESTION BIENS (AVEC DÉLÉGATION AGENT) ---
+exports.getAddProperty = async (req, res) => {
+    try {
+        // V3: Récupérer tous les agents actifs pour le menu déroulant
+        const agents = await prisma.user.findMany({
+            where: { role: 'AGENT', isActive: true },
+            select: { id: true, name: true, commune: true }
+        });
+
+        res.render('owner/add-property', { 
+            agents, 
+            csrfToken: req.csrfToken ? req.csrfToken() : "" 
+        });
+    } catch (error) {
+        console.error("Erreur chargement form bien:", error);
+        res.redirect('/owner/dashboard');
+    }
+};
+
 exports.postAddProperty = async (req, res) => {
     try {
-        const { title, price, address, commune, description, bedrooms, bathrooms, surface } = req.body;
+        const { title, price, address, commune, description, bedrooms, bathrooms, surface, agentId } = req.body;
         const ownerId = req.session.user.id;
         
         let imageUrls = [];
@@ -149,17 +171,33 @@ exports.postAddProperty = async (req, res) => {
             }
         }
 
-        await prisma.property.create({
+        const newProperty = await prisma.property.create({
             data: {
                 title, address, commune,
                 price: parseInt(price),
-                description: description || "",
+                description: description || "", // Sécurisé par le schéma V3
                 bedrooms: bedrooms ? parseInt(bedrooms) : null,
                 bathrooms: bathrooms ? parseInt(bathrooms) : null,
                 surface: surface ? parseInt(surface) : null,
                 images: imageUrls,
-                ownerId: ownerId
+                ownerId: ownerId,
+                // V3: Assignation de l'agent si sélectionné
+                managedById: agentId && agentId.length > 0 ? agentId : null 
             }
+        });
+
+        // V3: Notification Push à l'agent
+        if (agentId) {
+            pushService.sendNotificationToUser(agentId, {
+                title: "Nouvelle Mission 🏠",
+                body: `Le propriétaire ${req.session.user.name} vous a délégué un bien à ${commune}.`
+            }).catch(e => console.error("Erreur push agent", e));
+        }
+
+        // V3: Traçabilité
+        await tracker.trackAction("PROPERTY_CREATED", "OWNER", ownerId, { 
+            propertyId: newProperty.id,
+            delegated: !!agentId 
         });
 
         res.redirect('/owner/dashboard?success=property_created');
@@ -169,7 +207,7 @@ exports.postAddProperty = async (req, res) => {
     }
 };
 
-// --- AUTRES FONCTIONS ---
+// --- 4. AUTRES FONCTIONS ---
 exports.postAddExpense = async (req, res) => {
     try {
         await prisma.expense.create({
@@ -193,6 +231,7 @@ exports.postAddArtisan = async (req, res) => {
     } catch (error) { console.error(error); res.redirect('/owner/dashboard?error=artisan_failed'); }
 };
 
+// --- 5. DOCUMENTS LÉGAUX ---
 exports.getContract = async (req, res) => {
     try {
         const lease = await prisma.lease.findUnique({ where: { id: req.params.leaseId }, include: { tenant: true, property: { include: { owner: true } } } });
@@ -231,7 +270,10 @@ exports.postSubmitInventory = async (req, res) => {
         const kitchenPhoto = req.files['kitchenPhoto'] ? (await uploadFromBuffer(req.files['kitchenPhoto'][0].buffer)).secure_url : null;
         const livingPhoto = req.files['livingPhoto'] ? (await uploadFromBuffer(req.files['livingPhoto'][0].buffer)).secure_url : null;
         await prisma.inventory.create({ data: { type, kitchenState, kitchenPhoto, livingState, livingPhoto, leaseId } });
+        
+        // V3: Log
         await tracker.trackAction("INVENTORY_COMPLETED", "OWNER", req.session.user.id, { leaseId, type });
+        
         res.redirect(`/owner/dashboard?success=inventory_saved`);
     } catch (error) { console.error(error); res.redirect('/owner/dashboard?error=inventory_failed'); }
 };
@@ -322,9 +364,60 @@ exports.postRequestWithdrawal = async (req, res) => {
             await tx.user.update({ where: { id: userId }, data: { walletBalance: { decrement: value } } });
             await tx.withdrawal.create({ data: { amount: value, details: paymentDetails, status: 'PENDING', ownerId: userId } });
         });
+        
+        await tracker.trackAction("WITHDRAWAL_REQUESTED", "OWNER", userId, { amount: value });
+        
         res.redirect('/owner/dashboard?success=withdrawal_initiated');
     } catch (error) {
         console.error("Erreur Retrait:", error);
         res.redirect('/owner/dashboard?error=withdrawal_failed');
+    }
+};
+
+exports.signLease = async (req, res) => {
+    const { leaseId, otpEntered } = req.body;
+    const userId = req.session.user.id;
+    const userRole = req.session.user.role;
+
+    try {
+        // 1. Récupérer la preuve de scellement en attente
+        const proof = await prisma.signatureProof.findUnique({
+            where: { leaseId: leaseId }
+        });
+
+        // 2. Vérification du code OTP (Signature)
+        const isOwner = userRole === 'OWNER' && proof.ownerOtp === otpEntered;
+        const isTenant = userRole === 'TENANT' && proof.tenantOtp === otpEntered;
+
+        if (!isOwner && !isTenant) {
+            return res.status(403).json({ error: "Code OTP invalide" });
+        }
+
+        // 3. Enregistrement de la signature et de l'IP (Traçabilité V4)
+        const updateData = isOwner 
+            ? { ownerSigned: true, ownerIp: req.ip } 
+            : { tenantSigned: true, tenantIp: req.ip };
+
+        const updatedProof = await prisma.signatureProof.update({
+            where: { leaseId: leaseId },
+            data: { 
+                ...updateData,
+                signedAt: new Date() // Horodatage
+            }
+        });
+
+        // 4. Si les deux ont signé, on active officiellement le bail
+        if (updatedProof.ownerSigned && updatedProof.tenantSigned) {
+            await prisma.lease.update({
+                where: { id: leaseId },
+                data: { status: 'SIGNED_ELECTRONICALLY' }
+            });
+        }
+
+        res.json({ success: true, message: "Signature enregistrée avec succès." });
+
+    } catch (error) {
+        console.error("Erreur de signature:", error);
+        res.status(500).json({ error: "Échec de la procédure de signature" });
     }
 };

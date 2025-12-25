@@ -1,9 +1,9 @@
 // src/controllers/paymentController.js
 const prisma = require('../prisma/client');
 const axios = require('axios');
-const tracker = require('../utils/tracker'); // ✅ C'EST ACTIVÉ MAINTENANT
+const tracker = require('../utils/tracker');
 
-// Helper pour appeler l'API CinetPay (évite la duplication de code)
+// Helper pour appeler l'API CinetPay
 const callCinetPay = async (payload) => {
     try {
         const response = await axios.post('https://api-checkout.cinetpay.com/v2/payment', payload);
@@ -54,7 +54,6 @@ exports.postPayRent = async (req, res) => {
             })
         ]);
 
-        // ✅ LOG D'ACTIVITÉ
         await tracker.trackAction("RENT_COLLECTED", "OWNER", userId, { 
             amount: rentAmount, 
             leaseId 
@@ -86,7 +85,6 @@ exports.initCinetPay = async (req, res) => {
         notify_url: `${SITE_URL}/api/payment/notify`, // Webhook
         return_url: `${SITE_URL}/owner/dashboard?success=recharge_pending`,
         channels: 'ALL',
-        // METADATA : C'est ici qu'on dit "C'est un rechargement de wallet"
         metadata: JSON.stringify({ 
             type: 'WALLET_RECHARGE', 
             userId: req.session.user.id 
@@ -109,7 +107,7 @@ exports.initCinetPay = async (req, res) => {
 // 3. Paiement des Frais de Dossier (Locataire)
 exports.payApplicationFees = async (req, res) => {
     const { leaseId } = req.body;
-    const FEES_AMOUNT = 20000; // Tarif fixe
+    const FEES_AMOUNT = 20000; 
     const user = req.session.user;
     const SITE_URL = process.env.APP_URL || 'http://localhost:3000';
 
@@ -128,7 +126,6 @@ exports.payApplicationFees = async (req, res) => {
         notify_url: `${SITE_URL}/api/payment/notify`,
         return_url: `${SITE_URL}/tenant/dashboard?success=fees_paid`,
         channels: 'ALL',
-        // METADATA : C'est ici qu'on dit "C'est des frais de dossier"
         metadata: JSON.stringify({ 
             type: 'FRAIS_DOSSIER', 
             leaseId: leaseId,
@@ -149,16 +146,15 @@ exports.payApplicationFees = async (req, res) => {
     }
 };
 
-// 4. Webhook CINETPAY (Le Cerveau Central) 🧠
+// 4. Webhook CINETPAY (SÉCURISÉ & IDEMPOTENT) 🛡️
 exports.webhookCinetPay = async (req, res) => {
-    // CinetPay envoie les données en POST dans le body
     const { cpm_trans_id } = req.body;
 
-    // Si pas de trans_id, on ignore (protection)
+    // Protection basique
     if (!cpm_trans_id) return res.sendStatus(400);
 
     try {
-        // A. Vérification officielle de la transaction
+        // A. Vérification officielle
         const verification = await axios.post('https://api-checkout.cinetpay.com/v2/payment/check', {
             apikey: process.env.CINETPAY_API_KEY,
             site_id: process.env.CINETPAY_SITE_ID,
@@ -167,14 +163,30 @@ exports.webhookCinetPay = async (req, res) => {
 
         const { code, data } = verification.data;
 
-        // B. Si le paiement est VALIDÉ ('00')
+        // B. Traitement uniquement si succès ('00')
         if (code === '00') { 
             const amountPaid = parseInt(data.amount);
-            const metadata = JSON.parse(data.metadata); // On récupère nos infos cachées
+            const metadata = JSON.parse(data.metadata); 
 
-            console.log(`🔔 Webhook reçu : Type=${metadata.type}, Montant=${amountPaid}`);
+            console.log(`🔔 Webhook reçu : Type=${metadata.type}, Ref=${cpm_trans_id}`);
 
-            // SCÉNARIO 1 : Rechargement du Portefeuille Propriétaire
+            // --- 🛡️ SÉCURITÉ IDEMPOTENCE (La Correction V3) ---
+            
+            // 1. Vérifier si cette transaction a DÉJÀ été traitée dans l'historique
+            // On cherche une transaction qui mentionne cette référence exacte
+            const existingTransaction = await prisma.creditTransaction.findFirst({
+                where: { 
+                    description: { contains: cpm_trans_id } 
+                }
+            });
+
+            if (existingTransaction) {
+                console.log(`🛑 DOUBLON DÉTECTÉ : Transaction ${cpm_trans_id} déjà traitée. On ignore.`);
+                return res.sendStatus(200); // On dit OK à CinetPay pour qu'il arrête d'insister
+            }
+            // ----------------------------------------------------
+
+            // SCÉNARIO 1 : Rechargement Wallet
             if (metadata.type === 'WALLET_RECHARGE') {
                 await prisma.$transaction([
                     prisma.user.update({
@@ -184,23 +196,30 @@ exports.webhookCinetPay = async (req, res) => {
                     prisma.creditTransaction.create({
                         data: {
                             amount: amountPaid,
+                            // IMPORTANT: On inclut la REF pour la vérification future d'idempotence
                             description: `Rechargement Mobile Money (Ref: ${cpm_trans_id})`,
                             userId: metadata.userId
                         }
                     })
                 ]);
                 
-                // ✅ LOG
                 await tracker.trackAction("WALLET_RECHARGED", "OWNER", metadata.userId, { 
                     amount: amountPaid, 
                     ref: cpm_trans_id 
                 });
             }
 
-            // SCÉNARIO 2 : Paiement des Frais de Dossier Locataire (ACTIVATION BAIL)
+            // SCÉNARIO 2 : Frais de Dossier
             else if (metadata.type === 'FRAIS_DOSSIER') {
+                
+                // Double sécurité pour les baux : Vérifier si le bail est déjà actif
+                const leaseCheck = await prisma.lease.findUnique({ where: { id: metadata.leaseId } });
+                if (leaseCheck && leaseCheck.isActive) {
+                    console.log(`🛑 BAIL DÉJÀ ACTIF : Paiement ignoré pour ${metadata.leaseId}`);
+                    return res.sendStatus(200);
+                }
+
                 await prisma.$transaction([
-                    // 1. Enregistrer la trace du paiement
                     prisma.payment.create({
                         data: {
                             amount: amountPaid,
@@ -209,18 +228,12 @@ exports.webhookCinetPay = async (req, res) => {
                             month: 'FRAIS_ENTREE'
                         }
                     }),
-                    // 2. ACTIVER LE BAIL (C'est le plus important !)
                     prisma.lease.update({
                         where: { id: metadata.leaseId },
-                        data: { 
-                            status: 'ACTIVE', 
-                            isActive: true 
-                        }
+                        data: { status: 'ACTIVE', isActive: true }
                     })
                 ]);
-                console.log(`✅ Bail ${metadata.leaseId} activé après paiement des frais.`);
                 
-                // ✅ LOG
                 await tracker.trackAction("FEES_PAID", "TENANT", metadata.userId, { 
                     leaseId: metadata.leaseId 
                 });
@@ -230,6 +243,6 @@ exports.webhookCinetPay = async (req, res) => {
         console.error("❌ Webhook Error:", error.message);
     }
     
-    // Toujours répondre 200 à CinetPay pour qu'il arrête d'envoyer la notif
+    // Toujours répondre 200 à la fin
     res.sendStatus(200);
 };

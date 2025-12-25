@@ -1,77 +1,85 @@
 <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
-    <div class="mb-10 text-center md:text-left hidden md:block">
-        <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-16 object-contain">
+    
+    <div class="mb-8 text-center md:text-left hidden md:block">
+        <a href="/">
+            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-14 object-contain">
+        </a>
     </div>
 
-    <nav class="space-y-4 flex-1">
-        <a href="/owner/dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20">
-            <span>📊</span> Tableau de bord
+    <nav class="space-y-1 flex-1">
+        
+        <a href="/owner/dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20 mb-6">
+            <i class="ph-fill ph-squares-four text-xl"></i>
+            <span>Tableau de bord</span>
         </a>
 
-        <a href="/investor/dashboard" class="block p-3 bg-gradient-to-r from-purple-900 to-slate-900 border border-purple-500/30 text-purple-300 hover:text-white hover:border-purple-500 rounded-xl transition flex items-center gap-3 group">
-            <span class="group-hover:scale-110 transition">🚀</span> Espace Investisseur
+        <div class="mb-6">
+            <a href="/investor/dashboard" class="block p-3 bg-gradient-to-r from-purple-900/40 to-slate-900 border border-purple-500/30 text-purple-200 hover:text-white hover:border-purple-500 rounded-xl transition flex items-center gap-3 group relative overflow-hidden">
+                <div class="absolute inset-0 bg-purple-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></div>
+                <i class="ph-duotone ph-rocket-launch text-xl text-purple-400 group-hover:scale-110 transition relative z-10"></i>
+                <div class="relative z-10">
+                    <span class="block font-bold text-sm">Mode Investisseur</span>
+                    <span class="text-[10px] opacity-60 block leading-none mt-0.5">Suivi ROI & Chantiers</span>
+                </div>
+            </a>
+        </div>
+
+        <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Ma Gestion</p>
+        
+        <a href="/owner/dashboard#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+            <i class="ph-bold ph-house-line text-xl"></i> Mes Biens
+        </a>
+        <a href="/owner/dashboard#locataires" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+            <i class="ph-bold ph-users-three text-xl"></i> Locataires
+        </a>
+        <a href="/owner/tax-summary" class="block p-3 text-slate-400 hover:text-[#F59E0B] hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3 group">
+            <i class="ph-bold ph-receipt text-xl group-hover:text-[#F59E0B] transition"></i> 
+            <span>Bilan Fiscal</span>
         </a>
 
-        <a href="#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-            <span>🏠</span> Mes Biens
+        <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Outils & Services</p>
+
+        <a href="/owner/dashboard#documents" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+            <i class="ph-bold ph-folder-open text-xl"></i> Bibliothèque
         </a>
-        <a href="#locataires" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-            <span>👥</span> Locataires
-        </a>
-        <a href="#documents" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-            <span>📂</span> Documents
-        </a>
-        <a href="#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-            <span>🔨</span> Artisans
+        <a href="/owner/dashboard#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+            <i class="ph-bold ph-hammer text-xl"></i> Artisans Certifiés
         </a>
         
-        <div class="mt-4 border-t border-slate-800 pt-4 space-y-2">
-            <button onclick="enableNotifications()" class="w-full text-left block p-3 text-slate-400 hover:text-[#F59E0B] hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-                <span>🔔</span> Notifications
+        <div class="mt-4 border-t border-slate-800 pt-4 space-y-1">
+            <button onclick="enableNotifications()" class="w-full text-left block p-3 text-slate-400 hover:text-blue-400 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-bell text-xl"></i> Notifications
             </button>
 
-            <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-xl transition flex items-center gap-3">
-                <span>❓</span> Centre d'Aide
+            <a href="/about-us" target="_blank" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-cpu text-xl"></i> Notre Technologie
+            </a>
+
+            <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-life-buoy text-xl"></i> Centre d'Aide
             </a>
         </div>
 
-        <div class="mt-2 border-t border-slate-800 pt-2 space-y-1">
-            <a href="/terms" target="_blank" class="block p-2 text-xs text-slate-500 hover:text-white hover:bg-slate-900 rounded-lg transition flex items-center gap-2">
-                <span>⚖️</span> CGU / Mentions Légales
-            </a>
-            <a href="/privacy" target="_blank" class="block p-2 text-xs text-slate-500 hover:text-white hover:bg-slate-900 rounded-lg transition flex items-center gap-2">
-                <span>🔒</span> Confidentialité
-            </a>
-        </div>
-
-        <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
-            <span>🚪</span> Déconnexion
+        <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3 group">
+            <i class="ph-bold ph-sign-out text-xl group-hover:translate-x-1 transition"></i> Déconnexion
         </a>
 
-        <div class="mt-6 bg-[#0B1120] border border-blue-900/50 p-4 rounded-xl relative overflow-hidden group">
-            <div class="absolute -right-4 -top-4 bg-blue-600 w-12 h-12 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition"></div>
-            
-            <div class="flex items-start gap-3">
-                <div class="text-2xl">⚖️</div>
+        <div class="mt-6 bg-[#0B1120] border border-blue-900/30 p-3 rounded-xl relative overflow-hidden group">
+            <div class="flex items-center gap-3">
+                <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
                 <div>
-                    <h4 class="text-xs font-bold text-blue-100 uppercase mb-1">Protection Juridique</h4>
                     <p class="text-[10px] text-slate-400 leading-tight">
-                        Vos baux sont générés automatiquement en conformité avec la 
-                        <strong class="text-blue-400">loi n°2024-1115</strong> (Plafonnement caution & garantie).
+                        Conforme <strong class="text-blue-400">Loi 2024-1115</strong> (Baux & Cautions).
                     </p>
-                    <a href="/legal-notice" class="text-[10px] text-blue-500 underline mt-2 block hover:text-blue-400">Voir le certificat de conformité</a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <div class="mt-auto pt-6 border-t border-slate-800">
-        <div class="flex items-center gap-3 opacity-60 hover:opacity-100 transition duration-300">
-            <img src="/images/logo_webappci.png" alt="Logo WebAppCI" class="h-8 w-auto object-contain grayscale hover:grayscale-0">
-            <div>
-                <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Made by</p>
-                <p class="text-xs font-black text-white">WebAppCI <span class="text-[#F59E0B]">©</span></p>
-            </div>
+    <div class="mt-4 pt-4 border-t border-slate-800">
+        <div class="flex items-center gap-2 opacity-60 hover:opacity-100 transition duration-300">
+            <img src="/images/logo_webappci.png" alt="Logo" class="h-6 w-auto object-contain grayscale hover:grayscale-0">
+            <p class="text-[10px] font-bold text-slate-500">v3.0.0</p>
         </div>
     </div>
 </aside>
