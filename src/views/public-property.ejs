@@ -17,8 +17,11 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; padding-bottom: 90px; }
         
@@ -111,6 +114,19 @@
                 </p>
             </div>
 
+            <div class="mt-8 mb-8">
+                <h3 class="font-bold text-[#0B1120] mb-4 text-lg flex items-center gap-2">
+                    <i class="ph-fill ph-map-trifold text-[#F59E0B]"></i> Le Quartier
+                </h3>
+
+                <div id="propertyMap" class="h-72 w-full rounded-2xl shadow-lg border border-slate-100 z-0 mb-6"></div>
+
+                <div id="poiList" class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="col-span-2 text-center text-slate-400 py-2 text-xs">
+                        <i class="ph-duotone ph-spinner animate-spin"></i> Recherche des commodités à proximité...
+                    </div>
+                </div>
+            </div>
             <hr class="border-dashed border-slate-200 my-8">
 
             <div id="applyForm" class="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-3xl p-6 relative overflow-hidden shadow-sm">
@@ -184,7 +200,86 @@
         </button>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script>
+        // --- 0. GESTION DE LA CARTE ET OVERPASS (API) ---
+        // Cette partie s'exécute automatiquement pour charger la carte
+        document.addEventListener('DOMContentLoaded', () => {
+            const lat = <%= property.latitude || 5.359952 %>;
+            const lng = <%= property.longitude || -4.008256 %>;
+
+            // 1. AFFICHER LA CARTE
+            // On vérifie si le conteneur map existe pour éviter les erreurs
+            if (document.getElementById('propertyMap')) {
+                const map = L.map('propertyMap').setView([lat, lng], 15); // Zoom 15 pour voir les rues
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                
+                // Le bien est marqué par un cercle rouge (plus élégant qu'un marqueur bleu standard)
+                L.circleMarker([lat, lng], {
+                    color: '#F59E0B',
+                    fillColor: '#F59E0B',
+                    fillOpacity: 0.8,
+                    radius: 12
+                }).addTo(map).bindPopup("<b><%= property.title %></b>").openPopup();
+
+                // 2. CHERCHER LES POINTS D'INTÉRÊT (API OVERPASS)
+                // On cherche : Pharmacy, School, Restaurant, Bank dans un rayon de 800m
+                const query = `
+                    [out:json];
+                    (
+                    node["amenity"~"pharmacy|school|restaurant|bank|marketplace"](around:800, ${lat}, ${lng});
+                    );
+                    out 5; 
+                `;
+
+                fetch('https://overpass-api.de/api/interpreter', {
+                    method: 'POST',
+                    body: query
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const poiContainer = document.getElementById('poiList');
+                    poiContainer.innerHTML = ''; // Vider le loader
+
+                    if (data.elements.length === 0) {
+                        poiContainer.innerHTML = '<p class="text-xs text-slate-400 col-span-2">Aucun point d\'intérêt majeur détecté à proximité immédiate.</p>';
+                        return;
+                    }
+
+                    data.elements.forEach(poi => {
+                        let icon = '📍';
+                        let type = 'Lieu';
+                        
+                        // Icones sympas selon le type
+                        if (poi.tags.amenity === 'pharmacy') { icon = '💊'; type = 'Pharmacie'; }
+                        if (poi.tags.amenity === 'school') { icon = '🎓'; type = 'École'; }
+                        if (poi.tags.amenity === 'restaurant') { icon = '🍽️'; type = 'Resto/Maquis'; }
+                        if (poi.tags.amenity === 'bank') { icon = '🏦'; type = 'Banque'; }
+                        if (poi.tags.amenity === 'marketplace') { icon = '🛒'; type = 'Marché'; }
+
+                        const html = `
+                            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <div class="text-xl">${icon}</div>
+                                <div>
+                                    <p class="font-bold text-[#0B1120] text-xs truncate w-32">${poi.tags.name || type}</p>
+                                    <p class="text-[10px] text-slate-500 uppercase">${type}</p>
+                                </div>
+                            </div>
+                        `;
+                        poiContainer.insertAdjacentHTML('beforeend', html);
+                        
+                        // Ajouter aussi sur la carte en petit
+                        L.marker([poi.lat, poi.lon], { opacity: 0.6 }).addTo(map).bindPopup(poi.tags.name || type);
+                    });
+                })
+                .catch(err => {
+                    console.error("Erreur POI", err);
+                    document.getElementById('poiList').innerHTML = ''; // Cacher l'erreur silencieusement
+                });
+            }
+        });
+
         // --- 1. GESTION DU CARROUSEL ---
         const slider = document.getElementById('imageSlider');
         const counter = document.getElementById('slideCounter');

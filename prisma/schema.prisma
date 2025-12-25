@@ -97,6 +97,8 @@ model Property {
   address   String
   commune   String
   price     Int  
+  latitude  Float?  @default(5.359952)
+  longitude Float?  @default(-4.008256)
   createdAt DateTime @default(now())
   
   images    String[] 
