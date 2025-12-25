@@ -1,72 +1,122 @@
-<aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
+<aside id="sidebar" class="fixed inset-y-0 left-0 w-72 border-r border-white/5 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 transition-transform duration-300 flex flex-col custom-scrollbar backdrop-blur-xl">
     
-    <div class="mb-8 text-center md:text-left hidden md:block">
-        <a href="/">
-            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-14 object-contain">
+    <div class="mb-10 px-2 relative group">
+        <a href="<%= user.role === 'ADMIN' ? '/admin/dashboard' : '/owner/dashboard' %>" class="flex items-center gap-4">
+            <div class="relative w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg shadow-white/10 group-hover:scale-105 transition-transform duration-300">
+                <img src="/images/immo_logo.png" alt="Logo" class="w-8 h-8 object-contain">
+            </div>
+            <div>
+                <span class="block text-white font-black text-xl tracking-tighter uppercase leading-none">ImmoFacile<span class="text-[#F59E0B]">.V4</span></span>
+                <% if(user.role === 'ADMIN') { %>
+                    <span class="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-1 inline-block">Super Admin</span>
+                <% } else { %>
+                    <span class="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase mt-1 inline-block">Espace Client</span>
+                <% } %>
+            </div>
         </a>
     </div>
 
     <nav class="space-y-1 flex-1">
         
+        <% let dashboardUrl = user.role === 'ADMIN' ? '/admin/dashboard' : (user.role === 'INVESTOR' ? '/investor/dashboard' : '/owner/dashboard'); %>
+        
+        <a href="<%= dashboardUrl %>" class="flex items-center gap-4 p-3.5 bg-white/5 text-white rounded-xl font-bold border border-white/10 mb-8 transition-all hover:bg-white/10 hover:shadow-lg hover:shadow-black/20 group relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <i class="ph-fill ph-squares-four text-[#F59E0B] text-xl group-hover:scale-110 transition-transform"></i>
+            <span class="relative z-10">Vue Globale</span>
+        </a>
+
         <% if (user.role === 'ADMIN') { %>
-            <a href="/admin/dashboard" class="block p-3 bg-red-600 rounded-xl text-white font-bold hover:bg-red-700 transition flex items-center gap-3 shadow-lg mb-6">
-                <i class="ph-fill ph-shield-star text-xl"></i>
-                <span>Admin Panel</span>
+            
+            <div class="px-3 mt-6 mb-3 flex items-center gap-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gestion Trésorerie</span>
+            </div>
+            
+            <a href="#tresorerie" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-wallet text-xl group-hover:text-[#F59E0B] transition-colors"></i>
+                <span class="font-medium text-sm">Rechargements</span>
             </a>
-        <% } else if (user.role === 'INVESTOR') { %>
-            <a href="/investor/dashboard" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg mb-6">
-                <i class="ph-fill ph-chart-line-up text-xl"></i>
-                <span>Mon Portefeuille</span>
+
+            <a href="#agents" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-users-three text-xl group-hover:text-blue-400 transition-colors"></i>
+                <span class="font-medium text-sm">Agents & Sales</span>
             </a>
+
+            <a href="#artisans" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-toolbox text-xl group-hover:text-orange-400 transition-colors"></i>
+                <span class="font-medium text-sm">Artisans</span>
+            </a>
+
+            <div class="px-3 mt-6 mb-3 flex items-center gap-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Système</span>
+            </div>
+
+            <a href="#alertes" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-warning-octagon text-xl group-hover:text-red-500 transition-colors"></i>
+                <span class="font-medium text-sm">Alertes Système</span>
+            </a>
+
+            <a href="/admin/logs" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-scroll text-xl group-hover:text-purple-400 transition-colors"></i>
+                <span class="font-medium text-sm">Logs d'audit</span>
+            </a>
+
+            <button onclick="checkSystemHealth()" class="w-full flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group text-left">
+                <i class="ph-bold ph-activity text-xl text-emerald-500 group-hover:animate-pulse transition-colors"></i>
+                <span class="font-medium text-sm">Santé Système</span>
+            </button>
+
         <% } else { %>
-            <a href="/owner/dashboard" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg mb-6">
-                <i class="ph-fill ph-squares-four text-xl"></i>
-                <span>Tableau de bord</span>
-            </a>
-        <% } %>
-
-        <% if (user.role === 'INVESTOR' || user.role === 'ADMIN') { %>
-            <div class="mb-6 space-y-1">
-                <p class="text-[10px] uppercase text-slate-500 font-bold ml-3 mb-2 tracking-widest">Investissement</p>
-                
-                <a href="/investor/opportunities" class="block p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                    <i class="ph-bold ph-hand-coins text-xl text-purple-400"></i> Opportunités
-                </a>
-
-                <button onclick="exportMyData()" class="w-full text-left p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                    <i class="ph-bold ph-file-arrow-down text-xl text-green-400"></i> Exporter mes relevés
-                </button>
+            
+            <div class="px-3 mt-6 mb-3">
+                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mon Espace</span>
             </div>
-        <% } %>
 
-        <% if (user.role === 'ADMIN') { %>
-            <div class="mb-6 space-y-1">
-                <p class="text-[10px] uppercase text-slate-500 font-bold ml-3 mb-2 tracking-widest">Administration</p>
-                <a href="/admin/logs" class="block p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                    <i class="ph-bold ph-list-checks text-xl"></i> Logs d'audit
+            <% if (user.role === 'INVESTOR') { %>
+                <a href="/investor/opportunities" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                    <i class="ph-bold ph-trend-up text-xl text-green-400"></i>
+                    <span class="font-medium text-sm">Opportunités ROI</span>
                 </a>
-            </div>
+            <% } %>
+
+            <a href="#properties" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-house text-xl group-hover:text-blue-400"></i>
+                <span class="font-medium text-sm">Mes Biens</span>
+            </a>
+
+            <a href="#tenants" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <i class="ph-bold ph-users text-xl group-hover:text-purple-400"></i>
+                <span class="font-medium text-sm">Locataires</span>
+            </a>
+
+            <button onclick="exportMyData()" class="w-full flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group text-left">
+                <i class="ph-bold ph-file-arrow-down text-xl text-[#F59E0B]"></i>
+                <span class="font-medium text-sm">Mes Documents</span>
+            </button>
         <% } %>
 
-        <div class="border-t border-slate-800 pt-4 mt-auto">
-            <a href="/logout" class="block p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
-                <i class="ph-bold ph-sign-out text-xl"></i> Déconnexion
-            </a>
-        </div>
     </nav>
 
-    <div class="mt-6 bg-[#0B1120] border border-blue-900/30 p-3 rounded-xl">
-        <div class="flex items-center gap-3">
-            <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
-            <p class="text-[10px] text-slate-400 leading-tight">
-                Certifié <strong class="text-blue-400">SHA-256</strong> & Loi 2024-1115.
-            </p>
+    <div class="mt-auto pt-6 border-t border-white/5">
+        
+        <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/10 mb-4">
+            <i class="ph-fill ph-shield-check text-blue-500"></i>
+            <div class="flex flex-col">
+                <span class="text-[9px] font-black text-blue-400 uppercase tracking-wider">Sécurité V4 Active</span>
+                <span class="text-[8px] text-slate-500">Loi 2024-1115 • SHA-256</span>
+            </div>
         </div>
+        
+        <a href="/logout" class="flex items-center gap-4 p-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition-all font-bold text-sm group">
+            <i class="ph-bold ph-sign-out text-xl group-hover:-translate-x-1 transition-transform"></i>
+            <span>Déconnexion</span>
+        </a>
     </div>
 </aside>
 
 <script>
     async function exportMyData() {
+        Swal.fire({ title: 'Génération...', didOpen: () => Swal.showLoading(), background: '#0B1120', color: '#fff' });
         try {
             const res = await fetch('/investor/export');
             const data = await res.json();
@@ -75,11 +125,12 @@
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `mon_portefeuille_${new Date().toLocaleDateString()}.json`;
+                a.download = `portefeuille_v4_${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
+                Swal.close();
             }
         } catch (e) {
-            console.error("Erreur d'exportation");
+            Swal.fire({ icon: 'error', title: 'Erreur', text: 'Export impossible', background: '#0B1120', color: '#fff' });
         }
     }
 </script>

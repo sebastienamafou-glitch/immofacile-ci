@@ -1,44 +1,155 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Propriétaire | ImmoFacile CI</title>
-    
-    <meta name="author" content="WebAppCI SARL">
-    <meta name="copyright" content="WebAppCI SARL">
+    <title>Espace Propriétaire | ImmoFacile V4</title>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0B1120">
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-</head>
-<body class="bg-[#0B1120] text-white font-['Plus_Jakarta_Sans']">
 
-    <div id="globalLoader" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120]/80 backdrop-blur-sm">
-        <div class="w-16 h-16 border-4 border-slate-700 border-t-[#F59E0B] rounded-full animate-spin"></div>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; scroll-behavior: smooth; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="bg-[#0B1120] text-slate-200 custom-scrollbar">
+
+    <div id="globalLoader" class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120]/90 backdrop-blur-md transition-opacity">
+        <div class="w-16 h-16 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin"></div>
+        <p class="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest animate-pulse">Chargement V4...</p>
     </div>
 
     <div class="flex min-h-screen">
         <%- include('partials/sidebar') %>
 
-        <main class="flex-1 p-4 md:p-8 md:ml-64 w-full">
-            <%- include('partials/stats-header') %>
-            <%- include('partials/properties-grid') %>
-            <%- include('partials/section-tenants') %> 
-            <%- include('partials/section-documents') %>
-            <%- include('partials/section-artisans') %>
-            <%- include('../partials/section-investments') %>
+        <main class="flex-1 md:ml-72 p-6 lg:p-10 max-w-7xl mx-auto w-full">
+            
+            <header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+                <div>
+                    <h1 class="text-3xl font-black text-white uppercase tracking-tight">
+                        Bonjour <%= user.name.split(' ')[0] %> 👋
+                    </h1>
+                    <p class="text-slate-400 mt-2 flex items-center gap-2 text-sm">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>Compte Actif • Portefeuille Sécurisé</span>
+                    </p>
+                </div>
+
+                <div class="bg-gradient-to-r from-blue-900 to-slate-900 p-1 rounded-2xl shadow-2xl w-full md:w-auto">
+                    <div class="bg-[#0B1120] rounded-xl px-6 py-4 flex items-center gap-6 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 p-4 opacity-10">
+                            <i class="ph-fill ph-wallet text-6xl text-blue-500"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Solde Disponible</p>
+                            <p class="text-3xl font-black text-white">
+                                <%= user.walletBalance ? user.walletBalance.toLocaleString('fr-FR') : '0' %> <span class="text-base font-normal text-slate-500">FCFA</span>
+                            </p>
+                        </div>
+                        <div class="h-10 w-px bg-slate-800"></div>
+                        <button class="flex flex-col items-center gap-1 text-blue-400 hover:text-white transition group">
+                            <i class="ph-bold ph-download-simple text-xl group-hover:-translate-y-1 transition-transform"></i>
+                            <span class="text-[9px] font-bold uppercase">Retrait</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="mb-12">
+                <%- include('partials/stats-header') %>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                
+                <div class="lg:col-span-2 space-y-8">
+                    <section id="properties" class="scroll-mt-24">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                <i class="ph-fill ph-house-line text-blue-500"></i> Vos Biens
+                            </h3>
+                            <a href="/properties" class="text-xs font-bold text-slate-400 hover:text-white transition">Voir tout</a>
+                        </div>
+                        <%- include('partials/properties-grid') %>
+                    </section>
+
+                    <section id="tenants" class="scroll-mt-24">
+                        <%- include('partials/section-tenants') %>
+                    </section>
+                </div>
+
+                <div class="space-y-8">
+                    <div class="bg-white rounded-3xl p-6 border border-slate-100 shadow-xl text-slate-900">
+                        <h3 class="font-black text-lg mb-4 flex items-center gap-2">
+                            <i class="ph-duotone ph-toolbox text-orange-500"></i> Artisans Utiles
+                        </h3>
+                        <%- include('partials/section-artisans') %>
+                    </div>
+
+                    <div class="glass-card rounded-3xl p-6">
+                        <h3 class="font-bold text-white mb-4 flex items-center gap-2">
+                            <i class="ph-duotone ph-files text-purple-400"></i> Documents
+                        </h3>
+                        <%- include('partials/section-documents') %>
+                    </div>
+
+                    <div class="glass-card rounded-3xl p-6 border-emerald-500/20">
+                        <%- include('../partials/section-investments') %>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
     <%- include('partials/fab-actions') %>
 
     <%- include('partials/modals') %>
+    
+    <script>
+        // 1. POLLING NOTIFICATIONS PROPRIÉTAIRE (V4)
+        async function pollOwnerNotifications() {
+            // Simulation : Dans un cas réel, appeler /api/owner/notifications
+            // Ici on vérifie juste si le solde a bougé récemment (exemple)
+            try {
+                // Logique de polling légère
+            } catch (e) { console.log("Polling Owner silent"); }
+        }
+        setInterval(pollOwnerNotifications, 60000);
+
+        // 2. INITIALISATION
+        document.addEventListener('DOMContentLoaded', () => {
+            // Loader
+            const loader = document.getElementById('globalLoader');
+            if(loader) {
+                setTimeout(() => {
+                    loader.classList.add('opacity-0');
+                    setTimeout(() => loader.style.display = 'none', 500);
+                }, 800);
+            }
+
+            // Flash Messages V4
+            <% if (locals.success && locals.success.length > 0) { %>
+                Swal.fire({
+                    toast: true, position: 'top-end', icon: 'success',
+                    title: "<%= locals.success %>",
+                    showConfirmButton: false, timer: 3000, background: '#1e293b', color: '#fff'
+                });
+            <% } %>
+        });
+    </script>
     <%- include('partials/scripts') %>
 
 </body>
