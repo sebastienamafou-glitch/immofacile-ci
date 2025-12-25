@@ -23,7 +23,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.2",
-    "helmet": "^7.1.0",
+    "helmet": "^7.2.0",
     "json2csv": "^6.0.0-alpha.2",
     "mindee": "^4.36.0",
     "multer": "^2.0.2",

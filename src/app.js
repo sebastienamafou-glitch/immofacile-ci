@@ -90,6 +90,16 @@ const aiLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+// 🛡️ SÉCURITÉ V4 : Limiteur Global (Anti-DDoS & Bruteforce)
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300, // Limite chaque IP à 300 requêtes par fenêtre
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+// Appliquer à toutes les routes
+app.use(globalLimiter)
+
 // --- ROUTES ---
 
 // Pages Publiques & Légales

@@ -298,14 +298,14 @@
     </script>
 
     <script>
-        // Initialisation de la carte sur Abidjan
+        // Initialisation de la carte sur Abidjan (Cocody par défaut)
         const map = L.map('mapSelector').setView([5.359952, -4.008256], 13);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Marqueur initial
+        // Marqueur initial déplaçable
         let marker = L.marker([5.359952, -4.008256], {draggable: true}).addTo(map);
 
         // Fonction pour mettre à jour les inputs cachés
@@ -320,11 +320,11 @@
             updatePosition(position.lat, position.lng);
         });
 
-        // 2. Écouter le CLIC sur la carte (C'est ce qui manquait)
+        // 2. Écouter le CLIC sur la carte (C'est ce qui manquait !)
         map.on('click', function(e) {
             const { lat, lng } = e.latlng;
             marker.setLatLng([lat, lng]); // Déplace le marqueur visuellement
-            updatePosition(lat, lng);     // Met à jour les données
+            updatePosition(lat, lng);     // Met à jour les données cachées
         });
 
         // Correction d'affichage au chargement

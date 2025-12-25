@@ -251,11 +251,22 @@
     </div>
 
     <script>
-        // 1. GESTION DES URL PARAMS (Pour le Popup Locataire)
+        // LOADER
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('globalLoader');
+            if(loader) {
+                setTimeout(() => {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.style.display = 'none', 500);
+                }, 600);
+            }
+        });
+
+        // GESTION INTELLIGENTE DES NOTIFICATIONS ET POPUPS (CLIENT-SIDE)
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // A. POPUP CRÉDENTIALS LOCATAIRE (Le fameux popup manquant)
+            // 1. POPUP LOCATAIRE (Avec identifiants)
             if (urlParams.has('new_pass')) {
                 const newUser = urlParams.get('new_user');
                 const newPass = urlParams.get('new_pass');
@@ -280,25 +291,41 @@
                     background: '#fff',
                     allowOutsideClick: false
                 }).then(() => {
-                    // Nettoyer l'URL pour ne pas réafficher le popup au refresh
                     window.history.replaceState({}, document.title, window.location.pathname);
                 });
             }
 
-            // B. GESTION DES ERREURS (Loi, etc.)
+            // 2. GESTION SUCCÈS GÉNÉRAL
+            const success = urlParams.get('success');
+            if (success) {
+                let msg = 'Opération réussie';
+                if (success === 'withdrawal_initiated') msg = 'Demande de retrait envoyée.';
+                if (success === 'tenant_added') msg = 'Locataire ajouté avec succès.';
+                if (success === 'property_created') msg = 'Bien immobilier créé.';
+                
+                Swal.fire({ 
+                    toast: true, position: 'top-end', icon: 'success', 
+                    title: 'Succès', text: msg, 
+                    showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
+                });
+            }
+
+            // 3. GESTION ERREURS
             const error = urlParams.get('error');
-            if (error === 'illegal_deposit') {
-                Swal.fire({
-                    title: 'Action Bloquée 🛑',
-                    text: 'Conformément à la Loi n° 2019-576, la caution et l\'avance ne peuvent excéder 4 mois cumulés.',
-                    icon: 'error',
-                    confirmButtonColor: '#ef4444',
-                    background: '#1e293b', color: '#fff'
+            if (error) {
+                let msg = 'Une erreur est survenue.';
+                if (error === 'illegal_deposit') msg = 'La caution ne peut excéder 4 mois (Loi 2019).';
+                if (error === 'withdrawal_failed') msg = 'Solde insuffisant.';
+                
+                Swal.fire({ 
+                    toast: true, position: 'top-end', icon: 'error', 
+                    title: 'Erreur', text: msg, 
+                    showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
                 });
             }
         });
 
-        // 2. MODALE AJOUT ARTISAN (Réparée)
+        // FONCTION AJOUT ARTISAN (Réparée avec CSRF)
         async function addArtisanModal() {
             const { value: formValues } = await Swal.fire({
                 title: 'Nouvel Artisan',
@@ -326,17 +353,15 @@
             });
 
             if (formValues) {
-                // Création dynamique du formulaire pour envoi POST
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = '/owner/add-artisan'; // Assurez-vous que cette route existe dans ownerRoutes.js
-
-                // CSRF Token (Important)
-                const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>'; 
+                form.action = '/owner/add-artisan';
+                
+                // Injection CSRF Token depuis le serveur
                 const csrfInput = document.createElement('input');
                 csrfInput.type = 'hidden';
                 csrfInput.name = '_csrf';
-                csrfInput.value = csrfToken;
+                csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
                 form.appendChild(csrfInput);
 
                 for (const key in formValues) {
@@ -351,6 +376,7 @@
             }
         }
 
+        // FONCTION RETRAIT (Réparée avec CSRF)
         async function requestWithdrawal() {
             const { value: formValues } = await Swal.fire({
                 title: 'Effectuer un retrait',
@@ -360,56 +386,38 @@
                 focusConfirm: false,
                 showCancelButton: true,
                 confirmButtonColor: '#0B1120',
-                preConfirm:  () => {
+                preConfirm: () => {
                     return {
                         amount: document.getElementById('swal-amount').value,
-                paymentDetails: document.getElementById('swal-details').value
+                        paymentDetails: document.getElementById('swal-details').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                if(!formValues.amount || !formValues.paymentDetails) return;
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/owner/request-withdrawal';
+                
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = '_csrf';
+                csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+                form.appendChild(csrfInput);
+
+                for (const key in formValues) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = formValues[key];
+                    form.appendChild(input);
+                }
+                document.body.appendChild(form);
+                form.submit();
             }
         }
-    });
-    
-    if (formValues) {
-        if(!formValues.amount || !formValues.paymentDetails) return;
-        
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/owner/request-withdrawal';
-        
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_csrf';
-        csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
-        form.appendChild(csrfInput);
-
-        for (const key in formValues) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = formValues[key];
-            form.appendChild(input);
-        }
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-        // 3. Gestion des Retours Serveur (Flash Messages - Conservé pour compatibilité)
-         if (typeof success !== 'undefined' && success) { 
-            Swal.fire({ 
-                toast: true, position: 'top-end', icon: 'success', 
-                title: 'Succès', text: '<%= success === "withdrawal_initiated" ? "Demande de retrait envoyée." : "Opération réussie." %>', 
-                showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
-            });
-        } 
-        
-         if (typeof error !== 'undefined' && error) {
-            Swal.fire({ 
-                toast: true, position: 'top-end', icon: 'error', 
-                title: 'Erreur', text: '<%= error === "withdrawal_failed" ? "Solde insuffisant ou erreur." : "Une erreur est survenue." %>', 
-                showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
-            });
-       }
     </script>
-
 </body>
 </html>
