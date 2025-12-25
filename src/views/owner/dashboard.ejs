@@ -251,86 +251,70 @@
     </div>
 
     <script>
-        // 1. Loader Disparition
-        window.addEventListener('load', () => {
-            const loader = document.getElementById('globalLoader');
-            if(loader) {
-                setTimeout(() => {
-                    loader.style.opacity = '0';
-                    setTimeout(() => loader.style.display = 'none', 500);
-                }, 600);
+        // 1. GESTION DES URL PARAMS (Pour le Popup Locataire)
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // A. POPUP CRÉDENTIALS LOCATAIRE (Le fameux popup manquant)
+            if (urlParams.has('new_pass')) {
+                const newUser = urlParams.get('new_user');
+                const newPass = urlParams.get('new_pass');
+                const newPhone = urlParams.get('new_phone');
+
+                Swal.fire({
+                    title: '🎉 Locataire créé !',
+                    html: `
+                        <div class="bg-slate-100 p-4 rounded-xl text-left text-slate-800 mb-4">
+                            <p class="mb-2">Transmettez ces accès au locataire :</p>
+                            <p><strong>Nom :</strong> ${newUser}</p>
+                            <p><strong>Identifiant :</strong> ${newPhone}</p>
+                            <div class="flex items-center gap-2 mt-2 bg-white p-2 rounded border border-slate-200">
+                                <code class="text-xl font-mono font-bold text-[#F59E0B]">${newPass}</code>
+                            </div>
+                            <p class="text-xs text-red-500 mt-2">⚠️ Notez-le, il ne s'affichera qu'une seule fois.</p>
+                        </div>
+                    `,
+                    icon: 'success',
+                    confirmButtonText: 'C\'est noté',
+                    confirmButtonColor: '#0B1120',
+                    background: '#fff',
+                    allowOutsideClick: false
+                }).then(() => {
+                    // Nettoyer l'URL pour ne pas réafficher le popup au refresh
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                });
+            }
+
+            // B. GESTION DES ERREURS (Loi, etc.)
+            const error = urlParams.get('error');
+            if (error === 'illegal_deposit') {
+                Swal.fire({
+                    title: 'Action Bloquée 🛑',
+                    text: 'Conformément à la Loi n° 2019-576, la caution et l\'avance ne peuvent excéder 4 mois cumulés.',
+                    icon: 'error',
+                    confirmButtonColor: '#ef4444',
+                    background: '#1e293b', color: '#fff'
+                });
             }
         });
 
-        // 2. Demande de Retrait (CONNECTÉ AU BACKEND)
-        async function requestWithdrawal() {
-            const { value: formValues } = await Swal.fire({
-                title: 'Effectuer un retrait',
-                html:
-                    '<label class="block text-left text-xs text-slate-400 mb-1">Montant (FCFA)</label>' +
-                    '<input id="swal-amount" type="number" class="swal2-input" placeholder="Ex: 50000" style="margin-top:0">' +
-                    '<label class="block text-left text-xs text-slate-400 mt-3 mb-1">Numéro Wave/OM</label>' +
-                    '<input id="swal-details" class="swal2-input" placeholder="07 00 00 00 00" style="margin-top:0">',
-                background: '#1e293b', 
-                color: '#fff',
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Valider la demande',
-                confirmButtonColor: '#3b82f6',
-                cancelButtonColor: '#64748b',
-                preConfirm: () => {
-                    const amount = document.getElementById('swal-amount').value;
-                    const details = document.getElementById('swal-details').value;
-                    if (!amount || amount < 1000) {
-                        Swal.showValidationMessage('Le montant minimum est de 1000 FCFA');
-                        return false;
-                    }
-                    if (!details) {
-                        Swal.showValidationMessage('Veuillez entrer un numéro de paiement');
-                        return false;
-                    }
-                    return { amount: amount, paymentDetails: details };
-                }
-            });
-
-            if (formValues) {
-                // SOUMISSION REELLE AU BACKEND
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/owner/request-withdrawal'; // Route confirmée par ownerController
-
-                // Injection CSRF
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_csrf';
-                csrfInput.value = '<%= csrfToken %>';
-                form.appendChild(csrfInput);
-
-                // Données
-                for (const key in formValues) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = formValues[key];
-                    form.appendChild(input);
-                }
-                
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-
-        // 3. Modal Ajout Artisan (CONNECTÉ AU BACKEND)
+        // 2. MODALE AJOUT ARTISAN (Réparée)
         async function addArtisanModal() {
             const { value: formValues } = await Swal.fire({
                 title: 'Nouvel Artisan',
                 html:
-                    '<input id="swal-name" class="swal2-input" placeholder="Nom">' +
-                    '<input id="swal-job" class="swal2-input" placeholder="Métier (Plombier...)">' +
-                    '<input id="swal-phone" class="swal2-input" placeholder="Téléphone">',
-                background: '#fff', color: '#000',
+                    '<input id="swal-name" class="swal2-input" placeholder="Nom (ex: Koné Plomberie)">' +
+                    '<select id="swal-job" class="swal2-input">' +
+                        '<option value="Plombier">Plombier</option>' +
+                        '<option value="Électricien">Électricien</option>' +
+                        '<option value="Menuisier">Menuisier</option>' +
+                        '<option value="Peintre">Peintre</option>' +
+                        '<option value="Climatisation">Climatisation</option>' +
+                    '</select>' +
+                    '<input id="swal-phone" class="swal2-input" placeholder="Téléphone (07...)">',
                 focusConfirm: false,
                 showCancelButton: true,
+                confirmButtonText: 'Ajouter',
                 confirmButtonColor: '#0B1120',
                 preConfirm: () => {
                     return {
@@ -342,14 +326,17 @@
             });
 
             if (formValues) {
+                // Création dynamique du formulaire pour envoi POST
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = '/owner/add-artisan'; // Route confirmée par ownerController
-                
+                form.action = '/owner/add-artisan'; // Assurez-vous que cette route existe dans ownerRoutes.js
+
+                // CSRF Token (Important)
+                const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>'; 
                 const csrfInput = document.createElement('input');
                 csrfInput.type = 'hidden';
                 csrfInput.name = '_csrf';
-                csrfInput.value = '<%= csrfToken %>';
+                csrfInput.value = csrfToken;
                 form.appendChild(csrfInput);
 
                 for (const key in formValues) {
@@ -364,22 +351,64 @@
             }
         }
 
-        // 4. Gestion des Retours Serveur (Flash Messages)
-        <% if (typeof success !== 'undefined' && success) { %>
+        async function requestWithdrawal() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Effectuer un retrait',
+                html:
+                    '<input id="swal-amount" type="number" class="swal2-input" placeholder="Montant (FCFA)">' +
+                    '<input id="swal-details" class="swal2-input" placeholder="Numéro Wave/OM">',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonColor: '#0B1120',
+                preConfirm:  () => {
+                    return {
+                        amount: document.getElementById('swal-amount').value,
+                paymentDetails: document.getElementById('swal-details').value
+            }
+        }
+    });
+    
+    if (formValues) {
+        if(!formValues.amount || !formValues.paymentDetails) return;
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/owner/request-withdrawal';
+        
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_csrf';
+        csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+        form.appendChild(csrfInput);
+
+        for (const key in formValues) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = formValues[key];
+            form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+        // 3. Gestion des Retours Serveur (Flash Messages - Conservé pour compatibilité)
+         if (typeof success !== 'undefined' && success) { 
             Swal.fire({ 
                 toast: true, position: 'top-end', icon: 'success', 
                 title: 'Succès', text: '<%= success === "withdrawal_initiated" ? "Demande de retrait envoyée." : "Opération réussie." %>', 
                 showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
             });
-        <% } %>
+        } 
         
-        <% if (typeof error !== 'undefined' && error) { %>
+         if (typeof error !== 'undefined' && error) {
             Swal.fire({ 
                 toast: true, position: 'top-end', icon: 'error', 
                 title: 'Erreur', text: '<%= error === "withdrawal_failed" ? "Solde insuffisant ou erreur." : "Une erreur est survenue." %>', 
                 showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
             });
-        <% } %>
+       }
     </script>
 
 </body>

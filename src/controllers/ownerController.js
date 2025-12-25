@@ -23,44 +23,74 @@ exports.getAddTenant = async (req, res) => {
 
 exports.postAddTenant = async (req, res) => {
     const { propertyId, tenantName, tenantPhone, monthlyRent, depositMonths, startDate } = req.body;
+    
+    // --- 🛡️ BLINDAGE LOI 2019-576 ---
+    // La loi limite la caution à 2 mois et l'avance à 2 mois (Total 4 mois max)
+    // Ici on vérifie le champ "depositMonths"
+    if (parseInt(depositMonths) > 4) {
+        console.warn(`Tentative de caution illégale : ${depositMonths} mois`);
+        return res.redirect('/owner/dashboard?error=illegal_deposit');
+    }
+
     try {
         let tempPassword = null;
-        let tenantNameForRedirect = '';
+        let isNewUser = false;
+
         await prisma.$transaction(async (tx) => {
             let tenant = await tx.user.findUnique({ where: { phone: tenantPhone } });
+            
+            // Création automatique si le locataire n'existe pas
             if (!tenant) {
-                tempPassword = generateRandomPassword(10); 
+                isNewUser = true;
+                tempPassword = generateRandomPassword(8); // Mot de passe court et lisible (ex: 8 char)
                 const hashedPassword = await bcrypt.hash(tempPassword, 10);
+                
                 tenant = await tx.user.create({
                     data: {
-                        name: tenantName, phone: tenantPhone, email: `${tenantPhone}@immofacile.ci`, 
-                        password: hashedPassword, role: 'TENANT', walletBalance: 0, escrowBalance: 0
+                        name: tenantName, 
+                        phone: tenantPhone, 
+                        email: `${tenantPhone}@immofacile.ci`, // Email placeholder
+                        password: hashedPassword, 
+                        role: 'TENANT', 
+                        walletBalance: 0, 
+                        escrowBalance: 0
                     }
                 });
             }
-            tenantNameForRedirect = tenant.name;
+
             const rent = parseFloat(monthlyRent);
             const deposit = rent * parseFloat(depositMonths);
+
             await tx.lease.create({
                 data: {
-                    monthlyRent: rent, depositAmount: deposit, startDate: new Date(startDate),
-                    tenantId: tenant.id, propertyId: propertyId, isActive: true
+                    monthlyRent: rent, 
+                    depositAmount: deposit, 
+                    startDate: new Date(startDate),
+                    tenantId: tenant.id, 
+                    propertyId: propertyId, 
+                    isActive: true
                 }
             });
+
+            // Mise à jour cagnotte propriétaire (Virtuelle/Escrow)
             await tx.user.update({
                 where: { id: req.session.user.id },
                 data: { escrowBalance: { increment: deposit } }
             });
         });
         
-        // Log pour V3
-        await tracker.trackAction("TENANT_ADDED", "OWNER", req.session.user.id, { propertyId, tenantPhone });
+        await tracker.trackAction("TENANT_ADDED", "OWNER", req.session.user.id, { propertyId });
 
+        // --- CONSTRUCTION URL REDIRECT ---
         let redirectUrl = '/owner/dashboard?success=tenant_added';
-        if (tempPassword) {
-            redirectUrl += `&new_pass=${tempPassword}&new_user=${encodeURIComponent(tenantNameForRedirect)}&new_phone=${tenantPhone}`; 
+        
+        // Si c'est un nouveau user, on passe les credentials en URL pour le Popup
+        if (isNewUser && tempPassword) {
+            redirectUrl += `&new_user=${encodeURIComponent(tenantName)}&new_pass=${tempPassword}&new_phone=${tenantPhone}`;
         }
+        
         res.redirect(redirectUrl);
+
     } catch (error) {
         console.error("Erreur ajout locataire:", error);
         res.redirect('/owner/dashboard?error=tenant_creation_failed');
