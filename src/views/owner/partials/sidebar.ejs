@@ -8,80 +8,78 @@
 
     <nav class="space-y-1 flex-1">
         
-        <a href="/owner/dashboard" onclick="closeMenuMobile()" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg shadow-blue-900/20 mb-6">
-            <i class="ph-fill ph-squares-four text-xl"></i>
-            <span>Tableau de bord</span>
-        </a>
-
-        <div class="mb-6">
-            <a href="/investor/dashboard" class="block p-3 bg-gradient-to-r from-purple-900/40 to-slate-900 border border-purple-500/30 text-purple-200 hover:text-white hover:border-purple-500 rounded-xl transition flex items-center gap-3 group relative overflow-hidden">
-                <div class="absolute inset-0 bg-purple-500/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-500"></div>
-                <i class="ph-duotone ph-rocket-launch text-xl text-purple-400 group-hover:scale-110 transition relative z-10"></i>
-                <div class="relative z-10">
-                    <span class="block font-bold text-sm">Mode Investisseur</span>
-                    <span class="text-[10px] opacity-60 block leading-none mt-0.5">Suivi ROI & Chantiers</span>
-                </div>
+        <% if (user.role === 'ADMIN') { %>
+            <a href="/admin/dashboard" class="block p-3 bg-red-600 rounded-xl text-white font-bold hover:bg-red-700 transition flex items-center gap-3 shadow-lg mb-6">
+                <i class="ph-fill ph-shield-star text-xl"></i>
+                <span>Admin Panel</span>
             </a>
-        </div>
-
-        <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Ma Gestion</p>
-        
-        <a href="/owner/dashboard#biens" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-            <i class="ph-bold ph-house-line text-xl"></i> Mes Biens
-        </a>
-        <a href="/owner/dashboard#locataires" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-            <i class="ph-bold ph-users-three text-xl"></i> Locataires
-        </a>
-        <a href="/owner/tax-summary" class="block p-3 text-slate-400 hover:text-[#F59E0B] hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3 group">
-            <i class="ph-bold ph-receipt text-xl group-hover:text-[#F59E0B] transition"></i> 
-            <span>Bilan Fiscal</span>
-        </a>
-
-        <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Outils & Services</p>
-
-        <a href="/owner/dashboard#documents" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-            <i class="ph-bold ph-folder-open text-xl"></i> Bibliothèque
-        </a>
-        <a href="/owner/dashboard#artisans" onclick="closeMenuMobile()" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-            <i class="ph-bold ph-hammer text-xl"></i> Artisans Certifiés
-        </a>
-        
-        <div class="mt-4 border-t border-slate-800 pt-4 space-y-1">
-            <button onclick="enableNotifications()" class="w-full text-left block p-3 text-slate-400 hover:text-blue-400 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                <i class="ph-bold ph-bell text-xl"></i> Notifications
-            </button>
-
-            <a href="/about-us" target="_blank" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                <i class="ph-bold ph-cpu text-xl"></i> Notre Technologie
+        <% } else if (user.role === 'INVESTOR') { %>
+            <a href="/investor/dashboard" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg mb-6">
+                <i class="ph-fill ph-chart-line-up text-xl"></i>
+                <span>Mon Portefeuille</span>
             </a>
-
-            <a href="/owner/help" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
-                <i class="ph-bold ph-life-buoy text-xl"></i> Centre d'Aide
+        <% } else { %>
+            <a href="/owner/dashboard" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg mb-6">
+                <i class="ph-fill ph-squares-four text-xl"></i>
+                <span>Tableau de bord</span>
             </a>
-        </div>
+        <% } %>
 
-        <a href="/logout" class="block p-3 text-red-400 hover:text-red-500 mt-4 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3 group">
-            <i class="ph-bold ph-sign-out text-xl group-hover:translate-x-1 transition"></i> Déconnexion
-        </a>
+        <% if (user.role === 'INVESTOR' || user.role === 'ADMIN') { %>
+            <div class="mb-6 space-y-1">
+                <p class="text-[10px] uppercase text-slate-500 font-bold ml-3 mb-2 tracking-widest">Investissement</p>
+                
+                <a href="/investor/opportunities" class="block p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                    <i class="ph-bold ph-hand-coins text-xl text-purple-400"></i> Opportunités
+                </a>
 
-        <div class="mt-6 bg-[#0B1120] border border-blue-900/30 p-3 rounded-xl relative overflow-hidden group">
-            <div class="flex items-center gap-3">
-                <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
-                <div>
-                    <p class="text-[10px] text-slate-400 leading-tight">
-                        Conforme <strong class="text-blue-400">Loi 2024-1115</strong> (Baux & Cautions).
-                    </p>
-                </div>
+                <button onclick="exportMyData()" class="w-full text-left p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                    <i class="ph-bold ph-file-arrow-down text-xl text-green-400"></i> Exporter mes relevés
+                </button>
             </div>
+        <% } %>
+
+        <% if (user.role === 'ADMIN') { %>
+            <div class="mb-6 space-y-1">
+                <p class="text-[10px] uppercase text-slate-500 font-bold ml-3 mb-2 tracking-widest">Administration</p>
+                <a href="/admin/logs" class="block p-3 text-slate-300 hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                    <i class="ph-bold ph-list-checks text-xl"></i> Logs d'audit
+                </a>
+            </div>
+        <% } %>
+
+        <div class="border-t border-slate-800 pt-4 mt-auto">
+            <a href="/logout" class="block p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-sign-out text-xl"></i> Déconnexion
+            </a>
         </div>
     </nav>
 
-    <div class="mt-4 pt-4 border-t border-slate-800">
-        <div class="flex items-center gap-2 opacity-60 hover:opacity-100 transition duration-300">
-            <img src="/images/logo_webappci.png" alt="Logo" class="h-6 w-auto object-contain grayscale hover:grayscale-0">
-            <p class="text-[10px] font-bold text-slate-500">v3.0.0</p>
+    <div class="mt-6 bg-[#0B1120] border border-blue-900/30 p-3 rounded-xl">
+        <div class="flex items-center gap-3">
+            <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
+            <p class="text-[10px] text-slate-400 leading-tight">
+                Certifié <strong class="text-blue-400">SHA-256</strong> & Loi 2024-1115.
+            </p>
         </div>
     </div>
 </aside>
 
-<div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+<script>
+    async function exportMyData() {
+        try {
+            const res = await fetch('/investor/export');
+            const data = await res.json();
+            if (data.success) {
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `mon_portefeuille_${new Date().toLocaleDateString()}.json`;
+                a.click();
+            }
+        } catch (e) {
+            console.error("Erreur d'exportation");
+        }
+    }
+</script>

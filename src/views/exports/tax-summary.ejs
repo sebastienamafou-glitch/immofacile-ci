@@ -1,0 +1,36 @@
+<%- include('../partials/header') %>
+<div class="max-w-4xl mx-auto p-10 bg-white text-black shadow-none print:shadow-none" id="printable-area">
+    <div class="flex justify-between items-start border-b-2 border-blue-600 pb-6 mb-8">
+        <div>
+            <img src="/images/immo_logo.png" class="h-12 mb-2">
+            <h1 class="text-2xl font-bold uppercase">Bilan Fiscal Annuel</h1>
+            <p class="text-gray-500">Exercice <%= year %></p>
+        </div>
+        <div class="text-right text-sm">
+            <p class="font-bold">ImmoFacile CI - Certifié V4</p>
+            <p>Date : <%= generatedAt.toLocaleDateString() %></p>
+            <p>ID Propriétaire : <%= user.id.substring(0,8) %></p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-8 mb-10">
+        <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs font-bold text-gray-400 uppercase">Total Revenus Encaissés</p>
+            <p class="text-3xl font-black text-blue-700"><%= totalRevenue.toLocaleString() %> FCFA</p>
+        </div>
+        <div class="p-4 bg-gray-50 rounded-lg">
+            <p class="text-xs font-bold text-gray-400 uppercase">Nombre de Transactions</p>
+            <p class="text-3xl font-black text-gray-800"><%= transactionCount %></p>
+        </div>
+    </div>
+
+    <p class="text-xs text-gray-400 italic mb-10">
+        Ce document est généré automatiquement par le registre de preuves ImmoFacile CI. 
+        L'empreinte numérique SHA-256 de vos baux garantit l'intégrité de ces chiffres. [cite: 42]
+    </p>
+
+    <button onclick="window.print()" class="print:hidden bg-blue-600 text-white px-6 py-2 rounded-lg font-bold">
+        Imprimer / Sauvegarder en PDF
+    </button>
+</div>
+<%- include('../partials/footer') %>

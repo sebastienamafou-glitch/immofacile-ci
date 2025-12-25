@@ -1,0 +1,78 @@
+<aside id="sidebar" class="fixed inset-y-0 left-0 w-64 border-r border-slate-800 p-6 bg-[#0B1120] overflow-y-auto z-50 md:z-30 md:translate-x-0 closed shadow-2xl md:shadow-none flex flex-col transition-transform duration-300">
+    
+    <div class="mb-8 text-center md:text-left hidden md:block">
+        <a href="/">
+            <img src="/images/immo_logo.png" alt="ImmoFacile CI" class="h-14 object-contain">
+        </a>
+    </div>
+
+    <nav class="space-y-1 flex-1">
+        <% let dashboardUrl = user.role === 'ADMIN' ? '/admin/dashboard' : (user.role === 'INVESTOR' ? '/investor/dashboard' : '/owner/dashboard'); %>
+        <a href="<%= dashboardUrl %>" class="block p-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition flex items-center gap-3 shadow-lg mb-6">
+            <i class="ph-fill ph-squares-four text-xl"></i>
+            <span>Tableau de bord</span>
+        </a>
+
+        <% if (user.role === 'INVESTOR' || user.role === 'ADMIN') { %>
+            <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Investissement</p>
+            <a href="/investor/opportunities" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3 group">
+                <i class="ph-duotone ph-rocket-launch text-xl text-purple-400 group-hover:scale-110 transition"></i>
+                <span>Opportunités ROI</span>
+            </a>
+            <button onclick="exportInvestments()" class="w-full text-left p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-file-arrow-down text-xl text-green-400"></i> Exporter Relevés
+            </button>
+        <% } %>
+
+        <% if (user.role === 'ADMIN') { %>
+            <p class="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-6 mb-2">Système & Audit</p>
+            <a href="/admin/logs" class="block p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-scroll text-xl text-purple-400"></i> Logs & Exports
+            </a>
+            <button onclick="checkSystemHealth()" class="w-full text-left p-3 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition flex items-center gap-3 group">
+                <i class="ph-bold ph-activity text-xl text-emerald-400 group-hover:animate-pulse"></i>
+                <span>Santé Système</span>
+            </button>
+        <% } %>
+
+        <div class="mt-auto pt-6 border-t border-slate-800">
+            <a href="/logout" class="block p-3 text-red-400 hover:bg-red-500/10 rounded-xl transition flex items-center gap-3">
+                <i class="ph-bold ph-sign-out text-xl"></i> Déconnexion
+            </a>
+        </div>
+    </nav>
+
+    <div class="mt-6 bg-[#0B1120] border border-blue-900/30 p-3 rounded-xl">
+        <div class="flex items-center gap-3">
+            <i class="ph-fill ph-shield-check text-2xl text-blue-500"></i>
+            <p class="text-[10px] text-slate-400 leading-tight">
+                Certifié <strong class="text-blue-400">SHA-256</strong> & Loi 2024-1115[cite: 42, 43].
+            </p>
+        </div>
+    </div>
+</aside>
+
+<script>
+async function checkSystemHealth() {
+    try {
+        const res = await fetch('/api/system/status');
+        const data = await res.json();
+        if (data.success) {
+            Swal.fire({
+                title: 'État Global (Dispatcher)',
+                html: `<div class="text-left text-sm">
+                    <p>👥 Utilisateurs : <b>${data.stats.users}</b></p>
+                    <p>🏠 Biens : <b>${data.stats.properties}</b></p>
+                    <p class="text-xs mt-2 text-slate-500">Région : iad1 (Vercel Production)</p>
+                </div>`,
+                icon: 'info',
+                background: '#1e293b', color: '#fff'
+            });
+        }
+    } catch (e) { Swal.fire('Erreur', 'Dispatcher inaccessible', 'error'); }
+}
+
+async function exportInvestments() {
+    window.location.href = '/investor/export';
+}
+</script>

@@ -9,7 +9,7 @@ const helmet = require('helmet');
 const pg = require('pg');
 const pgSession = require('connect-pg-simple')(session);
 const rateLimit = require('express-rate-limit'); // 🟢 1. IMPORT DU LIMITEUR
-const signatureRoutes = require('./routes/signatureRoutes');
+
 
 // --- IMPORTS DES ROUTES ---
 const authRoutes = require('./routes/authRoutes');
@@ -23,7 +23,10 @@ const artisanRoutes = require('./routes/artisanRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const publicRoutes = require('./routes/publicRoutes');
-const cronRoutes = require('./routes/cronRoutes'); // Route pour le Cron Vercel
+const cronRoutes = require('./routes/cronRoutes'); 
+const systemRoutes = require('./routes/systemRoutes'); // Route pour le Cron Vercel
+const signatureRoutes = require('./routes/signatureRoutes');
+const exportController = require('./controllers/exportController');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -160,6 +163,8 @@ app.get('/terms', (req, res) => {
     res.render('terms'); 
 });
 
+app.get('/owner/tax-summary', auth.isOwner, exportController.generateTaxSummary);
+
 // 🟢 3. APPLICATION DU BOUCLIER (Protège les routes /api/ai)
 app.use('/api/ai', aiLimiter);
 
@@ -173,6 +178,7 @@ app.use('/investor', investorRoutes);
 app.use('/artisan', artisanRoutes);
 app.use('/chat', chatRoutes);
 app.use('/api/signature', signatureRoutes);
+app.use('/api/system', systemRoutes); 
 
 // Routes API & Systèmes
 app.use('/api', apiRoutes);
