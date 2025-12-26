@@ -2,9 +2,11 @@
 const prisma = require('../prisma/client');
 const axios = require('axios');
 const tracker = require('../utils/tracker');
+// 🟢 IMPORT CRITIQUE : Service pour la vérification officielle
+const cinetpayService = require('../services/cinetpay'); 
 
-// Helper pour appeler l'API CinetPay
-const callCinetPay = async (payload) => {
+// --- HELPER LOCAL (Pour initialisation API flexible) ---
+const callCinetPayInit = async (payload) => {
     try {
         const response = await axios.post('https://api-checkout.cinetpay.com/v2/payment', payload);
         return response.data;
@@ -14,17 +16,19 @@ const callCinetPay = async (payload) => {
     }
 };
 
-// 1. Logique d'encaissement manuel (Loyer) - Côté Propriétaire
+// --- 1. ENCAISSEMENT MANUEL (Loyer Cash/Virement) ---
+// Utilisé par le propriétaire pour déclarer un paiement reçu hors plateforme
 exports.postPayRent = async (req, res) => {
     const { leaseId, amount, month } = req.body;
     const rentAmount = parseInt(amount);
     const userId = req.session.user.id;
-    const COMMISSION_RATE = 0.05; 
+    const COMMISSION_RATE = 0.05; // 5%
 
     try {
         const owner = await prisma.user.findUnique({ where: { id: userId } });
         const commission = Math.round(rentAmount * COMMISSION_RATE);
 
+        // Vérification Solde Wallet
         if (owner.walletBalance < commission) {
             return res.status(402).render('errors/insufficient-funds', { 
                 commission, 
@@ -32,6 +36,7 @@ exports.postPayRent = async (req, res) => {
             });
         }
 
+        // Transaction Atomique : Débit Commission + Enregistrement Paiement
         await prisma.$transaction([
             prisma.user.update({
                 where: { id: userId },
@@ -40,8 +45,10 @@ exports.postPayRent = async (req, res) => {
             prisma.creditTransaction.create({
                 data: {
                     amount: -commission,
-                    description: `Commission Loyer ${month}`,
-                    userId: userId
+                    description: `Commission Loyer ${month} (Manuel)`,
+                    userId: userId,
+                    status: 'COMPLETED',
+                    transactionId: `MANUAL_${Date.now()}`
                 }
             }),
             prisma.payment.create({
@@ -49,15 +56,14 @@ exports.postPayRent = async (req, res) => {
                     amount: rentAmount, 
                     month: month, 
                     leaseId: leaseId,
-                    type: "LOYER"
+                    type: "LOYER",
+                    status: 'COMPLETED',
+                    paidAt: new Date()
                 }
             })
         ]);
 
-        await tracker.trackAction("RENT_COLLECTED", "OWNER", userId, { 
-            amount: rentAmount, 
-            leaseId 
-        });
+        await tracker.trackAction("RENT_COLLECTED", "OWNER", userId, { amount: rentAmount, leaseId });
 
         res.redirect('/owner/dashboard?success=payment_recorded');
 
@@ -67,32 +73,40 @@ exports.postPayRent = async (req, res) => {
     }
 };
 
-// 2. Initialisation CINETPAY (Rechargement Compte Propriétaire)
+// --- 2. RECHARGEMENT COMPTE (Propriétaire) ---
+// Initialise le paiement pour créditer le Wallet
 exports.initCinetPay = async (req, res) => {
     const amount = parseInt(req.body.amount);
+    // Génération ID unique pour CinetPay
     const transactionId = `TRANS_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const SITE_URL = process.env.APP_URL || 'http://localhost:3000'; 
 
-    const data = {
-        apikey: process.env.CINETPAY_API_KEY,
-        site_id: process.env.CINETPAY_SITE_ID,
-        transaction_id: transactionId,
-        amount: amount,
-        currency: 'XOF',
-        description: `Rechargement ImmoFacile - ${req.session.user.name}`,
-        customer_id: req.session.user.id,
-        customer_name: req.session.user.name,
-        notify_url: `${SITE_URL}/api/payment/notify`, // Webhook
-        return_url: `${SITE_URL}/owner/dashboard?success=recharge_pending`,
-        channels: 'ALL',
-        metadata: JSON.stringify({ 
-            type: 'WALLET_RECHARGE', 
-            userId: req.session.user.id 
-        })
-    };
-
     try {
-        const result = await callCinetPay(data);
+        // NOTE: On ne crée pas de transaction PENDING en BDD ici.
+        // On fait confiance aux métadonnées que CinetPay nous renverra.
+        
+        const data = {
+            apikey: process.env.CINETPAY_API_KEY,
+            site_id: process.env.CINETPAY_SITE_ID,
+            transaction_id: transactionId,
+            amount: amount,
+            currency: 'XOF',
+            description: `Rechargement Wallet ImmoFacile`,
+            customer_id: req.session.user.id,
+            customer_name: req.session.user.name,
+            // URLs de retour
+            notify_url: `${SITE_URL}/api/payment/notify`,
+            return_url: `${SITE_URL}/owner/dashboard?success=recharge_pending`,
+            channels: 'ALL',
+            // METADATA : C'est ici qu'on stocke l'info cruciale pour le Webhook
+            metadata: JSON.stringify({ 
+                type: 'WALLET_RECHARGE', 
+                userId: req.session.user.id 
+            })
+        };
+
+        const result = await callCinetPayInit(data);
+        
         if (result.code === '201') {
             res.redirect(result.data.payment_url);
         } else {
@@ -104,37 +118,37 @@ exports.initCinetPay = async (req, res) => {
     }
 };
 
-// 3. Paiement des Frais de Dossier (Locataire)
+// --- 3. PAIEMENT FRAIS DE DOSSIER (Locataire) ---
 exports.payApplicationFees = async (req, res) => {
     const { leaseId } = req.body;
-    const FEES_AMOUNT = 20000; 
+    const FEES_AMOUNT = 20000; // Montant Fixe
     const user = req.session.user;
     const SITE_URL = process.env.APP_URL || 'http://localhost:3000';
-
     const transactionId = `FEES_${leaseId}_${Date.now()}`;
 
-    const data = {
-        apikey: process.env.CINETPAY_API_KEY,
-        site_id: process.env.CINETPAY_SITE_ID,
-        transaction_id: transactionId,
-        amount: FEES_AMOUNT,
-        currency: 'XOF',
-        description: `Frais de dossier Bail #${leaseId.slice(-6)}`,
-        customer_name: user.name,
-        customer_email: user.email,
-        customer_phone_number: user.phone,
-        notify_url: `${SITE_URL}/api/payment/notify`,
-        return_url: `${SITE_URL}/tenant/dashboard?success=fees_paid`,
-        channels: 'ALL',
-        metadata: JSON.stringify({ 
-            type: 'FRAIS_DOSSIER', 
-            leaseId: leaseId,
-            userId: user.id 
-        })
-    };
-
     try {
-        const result = await callCinetPay(data);
+        const data = {
+            apikey: process.env.CINETPAY_API_KEY,
+            site_id: process.env.CINETPAY_SITE_ID,
+            transaction_id: transactionId,
+            amount: FEES_AMOUNT,
+            currency: 'XOF',
+            description: `Frais de dossier Bail #${leaseId.split('-')[0]}`,
+            customer_name: user.name,
+            customer_email: user.email,
+            customer_phone_number: user.phone,
+            notify_url: `${SITE_URL}/api/payment/notify`,
+            return_url: `${SITE_URL}/tenant/dashboard?success=fees_paid`,
+            channels: 'ALL',
+            metadata: JSON.stringify({ 
+                type: 'FRAIS_DOSSIER', 
+                leaseId: leaseId,
+                userId: user.id 
+            })
+        };
+
+        const result = await callCinetPayInit(data);
+
         if (result.code === '201') {
             res.redirect(result.data.payment_url);
         } else {
@@ -146,103 +160,184 @@ exports.payApplicationFees = async (req, res) => {
     }
 };
 
-// 4. Webhook CINETPAY (SÉCURISÉ & IDEMPOTENT) 🛡️
+// --- 4. WEBHOOK (Cerveau Financier) 🧠 ---
 exports.webhookCinetPay = async (req, res) => {
     const { cpm_trans_id } = req.body;
-
-    // Protection basique
+    
+    // Sécurité de base
     if (!cpm_trans_id) return res.sendStatus(400);
 
     try {
-        // A. Vérification officielle
-        const verification = await axios.post('https://api-checkout.cinetpay.com/v2/payment/check', {
-            apikey: process.env.CINETPAY_API_KEY,
-            site_id: process.env.CINETPAY_SITE_ID,
-            transaction_id: cpm_trans_id
+        // 1. VÉRIFICATION OFFICIELLE
+        // On interroge CinetPay pour obtenir les données fiables (montant, statut, métadonnées)
+        const response = await cinetpayService.verifyPayment(cpm_trans_id);
+        
+        if (response.code !== '00') {
+            console.warn(`[Webhook] Echec/Attente: ${cpm_trans_id} - ${response.message}`);
+            return res.sendStatus(200); // On acquitte pour éviter le spam
+        }
+
+        const data = response.data;
+        // Extraction sécurisée des métadonnées injectées lors de l'init
+        const metadata = data.metadata ? JSON.parse(data.metadata) : {};
+        const amount = parseInt(data.amount);
+
+        // --- IDEMPOTENCE ---
+        // Vérifier si cette transaction ID a déjà été traitée en BDD
+        const existingTx = await prisma.creditTransaction.findFirst({
+            where: { transactionId: cpm_trans_id }
+        });
+        
+        // Si elle existe déjà, on vérifie si c'est pour des Frais de Dossier (table Payment)
+        const existingPayment = await prisma.payment.findFirst({
+            where: { transactionId: cpm_trans_id }
         });
 
-        const { code, data } = verification.data;
+        if (existingTx || existingPayment) {
+            console.log(`♻️ Transaction déjà traitée : ${cpm_trans_id}`);
+            return res.sendStatus(200);
+        }
 
-        // B. Traitement uniquement si succès ('00')
-        if (code === '00') { 
-            const amountPaid = parseInt(data.amount);
-            const metadata = JSON.parse(data.metadata); 
-
-            console.log(`🔔 Webhook reçu : Type=${metadata.type}, Ref=${cpm_trans_id}`);
-
-            // --- 🛡️ SÉCURITÉ IDEMPOTENCE (La Correction V3) ---
+        // --- SCÉNARIO A : RECHARGEMENT WALLET ---
+        if (metadata.type === 'WALLET_RECHARGE') {
+            const userId = metadata.userId;
             
-            // 1. Vérifier si cette transaction a DÉJÀ été traitée dans l'historique
-            // On cherche une transaction qui mentionne cette référence exacte
-            const existingTransaction = await prisma.creditTransaction.findFirst({
-                where: { 
-                    description: { contains: cpm_trans_id } 
+            await prisma.$transaction([
+                // Crédit du Wallet
+                prisma.user.update({
+                    where: { id: userId },
+                    data: { walletBalance: { increment: amount } }
+                }),
+                // Historisation
+                prisma.creditTransaction.create({
+                    data: {
+                        amount: amount,
+                        description: `Rechargement Mobile Money`,
+                        userId: userId,
+                        status: 'COMPLETED',
+                        transactionId: cpm_trans_id, // Clé d'idempotence future
+                        confirmedAt: new Date()
+                    }
+                })
+            ]);
+
+            await tracker.trackAction("WALLET_RECHARGED", "OWNER", userId, { amount, tx: cpm_trans_id });
+        }
+
+        // --- SCÉNARIO B : FRAIS DE DOSSIER (LOCATAIRE) ---
+        else if (metadata.type === 'FRAIS_DOSSIER') {
+            const leaseId = metadata.leaseId;
+
+            // Activation du Bail + Enregistrement Paiement
+            await prisma.$transaction([
+                prisma.lease.update({
+                    where: { id: leaseId },
+                    data: { status: 'ACTIVE', isActive: true }
+                }),
+                prisma.payment.create({
+                    data: {
+                        amount: amount,
+                        month: 'FRAIS_DOSSIER',
+                        type: 'FEES', // Type spécial pour les revenus plateforme
+                        leaseId: leaseId,
+                        status: 'COMPLETED',
+                        transactionId: cpm_trans_id,
+                        paidAt: new Date()
+                    }
+                })
+                // Note: Ici, 100% va à ImmoFacile, pas de crédit propriétaire
+            ]);
+            
+            await tracker.trackAction("FEES_PAID", "TENANT", metadata.userId, { leaseId, amount });
+        }
+
+        // --- SCÉNARIO C : PAIEMENT LOYER (SPLIT AUTOMATIQUE - PRÉPARATION V5) ---
+        else if (metadata.type === 'LOYER_DIRECT') {
+            const leaseId = metadata.leaseId;
+
+            // 1. On récupère les infos pour savoir qui payer
+            const lease = await prisma.lease.findUnique({
+                where: { id: leaseId },
+                include: {
+                    property: {
+                        select: { ownerId: true, managedById: true } // On vérifie s'il y a un agent
+                    }
                 }
             });
 
-            if (existingTransaction) {
-                console.log(`🛑 DOUBLON DÉTECTÉ : Transaction ${cpm_trans_id} déjà traitée. On ignore.`);
-                return res.sendStatus(200); // On dit OK à CinetPay pour qu'il arrête d'insister
+            if (!lease) {
+                console.error(`❌ Webhook Split: Bail introuvable ${leaseId}`);
+                return res.sendStatus(200);
             }
-            // ----------------------------------------------------
 
-            // SCÉNARIO 1 : Rechargement Wallet
-            if (metadata.type === 'WALLET_RECHARGE') {
-                await prisma.$transaction([
+            // 2. Calculs Mathématiques (Frais Plateforme & Agent)
+            const platformShare = Math.floor(amount * 0.05); // 5% pour ImmoFacile
+            let agentShare = 0;
+            let ownerShare = 0;
+
+            const agentId = lease.property.managedById;
+
+            if (agentId) {
+                // S'il y a un agent : 5% Agent, le reste au Propriétaire (90%)
+                agentShare = Math.floor(amount * 0.05);
+                ownerShare = amount - platformShare - agentShare;
+            } else {
+                // Pas d'agent : Le propriétaire récupère 95%
+                ownerShare = amount - platformShare;
+            }
+
+            // 3. Transactions Atomiques (Tout ou rien)
+            const transactions = [
+                // A. Créditer le Propriétaire
+                prisma.user.update({
+                    where: { id: lease.property.ownerId },
+                    data: { walletBalance: { increment: ownerShare } }
+                }),
+                
+                // B. Enregistrer le paiement du Loyer
+                prisma.payment.create({
+                    data: {
+                        amount: amount,
+                        month: new Date().toLocaleString('fr-FR', { month: 'long' }), // Mois courant
+                        type: 'LOYER',
+                        leaseId: leaseId,
+                        status: 'COMPLETED',
+                        transactionId: cpm_trans_id,
+                        paidAt: new Date()
+                    }
+                })
+            ];
+
+            // C. Créditer l'Agent (si applicable)
+            if (agentId && agentShare > 0) {
+                transactions.push(
                     prisma.user.update({
-                        where: { id: metadata.userId },
-                        data: { walletBalance: { increment: amountPaid } }
-                    }),
-                    prisma.creditTransaction.create({
-                        data: {
-                            amount: amountPaid,
-                            // IMPORTANT: On inclut la REF pour la vérification future d'idempotence
-                            description: `Rechargement Mobile Money (Ref: ${cpm_trans_id})`,
-                            userId: metadata.userId
-                        }
+                        where: { id: agentId },
+                        data: { walletBalance: { increment: agentShare } }
                     })
-                ]);
-                
-                await tracker.trackAction("WALLET_RECHARGED", "OWNER", metadata.userId, { 
-                    amount: amountPaid, 
-                    ref: cpm_trans_id 
-                });
+                );
             }
 
-            // SCÉNARIO 2 : Frais de Dossier
-            else if (metadata.type === 'FRAIS_DOSSIER') {
-                
-                // Double sécurité pour les baux : Vérifier si le bail est déjà actif
-                const leaseCheck = await prisma.lease.findUnique({ where: { id: metadata.leaseId } });
-                if (leaseCheck && leaseCheck.isActive) {
-                    console.log(`🛑 BAIL DÉJÀ ACTIF : Paiement ignoré pour ${metadata.leaseId}`);
-                    return res.sendStatus(200);
-                }
+            // Exécution sécurisée
+            await prisma.$transaction(transactions);
 
-                await prisma.$transaction([
-                    prisma.payment.create({
-                        data: {
-                            amount: amountPaid,
-                            type: 'FRAIS_DOSSIER', 
-                            leaseId: metadata.leaseId,
-                            month: 'FRAIS_ENTREE'
-                        }
-                    }),
-                    prisma.lease.update({
-                        where: { id: metadata.leaseId },
-                        data: { status: 'ACTIVE', isActive: true }
-                    })
-                ]);
-                
-                await tracker.trackAction("FEES_PAID", "TENANT", metadata.userId, { 
-                    leaseId: metadata.leaseId 
-                });
-            }
+            // 4. Traçabilité (Mouchard)
+            await tracker.trackAction("RENT_AUTO_SPLIT", "SYSTEM", metadata.userId, { 
+                total: amount,
+                ownerReceived: ownerShare,
+                agentReceived: agentShare,
+                platformFees: platformShare
+            });
         }
+
+        res.sendStatus(200);
+
     } catch (error) {
-        console.error("❌ Webhook Error:", error.message);
-    }
-    
-    // Toujours répondre 200 à la fin
+        console.error("❌ Erreur Critique Webhook:", error);
+        res.sendStatus(500); // Pour que CinetPay réessaie
+        
+        // Toujours répondre 200 à la fin
     res.sendStatus(200);
 };
+    }
+
