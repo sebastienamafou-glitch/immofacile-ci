@@ -3,23 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajouter un Bien | [cite_start]ImmoFacile CI [cite: 166]</title>
+    <title>Ajouter un Bien | ImmoFacile CI</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        /* Animation pour l'apparition des images */
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .thumb-animate { animation: fadeIn 0.3s ease-out forwards; }
-        
-        /* Personnalisation de la carte pour le thème sombre */
         .leaflet-container {
             font-family: 'Plus Jakarta Sans', sans-serif;
-            border-radius: 0.75rem; /* rounded-xl */
+            border-radius: 0.75rem;
+            z-index: 0; /* Pour ne pas passer au dessus des dropdowns */
         }
     </style>
 </head>
@@ -37,7 +34,8 @@
                 <p class="text-slate-500">Remplissez les informations ci-dessous pour publier votre annonce.</p>
             </div>
 
-            <form action="/owner/add-property?_csrf=<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" method="POST" enctype="multipart/form-data" class="space-y-6" id="propertyForm">
+            <form action="/owner/add-property" method="POST" enctype="multipart/form-data" class="space-y-6" id="propertyForm">
+                
                 <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
 
                 <div class="grid md:grid-cols-2 gap-6">
@@ -63,8 +61,10 @@
                             <option value="Bouaké">Bouaké</option>
                             <option value="Yamoussoukro">Yamoussoukro</option>
                             <option value="Bassam">Bassam</option>
-                            <option value="assinie">assinie</option>
+                            <option value="Assinie">Assinie</option>
                             <option value="Jacqueville">Jacqueville</option>
+                            <option value="Abobo">Abobo</option>
+                            <option value="Koumassi">Koumassi</option>
                         </select>
                     </div>
                     <div>
@@ -96,10 +96,8 @@
                         </button>
                     </div>
                     
-                    <textarea id="descField" name="description" rows="6" placeholder="Décrivez votre bien..." 
+                    <textarea id="descField" name="description" rows="6" placeholder="Décrivez votre bien (ou laissez l'IA le faire)..." 
                         class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none transition"></textarea>
-                    
-                    <p class="text-[10px] text-slate-500 mt-1 italic text-right">Astuce : Remplissez le type, la commune et les pièces avant de cliquer sur ✨</p>
                 </div>
 
                 <div>
@@ -109,8 +107,7 @@
                     </div>
                     
                     <div class="border-2 border-dashed border-slate-700 bg-[#0B1120]/50 rounded-2xl p-4">
-                        <div id="previewGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 empty:hidden">
-                        </div>
+                        <div id="previewGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 empty:hidden"></div>
 
                         <label class="cursor-pointer group flex flex-col items-center justify-center p-6 border border-slate-700 border-dashed rounded-xl hover:bg-slate-800/50 hover:border-[#F59E0B] transition">
                             <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition">
@@ -127,7 +124,7 @@
 
                 <div class="space-y-2 mb-6">
                     <label class="text-xs font-bold text-slate-500 uppercase block">Localisation Exacte <span class="text-red-500">*</span></label>
-                    <p class="text-xs text-slate-400 mb-2">Déplacez le marqueur bleu sur la carte pour indiquer l'entrée exacte de l'immeuble.</p>
+                    <p class="text-xs text-slate-400 mb-2">Déplacez le marqueur bleu pour indiquer l'emplacement précis.</p>
                     
                     <div id="mapSelector" class="h-64 w-full rounded-xl border border-slate-700 z-0"></div>
                     
@@ -139,7 +136,7 @@
                     <label class="text-xs font-bold text-slate-500 uppercase mb-3 block flex items-center gap-2">
                         <i class="ph-fill ph-detective text-[#F59E0B] text-lg"></i> Déléguer la gestion (Optionnel)
                     </label>
-                    <p class="text-xs text-slate-400 mb-4">Choisissez un Agent Certifié pour gérer les visites et les clés à votre place.</p>
+                    <p class="text-xs text-slate-400 mb-4">Choisissez un Agent Certifié pour gérer les visites à votre place.</p>
                     
                     <div class="relative">
                         <select name="agentId" class="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white focus:border-[#F59E0B] outline-none appearance-none cursor-pointer">
@@ -148,11 +145,11 @@
                             <% if (typeof agents !== 'undefined' && agents.length > 0) { %>
                                 <% agents.forEach(agent => { %>
                                     <option value="<%= agent.id %>">
-                                        <%= agent.name %> (<%= agent.commune || 'Toutes zones' %>)
+                                        <%= agent.name %> (<%= agent.commune || 'Zone Flexible' %>)
                                     </option>
                                 <% }) %>
                             <% } else { %>
-                                <option value="" disabled>Aucun agent disponible pour le moment</option>
+                                <option value="" disabled>Aucun agent disponible</option>
                             <% } %>
                         </select>
                         <div class="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
@@ -160,6 +157,7 @@
                         </div>
                     </div>
                 </div>
+
                 <button type="submit" class="w-full bg-[#F59E0B] hover:bg-yellow-400 text-[#0B1120] font-black py-4 rounded-xl shadow-lg transition transform hover:scale-[1.01]">
                     Publier le bien
                 </button>
@@ -179,6 +177,7 @@
         inputSource.addEventListener('change', function() {
             for (let i = 0; i < this.files.length; i++) {
                 const file = this.files[i];
+                // Déduplication basique
                 let isDuplicate = false;
                 for (let j = 0; j < dt.files.length; j++) {
                     if (dt.files[j].name === file.name && dt.files[j].size === file.size) {
@@ -186,19 +185,18 @@
                         break;
                     }
                 }
-                if (!isDuplicate) {
-                    dt.items.add(file);
-                }
+                if (!isDuplicate) dt.items.add(file);
             }
             updateFiles();
-            this.value = '';
+            this.value = ''; // Reset pour permettre de ré-ajouter le même fichier si supprimé
         });
 
         function updateFiles() {
-            inputFinal.files = dt.files;
+            inputFinal.files = dt.files; // Synchro avec l'input qui sera envoyé
+            
             if (dt.files.length > 0) {
                 counter.classList.remove('hidden');
-                counter.innerText = `${dt.files.length} photo(s) prête(s) à l'envoi`;
+                counter.innerText = `${dt.files.length} photo(s) prête(s)`;
             } else {
                 counter.classList.add('hidden');
             }
@@ -218,7 +216,7 @@
                     
                     const removeBtn = document.createElement('button');
                     removeBtn.innerHTML = '✕';
-                    removeBtn.type = 'button';
+                    removeBtn.type = 'button'; // Important pour ne pas submit le form
                     removeBtn.className = 'absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600 shadow-lg transform hover:scale-110 transition';
                     removeBtn.onclick = function() {
                         dt.items.remove(i);
@@ -238,7 +236,6 @@
             const btn = this;
             const originalText = btn.innerHTML;
             
-            // 1. Récupération des données du formulaire
             const type = document.querySelector('input[name="title"]')?.value || "Bien immobilier";
             const pieces = document.querySelector('input[name="bedrooms"]')?.value || "Non spécifié";
             const commune = document.querySelector('select[name="commune"]')?.value;
@@ -249,26 +246,24 @@
                 return;
             }
 
-            // 2. Animation de chargement
             btn.disabled = true;
-            btn.innerHTML = '<span>⏳</span> Rédaction en cours...';
+            btn.innerHTML = '<span>⏳</span> Rédaction...';
             document.getElementById('descField').classList.add('opacity-50');
 
             try {
-                // 3. Appel API
                 const response = await fetch('/api/ai/generate-ad', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        // Récupération sécurisée du Token CSRF
                         'CSRF-Token': document.querySelector('input[name="_csrf"]').value
                     },
                     body: JSON.stringify({ type, pieces, commune, details })
                 });
-
+                
                 const data = await response.json();
 
                 if (data.success) {
-                    // 4. Effet "Machine à écrire" pour le remplissage
                     const textarea = document.getElementById('descField');
                     textarea.value = "";
                     let i = 0;
@@ -282,14 +277,13 @@
                     }
                     typeWriter();
                 } else {
-                    alert("Erreur IA : " + data.error);
+                    alert("Erreur IA : " + (data.error || "Problème inconnu"));
                 }
 
             } catch (error) {
                 console.error(error);
                 alert("Impossible de contacter l'assistant IA.");
             } finally {
-                // Rétablissement du bouton
                 btn.disabled = false;
                 btn.innerHTML = originalText;
                 document.getElementById('descField').classList.remove('opacity-50');
@@ -298,36 +292,31 @@
     </script>
 
     <script>
-        // Initialisation de la carte sur Abidjan (Cocody par défaut)
         const map = L.map('mapSelector').setView([5.359952, -4.008256], 13);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Marqueur initial déplaçable
         let marker = L.marker([5.359952, -4.008256], {draggable: true}).addTo(map);
 
-        // Fonction pour mettre à jour les inputs cachés
         function updatePosition(lat, lng) {
             document.getElementById('lat').value = lat;
             document.getElementById('lng').value = lng;
         }
 
-        // 1. Écouter le déplacement manuel (Drag)
         marker.on('dragend', function(event) {
             const position = marker.getLatLng();
             updatePosition(position.lat, position.lng);
         });
 
-        // 2. Écouter le CLIC sur la carte (C'est ce qui manquait !)
         map.on('click', function(e) {
             const { lat, lng } = e.latlng;
-            marker.setLatLng([lat, lng]); // Déplace le marqueur visuellement
-            updatePosition(lat, lng);     // Met à jour les données cachées
+            marker.setLatLng([lat, lng]);
+            updatePosition(lat, lng);
         });
 
-        // Correction d'affichage au chargement
+        // Hack pour forcer le rendu correct des tuiles Leaflet
         setTimeout(() => { map.invalidateSize(); }, 500);
     </script>
 

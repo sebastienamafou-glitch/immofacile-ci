@@ -17,7 +17,7 @@ router.get('/status', auth.isAdmin, async (req, res) => {
             properties: prisma.property.count(),
             unpaidBails: prisma.lease.count({ where: { status: 'PENDING_FEES' } }),
             // Ajout du compteur de baux scellés V4 identifié dans les logs
-            sealedBails: prisma.lease.count({ where: { NOT: { signatureHash: null } } }),
+            sealedBails: prisma.lease.count({where: { status: 'SIGNED_ELECTRONICALLY'}}),
             dbTime: prisma.$queryRaw`SELECT NOW()`
         });
 

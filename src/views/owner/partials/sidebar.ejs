@@ -17,7 +17,7 @@
     <nav class="space-y-1 flex-1 flex flex-col">
         
         <% let dashboardUrl = user.role === 'ADMIN' ? '/admin/dashboard' : (user.role === 'INVESTOR' ? '/investor/dashboard' : '/owner/dashboard'); %>
-        <a href="<%= dashboardUrl %>" class="flex items-center gap-4 p-3.5 bg-white/5 text-white rounded-xl font-bold border border-white/10 mb-8 transition-all hover:bg-white/10 hover:shadow-lg hover:shadow-black/20 group relative overflow-hidden">
+        <a href="<%= dashboardUrl %>" class="flex items-center gap-4 p-3.5 bg-white/5 text-white rounded-xl font-bold border border-white/10 mb-6 transition-all hover:bg-white/10 hover:shadow-lg hover:shadow-black/20 group relative overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
             <i class="ph-fill ph-squares-four text-[#F59E0B] text-xl group-hover:scale-110 transition-transform"></i>
             <span class="relative z-10">Vue Globale</span>
@@ -93,6 +93,13 @@
                 <span class="font-medium text-sm">Locataires</span>
             </a>
 
+            <a href="/owner/notifications" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                    <i class="ph-bold ph-bell"></i>
+                </div>
+                <span class="font-medium text-sm">Notifications</span>
+            </a>
+
             <% if (user.role === 'INVESTOR') { %>
                 <a href="/investor/opportunities" class="flex items-center gap-4 p-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all group">
                     <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all">
@@ -140,16 +147,10 @@
             </div>
         </div>
         
-        <a href="/logout" class="flex items-center gap-4 p-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition-all font-bold text-sm group mb-6">
+        <a href="/logout" class="flex items-center gap-4 p-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition-all font-bold text-sm group">
             <i class="ph-bold ph-sign-out text-xl group-hover:-translate-x-1 transition-transform"></i>
             <span>Déconnexion</span>
         </a>
-
-        <div class="flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity duration-300 pb-2">
-            <img src="/images/logo_webappci.png" alt="WebApp CI" class="h-5 object-contain grayscale hover:grayscale-0 transition-all">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by WebApp CI</span>
-        </div>
-
     </div>
 </aside>
 
@@ -165,7 +166,6 @@
         try {
             const res = await fetch('/api/system/status');
             const data = await res.json();
-            
             if (data.success) {
                 Swal.fire({
                     title: 'Système Sain ✅',
