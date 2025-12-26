@@ -1,10 +1,10 @@
 <div class="searchable-item bg-slate-900/50 border border-slate-800 p-0 rounded-2xl hover:border-slate-700 transition overflow-hidden group">
     
-    <div class="h-32 w-full bg-slate-800 relative">
+    <a href="/owner/property/<%= prop.id %>" class="block h-32 w-full bg-slate-800 relative">
         <% if (prop.images && prop.images.length > 0) { %>
             <img src="<%= prop.images[0] %>" alt="<%= prop.title %>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
         <% } else if (prop.imageUrl) { %>
-            <img src="<%= prop.imageUrl %>" class="w-full h-full object-cover">
+            <img src="<%= prop.imageUrl %>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
         <% } else { %>
             <div class="w-full h-full flex items-center justify-center text-4xl bg-slate-800">🏠</div>
         <% } %>
@@ -12,10 +12,25 @@
         <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10">
             <span class="text-white font-bold text-xs"><%= prop.price.toLocaleString('fr-FR') %> FCFA</span>
         </div>
-    </div>
+    </a>
 
     <div class="p-5">
-        <div class="flex justify-between items-start mb-4">
-             </div>
+        <div class="flex justify-between items-start mb-2">
+            <h4 class="font-bold text-white text-sm truncate pr-2"><%= prop.title %></h4>
+            <span class="text-[10px] text-slate-400 bg-slate-800 px-2 py-1 rounded border border-slate-700 whitespace-nowrap">
+                <%= prop.commune %>
+            </span>
         </div>
+        
+        <div class="flex justify-between items-center text-xs text-slate-500 mt-3">
+            <div class="flex items-center gap-1">
+                <span>🏠 <%= prop.type || 'Logement' %></span>
+            </div>
+            
+            <% const isRented = prop.leases && prop.leases.some(l => l.isActive); %>
+            <span class="<%= isRented ? 'text-emerald-400 bg-emerald-400/10' : 'text-orange-400 bg-orange-400/10' %> px-2 py-0.5 rounded font-bold uppercase text-[10px]">
+                <%= isRented ? 'LOUÉ' : 'VACANT' %>
+            </span>
+        </div>
+    </div>
 </div>
