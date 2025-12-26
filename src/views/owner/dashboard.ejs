@@ -22,6 +22,26 @@
         .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
         .glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.03); transition: all 0.3s ease; }
         .glass-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.1); }
+        
+        /* Tooltip CSS pur pour performance */
+        [data-title] { position: relative; }
+        [data-title]:hover::after {
+            content: attr(data-title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #000;
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 10px;
+            border-radius: 4px;
+            white-space: nowrap;
+            margin-bottom: 5px;
+            z-index: 20;
+            pointer-events: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body class="bg-[#0B1120] text-slate-200 custom-scrollbar">
@@ -52,17 +72,21 @@
 
                 <div class="bg-gradient-to-r from-blue-900 to-slate-900 p-0.5 rounded-2xl shadow-2xl w-full md:w-auto hover:shadow-blue-900/20 transition group">
                     <div class="bg-[#0B1120] rounded-2xl px-6 py-4 flex items-center gap-6 relative overflow-hidden">
-                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                        
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition pointer-events-none">
                             <i class="ph-fill ph-wallet text-6xl text-blue-500"></i>
                         </div>
-                        <div>
+                        
+                        <div class="relative z-10">
                             <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Solde Disponible</p>
                             <p class="text-3xl font-black text-white">
                                 <%= user.walletBalance ? user.walletBalance.toLocaleString('fr-FR') : '0' %> <span class="text-base font-normal text-slate-500">FCFA</span>
                             </p>
                         </div>
-                        <div class="h-10 w-px bg-slate-800"></div>
-                        <button onclick="requestWithdrawal()" class="flex flex-col items-center gap-1 text-blue-400 hover:text-white transition group/btn">
+                        
+                        <div class="h-10 w-px bg-slate-800 relative z-10"></div>
+                        
+                        <button onclick="requestWithdrawal()" class="relative z-10 flex flex-col items-center gap-1 text-blue-400 hover:text-white transition group/btn cursor-pointer">
                             <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover/btn:bg-blue-500 transition">
                                 <i class="ph-bold ph-download-simple"></i>
                             </div>
@@ -98,7 +122,7 @@
                     <section id="properties" class="scroll-mt-24">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                                <i class="ph-fill ph-house-line text-blue-500"></i> Vos Biens Immobiliers
+                                <i class="ph-fill ph-house-line text-blue-500"></i> Vos Biens
                             </h3>
                             <a href="/owner/add-property" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
                                 <i class="ph-bold ph-plus"></i> Ajouter un bien
@@ -150,13 +174,13 @@
                             <a href="/owner/add-tenant" class="text-xs font-bold text-slate-400 hover:text-white transition">Nouveau bail +</a>
                         </div>
 
-                        <div class="glass-panel rounded-2xl overflow-hidden">
+                        <div class="glass-panel rounded-2xl overflow-hidden overflow-x-auto">
                             <table class="w-full text-left text-sm">
                                 <thead class="bg-slate-900/50 text-slate-500 text-[10px] uppercase font-bold border-b border-white/5">
                                     <tr>
                                         <th class="p-4">Locataire</th>
-                                        <th class="p-4">Bien Loué</th>
-                                        <th class="p-4 text-right">Loyer</th>
+                                        <th class="p-4 hidden md:table-cell">Loyer</th>
+                                        <th class="p-4 text-right">Actions Rapides</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5">
@@ -165,16 +189,76 @@
                                         <% if (prop.leases) { %>
                                             <% prop.leases.forEach(lease => { %>
                                                 <% if (lease.isActive && lease.tenant) { hasTenants = true; %>
-                                                    <tr class="hover:bg-white/5 transition">
+                                                    <tr class="hover:bg-white/5 transition group">
                                                         <td class="p-4">
-                                                            <p class="font-bold text-white"><%= lease.tenant.name %></p>
-                                                            <a href="<%= formatWaLink(lease.tenant.phone, 'Bonjour, concernant votre loyer...') %>" target="_blank" class="text-green-500 hover:text-green-400"></a><%= lease.tenant.phone %>
-                                                               <i class="ph-fill ph-whatsapp-logo text-lg"></i>
-                                                            </a>
+                                                            <div class="flex items-center gap-3">
+                                                                <div class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                                                                    <%= lease.tenant.name.charAt(0) %>
+                                                                </div>
+                                                                <div>
+                                                                    <p class="font-bold text-white"><%= lease.tenant.name %></p>
+                                                                    <p class="text-[10px] text-slate-400"><%= prop.title %></p>
+                                                                </div>
+                                                            </div>
                                                         </td>
-                                                        <td class="p-4 text-slate-300 text-xs"><%= prop.title %></td>
-                                                        <td class="p-4 text-right font-mono font-bold text-emerald-400">
-                                                            <%= lease.monthlyRent.toLocaleString('fr-FR') %> F
+                                                        <td class="p-4 hidden md:table-cell">
+                                                            <span class="font-mono font-bold text-emerald-400"><%= lease.monthlyRent.toLocaleString('fr-FR') %> F</span>
+                                                        </td>
+                                                        
+                                                        <td class="p-4 text-right">
+                                                            <div class="flex items-center justify-end gap-2">
+                                                                
+                                                                <a href="https://wa.me/<%= lease.tenant.phone ? '225' + lease.tenant.phone.replace(/\s/g,'') : '' %>?text=Bonjour <%= lease.tenant.name %>, sauf erreur, nous n'avons pas reçu votre loyer." 
+                                                                   target="_blank"
+                                                                   class="w-8 h-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366] hover:text-black transition"
+                                                                   data-title="Relance WhatsApp">
+                                                                    <i class="ph-bold ph-whatsapp-logo"></i>
+                                                                </a>
+
+                                                                <a href="/owner/contract/<%= lease.id %>" 
+                                                                   target="_blank"
+                                                                   class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center hover:bg-blue-500 hover:text-white transition"
+                                                                   data-title="Voir le Bail">
+                                                                    <i class="ph-bold ph-file-text"></i>
+                                                                </a>
+
+                                                                <% if (lease.payments && lease.payments.length > 0) { 
+                                                                    const lastPayment = lease.payments[lease.payments.length - 1]; 
+                                                                %>
+                                                                    <a href="/owner/receipt/<%= lastPayment.id %>" 
+                                                                       target="_blank"
+                                                                       class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center hover:bg-purple-500 hover:text-white transition"
+                                                                       data-title="Dernière Quittance">
+                                                                        <i class="ph-bold ph-receipt"></i>
+                                                                    </a>
+                                                                <% } %>
+
+                                                                <a href="/owner/inventory/<%= lease.id %>?type=ENTREE" 
+                                                                   class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center hover:bg-orange-500 hover:text-white transition"
+                                                                   data-title="État des Lieux (Entrée)">
+                                                                    <i class="ph-bold ph-sign-in"></i>
+                                                                </a>
+
+                                                                <a href="/owner/inventory/<%= lease.id %>?type=SORTIE" 
+                                                                   class="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center hover:bg-orange-500 hover:text-white transition"
+                                                                   data-title="État des Lieux (Sortie)">
+                                                                    <i class="ph-bold ph-sign-out"></i>
+                                                                </a>
+
+                                                                <a href="/owner/formal-notice/<%= lease.id %>" 
+                                                                   target="_blank"
+                                                                   class="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition"
+                                                                   data-title="Mise en Demeure">
+                                                                    <i class="ph-bold ph-gavel"></i>
+                                                                </a>
+
+                                                                <button onclick="endLeaseModal('<%= lease.id %>', '<%= lease.tenant.name %>')"
+                                                                   class="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition shadow-lg shadow-red-900/50"
+                                                                   data-title="Clôturer le Bail (Sortie)">
+                                                                    <i class="ph-bold ph-x-circle"></i>
+                                                                </button>
+
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 <% } %>
@@ -253,22 +337,19 @@
     </div>
 
     <script>
-        // LOADER
+        // Loader
         window.addEventListener('load', () => {
             const loader = document.getElementById('globalLoader');
             if(loader) {
-                setTimeout(() => {
-                    loader.style.opacity = '0';
-                    setTimeout(() => loader.style.display = 'none', 500);
-                }, 600);
+                setTimeout(() => { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 500); }, 600);
             }
         });
 
-        // GESTION INTELLIGENTE DES NOTIFICATIONS ET POPUPS (CLIENT-SIDE)
+        // Notifications & Popups
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // 1. POPUP LOCATAIRE (Avec identifiants)
+            // Popup Identifiants Locataire
             if (urlParams.has('new_pass')) {
                 const newUser = urlParams.get('new_user');
                 const newPass = urlParams.get('new_pass');
@@ -276,148 +357,93 @@
 
                 Swal.fire({
                     title: '🎉 Locataire créé !',
-                    html: `
-                        <div class="bg-slate-100 p-4 rounded-xl text-left text-slate-800 mb-4">
-                            <p class="mb-2">Transmettez ces accès au locataire :</p>
-                            <p><strong>Nom :</strong> ${newUser}</p>
-                            <p><strong>Identifiant :</strong> ${newPhone}</p>
-                            <div class="flex items-center gap-2 mt-2 bg-white p-2 rounded border border-slate-200">
-                                <code class="text-xl font-mono font-bold text-[#F59E0B]">${newPass}</code>
-                            </div>
-                            <p class="text-xs text-red-500 mt-2">⚠️ Notez-le, il ne s'affichera qu'une seule fois.</p>
-                        </div>
-                    `,
-                    icon: 'success',
-                    confirmButtonText: 'C\'est noté',
-                    confirmButtonColor: '#0B1120',
-                    background: '#fff',
-                    allowOutsideClick: false
-                }).then(() => {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                });
+                    html: `<div class="bg-slate-100 p-4 rounded-xl text-left text-slate-800 mb-4"><p class="mb-2">Accès locataire :</p><p><strong>Nom :</strong> ${newUser}</p><p><strong>ID :</strong> ${newPhone}</p><div class="flex items-center gap-2 mt-2 bg-white p-2 rounded border border-slate-200"><code class="text-xl font-mono font-bold text-[#F59E0B]">${newPass}</code></div></div>`,
+                    icon: 'success', confirmButtonText: 'C\'est noté', confirmButtonColor: '#0B1120'
+                }).then(() => { window.history.replaceState({}, document.title, window.location.pathname); });
             }
 
-            // 2. GESTION SUCCÈS GÉNÉRAL
+            // Messages Succès/Erreur
             const success = urlParams.get('success');
-            if (success) {
-                let msg = 'Opération réussie';
-                if (success === 'withdrawal_initiated') msg = 'Demande de retrait envoyée.';
-                if (success === 'tenant_added') msg = 'Locataire ajouté avec succès.';
-                if (success === 'property_created') msg = 'Bien immobilier créé.';
-                
-                Swal.fire({ 
-                    toast: true, position: 'top-end', icon: 'success', 
-                    title: 'Succès', text: msg, 
-                    showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
-                });
-            }
-
-            // 3. GESTION ERREURS
+            if (success) Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Succès', showConfirmButton: false, timer: 3000, background: '#1e293b', color: '#fff' });
+            
             const error = urlParams.get('error');
             if (error) {
-                let msg = 'Une erreur est survenue.';
-                if (error === 'illegal_deposit') msg = 'La caution ne peut excéder 4 mois (Loi 2019).';
-                if (error === 'withdrawal_failed') msg = 'Solde insuffisant.';
-                
-                Swal.fire({ 
-                    toast: true, position: 'top-end', icon: 'error', 
-                    title: 'Erreur', text: msg, 
-                    showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' 
-                });
+                let msg = 'Erreur';
+                if(error === 'illegal_deposit') msg = 'Caution illégale (> 4 mois)';
+                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: msg, showConfirmButton: false, timer: 4000, background: '#1e293b', color: '#fff' });
             }
         });
 
-        // FONCTION AJOUT ARTISAN (Réparée avec CSRF)
-        async function addArtisanModal() {
-            const { value: formValues } = await Swal.fire({
-                title: 'Nouvel Artisan',
-                html:
-                    '<input id="swal-name" class="swal2-input" placeholder="Nom (ex: Koné Plomberie)">' +
-                    '<select id="swal-job" class="swal2-input">' +
-                        '<option value="Plombier">Plombier</option>' +
-                        '<option value="Électricien">Électricien</option>' +
-                        '<option value="Menuisier">Menuisier</option>' +
-                        '<option value="Peintre">Peintre</option>' +
-                        '<option value="Climatisation">Climatisation</option>' +
-                    '</select>' +
-                    '<input id="swal-phone" class="swal2-input" placeholder="Téléphone (07...)">',
-                focusConfirm: false,
+        // Modale Fin de Bail (Sortie)
+        async function endLeaseModal(leaseId, tenantName) {
+            const { value: deduction } = await Swal.fire({
+                title: 'Fin de Bail',
+                html: `<p class="text-sm mb-4">Vous allez clôturer le dossier de <strong>${tenantName}</strong>.</p>
+                       <label class="block text-xs font-bold text-left mb-1">Retenue sur Caution (FCFA)</label>
+                       <input id="swal-deduction" type="number" class="swal2-input" placeholder="0" value="0">
+                       <p class="text-xs text-slate-500 mt-2">Montant à déduire pour réparations ou impayés.</p>`,
+                icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Ajouter',
-                confirmButtonColor: '#0B1120',
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Clôturer le bail',
                 preConfirm: () => {
-                    return {
-                        name: document.getElementById('swal-name').value,
-                        job: document.getElementById('swal-job').value,
-                        phone: document.getElementById('swal-phone').value
-                    }
+                    return document.getElementById('swal-deduction').value;
                 }
             });
 
-            if (formValues) {
+            if (deduction !== undefined) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = '/owner/add-artisan';
+                form.action = '/owner/end-lease';
                 
-                // Injection CSRF Token depuis le serveur
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_csrf';
-                csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
-                form.appendChild(csrfInput);
+                const csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = '_csrf'; csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+                const idInput = document.createElement('input'); idInput.type = 'hidden'; idInput.name = 'leaseId'; idInput.value = leaseId;
+                const dedInput = document.createElement('input'); dedInput.type = 'hidden'; dedInput.name = 'deduction'; dedInput.value = deduction;
 
-                for (const key in formValues) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = formValues[key];
-                    form.appendChild(input);
-                }
+                form.appendChild(csrfInput);
+                form.appendChild(idInput);
+                form.appendChild(dedInput);
                 document.body.appendChild(form);
                 form.submit();
             }
         }
 
-        // FONCTION RETRAIT (Réparée avec CSRF)
-        async function requestWithdrawal() {
+        // Modale Artisan
+        async function addArtisanModal() {
             const { value: formValues } = await Swal.fire({
-                title: 'Effectuer un retrait',
-                html:
-                    '<input id="swal-amount" type="number" class="swal2-input" placeholder="Montant (FCFA)">' +
-                    '<input id="swal-details" class="swal2-input" placeholder="Numéro Wave/OM">',
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonColor: '#0B1120',
-                preConfirm: () => {
-                    return {
-                        amount: document.getElementById('swal-amount').value,
-                        paymentDetails: document.getElementById('swal-details').value
-                    }
-                }
+                title: 'Nouvel Artisan',
+                html: '<input id="swal-name" class="swal2-input" placeholder="Nom"><select id="swal-job" class="swal2-input"><option value="Plombier">Plombier</option><option value="Électricien">Électricien</option><option value="Peintre">Peintre</option><option value="Climatisation">Climatisation</option></select><input id="swal-phone" class="swal2-input" placeholder="Téléphone">',
+                showCancelButton: true, confirmButtonColor: '#0B1120',
+                preConfirm: () => { return { name: document.getElementById('swal-name').value, job: document.getElementById('swal-job').value, phone: document.getElementById('swal-phone').value } }
             });
 
             if (formValues) {
-                if(!formValues.amount || !formValues.paymentDetails) return;
-                
                 const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/owner/request-withdrawal';
-                
-                const csrfInput = document.createElement('input');
-                csrfInput.type = 'hidden';
-                csrfInput.name = '_csrf';
-                csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+                form.method = 'POST'; form.action = '/owner/add-artisan';
+                const csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = '_csrf'; csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
                 form.appendChild(csrfInput);
+                for (const key in formValues) { const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = formValues[key]; form.appendChild(input); }
+                document.body.appendChild(form); form.submit();
+            }
+        }
 
-                for (const key in formValues) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = formValues[key];
-                    form.appendChild(input);
-                }
-                document.body.appendChild(form);
-                form.submit();
+        // Modale Retrait (Corrigée)
+        async function requestWithdrawal() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Retrait de fonds',
+                html: '<input id="swal-amount" type="number" class="swal2-input" placeholder="Montant"><input id="swal-details" class="swal2-input" placeholder="Numéro Wave/OM">',
+                showCancelButton: true, confirmButtonColor: '#0B1120',
+                preConfirm: () => { return { amount: document.getElementById('swal-amount').value, paymentDetails: document.getElementById('swal-details').value } }
+            });
+
+            if (formValues) {
+                const form = document.createElement('form');
+                form.method = 'POST'; form.action = '/owner/request-withdrawal';
+                const csrfInput = document.createElement('input'); csrfInput.type = 'hidden'; csrfInput.name = '_csrf'; csrfInput.value = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+                form.appendChild(csrfInput);
+                for (const key in formValues) { const input = document.createElement('input'); input.type = 'hidden'; input.name = key; input.value = formValues[key]; form.appendChild(input); }
+                document.body.appendChild(form); form.submit();
             }
         }
     </script>
