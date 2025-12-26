@@ -218,6 +218,9 @@ model Lead {
   id          String   @id @default(cuid())
   name        String
   phone       String
+  email       String?
+  income      Int?
+  propertyId  String
   address     String?
   status      String   @default("NOUVEAU")
   createdAt   DateTime @default(now())

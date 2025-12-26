@@ -238,7 +238,7 @@ exports.webhookCinetPay = async (req, res) => {
                     data: {
                         amount: amount,
                         month: 'FRAIS_DOSSIER',
-                        type: 'FEES', // Type spécial pour les revenus plateforme
+                        type: 'FRAIS_DOSSIER', // Type spécial pour les revenus plateforme
                         leaseId: leaseId,
                         status: 'COMPLETED',
                         transactionId: cpm_trans_id,

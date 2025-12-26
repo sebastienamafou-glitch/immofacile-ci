@@ -3,71 +3,272 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Espace Artisan | ImmoFacile</title>
+    <title>Espace Artisan | ImmoFacile V4</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0B1120">
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; scroll-behavior: smooth; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.03); transition: all 0.3s ease; }
+        .glass-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.1); }
+        .status-badge { @apply px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide; }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen pb-20">
+<body class="bg-[#0B1120] text-slate-200 custom-scrollbar">
 
-    <div class="bg-[#0B1120] p-6 border-b border-slate-800 sticky top-0 z-20">
-        <div class="flex justify-between items-center">
-            <h1 class="text-xl font-bold">🔨 Mes Missions</h1>
-            <a href="/logout" class="text-red-400 text-sm">Déconnexion</a>
-        </div>
-        <p class="text-slate-400 text-xs mt-1">Bonjour, <%= artisan.name %></p>
+    <div id="globalLoader" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0B1120] transition-opacity duration-500">
+        <div class="w-16 h-16 border-4 border-slate-800 border-t-orange-500 rounded-full animate-spin"></div>
+        <p class="mt-4 text-xs font-bold text-slate-500 uppercase tracking-widest animate-pulse">Chargement Artisan...</p>
     </div>
 
-    <div class="p-4 space-y-4">
-        <% if (missions.length === 0) { %>
-            <div class="text-center py-10 text-slate-500">
-                <p class="text-4xl mb-2">✅</p>
-                <p>Aucune mission en cours.</p>
-                <p class="text-xs">Profitez de votre pause !</p>
+    <div class="flex min-h-screen">
+        <%- include('../partials/sidebar') %>
+
+        <main class="flex-1 md:ml-72 p-6 lg:p-10 max-w-7xl mx-auto w-full">
+            
+            <header class="flex flex-col md:flex-row justify-between items-end mb-10 gap-6">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <h1 class="text-3xl font-black text-white uppercase tracking-tight">
+                            <%= user.name %> 🛠️
+                        </h1>
+                        <div class="flex items-center gap-2 bg-slate-900 border border-slate-700 px-3 py-1 rounded-full cursor-pointer" onclick="toggleAvailability()">
+                            <div id="statusDot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                            <span id="statusText" class="text-xs font-bold text-slate-300">Disponible</span>
+                        </div>
+                    </div>
+                    <p class="text-slate-400 text-sm">
+                        <%= user.job || 'Artisan Certifié' %> • <%= user.location || 'Abidjan' %>
+                    </p>
+                </div>
+
+                <div class="bg-gradient-to-r from-orange-900/50 to-slate-900 p-0.5 rounded-2xl shadow-2xl w-full md:w-auto hover:shadow-orange-900/20 transition group">
+                    <div class="bg-[#0B1120] rounded-2xl px-6 py-4 flex items-center gap-6 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition pointer-events-none">
+                            <i class="ph-fill ph-coins text-6xl text-orange-500"></i>
+                        </div>
+                        <div class="relative z-10">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Gains Disponibles</p>
+                            <p class="text-3xl font-black text-white">
+                                <%= user.walletBalance ? user.walletBalance.toLocaleString('fr-FR') : '0' %> <span class="text-base font-normal text-slate-500">FCFA</span>
+                            </p>
+                        </div>
+                        <div class="h-10 w-px bg-slate-800 relative z-10"></div>
+                        <button onclick="requestWithdrawal()" class="relative z-10 flex flex-col items-center gap-1 text-orange-400 hover:text-white transition group/btn cursor-pointer">
+                            <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover/btn:bg-orange-500 transition">
+                                <i class="ph-bold ph-download-simple"></i>
+                            </div>
+                            <span class="text-[9px] font-bold uppercase mt-1">Retrait</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-blue-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Missions Totales</p>
+                            <p class="text-2xl font-black text-white"><%= stats.totalMissions || 0 %></p>
+                        </div>
+                        <i class="ph-duotone ph-briefcase text-2xl text-blue-500"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-yellow-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Note Moyenne</p>
+                            <div class="flex items-center gap-1">
+                                <p class="text-2xl font-black text-white"><%= stats.rating || '5.0' %></p>
+                                <i class="ph-fill ph-star text-yellow-500 text-lg"></i>
+                            </div>
+                        </div>
+                        <i class="ph-duotone ph-trophy text-2xl text-yellow-500"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-green-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">Revenus ce mois</p>
+                            <p class="text-2xl font-black text-white"><%= stats.monthlyEarnings ? stats.monthlyEarnings.toLocaleString('fr-FR') : '0' %> <span class="text-sm text-slate-500">F</span></p>
+                        </div>
+                        <i class="ph-duotone ph-chart-line-up text-2xl text-green-500"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border-l-4 border-purple-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-400 text-xs font-bold uppercase mb-1">En Cours</p>
+                            <p class="text-2xl font-black text-white"><%= stats.activeMissions || 0 %></p>
+                        </div>
+                        <i class="ph-duotone ph-clock text-2xl text-purple-500"></i>
+                    </div>
+                </div>
             </div>
-        <% } %>
 
-        <% missions.forEach(mission => { %>
-            <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 shadow-lg">
-                <div class="flex justify-between items-start mb-3">
-                    <span class="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-xs font-bold uppercase">
-                        <%= mission.priority || 'Urgent' %>
-                    </span>
-                    <span class="text-xs text-slate-400"><%= new Date(mission.createdAt).toLocaleDateString() %></span>
-                </div>
-
-                <h3 class="font-bold text-lg mb-1"><%= mission.title %></h3>
-                <p class="text-slate-400 text-sm mb-4"><%= mission.description %></p>
-
-                <div class="bg-slate-900/50 p-3 rounded-xl mb-4 text-sm space-y-2">
-                    <div class="flex items-center gap-2">
-                        <span>📍</span>
-                        <a href="https://maps.google.com/?q=<%= mission.property.address %>" target="_blank" class="text-blue-400 underline">
-                            <%= mission.property.address %>, <%= mission.property.commune %>
-                        </a>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span>📞</span>
-                        <a href="tel:<%= mission.reporter.phone %>" class="text-white font-bold">
-                            <%= mission.reporter.phone %> (Locataire)
-                        </a>
-                    </div>
-                </div>
-
-                <form action="/artisan/complete-mission" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <input type="hidden" name="incidentId" value="<%= mission.id %>">
-                    
-                    <label class="block w-full text-center border-2 border-dashed border-slate-600 rounded-xl p-3 mb-3 text-xs text-slate-400 cursor-pointer hover:border-white transition">
-                        📷 Ajouter photo preuve
-                        <input type="file" name="proof" class="hidden">
-                    </label>
-
-                    <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg transition">
-                        ✅ Marquer comme Terminé
+            <div class="glass-panel rounded-3xl overflow-hidden min-h-[500px]">
+                <div class="flex border-b border-white/5 bg-white/5">
+                    <button class="px-6 py-4 text-sm font-bold text-white border-b-2 border-orange-500 bg-white/5">
+                        Missions en cours
                     </button>
-                </form>
+                    <button class="px-6 py-4 text-sm font-bold text-slate-400 hover:text-white transition">
+                        Historique
+                    </button>
+                </div>
+
+                <div class="p-6">
+                    <% if (missions && missions.length > 0) { %>
+                        <div class="space-y-4">
+                            <% missions.forEach(mission => { %>
+                                <div class="glass-card p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 group">
+                                    
+                                    <div class="flex items-start gap-4 flex-1">
+                                        <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
+                                            <i class="ph-fill ph-wrench text-2xl text-slate-400"></i>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-3 mb-1">
+                                                <h3 class="font-bold text-white text-lg"><%= mission.title %></h3>
+                                                <span class="status-badge <%= mission.status === 'IN_PROGRESS' ? 'bg-blue-500/20 text-blue-400' : 'bg-orange-500/20 text-orange-400' %>">
+                                                    <%= mission.status === 'IN_PROGRESS' ? 'En Cours' : 'En Attente' %>
+                                                </span>
+                                            </div>
+                                            <p class="text-sm text-slate-400 flex items-center gap-2">
+                                                <i class="ph-fill ph-map-pin"></i> <%= mission.property.address %>, <%= mission.property.commune %>
+                                                <span class="w-1 h-1 rounded-full bg-slate-600"></span>
+                                                <span><%= new Date(mission.createdAt).toLocaleDateString('fr-FR') %></span>
+                                            </p>
+                                            <p class="mt-2 text-sm text-slate-300 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                                                "<%= mission.description %>"
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-col items-end gap-3 min-w-[150px]">
+                                        <p class="text-xl font-mono font-bold text-orange-400"><%= mission.amount ? mission.amount.toLocaleString('fr-FR') : 'Sur Devis' %> F</p>
+                                        
+                                        <div class="flex gap-2">
+                                            <% if (mission.status === 'PENDING') { %>
+                                                <button onclick="updateMissionStatus('<%= mission.id %>', 'ACCEPTED')" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2">
+                                                    <i class="ph-bold ph-check"></i> Accepter
+                                                </button>
+                                                <button onclick="updateMissionStatus('<%= mission.id %>', 'REJECTED')" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-xs font-bold transition">
+                                                    Refuser
+                                                </button>
+                                            <% } else if (mission.status === 'IN_PROGRESS') { %>
+                                                <a href="https://wa.me/<%= mission.property.owner.phone %>" target="_blank" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition" title="Contacter Propriétaire">
+                                                    <i class="ph-bold ph-whatsapp-logo text-lg"></i>
+                                                </a>
+                                                <button onclick="completeMission('<%= mission.id %>')" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                                                    <i class="ph-bold ph-check-circle"></i> Terminer
+                                                </button>
+                                            <% } %>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <div class="text-center py-20">
+                            <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="ph-duotone ph-coffee text-4xl text-slate-600"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-white">Aucune mission en cours</h3>
+                            <p class="text-slate-500 text-sm mt-2">Profitez de votre temps libre ou mettez à jour votre profil.</p>
+                        </div>
+                    <% } %>
+                </div>
             </div>
-        <% }) %>
+
+        </main>
     </div>
 
+    <script>
+        // Loader
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('globalLoader');
+            if(loader) {
+                setTimeout(() => { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 500); }, 600);
+            }
+        });
+
+        // Toggle Disponibilité
+        function toggleAvailability() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            // Simulation
+            if (text.innerText === 'Disponible') {
+                text.innerText = 'Occupé';
+                text.className = 'text-xs font-bold text-red-400';
+                dot.className = 'w-2 h-2 rounded-full bg-red-500';
+                // fetch('/artisan/status', { method: 'POST', body: JSON.stringify({status: 'BUSY'}) ... })
+            } else {
+                text.innerText = 'Disponible';
+                text.className = 'text-xs font-bold text-slate-300';
+                dot.className = 'w-2 h-2 rounded-full bg-green-500 animate-pulse';
+            }
+        }
+
+        // Action sur Mission (Accepter/Refuser)
+        async function updateMissionStatus(id, status) {
+            Swal.fire({
+                title: 'Confirmation',
+                text: status === 'ACCEPTED' ? "Accepter cette mission ?" : "Refuser cette mission ?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#0B1120',
+                confirmButtonText: 'Oui, confirmer'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Appel API simulé
+                    // fetch(`/artisan/mission/${id}/status`, { ... })
+                    Swal.fire('Mis à jour', 'Le statut a été modifié.', 'success').then(() => location.reload());
+                }
+            });
+        }
+
+        // Terminer Mission (Upload Preuve)
+        async function completeMission(id) {
+            const { value: file } = await Swal.fire({
+                title: 'Terminer la mission',
+                text: 'Téléversez une photo du travail fini ou la facture',
+                input: 'file',
+                inputAttributes: { 'accept': 'image/*', 'aria-label': 'Upload photo' },
+                showCancelButton: true,
+                confirmButtonColor: '#0B1120',
+                confirmButtonText: 'Envoyer & Clôturer'
+            });
+
+            if (file) {
+                // Logique d'upload ici
+                Swal.fire({ icon: 'success', title: 'Mission Terminée !', text: 'Le paiement sera débloqué après validation du propriétaire.' });
+            }
+        }
+
+        // Retrait (Même logique que Owner)
+        async function requestWithdrawal() {
+            const { value: formValues } = await Swal.fire({
+                title: 'Retrait de vos gains',
+                html: '<input id="swal-amount" type="number" class="swal2-input" placeholder="Montant (FCFA)"><input id="swal-details" class="swal2-input" placeholder="Numéro Wave/OM">',
+                showCancelButton: true, confirmButtonColor: '#f97316',
+                preConfirm: () => { return { amount: document.getElementById('swal-amount').value, paymentDetails: document.getElementById('swal-details').value } }
+            });
+
+            if (formValues) {
+                // Post vers backend
+                Swal.fire({ icon: 'success', title: 'Demande envoyée', text: 'Transfert en cours de traitement.' });
+            }
+        }
+    </script>
 </body>
 </html>
