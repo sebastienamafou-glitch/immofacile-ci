@@ -28,10 +28,10 @@ export async function POST(request: Request) {
       data: {
         title,
         description: description || "",
-        status: "REPORTED", // Statut par défaut : "Signalé"
-        priority: "MEDIUM", // Priorité par défaut
+        status: "OPEN", // Statut par défaut : "Ouvert"
+        priority: "NORMAL", // Priorité par défaut
         property: { connect: { id: lease.propertyId } },
-        tenant: { connect: { id: lease.tenantId } }
+        reporter: { connect: { id: lease.tenantId } }
       }
     });
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
             orderBy: { createdAt: 'desc' },
             include: {
                 property: { select: { title: true, address: true } },
-                tenant: { select: { name: true, phone: true } }
+               reporter: { select: { name: true, phone: true } }
             }
         });
         return NextResponse.json({ success: true, data: incidents });
