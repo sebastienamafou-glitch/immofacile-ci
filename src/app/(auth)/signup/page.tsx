@@ -151,7 +151,7 @@ function SignupForm() {
                         />
                      </div>
                      <label htmlFor="terms" className="text-xs text-slate-400 leading-tight cursor-pointer select-none">
-                        J'accepte les conditions générales.
+                         J'accepte les <Link href="/terms" target="_blank" className="text-orange-500 hover:underline font-bold">Conditions Générales</Link> et la <Link href="/privacy" target="_blank" className="text-orange-500 hover:underline font-bold">Politique de Confidentialité</Link>.
                      </label>
                 </div>
 
