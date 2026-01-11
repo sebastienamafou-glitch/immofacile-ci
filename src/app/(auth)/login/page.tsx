@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner"; 
+import Cookies from "js-cookie"; // Importation pour la gestion du middleware
 import { 
   Loader2, Lock, Eye, EyeOff, LogIn, Mail, ShieldCheck 
 } from "lucide-react";
@@ -26,6 +27,8 @@ function LoginForm() {
   });
 
   useEffect(() => {
+    // Nettoyage complet à l'arrivée sur la page pour éviter les conflits
+    Cookies.remove('token', { path: '/' }); // On supprime bien le cookie global
     localStorage.removeItem('token');
     localStorage.removeItem('immouser'); 
     localStorage.removeItem('user'); 
@@ -44,22 +47,35 @@ function LoginForm() {
       const data = res.data;
 
       if (data.token) {
+        // --- CORRECTION MAJEURE ICI ---
+        // 1. Stockage du TOKEN dans un Cookie avec une portée GLOBALE (path: '/')
+        Cookies.set('token', data.token, { 
+            expires: 7, 
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'lax', // 'lax' est plus robuste que 'strict' pour la navigation
+            path: '/'        // INDISPENSABLE : rend le token visible partout (API, Dashboard, KYC)
+        });
+
+        // 2. Stockage dans le LocalStorage (Pour la persistance côté client / UI)
         localStorage.setItem('token', data.token);
         localStorage.setItem('immouser', JSON.stringify(data.user));
         
         toast.success(`Heureux de vous revoir, ${data.user.name?.split(' ')[0] || 'Client'} !`);
 
+        // 3. Redirection intelligente basée sur le rôle
         setTimeout(() => {
-            if (data.redirectUrl) {
-                router.push(data.redirectUrl);
+            if (data.user.role === 'ADMIN') {
+                router.push('/dashboard/admin');
+            } else if (data.user.role === 'OWNER') {
+                router.push('/dashboard/owner');
             } else {
-                router.push('/dashboard');
+                router.push('/dashboard/tenant');
             }
         }, 800);
       }
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.response?.data?.error || "Identifiants incorrects.");
+      console.error("Erreur Login:", error);
+      toast.error(error.response?.data?.error || "Identifiants incorrects ou erreur serveur.");
     } finally {
       setLoading(false);
     }
@@ -67,7 +83,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1120] relative overflow-hidden w-full">
-      {/* FOND DÉCORATIF ORIGINAL */}
+      {/* FOND DÉCORATIF */}
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-[#0B1120] via-[#0B1120]/80 to-transparent"></div>
 
@@ -81,7 +97,7 @@ function LoginForm() {
                 Espace <span className="text-orange-500 italic">CLIENT</span>
             </h1>
             <p className="text-slate-400 text-sm mt-2 text-center">
-                Connectez-vous pour gérer votre patrimoine.
+                Connectez-vous pour gérer votre patrimoine en toute sécurité.
             </p>
         </div>
 
@@ -95,6 +111,7 @@ function LoginForm() {
                         <Input 
                             required 
                             autoFocus
+                            type="text"
                             placeholder="Ex: admin@immofacile.ci" 
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-12"
                             value={formData.identifier}
@@ -106,7 +123,7 @@ function LoginForm() {
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-center px-1">
                         <Label className="text-xs uppercase font-bold text-slate-400">Mot de passe</Label>
-                        <Link href="/forgot-password" className="text-xs text-orange-500 hover:text-orange-400 font-bold transition">
+                        <Link href="/forgot-password" title="Récupérer mon accès" className="text-xs text-orange-500 hover:text-orange-400 font-bold transition">
                             Oublié ?
                         </Link>
                     </div>
@@ -124,6 +141,7 @@ function LoginForm() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-3 text-slate-500 hover:text-white transition p-1"
+                            aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                         >
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -133,7 +151,7 @@ function LoginForm() {
                 <Button 
                     type="submit" 
                     disabled={loading} 
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95 mt-2"
+                    className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-95 mt-2"
                 >
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : (
                         <span className="flex items-center gap-2">Se connecter <LogIn className="w-4 h-4" /></span>

@@ -1,27 +1,34 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { verifyToken } from "@/lib/auth";
+import { prisma } from "@/lib/prisma"; 
 
-const prisma = new PrismaClient();
-
+// Force le mode dynamique pour ne pas mettre en cache les données financières
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userAuth = verifyToken(request);
+    // 1. SÉCURITÉ : On fait confiance au Middleware qui a déjà validé le token
+    const userEmail = request.headers.get("x-user-email");
     
-    const owner = await prisma.user.findUnique({ where: { id: userAuth.id } });
-    if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 403 });
+    if (!userEmail) {
+        return NextResponse.json({ error: "Session invalide" }, { status: 401 });
+    }
 
-    // 2. RECUPÉRATION DE L'ANNÉE
+    const owner = await prisma.user.findUnique({ 
+        where: { email: userEmail } 
+    });
+
+    if (!owner) {
+        return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
+    }
+
+    // 2. PARAMÈTRES DE DATE
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
 
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
 
-    // 3. REQUÊTE BASE DE DONNÉES
+    // 3. REQUÊTE OPTIMISÉE
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       include: {
@@ -44,23 +51,17 @@ export async function GET(request: Request) {
       }
     });
 
-    // 4. CALCULS (CORRECTION TYPESCRIPT ICI)
+    // 4. AGRÉGATION DES DONNÉES
     let totalRevenue = 0;
     let totalExpenses = 0;
 
-    // On utilise ': any' ici pour simplifier la syntaxe Prisma complexe
-    // et ': number' pour les accumulateurs des reduce
     const breakdown = properties.map((prop: any) => {
-        
-        // A. Revenus
+        // Revenus
         const propRevenue = prop.leases.reduce((sum: number, lease: any) => {
-            const leasePayments = lease.payments.reduce((pSum: number, p: any) => {
-                return pSum + (p.amount || 0);
-            }, 0);
-            return sum + leasePayments;
+            return sum + lease.payments.reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0);
         }, 0);
 
-        // B. Dépenses
+        // Dépenses
         const propExpenses = prop.incidents.reduce((sum: number, inc: any) => {
             return sum + (inc.finalCost || 0);
         }, 0);
@@ -78,13 +79,10 @@ export async function GET(request: Request) {
         };
     });
 
-    // 5. RÉPONSE
     return NextResponse.json({
       success: true,
       data: {
-          ownerName: owner.name || "Propriétaire",
-          ownerEmail: owner.email,
-          year: year,
+          year,
           revenue: totalRevenue,
           expenses: totalExpenses,
           net: totalRevenue - totalExpenses,
@@ -92,8 +90,11 @@ export async function GET(request: Request) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur API Tax:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+        { error: "Erreur serveur", details: error.message }, 
+        { status: 500 }
+    );
   }
 }

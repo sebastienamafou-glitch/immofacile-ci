@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { 
   Camera, UploadCloud, CheckCircle2, 
-  AlertCircle, Loader2, ArrowLeft, Shield 
+  Loader2, ArrowLeft, Shield 
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Link from "next/link";
@@ -18,18 +18,24 @@ export default function KYCPage() {
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string>("PENDING"); // PENDING, VERIFIED, REJECTED, NONE
 
-  // On vérifie le statut actuel au chargement
+  // --- CORRECTION MAJEURE ICI ---
+  // On ne fait plus d'appel API risque au chargement.
+  // On récupère le statut directement depuis le stockage local (mis à jour lors du login).
   useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const res = await api.get('/tenant/dashboard');
-        if (res.data.user) {
-            // Suppose que votre User a un champ kycStatus
-            setStatus(res.data.user.kycStatus || "NONE");
-        }
-      } catch (e) { console.error(e); }
-    };
-    checkStatus();
+    try {
+      const storedUser = localStorage.getItem('immouser');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        // Si le user a un statut, on l'utilise, sinon 'NONE'
+        setStatus(user.kycStatus || "NONE");
+      } else {
+        // Si pas d'info locale, on met NONE par défaut (évite le crash)
+        setStatus("NONE");
+      }
+    } catch (e) {
+      console.error("Erreur lecture user local:", e);
+      setStatus("NONE");
+    }
   }, []);
 
   // Gestion de la sélection de fichier
@@ -47,22 +53,31 @@ export default function KYCPage() {
 
     setUploading(true);
     const formData = new FormData();
-    // ⚠️ IMPORTANT : Le nom 'document' doit correspondre à upload.single('document') dans kycRoutes.js
     formData.append('document', file); 
 
     try {
-      // Appel de votre route Backend
+      // Appel de la route d'upload
       await api.post('/kyc/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
+      // Mise à jour immédiate de l'interface
       setStatus("PENDING");
+      
+      // On met aussi à jour le localStorage pour la prochaine fois
+      const storedUser = localStorage.getItem('immouser');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        user.kycStatus = "PENDING";
+        localStorage.setItem('immouser', JSON.stringify(user));
+      }
       
       Swal.fire({
         icon: 'success',
         title: 'Envoyé !',
         text: 'Votre document est en cours de validation par nos services.',
-        background: '#0B1120', color: '#fff'
+        background: '#0B1120', color: '#fff',
+        confirmButtonColor: '#ea580c'
       });
 
     } catch (error) {
@@ -70,8 +85,9 @@ export default function KYCPage() {
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: "L'envoi a échoué. Vérifiez que le fichier n'est pas trop lourd.",
-        background: '#0B1120', color: '#fff'
+        text: "L'envoi a échoué. Vérifiez que le fichier n'est pas trop lourd (Max 5Mo).",
+        background: '#0B1120', color: '#fff',
+        confirmButtonColor: '#ea580c'
       });
     } finally {
       setUploading(false);
@@ -98,7 +114,7 @@ export default function KYCPage() {
 
         {/* ÉTAT : DÉJÀ VÉRIFIÉ */}
         {status === 'VERIFIED' && (
-             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] p-8 text-center">
+             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] p-8 text-center animate-in fade-in zoom-in duration-500">
                 <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
                     <CheckCircle2 className="w-10 h-10 text-white" />
                 </div>
@@ -109,7 +125,7 @@ export default function KYCPage() {
 
         {/* ÉTAT : EN ATTENTE */}
         {status === 'PENDING' && (
-             <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-8 text-center">
+             <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-8 text-center animate-in fade-in zoom-in duration-500">
                 <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
                     <Loader2 className="w-10 h-10 text-orange-500" />
                 </div>
@@ -120,7 +136,7 @@ export default function KYCPage() {
 
         {/* ÉTAT : NON SOUMIS (Formulaire) */}
         {(status === 'NONE' || status === 'REJECTED') && (
-            <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 shadow-xl">
+            <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
                 
                 <div className="text-center mb-8">
                     <p className="text-sm text-slate-400 leading-relaxed">
