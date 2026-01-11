@@ -1,0 +1,326 @@
+// 1. La connexion à la base de données (C'est la ligne qui manquait !)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 2. Le générateur du client (Version standard)
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. GESTION UTILISATEURS & IAM (Identity)
+// ==========================================
+
+model User {
+  id              String             @id @default(cuid())
+  email           String             @unique
+  phone           String             @unique
+  name            String?
+  password        String
+  role            Role               @default(TENANT)
+
+  //---PAGE PARAMÈTRES----//
+  address         String?            // <-- AJOUT : Pour le profil
+  paymentMethod   String?            // <-- AJOUT : WAVE, OM, MTN, BANK
+  paymentNumber   String?            // <-- AJOUT : Le numéro ou RIB
+  
+  // --- KYC & Légal ---
+  kycStatus       VerificationStatus @default(PENDING)
+  kycDocuments    String[]           // URLs des documents (CNI, Passeport)
+  
+  // --- Fintech (Wallet) ---
+  walletBalance   Int                @default(0) // Argent disponible
+  escrowBalance   Int                @default(0) // Argent bloqué (Caution)
+  referralBalance Int                @default(0) // Commissions parrainage
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  // --- Relations ---
+  propertiesOwned    Property[]      @relation("PropertyOwner")
+  leases             Lease[]         // En tant que locataire
+  
+  // Rôle Agent
+  missionsAccepted   Mission[]       @relation("AgentMissions")
+  leads              Lead[]
+  
+  // Rôle Artisan
+  incidentsAssigned  Incident[]      @relation("ArtisanIncidents")
+  
+  // Rôle Tout utilisateur (Reporter un incident, signer un bail)
+  incidentsReported  Incident[]      @relation("IncidentReporter")
+  transactions       Transaction[]
+  signatureProofs    SignatureProof[]
+}
+
+// ==========================================
+// 2. PATRIMOINE (Biens)
+// ==========================================
+
+model Property {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  address     String
+  commune     String
+  price       Int          // Loyer de référence
+  type        PropertyType
+  bedrooms    Int
+  bathrooms   Int
+  surface     Float?       // Ajouté pour précision
+  images      String[]
+  isPublished Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  ownerId     String
+  owner       User         @relation("PropertyOwner", fields: [ownerId], references: [id])
+  
+  leases      Lease[]
+  incidents   Incident[]
+  missions    Mission[]
+  inventories Inventory[]
+}
+
+// ==========================================
+// 3. GESTION LOCATIVE (Baux & États des lieux)
+// ==========================================
+
+model Lease {
+  id              String          @id @default(cuid())
+  startDate       DateTime
+  endDate         DateTime?
+  monthlyRent     Int
+  depositAmount   Int
+  status          LeaseStatus     @default(PENDING)
+  isActive        Boolean         @default(false)
+  
+  // --- Légal (Signature Électronique) ---
+  contractUrl     String?         // PDF final généré
+  documentHash    String?         // Hash unique pour preuve légale
+  signatureStatus SignatureStatus @default(PENDING)
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenantId        String
+  tenant          User            @relation(fields: [tenantId], references: [id])
+  propertyId      String
+  property        Property        @relation(fields: [propertyId], references: [id])
+  
+  payments        Payment[]
+  signatures      SignatureProof[]
+  inventories     Inventory[]
+}
+
+// Nouveau : Détail de l'état des lieux (Data Model structuré)
+model Inventory {
+  id          String      @id @default(cuid())
+  date        DateTime    @default(now())
+  type        MissionType // ENTREE ou SORTIE
+  notes       String?
+  reportUrl   String?     // PDF généré
+  
+  leaseId     String
+  lease       Lease       @relation(fields: [leaseId], references: [id])
+  propertyId  String
+  property    Property    @relation(fields: [propertyId], references: [id])
+  
+  agentId     String?     // L'agent qui a fait l'état des lieux
+  
+  items       InventoryItem[] // Liste des pièces/équipements vérifiés
+}
+
+// Nouveau : Détail pièce par pièce (ex: Cuisine - Mur - Bon état)
+model InventoryItem {
+  id          String   @id @default(cuid())
+  roomName    String   // ex: "Cuisine", "Salon"
+  element     String   // ex: "Mur", "Sol", "Prises"
+  condition   String   // ex: "Neuf", "Bon", "Usé"
+  comment     String?
+  photos      String[] // Preuves photos spécifiques
+  
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+}
+
+// Nouveau : Preuve juridique de signature
+model SignatureProof {
+  id        String   @id @default(cuid())
+  ipAddress String
+  signedAt  DateTime @default(now())
+  userAgent String?
+  otpToken  String?  // Si validation par SMS
+  
+  leaseId   String
+  lease     Lease    @relation(fields: [leaseId], references: [id])
+  signerId  String
+  signer    User     @relation(fields: [signerId], references: [id])
+}
+
+// ==========================================
+// 4. FINTECH & PAIEMENTS (Split)
+// ==========================================
+
+model Payment {
+  id             String        @id @default(cuid())
+  amount         Int           // Montant total payé par le locataire
+  date           DateTime      @default(now())
+  type           PaymentType
+  status         PaymentStatus @default(PENDING)
+  method         String?       // WAVE, ORANGE_MONEY, CARD
+  reference      String?       // ID transaction externe
+
+  // --- Logique de Split (Banque) ---
+  amountOwner    Int           @default(0) // Part propriétaire
+  amountPlatform Int           @default(0) // Commission ImmoFacile
+  amountAgent    Int           @default(0) // Commission Agent (si applicable)
+
+  leaseId        String
+  lease          Lease         @relation(fields: [leaseId], references: [id])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  amount      Int
+  type        String   // CREDIT (Entrée), DEBIT (Sortie)
+  reason      String   // "Loyer Janvier", "Retrait vers banque"
+  createdAt   DateTime @default(now())
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// 5. OPÉRATIONS (Missions & Maintenance)
+// ==========================================
+
+model Mission {
+  id            String        @id @default(cuid())
+  type          MissionType
+  status        MissionStatus @default(PENDING)
+  fee           Int           // Rémunération de l'agent
+  dateScheduled DateTime?
+  reportData    String?       // JSON ou résumé textuel
+  createdAt     DateTime      @default(now())
+
+  propertyId    String
+  property      Property      @relation(fields: [propertyId], references: [id])
+  agentId       String?
+  agent         User?         @relation("AgentMissions", fields: [agentId], references: [id])
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  priority    String         @default("NORMAL") // URGENT, NORMAL
+  photos      String[]
+  status      IncidentStatus @default(OPEN)
+  
+  // Coûts et Devis
+  quoteAmount Int?           // Montant du devis artisan
+  finalCost   Int?           // Coût réel final
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  reporterId  String
+  reporter    User           @relation("IncidentReporter", fields: [reporterId], references: [id])
+  
+  assignedToId String?       // Nouveau : Assignation Artisan
+  assignedTo   User?         @relation("ArtisanIncidents", fields: [assignedToId], references: [id])
+
+  propertyId  String
+  property    Property       @relation(fields: [propertyId], references: [id])
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  needs     String?
+  budget    Int?
+  status    String   @default("NEW") // NEW, CONTACTED, CONVERTED
+  createdAt DateTime @default(now())
+  agentId   String?
+  agent     User?    @relation(fields: [agentId], references: [id])
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMIN
+  OWNER
+  TENANT
+  AGENT
+  ARTISAN // Nouveau
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SignatureStatus {
+  PENDING
+  SIGNED_TENANT
+  SIGNED_OWNER
+  COMPLETED
+}
+
+enum PropertyType {
+  APPARTEMENT
+  VILLA
+  STUDIO
+  MAGASIN
+  BUREAU
+  TERRAIN
+}
+
+enum LeaseStatus {
+  PENDING
+  ACTIVE
+  TERMINATED
+  CANCELLED
+}
+
+enum PaymentType {
+  LOYER
+  DEPOSIT
+  CHARGES
+  FEE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  QUOTATION // En attente de devis
+  RESOLVED
+  CLOSED
+}
+
+enum MissionStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+enum MissionType {
+  VISITE
+  ETAT_DES_LIEUX_ENTREE
+  ETAT_DES_LIEUX_SORTIE
+  PHOTOS
+}
