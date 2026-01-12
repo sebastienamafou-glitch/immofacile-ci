@@ -29,6 +29,11 @@ model User {
   // --- KYC & Légal ---
   kycStatus       VerificationStatus @default(PENDING)
   kycDocuments    String[]           // URLs des documents (CNI, Passeport)
+
+  // ✅ AJOUTS CRITIQUES POUR LE MODULE AGENT
+  kycDocumentUrl  String?            // L'image principale de la CNI
+  income          Int?               // Revenus mensuels déclarés
+  jobTitle        String?            // Profession du locataire
   
   // --- Fintech (Wallet) ---
   walletBalance   Int                @default(0) // Argent disponible
@@ -37,6 +42,7 @@ model User {
   
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+  isAvailable     Boolean            @default(false)
   
   // --- Relations ---
   propertiesOwned    Property[]      @relation("PropertyOwner")

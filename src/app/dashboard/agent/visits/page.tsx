@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api"; // Axios gère les cookies automatiquement
 import { toast } from "sonner";
 import { 
   MapPin, Calendar, Clock, ArrowRight, CheckCircle, 
-  AlertCircle, DollarSign, Briefcase, Navigation, Loader2 
+  Briefcase, Navigation, Loader2 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +14,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Mission {
   id: string;
-  type: string; // VISITE, ETAT_LIEUX
+  type: string;
   fee: number;
   commune: string;
   dateScheduled: string;
-  status: string; // PENDING, ACCEPTED, COMPLETED
+  status: string;
   property: {
     title: string;
     address: string;
@@ -28,27 +28,31 @@ interface Mission {
 
 export default function AgentVisitsPage() {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("available"); // available, agenda, history
+  const [activeTab, setActiveTab] = useState("available"); 
   
   const [availableMissions, setAvailableMissions] = useState<Mission[]>([]);
   const [myMissions, setMyMissions] = useState<Mission[]>([]);
   const [historyMissions, setHistoryMissions] = useState<Mission[]>([]);
 
-  // Chargement des données
+  // --- CHARGEMENT SYNCHRONISÉ ---
   const fetchMissions = async () => {
     try {
       setLoading(true);
       
-      // 1. Missions Disponibles (Marketplace)
-      const resAvailable = await api.get('/missions/available');
-      if (resAvailable.data.success) setAvailableMissions(resAvailable.data.missions);
+      // ✅ APPEL CORRIGÉ : On tape sur la route unique qui agrège tout
+      const res = await api.get('/agent/missions');
+      
+      if (res.data.success) {
+        const { available, myMissions: allMy } = res.data.data;
+        
+        // 1. Marketplace
+        setAvailableMissions(available || []);
 
-      // 2. Mes Missions (Agenda & Historique)
-      const resMy = await api.get('/missions/my');
-      if (resMy.data.success) {
-        const allMy = resMy.data.missions;
-        setMyMissions(allMy.filter((m: Mission) => m.status === 'ACCEPTED'));
-        setHistoryMissions(allMy.filter((m: Mission) => m.status === 'COMPLETED'));
+        // 2. Mes Missions (Dispatch selon statut)
+        if (Array.isArray(allMy)) {
+            setMyMissions(allMy.filter((m: Mission) => m.status === 'ACCEPTED'));
+            setHistoryMissions(allMy.filter((m: Mission) => m.status === 'COMPLETED'));
+        }
       }
 
     } catch (error) {
@@ -67,22 +71,23 @@ export default function AgentVisitsPage() {
 
   const handleAccept = async (missionId: string) => {
     try {
-        await api.post('/missions/accept', { missionId });
+        // ✅ URL CORRIGÉE
+        await api.post('/agent/missions/accept', { missionId });
         toast.success("Mission acceptée ! Ajoutée à votre agenda.");
-        fetchMissions(); // Rafraichir
-        setActiveTab("agenda"); // Basculer vers l'agenda
+        fetchMissions(); 
+        setActiveTab("agenda"); 
     } catch (error: any) {
         toast.error(error.response?.data?.error || "Erreur lors de l'acceptation.");
     }
   };
 
   const handleComplete = async (missionId: string) => {
-    // Pour la V1, on valide directement. 
-    // Plus tard : Ouvrir une modale pour uploader le rapport de visite.
+    // Note : Pour la V2, ajouter une modale avec upload de photo/rapport
     if(!confirm("Confirmer que la visite a été effectuée ?")) return;
 
     try {
-        await api.post('/missions/complete', { missionId, reportData: { note: "Effectué via App" } });
+        // ✅ URL CORRIGÉE
+        await api.post('/agent/missions/complete', { missionId, reportData: { note: "Effectué via App" } });
         toast.success("Visite validée ! Commission créditée.");
         fetchMissions();
     } catch (error) {
@@ -91,15 +96,15 @@ export default function AgentVisitsPage() {
   };
 
   if (loading) return (
-    <div className="flex h-[80vh] items-center justify-center">
+    <div className="flex h-[80vh] items-center justify-center bg-[#060B18]">
         <Loader2 className="w-10 h-10 text-emerald-500 animate-spin"/>
     </div>
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto min-h-screen pb-20">
+    <div className="p-4 lg:p-10 max-w-7xl mx-auto min-h-screen bg-[#060B18] pb-20 font-sans">
       
-      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
         <div>
             <h1 className="text-3xl font-black text-white tracking-tight">Gestion des Visites</h1>
             <p className="text-slate-400 mt-1">Gérez votre planning et acceptez de nouvelles missions.</p>
@@ -113,16 +118,16 @@ export default function AgentVisitsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         
         {/* Navigation Onglets */}
-        <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl w-full md:w-auto flex">
-            <TabsTrigger value="available" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white font-bold transition-all">
+        <TabsList className="bg-slate-900 border border-slate-800 p-1 rounded-xl w-full md:w-auto flex overflow-x-auto">
+            <TabsTrigger value="available" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-400 font-bold transition-all">
                 📍 Nouvelles Missions 
                 {availableMissions.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 rounded-full animate-pulse">{availableMissions.length}</span>}
             </TabsTrigger>
-            <TabsTrigger value="agenda" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-bold transition-all">
+            <TabsTrigger value="agenda" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white text-slate-400 font-bold transition-all">
                 📅 Mon Planning
                 {myMissions.length > 0 && <span className="ml-2 bg-slate-700 text-white text-[10px] px-1.5 rounded-full">{myMissions.length}</span>}
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-slate-700 data-[state=active]:text-white font-bold transition-all">
+            <TabsTrigger value="history" className="flex-1 md:flex-none px-6 py-2.5 data-[state=active]:bg-slate-700 data-[state=active]:text-white text-slate-400 font-bold transition-all">
                 ✅ Historique
             </TabsTrigger>
         </TabsList>
@@ -188,25 +193,26 @@ export default function AgentVisitsPage() {
 
 function MissionCard({ mission, type, onAction }: { mission: Mission, type: string, onAction: () => void }) {
     return (
-        <Card className="bg-slate-900 border-slate-800 text-white overflow-hidden hover:border-emerald-500/50 transition-all group flex flex-col">
+        <Card className="bg-slate-900 border-slate-800 text-white overflow-hidden hover:border-emerald-500/50 transition-all group flex flex-col shadow-lg">
             <div className="h-40 bg-slate-800 relative">
-                {/* Image Placeholder ou réelle */}
                 {mission.property.images?.[0] ? (
-                    <img src={mission.property.images[0]} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" />
+                    <img src={mission.property.images[0]} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-500" />
                 ) : (
-                    <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600">No Image</div>
+                    <div className="w-full h-full bg-slate-800 flex items-center justify-center text-slate-600">
+                        <MapPin className="w-8 h-8 opacity-20"/>
+                    </div>
                 )}
                 <div className="absolute top-3 right-3 bg-black/60 backdrop-blur px-3 py-1 rounded-full border border-white/10">
                     <span className="text-emerald-400 font-bold text-sm">+{mission.fee.toLocaleString()} F</span>
                 </div>
                 <div className="absolute bottom-3 left-3">
-                     <Badge className="bg-emerald-500 text-black font-bold hover:bg-emerald-400">{mission.type}</Badge>
+                     <Badge className="bg-emerald-500 text-black font-bold hover:bg-emerald-400 transition-colors border-0">{mission.type}</Badge>
                 </div>
             </div>
             <CardContent className="p-5 flex-1 flex flex-col">
-                <h4 className="font-bold text-lg mb-1 truncate">{mission.property.title}</h4>
-                <p className="text-slate-400 text-sm flex items-center gap-1 mb-4">
-                    <MapPin className="w-3 h-3 text-slate-500"/> {mission.property.address}, {mission.commune}
+                <h4 className="font-bold text-lg mb-1 truncate text-white">{mission.property.title}</h4>
+                <p className="text-slate-400 text-sm flex items-center gap-1 mb-4 truncate">
+                    <MapPin className="w-3 h-3 text-slate-500 shrink-0"/> {mission.property.address}, {mission.commune}
                 </p>
                 
                 <div className="mt-auto pt-4 border-t border-slate-800">
@@ -214,7 +220,7 @@ function MissionCard({ mission, type, onAction }: { mission: Mission, type: stri
                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3"/> {new Date(mission.dateScheduled).toLocaleDateString()}</span>
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(mission.dateScheduled).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                     </div>
-                    <Button onClick={onAction} className="w-full bg-white text-black hover:bg-emerald-500 hover:text-black font-bold">
+                    <Button onClick={onAction} className="w-full bg-white text-black hover:bg-emerald-500 hover:text-white font-bold transition-all">
                         ACCEPTER LA COURSE <ArrowRight className="w-4 h-4 ml-2"/>
                     </Button>
                 </div>
@@ -225,7 +231,7 @@ function MissionCard({ mission, type, onAction }: { mission: Mission, type: stri
 
 function MissionRow({ mission, onComplete }: { mission: Mission, onComplete: () => void }) {
     return (
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row justify-between items-center gap-6 shadow-lg">
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row justify-between items-center gap-6 shadow-lg hover:border-blue-500/30 transition-all">
             <div className="flex items-center gap-6 w-full md:w-auto">
                 <div className="hidden md:flex w-16 h-16 bg-blue-900/20 text-blue-400 rounded-xl items-center justify-center border border-blue-500/20 shrink-0">
                     <Navigation className="w-8 h-8"/>
@@ -247,7 +253,7 @@ function MissionRow({ mission, onComplete }: { mission: Mission, onComplete: () 
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Commission</p>
                     <p className="text-emerald-400 font-bold text-lg">{mission.fee} F</p>
                  </div>
-                 <Button onClick={onComplete} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 px-6 shadow-lg shadow-blue-600/20">
+                 <Button onClick={onComplete} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 px-6 shadow-lg shadow-blue-600/20 active:scale-95 transition-all">
                     <CheckCircle className="w-4 h-4 mr-2"/> TERMINER
                  </Button>
             </div>

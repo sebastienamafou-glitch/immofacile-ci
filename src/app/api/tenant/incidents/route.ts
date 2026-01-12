@@ -1,20 +1,28 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { verifyToken } from '@/lib/auth';
+import { prisma } from '@/lib/prisma'; // ✅ 1. Utilisation du Singleton
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
-// GET : Récupérer tous les incidents du locataire
+// Fonction utilitaire pour récupérer l'utilisateur via le header sécurisé
+async function getAuthenticatedUser(request: Request) {
+  const email = request.headers.get("x-user-email"); // ✅ 2. Sécurité via Middleware
+  if (!email) return null;
+  
+  return await prisma.user.findUnique({
+    where: { email }
+  });
+}
+
 export async function GET(request: Request) {
   try {
-    const user = verifyToken(request);
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     
-    // On récupère les incidents et l'artisan assigné (s'il y en a un)
     const incidents = await prisma.incident.findMany({
       where: { reporterId: user.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        assignedTo: { // L'artisan
+        assignedTo: { 
           select: { name: true, phone: true }
         }
       }
@@ -23,45 +31,52 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, incidents });
 
   } catch (error) {
-    return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    console.error("Erreur GET Incidents:", error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
 
-// POST : Créer un nouveau signalement
 export async function POST(request: Request) {
   try {
-    const user = verifyToken(request);
+    // 1. Identification robuste
+    const user = await getAuthenticatedUser(request);
+    if (!user) return NextResponse.json({ error: 'Session expirée' }, { status: 401 });
+
     const body = await request.json();
     const { type, description } = body;
 
     if (!type || !description) {
-      return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+      return NextResponse.json({ error: "Type et description requis" }, { status: 400 });
     }
 
-    // On doit trouver la propriété liée au locataire (via son bail actif)
+    // 2. Trouver la propriété liée via le bail actif
     const lease = await prisma.lease.findFirst({
-      where: { tenantId: user.id, status: { in: ['ACTIVE', 'PENDING'] } }
+      where: { 
+        tenantId: user.id, 
+        status: { in: ['ACTIVE', 'PENDING'] } 
+      }
     });
 
     if (!lease) {
-      return NextResponse.json({ error: "Aucun bail actif trouvé" }, { status: 404 });
+      return NextResponse.json({ error: "Aucun bail actif trouvé pour ce compte" }, { status: 404 });
     }
 
+    // 3. Création sécurisée avec l'ID confirmé
     const newIncident = await prisma.incident.create({
       data: {
-        title: `${type} - ${user.name || 'Locataire'}`, // Titre auto généré
+        title: `${type} - ${user.name || 'Locataire'}`,
         description: description,
         priority: 'NORMAL',
         status: 'OPEN',
-        reporterId: user.id,
+        reporterId: user.id, // ✅ Ici, user.id vient de la DB, il n'est jamais undefined
         propertyId: lease.propertyId
       }
     });
 
     return NextResponse.json({ success: true, incident: newIncident });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur Création Incident:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
   }
 }

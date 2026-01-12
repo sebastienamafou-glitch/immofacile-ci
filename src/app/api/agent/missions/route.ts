@@ -1,31 +1,67 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // ✅ Singleton OK
+
+// Indispensable pour éviter que Next.js ne cache la réponse
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. Missions disponibles (Marketplace)
+    // 1. SÉCURITÉ : On récupère l'agent connecté via le Middleware
+    const userEmail = request.headers.get("x-user-email");
+    
+    if (!userEmail) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    // On récupère l'ID de l'agent
+    const agent = await prisma.user.findUnique({
+        where: { email: userEmail }
+    });
+
+    if (!agent) {
+        return NextResponse.json({ error: "Compte agent introuvable" }, { status: 404 });
+    }
+
+    // 2. LOGIQUE MÉTIER
+
+    // A. Marketplace : Missions en attente (disponibles pour tous les agents)
     const available = await prisma.mission.findMany({
-      where: { status: "PENDING" },
-      include: { property: { select: { address: true, commune: true, type: true } } },
+      where: { 
+        status: "PENDING",
+        agentId: null // On s'assure qu'elle n'est pas déjà prise
+      },
+      include: { 
+        property: { 
+            select: { address: true, commune: true, type: true } 
+        } 
+      },
       orderBy: { dateScheduled: 'asc' }
     });
 
-    // 2. Mes missions (Acceptées par l'agent courant)
+    // B. Mes missions : Celles assignées spécifiquement à CET agent
     const myMissions = await prisma.mission.findMany({
       where: { 
-        agent: { role: "AGENT" }, // À remplacer par agentId dynamique
+        agentId: agent.id, // ✅ Correction critique : filtrage par ID
         status: { in: ["ACCEPTED", "COMPLETED"] } 
       },
-      include: { property: true }
+      include: { 
+        property: {
+            select: { address: true, commune: true, type: true }
+        }
+      },
+      orderBy: { dateScheduled: 'desc' }
     });
 
     return NextResponse.json({
       success: true,
-      available,
-      myMissions
+      data: {
+          available,
+          myMissions
+      }
     });
 
-  } catch (error) {
-    return NextResponse.json({ error: "Erreur missions" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erreur API Missions:", error);
+    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
   }
 }

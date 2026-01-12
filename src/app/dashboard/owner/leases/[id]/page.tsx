@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react"; // Retrait de 'use' qui n'est pas nécessaire ici
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { 
   ArrowLeft, Download, Ban, User, MapPin, Calendar, 
-  Wallet, CheckCircle, XCircle, FileText, Loader2, 
+  Wallet, CheckCircle, FileText, Loader2, 
   AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
@@ -14,8 +14,11 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function LeaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+// Correction 1 : Typage standard pour Next.js 14 (pas de Promise)
+export default function LeaseDetailPage({ params }: { params: { id: string } }) {
+  // Correction 2 : Accès direct aux params sans le hook use()
+  const { id } = params;
+  
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [lease, setLease] = useState<any>(null);
@@ -92,20 +95,24 @@ export default function LeaseDetailPage({ params }: { params: Promise<{ id: stri
                     <Download className="w-4 h-4" /> PDF Certifié
                 </a>
 
-                {/* Bouton Résiliation (Seulement si actif) */}
+                {/* Boutons Actions (Seulement si actif) */}
                 {lease.isActive && (
-                    <button 
-                        onClick={handleTerminate}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl transition text-sm font-bold"
-                    >
-                        <Ban className="w-4 h-4" /> Résilier
+                    <>
+                        {/* Correction 3 : Séparation des boutons (Link ne doit pas être dans button) */}
+                        <button 
+                            onClick={handleTerminate}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl transition text-sm font-bold"
+                        >
+                            <Ban className="w-4 h-4" /> Résilier
+                        </button>
+
                         <Link 
                             href={`/dashboard/owner/leases/${id}/notice`}
                             className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/20 rounded-xl transition text-sm font-bold"
-      >
+                        >
                             <AlertTriangle className="w-4 h-4" /> Mise en Demeure
                         </Link>
-                    </button>
+                    </>
                 )}
             </div>
         </div>

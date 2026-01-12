@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react"; // Retrait de 'use'
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-export default function FormalNoticePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+// CORRECTION ICI : Retrait de Promise<...> et accès direct
+export default function FormalNoticePage({ params }: { params: { id: string } }) {
+  const { id } = params; // Plus besoin de use(params)
+  
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -111,14 +113,14 @@ export default function FormalNoticePage({ params }: { params: Promise<{ id: str
                 nous vous mettons en demeure de régler ladite somme sous un délai impératif de <strong>48 heures</strong>.
             </p>
 
-            <p className="bg-gray-100 p-4 border-l-4 border-red-600 text-sm font-medium">
+            <div className="bg-gray-100 p-4 border-l-4 border-red-600 text-sm font-medium">
                 À défaut de paiement intégral dans ce délai, nous avons pour instruction irrévocable d'engager :
                 <ol className="list-decimal pl-5 mt-2 space-y-1 font-bold">
                     <li>La résiliation de plein droit de votre bail ;</li>
                     <li>Une procédure d'expulsion forcée par voie de justice ;</li>
                     <li>La saisie conservatoire de vos comptes bancaires et biens mobiliers.</li>
                 </ol>
-            </p>
+            </div>
 
             <p className="font-bold text-center mt-8 uppercase text-sm tracking-widest">
                 VEUILLEZ CONSIDÉRER LA PRÉSENTE COMME DERNIÈRE SOMMATION AVANT POURSUITES.

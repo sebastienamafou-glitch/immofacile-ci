@@ -14,23 +14,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-// --- TYPES STRICTS ---
-interface Mission {
+// On parle d'Incidents (Réparations) pour les Artisans
+interface Job {
   id: string;
   title: string;
   description: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
-  address: string;
-  clientName?: string;
-  clientPhone?: string;
-  amount: number;
-  dateScheduled: string;
+  status: string; // OPEN, IN_PROGRESS, RESOLVED
+  priority: string;
+  address: string; // Adresse du bien
+  reporterName?: string;
+  reporterPhone?: string;
+  quoteAmount?: number; // Montant du devis/intervention
+  createdAt: string;
 }
 
 interface ArtisanStats {
-  missionsCount: number;
+  jobsCount: number;
   rating: number;
-  monthlyEarnings: number;
+  earnings: number;
 }
 
 interface ArtisanData {
@@ -41,50 +42,30 @@ interface ArtisanData {
     isAvailable: boolean;
   };
   stats: ArtisanStats;
-  missions: Mission[];
+  jobs: Job[];
 }
-
-// Fonction utilitaire sécurisée pour récupérer l'utilisateur
-const getArtisanUser = () => {
-  if (typeof window === "undefined") return null;
-  const stored = localStorage.getItem("immouser");
-  if (!stored) return null;
-  return JSON.parse(stored);
-};
 
 export default function ArtisanDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  
-  // État global des données
   const [data, setData] = useState<ArtisanData | null>(null);
 
-  // --- 1. CHARGEMENT DES DONNÉES SÉCURISÉ ---
+  // --- 1. CHARGEMENT (Sécurisé par Cookie) ---
   const fetchDashboard = async () => {
-    const user = getArtisanUser();
-    
-    // Sécurité : Si pas connecté, redirection
-    if (!user) {
-        router.push('/login'); 
-        return;
-    }
-
     try {
-        // Injection du header de sécurité OBLIGATOIRE
-        const res = await api.get('/artisan/dashboard', {
-            headers: { 'x-user-email': user.email }
-        });
+        // ✅ Plus de headers manuels ici
+        const res = await api.get('/artisan/dashboard');
 
         if (res.data.success) {
             setData(res.data);
-        } else {
-            toast.error("Impossible de charger le tableau de bord.");
         }
     } catch (error: any) {
-        console.error("Erreur Dashboard Artisan:", error);
+        console.error("Erreur Dashboard:", error);
         if (error.response?.status === 401) {
              toast.error("Session expirée.");
              router.push('/login');
+        } else {
+             toast.error("Impossible de charger les données.");
         }
     } finally {
         setLoading(false);
@@ -93,68 +74,56 @@ export default function ArtisanDashboard() {
 
   useEffect(() => {
     fetchDashboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- 2. ACTIONS ---
 
-  // --- 2. ACTIONS MÉTIER SÉCURISÉES ---
-
-  // Changer la disponibilité
   const toggleAvailability = async () => {
-    const user = getArtisanUser();
-    if (!user || !data) return;
-
+    if (!data) return;
     try {
         const newStatus = !data.user.isAvailable;
-        
-        // Optimistic UI update (mise à jour visuelle immédiate)
+        // Optimistic Update
         setData({ ...data, user: { ...data.user, isAvailable: newStatus } });
 
-        await api.post('/artisan/status', 
-            { available: newStatus },
-            { headers: { 'x-user-email': user.email } }
-        );
-        toast.success(newStatus ? "Vous êtes maintenant visible." : "Vous êtes passé hors ligne.");
+        await api.post('/artisan/status', { available: newStatus });
+        toast.success(newStatus ? "Vous êtes EN LIGNE." : "Vous êtes HORS LIGNE.");
     } catch (error) {
-        toast.error("Erreur lors du changement de statut.");
-        fetchDashboard(); // Rollback en cas d'erreur
+        toast.error("Erreur connexion serveur.");
+        fetchDashboard(); // Rollback
     }
   };
 
-  // Gérer une mission (Accepter / Refuser / Terminer)
-  const handleMissionAction = async (missionId: string, action: 'ACCEPT' | 'REJECT' | 'COMPLETE') => {
-    const user = getArtisanUser();
-    if (!user) return;
-
-    // Confirmation pour Clôturer
+  const handleJobAction = async (jobId: string, action: 'ACCEPT' | 'REJECT' | 'COMPLETE') => {
+    
     if (action === 'COMPLETE') {
         const confirm = await Swal.fire({
-            title: 'Terminer le chantier ?',
-            text: "Cela déclenchera la demande de paiement.",
-            icon: 'question',
+            title: 'Chantier terminé ?',
+            text: "Cela validera l'intervention et le paiement.",
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#2563EB',
+            confirmButtonColor: '#10B981',
+            cancelButtonColor: '#d33',
             confirmButtonText: 'Oui, terminer',
             cancelButtonText: 'Annuler',
-            background: '#1e293b',
-            color: '#fff'
+            background: '#0f172a', color: '#fff'
         });
         if (!confirm.isConfirmed) return;
     }
 
     try {
-        await api.post(`/artisan/missions/action`, 
-            { missionId, action }, 
-            { headers: { 'x-user-email': user.email } }
-        );
+        await api.post(`/artisan/jobs/action`, { jobId, action });
 
-        if (action === 'ACCEPT') {
-            Swal.fire({ icon: 'success', title: 'Mission Acceptée', text: 'Le client a été notifié.', timer: 2000, showConfirmButton: false, background: '#1e293b', color: '#fff' });
-        } else if (action === 'COMPLETE') {
-            Swal.fire({ icon: 'success', title: 'Félicitations !', text: 'Paiement en cours de validation.', timer: 2000, showConfirmButton: false, background: '#1e293b', color: '#fff' });
-        }
+        if (action === 'ACCEPT') toast.success("Chantier accepté !");
+        if (action === 'REJECT') toast.info("Offre déclinée.");
+        if (action === 'COMPLETE') Swal.fire({ 
+            title: 'Beau travail !', 
+            text: 'Intervention validée.', 
+            icon: 'success', 
+            background: '#0f172a', color: '#fff',
+            timer: 2000, showConfirmButton: false
+        });
 
-        fetchDashboard(); // Rafraîchir la liste
+        fetchDashboard(); 
 
     } catch (error: any) {
         toast.error(error.response?.data?.error || "Action impossible.");
@@ -164,172 +133,118 @@ export default function ArtisanDashboard() {
   if (loading) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center gap-4 text-white">
         <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-        <p className="text-slate-400 font-medium animate-pulse">Chargement Espace Pro...</p>
     </div>
   );
 
-  if (!data) return null; // Ou composant d'erreur
+  if (!data) return null;
 
-  const { user, stats, missions } = data;
+  const { user, stats, jobs } = data;
 
   return (
     <div className="flex min-h-screen bg-[#0B1120] text-slate-200 font-sans">
       
-      {/* --- SIDEBAR ARTISAN --- */}
+      {/* SIDEBAR */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden lg:flex flex-col fixed h-full bg-[#0B1120] z-10">
         <div className="flex items-center gap-2 mb-10">
             <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center font-black text-white">P</div>
             <span className="text-xl font-bold text-white tracking-tight">IMMO<span className="text-orange-500">.PRO</span></span>
         </div>
-        
         <nav className="space-y-2 flex-1">
-            <Link href="/dashboard/artisan" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-600 text-white shadow-lg shadow-orange-900/20 font-medium">
-                <LayoutDashboard className="w-5 h-5" /> Mes Chantiers
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition font-medium">
-                <Wrench className="w-5 h-5" /> Compétences
-            </Link>
+            <Button variant="ghost" className="w-full justify-start text-orange-500 bg-orange-500/10 font-bold"><LayoutDashboard className="w-4 h-4 mr-2"/> Chantiers</Button>
+            <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white"><Wrench className="w-4 h-4 mr-2"/> Profil & Services</Button>
         </nav>
-
-        <button 
-            onClick={() => { localStorage.removeItem("immouser"); router.push('/login'); }} 
-            className="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition font-bold text-sm"
-        >
-            <LogOut className="w-5 h-5" /> Déconnexion
-        </button>
+        <Button variant="ghost" onClick={() => router.push('/login')} className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20"><LogOut className="w-4 h-4 mr-2"/> Déconnexion</Button>
       </aside>
 
-      {/* --- CONTENU PRINCIPAL --- */}
+      {/* MAIN */}
       <main className="flex-1 p-6 md:p-10 lg:ml-64 pb-20">
-        
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
+        <header className="flex justify-between items-end mb-10">
             <div>
-                <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-black text-white">{user.name} 🛠️</h1>
-                    {/* Switch Disponibilité */}
-                    <button 
-                        onClick={toggleAvailability} 
-                        className={`px-3 py-1 rounded-full border flex items-center gap-2 transition-all ${user.isAvailable ? 'border-green-500 bg-green-500/10 hover:bg-green-500/20' : 'border-red-500 bg-red-500/10 hover:bg-red-500/20'}`}
-                    >
-                        <div className={`w-2 h-2 rounded-full ${user.isAvailable ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                        <span className={`text-xs font-bold ${user.isAvailable ? 'text-green-400' : 'text-red-400'}`}>
-                            {user.isAvailable ? 'Disponible' : 'Indisponible'}
-                        </span>
+                <h1 className="text-3xl font-black text-white mb-2">Bonjour, {user.name}</h1>
+                <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="border-orange-500 text-orange-500">Artisan Certifié</Badge>
+                    <button onClick={toggleAvailability} className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold transition-all ${user.isAvailable ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-slate-600 bg-slate-800 text-slate-400'}`}>
+                        <div className={`w-2 h-2 rounded-full ${user.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                        {user.isAvailable ? 'DISPONIBLE' : 'HORS LIGNE'}
                     </button>
                 </div>
-                <p className="text-slate-400 text-sm">Artisan Certifié • Note: {stats.rating}/5 ⭐</p>
             </div>
-
-            {/* Widget Gains */}
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center gap-6 w-full md:w-auto">
-                <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase">Portefeuille</p>
-                    <p className="text-3xl font-black text-orange-500">{user.walletBalance.toLocaleString()} F</p>
-                </div>
-                <Button size="icon" className="bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-black transition">
-                    <Download className="w-5 h-5" />
-                </Button>
+            <div className="text-right hidden md:block">
+                <p className="text-xs font-bold text-slate-500 uppercase">Solde Portefeuille</p>
+                <p className="text-3xl font-black text-white">{user.walletBalance.toLocaleString()} F</p>
             </div>
         </header>
 
-        {/* STATS RAPIDES */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <Card className="bg-slate-900 border-slate-800 text-white">
-                <CardContent className="p-6">
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Missions Totales</p>
-                    <p className="text-2xl font-black">{stats.missionsCount}</p>
-                </CardContent>
-            </Card>
-            <Card className="bg-slate-900 border-slate-800 text-white">
-                <CardContent className="p-6">
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Satisfaction Client</p>
-                    <p className="text-2xl font-black text-yellow-400">{stats.rating}/5</p>
-                </CardContent>
-            </Card>
-            <Card className="bg-slate-900 border-slate-800 text-white">
-                <CardContent className="p-6">
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Revenus ce mois</p>
-                    <p className="text-2xl font-black text-green-500">{stats.monthlyEarnings.toLocaleString()} F</p>
-                </CardContent>
-            </Card>
+        {/* KPI */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="bg-slate-900 border-slate-800"><CardContent className="p-6">
+                <p className="text-slate-500 text-xs font-bold uppercase">Missions Réalisées</p>
+                <p className="text-2xl font-black text-white">{stats.jobsCount}</p>
+            </CardContent></Card>
+            <Card className="bg-slate-900 border-slate-800"><CardContent className="p-6">
+                <p className="text-slate-500 text-xs font-bold uppercase">Note Moyenne</p>
+                <p className="text-2xl font-black text-yellow-400">{stats.rating}/5</p>
+            </CardContent></Card>
+            <Card className="bg-slate-900 border-slate-800"><CardContent className="p-6">
+                <p className="text-slate-500 text-xs font-bold uppercase">Gains Totaux</p>
+                <p className="text-2xl font-black text-emerald-400">{stats.earnings.toLocaleString()} F</p>
+            </CardContent></Card>
         </div>
 
-        {/* LISTE DES MISSIONS */}
-        <h3 className="font-bold text-xl text-white mb-6 flex items-center gap-2">
-            <Hammer className="text-orange-500" /> Missions en cours
-        </h3>
+        {/* LISTE JOBS */}
+        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Hammer className="text-orange-500"/> Tableau de bord des interventions</h2>
         
         <div className="space-y-4">
-            {missions.length > 0 ? missions.map(m => (
-                <Card key={m.id} className="bg-slate-900 border-slate-800 text-white hover:border-slate-700 transition group">
-                    <CardContent className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        
-                        <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-xl ${m.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-800 text-slate-400'}`}>
-                                <Hammer />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-3 mb-1 flex-wrap">
-                                    <h4 className="font-bold text-lg">{m.title}</h4>
-                                    <Badge variant="outline" className={m.status === 'IN_PROGRESS' ? 'text-blue-400 border-blue-400 bg-blue-400/10' : 'text-slate-400 border-slate-600'}>
-                                        {m.status === 'IN_PROGRESS' ? 'En Cours' : 'Nouvelle Demande'}
+            {jobs.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl bg-slate-900/50">
+                    <p className="text-slate-500">Aucune intervention en cours.</p>
+                </div>
+            ) : (
+                jobs.map(job => (
+                    <Card key={job.id} className="bg-slate-900 border-slate-800 text-slate-200">
+                        <CardContent className="p-6 flex flex-col md:flex-row gap-6">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Badge className={job.status === 'IN_PROGRESS' ? 'bg-blue-600' : 'bg-slate-700'}>
+                                        {job.status === 'IN_PROGRESS' ? 'EN COURS' : 'NOUVEAU'}
                                     </Badge>
+                                    <span className="text-xs text-slate-500 font-mono">{new Date(job.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <p className="text-sm text-slate-400 flex items-center gap-2 mb-1">
-                                    <MapPin className="w-3 h-3" /> {m.address}
-                                </p>
-                                <p className="text-sm text-slate-500 italic">"{m.description}"</p>
+                                <h3 className="text-lg font-bold text-white mb-1">{job.title}</h3>
+                                <p className="text-slate-400 text-sm mb-4"><MapPin className="w-3 h-3 inline mr-1"/> {job.address}</p>
                                 
-                                {/* Info Client (Visible uniquement si mission acceptée) */}
-                                {m.status === 'IN_PROGRESS' && m.clientName && (
-                                    <div className="mt-3 p-3 bg-slate-950 rounded-lg border border-slate-800 inline-block animate-in fade-in">
-                                        <p className="text-xs text-slate-400 font-bold uppercase mb-1">Contact Client</p>
-                                        <p className="font-mono text-sm text-white flex items-center gap-2">
-                                            {m.clientName} 
-                                            {m.clientPhone && (
-                                                <>
-                                                    • <a href={`tel:${m.clientPhone}`} className="text-orange-400 hover:text-orange-300 font-bold hover:underline">{m.clientPhone}</a>
-                                                </>
-                                            )}
-                                        </p>
+                                {job.status === 'IN_PROGRESS' && (
+                                    <div className="bg-slate-950 p-3 rounded border border-slate-800 text-sm">
+                                        <p className="font-bold text-white mb-1">Contact Client :</p>
+                                        <p>{job.reporterName} • <span className="text-orange-400 select-all">{job.reporterPhone}</span></p>
                                     </div>
                                 )}
                             </div>
-                        </div>
 
-                        <div className="text-right w-full md:w-auto mt-4 md:mt-0">
-                            <p className="text-xl font-mono font-bold text-orange-400 mb-3">
-                                {m.amount > 0 ? m.amount.toLocaleString() + ' F' : 'Sur Devis'}
-                            </p>
-                            
-                            {m.status === 'PENDING' ? (
-                                <div className="flex gap-2 justify-end">
-                                    <Button onClick={() => handleMissionAction(m.id, 'ACCEPT')} size="sm" className="bg-green-600 hover:bg-green-500 text-white font-bold shadow-lg shadow-green-900/20">
-                                        <CheckCircle className="w-4 h-4 mr-2" /> Accepter
-                                    </Button>
-                                    <Button onClick={() => handleMissionAction(m.id, 'REJECT')} size="sm" variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
-                                        <XCircle className="w-4 h-4 mr-2" /> Refuser
-                                    </Button>
+                            <div className="flex flex-col items-end justify-center gap-3 min-w-[200px]">
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Budget / Devis</p>
+                                    <p className="text-xl font-black text-white">{job.quoteAmount ? `${job.quoteAmount.toLocaleString()} F` : 'Sur devis'}</p>
                                 </div>
-                            ) : (
-                                <Button onClick={() => handleMissionAction(m.id, 'COMPLETE')} size="sm" className="bg-blue-600 hover:bg-blue-500 w-full text-white font-bold shadow-lg shadow-blue-500/20">
-                                    <CheckCircle className="w-4 h-4 mr-2" /> Terminer & Encaisser
-                                </Button>
-                            )}
-                        </div>
 
-                    </CardContent>
-                </Card>
-            )) : (
-                <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
-                    <Clock className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <p className="text-slate-400 font-medium">Aucune mission pour le moment.</p>
-                    <p className="text-slate-600 text-xs mt-1">Restez connecté, les demandes arrivent en temps réel.</p>
-                </div>
+                                {job.status === 'OPEN' && (
+                                    <div className="flex gap-2 w-full">
+                                        <Button onClick={() => handleJobAction(job.id, 'ACCEPT')} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"><CheckCircle className="w-4 h-4 mr-2"/> Accepter</Button>
+                                        <Button onClick={() => handleJobAction(job.id, 'REJECT')} variant="outline" className="border-slate-700 text-slate-400 hover:text-white"><XCircle className="w-4 h-4"/></Button>
+                                    </div>
+                                )}
+                                
+                                {job.status === 'IN_PROGRESS' && (
+                                    <Button onClick={() => handleJobAction(job.id, 'COMPLETE')} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-900/20">
+                                        <CheckCircle className="w-4 h-4 mr-2"/> Terminer le chantier
+                                    </Button>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))
             )}
         </div>
-
       </main>
     </div>
   );

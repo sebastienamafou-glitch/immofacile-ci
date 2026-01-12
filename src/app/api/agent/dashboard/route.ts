@@ -1,32 +1,54 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // ✅ Singleton OK
+
+// Indispensable pour que le Dashboard affiche des données fraîches à chaque visite
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // Récupère l'agent connecté
-    const agent = await prisma.user.findFirst({
-      where: { role: "AGENT" },
+    // 1. SÉCURITÉ : On identifie précisément qui fait la demande via le Middleware
+    const userEmail = request.headers.get("x-user-email");
+    
+    if (!userEmail) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    // 2. RÉCUPÉRATION DE L'AGENT CONNECTÉ
+    const agent = await prisma.user.findUnique({
+      where: { email: userEmail },
       include: {
         missionsAccepted: {
-            where: { status: "COMPLETED" }
+            where: { status: "COMPLETED" } // On compte ses missions terminées
         },
-        leads: { take: 5, orderBy: { createdAt: 'desc' } }
+        leads: { 
+            take: 5, 
+            orderBy: { createdAt: 'desc' } // Ses derniers prospects
+        }
       }
     });
 
-    if (!agent) {
-       // Fallback si pas d'agent, pour ne pas crash l'UI
-       return NextResponse.json({ success: false, message: "Profil Agent introuvable" });
+    // Vérification stricte du rôle
+    if (!agent || agent.role !== 'AGENT') {
+       return NextResponse.json({ error: "Accès refusé. Profil Agent requis." }, { status: 403 });
     }
 
-    // Récupère les missions disponibles dans la zone (Simulé : toutes les missions PENDING)
+    // 3. STATISTIQUES DU MARCHÉ (Données globales accessibles aux agents)
+    // Nombre de missions en attente dans la zone (ou globalement selon votre logique)
     const availableMissions = await prisma.mission.count({
-        where: { status: "PENDING" }
+        where: { 
+            status: "PENDING",
+            agentId: null // Uniquement celles qui n'ont pas encore été prises
+        }
     });
 
+    // 4. RÉPONSE STANDARDISÉE
     return NextResponse.json({
       success: true,
-      user: agent,
+      user: {
+        name: agent.name,
+        email: agent.email,
+        role: agent.role
+      },
       stats: {
         completedMissions: agent.missionsAccepted.length,
         availableMissions: availableMissions,
@@ -35,8 +57,8 @@ export async function GET(request: Request) {
       recentLeads: agent.leads
     });
 
-  } catch (error) {
-    console.error("Erreur Agent:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erreur Agent Dashboard:", error);
+    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
   }
 }

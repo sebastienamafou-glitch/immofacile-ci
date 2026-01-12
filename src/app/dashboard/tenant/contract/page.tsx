@@ -5,30 +5,18 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { 
   Loader2, 
-  FileText, 
-  Download, 
-  Calendar, 
-  User, 
   ShieldCheck, 
   MapPin, 
   Building2, 
   CheckCircle2, 
   Scale,
-  PenTool
+  PenTool,
+  Eye,
+  FileText,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
-import Swal from "sweetalert2";
-
-const logoBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-
-interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-}
 
 interface LeaseContract {
   id: string;
@@ -51,13 +39,13 @@ interface LeaseContract {
   }
 }
 
-export default function TenantContractPage() {
+export default function TenantContractDashboard() {
   const [lease, setLease] = useState<LeaseContract | null>(null);
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [signing, setSigning] = useState(false);
   const router = useRouter();
 
+  // 1. CHARGEMENT
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -75,7 +63,7 @@ export default function TenantContractPage() {
         }
       } catch (error) {
         console.error("Fetch Error:", error);
-        toast.error("Erreur lors du chargement du contrat.");
+        toast.error("Erreur lors du chargement.");
       } finally {
         setLoading(false);
       }
@@ -83,133 +71,11 @@ export default function TenantContractPage() {
     fetchData();
   }, [router]);
 
-  const handleSignContract = async () => {
-    if (!lease || !user) return;
-
-    const result = await Swal.fire({
-        title: 'Signer le contrat ?',
-        text: "En confirmant, vous apposez votre signature numérique sur ce bail à usage d'habitation.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#2563eb',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Oui, je signe',
-        cancelButtonText: 'Annuler',
-        background: '#0F172A',
-        color: '#fff'
-    });
-
-    if (!result.isConfirmed) return;
-
-    setSigning(true);
-    try {
-        const res = await api.post('/tenant/contract/sign', {
-            leaseId: lease.id
-        }, {
-            headers: { 'x-user-email': user.email }
-        });
-
-        if (res.data.success) {
-            setLease(prev => prev ? ({
-                ...prev,
-                signatureStatus: "SIGNED_TENANT",
-                documentHash: res.data.hash,
-                updatedAt: res.data.date 
-            }) : null);
-
-            toast.success("Contrat signé avec succès !");
-        }
-    } catch (error) {
-        toast.error("Erreur lors de la signature.");
-    } finally {
-        setSigning(false);
-    }
-  };
-
-  const generateLegalPDF = () => {
-    if (!lease || !user || !lease.documentHash) {
-        toast.error("Données de certification manquantes.");
-        return;
-    }
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
-    let y = 0;
-    const lineHeight = 6;
-
-    const addText = (text: string, fontSize = 10, fontType = "normal", align: "left" | "center" | "justify" = "left", marginTop = 0) => {
-        if (y > pageHeight - 40) { doc.addPage(); y = 20; }
-        doc.setFont("times", fontType);
-        doc.setFontSize(fontSize);
-        y += marginTop;
-        if (align === "justify") {
-             const splitText = doc.splitTextToSize(text, contentWidth);
-             doc.text(splitText, margin, y);
-             y += (splitText.length * lineHeight * (fontSize / 10));
-        } else if (align === "center") {
-            doc.text(text, pageWidth / 2, y, { align: "center" });
-            y += lineHeight;
-        } else {
-            doc.text(text, margin, y);
-            y += lineHeight;
-        }
-    };
-
-    // Header Design
-    doc.setFillColor(15, 23, 42); 
-    doc.rect(0, 0, pageWidth, 45, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("times", "bold");
-    doc.setFontSize(16);
-    doc.text("CONTRAT DE LOCATION CERTIFIÉ", pageWidth - margin, 25, { align: "right" });
-    doc.setFontSize(9);
-    doc.text(`ID: ${lease.id.toUpperCase()}`, pageWidth - margin, 32, { align: "right" });
-
-    // --- CORPS DU CONTRAT ---
-    y = 60;
-    doc.setTextColor(0, 0, 0);
-    addText("CONTRAT DE BAIL À USAGE D'HABITATION", 14, "bold", "center");
-    addText("Soumis à la Loi n° 2019-576 du 26 juin 2019", 9, "italic", "center", 5);
-
-    addText("ENTRE LES SOUSSIGNÉS :", 11, "bold", "left", 15);
-    addText(`1. LE BAILLEUR : ${lease.property.owner.name.toUpperCase()}`, 10, "bold", "left", 5);
-    addText(`2. LE PRENEUR : ${user.name.toUpperCase()}`, 10, "bold", "left", 5);
-
-    addText("ARTICLE 1 – OBJET", 11, "bold", "left", 10);
-    addText(`Désignation : ${lease.property.title} sis à ${lease.property.address}, ${lease.property.commune}.`, 10, "normal", "justify", 3);
-
-    addText("ARTICLE 2 – CONDITIONS FINANCIÈRES", 11, "bold", "left", 8);
-    addText(`Loyer mensuel : ${lease.monthlyRent.toLocaleString()} FCFA`, 10, "normal", "left", 3);
-    addText(`Dépôt de garantie : ${lease.depositAmount.toLocaleString()} FCFA`, 10, "normal", "left", 2);
-
-    // --- BLOC DE SIGNATURE RÉELLE ---
-    y = pageHeight - 75;
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(15, 23, 42);
-    doc.roundedRect(margin, y, contentWidth, 45, 3, 3, 'FD');
-
-    y += 10;
-    doc.setFont("times", "bold");
-    doc.setFontSize(11);
-    doc.text("CERTIFICATION NUMÉRIQUE", pageWidth / 2, y, { align: "center" });
-    
-    y += 8;
-    doc.setFont("times", "normal");
-    doc.setFontSize(9);
-    const signDate = new Date(lease.updatedAt).toLocaleString("fr-FR");
-    doc.text(`Document signé électroniquement le : ${signDate}`, pageWidth / 2, y, { align: "center" });
-    
-    y += 8;
-    doc.setFont("courier", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(100);
-    doc.text(`HASH SHA-256 : ${lease.documentHash}`, pageWidth / 2, y, { align: "center" });
-    doc.text(`Certifié conforme par le protocole ImmoFacile Digital Ledger`, pageWidth / 2, y + 4, { align: "center" });
-
-    doc.save(`Contrat_Signe_${lease.id.substring(0,8)}.pdf`);
+  // 2. NAVIGATION VERS LA PAGE OFFICIELLE
+  const goToOfficialContract = () => {
+    if (!lease) return;
+    // Redirection vers la page dynamique [id] que nous avons créée précédemment
+    router.push(`/dashboard/tenant/contract/${lease.id}`);
   };
 
   if (loading) return (
@@ -221,7 +87,7 @@ export default function TenantContractPage() {
   if (!lease) return (
     <div className="min-h-screen bg-[#060B18] text-white flex flex-col items-center justify-center p-8 text-center">
         <FileText className="w-16 h-16 text-slate-700 mb-6" />
-        <h2 className="text-2xl font-bold">Aucun contrat trouvé</h2>
+        <h2 className="text-2xl font-bold">Aucun contrat actif</h2>
         <Button onClick={() => router.push('/dashboard/tenant')} className="mt-6 bg-slate-800">Retour</Button>
     </div>
   );
@@ -246,22 +112,28 @@ export default function TenantContractPage() {
                 </div>
             </div>
             
+            {/* LE BOUTON D'ACTION PRINCIPAL (Redirige maintenant vers la page détaillée) */}
             {isSigned ? (
-                <Button onClick={generateLegalPDF} className="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 h-14 rounded-2xl gap-2 shadow-xl transition-all">
-                    <Download className="w-5 h-5" /> TÉLÉCHARGER LE PDF
+                <Button 
+                    onClick={goToOfficialContract} 
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 h-14 rounded-2xl gap-2 shadow-xl transition-all"
+                >
+                    <Eye className="w-5 h-5" /> CONSULTER & TÉLÉCHARGER
                 </Button>
             ) : (
-                <Button onClick={handleSignContract} disabled={signing} className="bg-orange-600 hover:bg-orange-500 text-white font-black px-8 h-14 rounded-2xl gap-2 shadow-xl animate-pulse">
-                    {signing ? <Loader2 className="animate-spin" /> : <PenTool className="w-5 h-5" />}
-                    SIGNER LE CONTRAT MAINTENANT
+                <Button 
+                    onClick={goToOfficialContract} 
+                    className="bg-orange-600 hover:bg-orange-500 text-white font-black px-8 h-14 rounded-2xl gap-2 shadow-xl animate-pulse"
+                >
+                    <PenTool className="w-5 h-5" /> ALLER À LA SIGNATURE
                 </Button>
             )}
         </div>
 
+        {/* RESTE DU DASHBOARD (Info Cartes) */}
         <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2 space-y-6">
                 
-                {/* STATUS ALERT */}
                 {isSigned && (
                     <div className="bg-emerald-500/5 border border-emerald-500/20 p-6 rounded-[1.5rem] flex items-center gap-5">
                         <div className="bg-emerald-500/20 p-3 rounded-xl">
@@ -274,7 +146,6 @@ export default function TenantContractPage() {
                     </div>
                 )}
 
-                {/* PROPERTY CARD */}
                 <div className="bg-[#0F172A] border border-white/5 rounded-[2rem] p-8">
                     <h3 className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6 flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-blue-500"/> Détails de la propriété
@@ -285,7 +156,6 @@ export default function TenantContractPage() {
                     </p>
                 </div>
 
-                {/* TERMS GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-[#0F172A] border border-white/5 p-6 rounded-2xl">
                         <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Loyer Mensuel</p>
@@ -298,7 +168,6 @@ export default function TenantContractPage() {
                 </div>
             </div>
 
-            {/* SIGNATORIES COLUMN */}
             <div className="space-y-6">
                 <div className="bg-[#0F172A] border border-white/5 rounded-[2rem] p-8">
                     <h3 className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8 flex items-center gap-2">

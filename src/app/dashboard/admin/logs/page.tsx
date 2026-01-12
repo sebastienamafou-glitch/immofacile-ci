@@ -2,17 +2,31 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Ajouté pour redirection
+import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api"; 
 import { 
   ArrowLeft, Search, ShieldAlert, UserPlus, 
-  Banknote, Activity, FileSpreadsheet, Fingerprint, Calendar
+  Banknote, Activity, FileSpreadsheet, Fingerprint, Calendar, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 
+// ✅ 1. TYPAGE STRICT
+interface AuditLog {
+  id: string;
+  action: string;
+  category: string; // 'FINANCE' | 'SECURITY' | 'AUTH' | 'SYSTEM'
+  details: any;     // JSON flexible
+  createdAt: string;
+  user: {
+    name: string | null;
+    email: string;
+    role: string;
+  } | null;
+}
+
 export default function AdminLogsPage() {
   const router = useRouter();
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filtres
@@ -20,46 +34,39 @@ export default function AdminLogsPage() {
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd] = useState("");
 
-  // ✅ FONCTION AUTH (Indispensable)
-  const getAdminUser = () => {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return null;
-    const user = JSON.parse(stored);
-    return user.role === 'ADMIN' ? user : null;
-  };
-
   useEffect(() => {
     const fetchLogs = async () => {
-        const admin = getAdminUser();
-        // Si pas admin, on redirige (Sécurité Frontend)
-        if (!admin) { router.push('/login'); return; }
-
         try {
-            // ✅ APPEL SÉCURISÉ
-            const res = await api.get('/admin/logs', {
-                headers: { 'x-user-email': admin.email }
-            });
+            // ✅ 2. APPEL SÉCURISÉ (Le cookie fait tout le travail)
+            const res = await api.get('/admin/logs');
+            
             if (res.data.success) {
                 setLogs(res.data.logs);
             }
-        } catch (e) {
-            console.error("Erreur chargement logs", e);
-            toast.error("Impossible de charger le registre.");
+        } catch (error: any) {
+            console.error("Erreur Audit:", error);
+            // Si l'API renvoie 401/403, c'est que le cookie n'est pas bon ou pas Admin
+            if (error.response?.status === 401 || error.response?.status === 403) {
+                 toast.error("Accès refusé. Admin uniquement.");
+                 router.push('/login');
+            } else {
+                 toast.error("Impossible de charger le registre.");
+            }
         } finally {
             setLoading(false);
         }
     };
     fetchLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
   // 🔎 FILTRAGE AVANCÉ
   const filteredLogs = logs.filter(log => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-        (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.user?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.id || "").toLowerCase().includes(searchTerm.toLowerCase());
+        (log.action || "").toLowerCase().includes(searchLower) ||
+        (log.user?.name || "").toLowerCase().includes(searchLower) ||
+        (log.user?.email || "").toLowerCase().includes(searchLower) ||
+        (log.id || "").toLowerCase().includes(searchLower);
 
     let matchesDate = true;
     const logDate = new Date(log.createdAt).getTime();
@@ -109,10 +116,15 @@ export default function AdminLogsPage() {
       }
   };
 
-  if (loading) return <div className="min-h-screen bg-[#020617] flex items-center justify-center"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
+        <p className="text-slate-500 text-sm">Déchiffrement du registre...</p>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white p-6 md:p-8 font-sans">
+    <div className="min-h-screen bg-[#020617] text-white p-6 md:p-8 font-sans pb-20">
         
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-slate-800 pb-6">
@@ -231,7 +243,6 @@ export default function AdminLogsPage() {
                 </div>
             )}
         </div>
-        
     </div>
   );
 }

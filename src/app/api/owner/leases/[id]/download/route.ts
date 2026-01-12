@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import PDFDocument from "pdfkit";
+
+// CORRECTION 1 : Utiliser la version standalone qui inclut les polices (évite l'erreur ENOENT)
+const PDFDocument = require("pdfkit/js/pdfkit.standalone");
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Correction 1: Typage Promise (Next.js 15)
+  // CORRECTION 2 : Adaptation pour Next.js 14 (pas de Promise ici)
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params; // ✅ Correction 2: Await params
+    // CORRECTION 2 (Suite) : Accès direct sans await
+    const { id } = params;
 
     // 1. Récupération des données
     const lease = await prisma.lease.findUnique({
-      where: { id }, // ✅ Correction 3: On utilise 'id' qui correspond au nom du dossier [id]
+      where: { id },
       include: {
         property: { include: { owner: true } },
         tenant: true,
@@ -25,7 +29,7 @@ export async function GET(
       return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
     }
 
-    // 2. Génération du PDF (Moteur Node.js natif)
+    // 2. Génération du PDF
     const pdfBuffer = await generateLeasePDF(lease);
 
     return new NextResponse(pdfBuffer as any, {
@@ -37,17 +41,18 @@ export async function GET(
 
   } catch (error) {
     console.error("Erreur PDF:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la génération du PDF" }, { status: 500 });
   }
 }
 
-// Fonction utilitaire de dessin (Style identique à votre code)
+// Fonction utilitaire de dessin
 function generateLeasePDF(lease: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    // Instance du document
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks: Buffer[] = [];
 
-    doc.on('data', chunk => chunks.push(chunk));
+    doc.on('data', (chunk: any) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
@@ -94,8 +99,8 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.fillColor('black').font('Helvetica-Bold').text("2. CONDITIONS FINANCIÈRES", 60, startY_Finance);
     doc.moveDown(1.5);
 
-    const loyer = lease.monthlyRent.toLocaleString('fr-FR');
-    const caution = lease.depositAmount.toLocaleString('fr-FR');
+    const loyer = lease.monthlyRent ? lease.monthlyRent.toLocaleString('fr-FR') : "0";
+    const caution = lease.depositAmount ? lease.depositAmount.toLocaleString('fr-FR') : "0";
 
     doc.font('Helvetica')
        .text(`- Loyer Mensuel : ${loyer} FCFA`)
@@ -116,7 +121,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.font('Helvetica-Bold').text("Le PRENEUR", 355, ySign + 10);
 
     // Gestion de l'affichage de la signature
-    const signatureProof = lease.signatures.length > 0 ? lease.signatures[0] : null;
+    const signatureProof = lease.signatures && lease.signatures.length > 0 ? lease.signatures[0] : null;
     const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "COMPLETED";
 
     if (isSigned && signatureProof) {

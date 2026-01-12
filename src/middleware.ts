@@ -4,51 +4,66 @@ import { jwtVerify } from 'jose';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'votre_super_secret');
 
+// Liste des chemins qui nécessitent une authentification
+const PROTECTED_PATHS = [
+  '/dashboard',
+  '/api/tenant',
+  '/api/owner',
+  '/api/agent',
+  '/api/admin'
+];
+
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
-  // CIBLAGE : On protège toutes les routes API et Dashboard du locataire
-  if (pathname.startsWith('/api/tenant') || pathname.startsWith('/dashboard/tenant')) {
+  // 1. Vérifie si le chemin actuel commence par l'un des chemins protégés
+  const isProtected = PROTECTED_PATHS.some(path => pathname.startsWith(path));
+
+  if (isProtected) {
     
-    // 1. Si pas de token en cookie -> Dehors
+    // A. Pas de token ? -> Redirection ou Erreur 401
     if (!token) {
-      // Si c'est une page, on redirige vers Login
       if (pathname.startsWith('/dashboard')) {
         return NextResponse.redirect(new URL('/login', request.url));
       }
-      // Si c'est une API, on renvoie 401 JSON
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     try {
-      // 2. Vérification cryptographique du token
+      // B. Vérification cryptographique
       const { payload } = await jwtVerify(token, JWT_SECRET);
       
-      // 3. INJECTION VITALE : On donne l'email à l'API via les headers
+      // C. Injection de l'identité pour l'API
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set('x-user-email', payload.email as string);
+      // On peut aussi passer le rôle pour gagner du temps, mais l'email suffit pour la DB
+      requestHeaders.set('x-user-role', payload.role as string); 
 
-      // On laisse passer avec les nouveaux headers
       return NextResponse.next({
         request: { headers: requestHeaders },
       });
+
     } catch (err) {
-      // Token invalide -> Dehors
+      // Token invalide ou expiré
       if (pathname.startsWith('/dashboard')) {
         return NextResponse.redirect(new URL('/login', request.url));
       }
-      return NextResponse.json({ error: "Session expirée" }, { status: 401 });
+      return NextResponse.json({ error: "Session invalide" }, { status: 401 });
     }
   }
 
   return NextResponse.next();
 }
 
-// CONFIGURATION : C'est ici qu'on définit les routes surveillées
+// CONFIGURATION GLOBALE
 export const config = {
   matcher: [
-    '/dashboard/tenant/:path*', // Couvre le dashboard et les sous-pages (KYC, etc.)
-    '/api/tenant/:path*'        // Couvre toutes les API locataires
+    // On surveille tout le dashboard et toutes les API métiers
+    '/dashboard/:path*',
+    '/api/tenant/:path*',
+    '/api/owner/:path*',
+    '/api/agent/:path*',
+    '/api/admin/:path*'
   ],
 };
