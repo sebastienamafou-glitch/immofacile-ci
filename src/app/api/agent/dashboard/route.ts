@@ -1,64 +1,80 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // ✅ Singleton OK
+import { prisma } from "@/lib/prisma"; // Singleton
 
-// Indispensable pour que le Dashboard affiche des données fraîches à chaque visite
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : On identifie précisément qui fait la demande via le Middleware
+    // 1. SÉCURITÉ AUTH
     const userEmail = request.headers.get("x-user-email");
-    
-    if (!userEmail) {
-        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION DE L'AGENT CONNECTÉ
+    // 2. RÉCUPÉRATION AGENT (Optimisée avec 'select')
     const agent = await prisma.user.findUnique({
       where: { email: userEmail },
-      include: {
-        missionsAccepted: {
-            where: { status: "COMPLETED" } // On compte ses missions terminées
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        walletBalance: true, // Nécessaire pour les commissions
+        
+        // On compte les missions terminées
+        _count: {
+            select: { 
+                missionsAccepted: { where: { status: "COMPLETED" } } 
+            }
         },
+        
+        // On récupère les leads (mais uniquement les infos utiles)
         leads: { 
             take: 5, 
-            orderBy: { createdAt: 'desc' } // Ses derniers prospects
+            orderBy: { createdAt: 'desc' }, // 'updatedAt' n'existe pas dans votre Lead model, j'ai remis 'createdAt'
+            select: {
+                id: true,
+                name: true,
+                phone: true,
+                status: true,
+                needs: true,
+                budget: true
+            }
         }
       }
     });
 
-    // Vérification stricte du rôle
+    // ✅ CHECK RÔLE STRICT
     if (!agent || agent.role !== 'AGENT') {
        return NextResponse.json({ error: "Accès refusé. Profil Agent requis." }, { status: 403 });
     }
 
-    // 3. STATISTIQUES DU MARCHÉ (Données globales accessibles aux agents)
-    // Nombre de missions en attente dans la zone (ou globalement selon votre logique)
+    // 3. STATISTIQUES MARCHÉ
+    // Combien de missions attendent un agent ?
     const availableMissions = await prisma.mission.count({
         where: { 
             status: "PENDING",
-            agentId: null // Uniquement celles qui n'ont pas encore été prises
+            agentId: null 
         }
     });
 
-    // 4. RÉPONSE STANDARDISÉE
+    // 4. RÉPONSE
     return NextResponse.json({
       success: true,
       user: {
         name: agent.name,
         email: agent.email,
-        role: agent.role
+        role: agent.role,
+        walletBalance: agent.walletBalance
       },
       stats: {
-        completedMissions: agent.missionsAccepted.length,
+        completedMissions: agent._count.missionsAccepted,
         availableMissions: availableMissions,
-        commissionEarned: agent.referralBalance || 0
+        commissionEarned: agent.walletBalance || 0 
       },
       recentLeads: agent.leads
     });
 
   } catch (error: any) {
     console.error("Erreur Agent Dashboard:", error);
-    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

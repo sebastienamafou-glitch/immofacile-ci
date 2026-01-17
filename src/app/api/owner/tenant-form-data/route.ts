@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    // 1. SÉCURITÉ
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    
+    // ✅ AJOUT SÉCURITÉ RÔLE (Manquait ici)
+    if (!owner || owner.role !== "OWNER") {
+        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+    }
 
-    // On récupère les biens avec leurs baux ACTIFS pour indiquer la disponibilité
+    // 2. RÉCUPÉRATION DES BIENS
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       select: {
@@ -25,9 +30,8 @@ export async function GET(request: Request) {
       }
     });
 
-    // ✅ CORRECTION ICI : On type 'p' en 'any' pour satisfaire TypeScript
-    // (Ou on pourrait définir une interface précise, mais 'any' suffit ici pour le mapping)
-    const formattedProperties = properties.map((p: any) => ({
+    // 3. FORMATAGE
+    const formattedProperties = properties.map((p) => ({
         id: p.id,
         title: p.title,
         commune: p.commune,

@@ -1,34 +1,28 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // ✅ Singleton OK
+import { prisma } from "@/lib/prisma"; // Singleton
 
-// Indispensable pour éviter que Next.js ne cache la réponse
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : On récupère l'agent connecté via le Middleware
+    // 1. SÉCURITÉ
     const userEmail = request.headers.get("x-user-email");
-    
-    if (!userEmail) {
-        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    }
+    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // On récupère l'ID de l'agent
-    const agent = await prisma.user.findUnique({
-        where: { email: userEmail }
-    });
+    const agent = await prisma.user.findUnique({ where: { email: userEmail } });
 
-    if (!agent) {
-        return NextResponse.json({ error: "Compte agent introuvable" }, { status: 404 });
+    // ✅ CHECK RÔLE STRICT (Manquait dans votre version)
+    if (!agent || agent.role !== "AGENT") {
+        return NextResponse.json({ error: "Accès réservé aux agents." }, { status: 403 });
     }
 
     // 2. LOGIQUE MÉTIER
 
-    // A. Marketplace : Missions en attente (disponibles pour tous les agents)
+    // A. Marketplace : Missions en attente (disponibles pour tous)
     const available = await prisma.mission.findMany({
       where: { 
         status: "PENDING",
-        agentId: null // On s'assure qu'elle n'est pas déjà prise
+        agentId: null 
       },
       include: { 
         property: { 
@@ -38,10 +32,10 @@ export async function GET(request: Request) {
       orderBy: { dateScheduled: 'asc' }
     });
 
-    // B. Mes missions : Celles assignées spécifiquement à CET agent
+    // B. Mes missions : Celles assignées à CET agent
     const myMissions = await prisma.mission.findMany({
       where: { 
-        agentId: agent.id, // ✅ Correction critique : filtrage par ID
+        agentId: agent.id, 
         status: { in: ["ACCEPTED", "COMPLETED"] } 
       },
       include: { 
@@ -62,6 +56,6 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error("Erreur API Missions:", error);
-    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

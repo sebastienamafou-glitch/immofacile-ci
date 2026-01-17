@@ -1,20 +1,31 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
+import { Prisma } from "@prisma/client"; // Pour le typage strict
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. On récupère les filtres depuis l'URL (ex: ?commune=Cocody)
     const { searchParams } = new URL(request.url);
     const commune = searchParams.get("commune");
 
-    // 2. Construction de la requête
-    const whereClause: any = {
-      status: "AVAILABLE", // On ne veut que les biens libres !
+    // 1. Construction de la requête (Typage Strict)
+    const whereClause: Prisma.PropertyWhereInput = {
+      isPublished: true, // Le bien doit être visible
+      // LOGIQUE STRICTE : Un bien est "Disponible" s'il n'a AUCUN bail actif
+      leases: {
+        none: {
+            isActive: true
+        }
+      }
     };
 
+    // 2. Filtre optionnel
     if (commune) {
-      whereClause.commune = { contains: commune, mode: "insensitive" };
+      whereClause.commune = { 
+        contains: commune, 
+        mode: "insensitive" 
+      };
     }
 
     // 3. Récupération des biens
@@ -22,10 +33,10 @@ export async function GET(request: Request) {
       where: whereClause,
       include: {
         owner: {
-          select: { name: true } // On montre juste le nom du propriétaire/agence
+          select: { name: true } // On ne montre que le nom (Confidentialité)
         }
       },
-      orderBy: { createdAt: "desc" } // Les plus récents en premier
+      orderBy: { createdAt: "desc" }
     });
 
     return NextResponse.json({ success: true, data: properties });

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } } // Version Next.js 14 compatible
+  { params }: { params: Promise<{ id: string }> } // ✅ Correction Next.js 15
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ On attend la résolution
 
+    // 1. Récupération optimisée du bien public
     const property = await prisma.property.findUnique({
       where: { 
         id: id,
@@ -28,12 +29,12 @@ export async function GET(
         surface: true,
         images: true,
         createdAt: true,
-        // ✅ ON AJOUTE LES INFOS DE CONTACT DU PROPRIÉTAIRE
+        // Confidentialité : On ne montre que le prénom/nom, pas l'email
         owner: {
             select: { 
                 name: true,
-                phone: true, // Indispensable pour l'affiche
-                email: true
+                phone: true, // Utile pour le contact commercial
+                // email: false // On cache l'email pour éviter le spam
             } 
         },
         leases: {
@@ -44,17 +45,19 @@ export async function GET(
     });
 
     if (!property) {
-      return NextResponse.json({ error: "Bien introuvable." }, { status: 404 });
+      return NextResponse.json({ error: "Bien introuvable ou retiré." }, { status: 404 });
     }
 
+    // 2. Calcul de disponibilité
     const isAvailable = property.leases.length === 0;
 
+    // 3. Réponse nettoyée
     return NextResponse.json({
       success: true,
       property: {
         ...property,
         isAvailable,
-        leases: undefined 
+        leases: undefined // On retire l'info technique des baux
       }
     });
 

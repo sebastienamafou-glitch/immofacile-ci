@@ -6,7 +6,7 @@ import { Loader2, AlertCircle, RefreshCcw } from "lucide-react";
 import TenantsList from "@/components/dashboard/owner/TenantsList";
 
 // ==========================================
-// 1. DÉFINITION DES TYPES
+// 1. DÉFINITION DES TYPES (Alignée avec TenantsList)
 // ==========================================
 
 interface Tenant {
@@ -14,6 +14,8 @@ interface Tenant {
   name: string;
   email?: string;
   phone: string;
+  // ✅ CORRECTION : Ajout du champ manquant requis par TenantsList
+  kycStatus: string; 
 }
 
 interface Lease {
@@ -29,8 +31,8 @@ interface Property {
   id: string;
   title: string;
   commune: string;
-  leases?: Lease[]; // Les locataires sont souvent liés via les baux
-  tenants?: Tenant[]; // Cas où l'API renvoie directement les locataires
+  leases: Lease[];
+  tenants?: Tenant[];
 }
 
 // ==========================================
@@ -38,47 +40,63 @@ interface Property {
 // ==========================================
 
 export default function TenantsPage() {
-  // États
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fonction de récupération des données (isolée pour pouvoir "Réessayer")
   const fetchTenantsData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      // Note: Idéalement, une route dédiée '/owner/tenants' serait plus légère que '/owner/dashboard'
       const res = await api.get('/owner/dashboard');
       
       if (res.data && res.data.success) {
-        setProperties(res.data.properties || []);
+        // ✅ NETTOYAGE & MAPPING DES DONNÉES
+        const cleanProperties: Property[] = (res.data.properties || []).map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            commune: p.commune,
+            // On map les baux pour s'assurer que la structure Tenant est complète
+            leases: Array.isArray(p.leases) ? p.leases.map((l: any) => ({
+                id: l.id,
+                isActive: l.isActive,
+                startDate: l.startDate,
+                endDate: l.endDate,
+                monthlyRent: l.monthlyRent,
+                tenant: {
+                    id: l.tenant?.id || "unknown",
+                    name: l.tenant?.name || "Inconnu",
+                    email: l.tenant?.email,
+                    phone: l.tenant?.phone || "",
+                    // ✅ AJOUT DE LA VALEUR PAR DÉFAUT SI MANQUANTE
+                    kycStatus: l.tenant?.kycStatus || "PENDING" 
+                }
+            })) : [],
+            tenants: p.tenants
+        }));
+
+        setProperties(cleanProperties);
       } else {
         throw new Error("Format de réponse invalide");
       }
     } catch (err) {
       console.error("Erreur chargement locataires:", err);
-      setError("Impossible de charger la liste des locataires. Vérifiez votre connexion.");
+      setError("Impossible de charger la liste des locataires.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Chargement initial
   useEffect(() => {
     fetchTenantsData();
   }, [fetchTenantsData]);
-
-  // ==========================================
-  // 3. RENDUS CONDITIONNELS (Loading / Error)
-  // ==========================================
 
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-[#0B1120] gap-4">
         <Loader2 className="w-12 h-12 text-[#F59E0B] animate-spin" />
-        <p className="text-slate-400 text-sm animate-pulse">Chargement de vos locataires...</p>
+        <p className="text-slate-400 text-sm animate-pulse">Chargement...</p>
       </div>
     );
   }
@@ -86,65 +104,35 @@ export default function TenantsPage() {
   if (error) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-[#0B1120] p-6 text-center">
-        <div className="bg-red-500/10 p-4 rounded-full mb-4">
-            <AlertCircle className="w-10 h-10 text-red-500" />
-        </div>
-        <h2 className="text-xl font-bold text-white mb-2">Une erreur est survenue</h2>
-        <p className="text-slate-400 mb-6 max-w-md">{error}</p>
-        <button 
-          onClick={fetchTenantsData}
-          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl transition font-bold"
-        >
-          <RefreshCcw className="w-4 h-4" /> Réessayer
+        <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
+        <p className="text-slate-400 mb-6">{error}</p>
+        <button onClick={fetchTenantsData} className="bg-slate-800 text-white px-6 py-2 rounded-lg">
+          Réessayer
         </button>
       </div>
     );
   }
 
-  // ==========================================
-  // 4. RENDU PRINCIPAL
-  // ==========================================
-
-  const hasProperties = properties.length > 0;
-
   return (
     <main className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 pb-20 font-sans">
-      
-      {/* En-tête */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800/50 pb-6">
-        <div>
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight flex items-center gap-3">
-              👥 Mes Locataires
-              <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded-full border border-slate-700 font-normal normal-case tracking-normal">
-                {properties.length} biens suivis
-              </span>
-            </h1>
-            <p className="text-slate-400 mt-2 text-sm max-w-xl">
-              Gérez les contrats de bail, suivez les paiements et accédez aux dossiers de vos locataires actifs.
-            </p>
-        </div>
-        
-        {/* Bouton d'action (Optionnel : si vous avez une page d'ajout manuel) */}
-        {/* <Link href="/owner/add-tenant" className="bg-[#F59E0B] text-[#0B1120] px-5 py-3 rounded-xl font-bold text-sm hover:bg-yellow-400 transition shadow-lg flex items-center gap-2">
-            <span>+</span> Nouveau Locataire
-        </Link> 
-        */}
+      <header className="mb-8 border-b border-slate-800/50 pb-6">
+        <h1 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
+          👥 Mes Locataires
+          <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded-full border border-slate-700 font-normal normal-case">
+            {properties.length} biens
+          </span>
+        </h1>
       </header>
 
-      {/* Contenu */}
-      {hasProperties ? (
+      {properties.length > 0 ? (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-           {/* On passe les propriétés nettoyées au composant liste */}
+           {/* TypeScript sera content : kycStatus est maintenant présent ! */}
            <TenantsList properties={properties} />
         </div>
       ) : (
-        /* État vide (si le tableau properties est vide) */
-        <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
-           <div className="text-4xl mb-4">🏠</div>
-           <h3 className="text-xl font-bold text-white mb-2">Aucun bien / locataire trouvé</h3>
-           <p className="text-slate-500 max-w-xs mx-auto">
-             Commencez par ajouter un bien immobilier pour pouvoir y assigner des locataires.
-           </p>
+        <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
+           <h3 className="text-xl font-bold text-white">Aucun locataire trouvé</h3>
+           <p className="text-slate-500">Ajoutez d'abord un bien immobilier.</p>
         </div>
       )}
     </main>

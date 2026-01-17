@@ -8,8 +8,11 @@ import {
   AlertCircle, X, Smartphone, CheckCircle, 
   Info, Loader2
 } from "lucide-react";
-import DownloadRentReceipt from "@/components/documents/DownloadRentReceipt";
-
+import dynamic from "next/dynamic";
+const DownloadRentReceipt = dynamic(
+  () => import('@/components/pdf/DownloadRentReceipt'),
+  { ssr: false }
+);
 // Interfaces
 interface Payment {
   id: string;

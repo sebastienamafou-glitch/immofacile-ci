@@ -1,30 +1,27 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma'; // ✅ 1. Utilisation du Singleton
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
-// Fonction utilitaire pour récupérer l'utilisateur via le header sécurisé
-async function getAuthenticatedUser(request: Request) {
-  const email = request.headers.get("x-user-email"); // ✅ 2. Sécurité via Middleware
-  if (!email) return null;
-  
-  return await prisma.user.findUnique({
-    where: { email }
-  });
-}
-
+// GET : Liste historique des incidents
 export async function GET(request: Request) {
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    
+    // 1. SÉCURITÉ
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!tenant || tenant.role !== "TENANT") {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+
+    // 2. RÉCUPÉRATION
     const incidents = await prisma.incident.findMany({
-      where: { reporterId: user.id },
+      where: { reporterId: tenant.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        assignedTo: { 
-          select: { name: true, phone: true }
-        }
+        assignedTo: { select: { name: true, phone: true } }, // Infos artisan
+        property: { select: { title: true } } // Infos bien
       }
     });
 
@@ -32,44 +29,53 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error("Erreur GET Incidents:", error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
+// POST : Créer un incident
 export async function POST(request: Request) {
   try {
-    // 1. Identification robuste
-    const user = await getAuthenticatedUser(request);
-    if (!user) return NextResponse.json({ error: 'Session expirée' }, { status: 401 });
+    // 1. SÉCURITÉ
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const body = await request.json();
-    const { type, description } = body;
-
-    if (!type || !description) {
-      return NextResponse.json({ error: "Type et description requis" }, { status: 400 });
+    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!tenant || tenant.role !== "TENANT") {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    // 2. Trouver la propriété liée via le bail actif
+    const body = await request.json();
+    const { title, description, priority, propertyId, photos } = body;
+
+    // Validation
+    if (!title || !description || !propertyId) {
+        return NextResponse.json({ error: "Titre, description et bien concerné sont requis" }, { status: 400 });
+    }
+
+    // 2. VÉRIFICATION STRICTE (Le locataire loue-t-il CE bien ?)
     const lease = await prisma.lease.findFirst({
       where: { 
-        tenantId: user.id, 
+        tenantId: tenant.id, 
+        propertyId: propertyId, // ✅ On vérifie le lien spécifique Bien <-> Locataire
         status: { in: ['ACTIVE', 'PENDING'] } 
       }
     });
 
     if (!lease) {
-      return NextResponse.json({ error: "Aucun bail actif trouvé pour ce compte" }, { status: 404 });
+      return NextResponse.json({ error: "Aucun bail valide trouvé pour ce bien" }, { status: 403 });
     }
 
-    // 3. Création sécurisée avec l'ID confirmé
+    // 3. CRÉATION
     const newIncident = await prisma.incident.create({
       data: {
-        title: `${type} - ${user.name || 'Locataire'}`,
-        description: description,
-        priority: 'NORMAL',
+        title,
+        description,
+        priority: priority || 'NORMAL',
         status: 'OPEN',
-        reporterId: user.id, // ✅ Ici, user.id vient de la DB, il n'est jamais undefined
-        propertyId: lease.propertyId
+        photos: photos || [], // ✅ Support des photos
+        reporterId: tenant.id,
+        propertyId: propertyId
       }
     });
 

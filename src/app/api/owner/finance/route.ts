@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
                 include: {
                     leases: {
                         include: {
-                            tenant: true,
+                            tenant: { select: { name: true } }, // Optimisation: on ne prend que le nom
                             payments: {
                                 orderBy: { date: 'desc' },
                                 take: 20 
@@ -28,49 +28,50 @@ export async function GET(request: Request) {
         }
     });
 
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    // ✅ VÉRIFICATION STRICTE DU RÔLE
+    if (!owner || owner.role !== "OWNER") {
+        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+    }
 
     // 2. CALCULS FINANCIERS
     let escrowBalance = 0; 
-    let allPayments: any[] = [];
-
-    // ✅ CORRECTION TS : Ajout de ': any' pour éviter l'erreur "implicit any"
-    owner.propertiesOwned.forEach((property: any) => {
-        property.leases.forEach((lease: any) => {
+    
+    // On utilise flatMap pour aplatir la structure proprement sans 'any'
+    // Structure : User -> Properties[] -> Leases[] -> Payments[]
+    const allPayments = owner.propertiesOwned.flatMap(property => 
+        property.leases.flatMap(lease => {
             
-            // A. Calcul du Séquestre (Cautions actives)
-            if (lease.status === 'ACTIVE' || lease.isActive) {
-                 // ✅ CORRECTION NOMMAGE : 'depositAmount' (selon votre schema.prisma)
+            // A. Calcul du Séquestre (Somme des cautions des baux actifs)
+            // Note: isActive est prioritaire, mais on vérifie aussi le statut pour être sûr
+            if (lease.isActive || lease.status === 'ACTIVE') {
                  escrowBalance += lease.depositAmount || 0;
             }
 
-            // B. Consolidation des paiements
-            lease.payments.forEach((payment: any) => {
-                allPayments.push({
-                    id: payment.id,
-                    amount: payment.amount,
-                    type: payment.type,
-                    status: payment.status,
-                    date: payment.date,
-                    lease: {
-                        id: lease.id,
-                        property: { title: property.title },
-                        tenant: { name: lease.tenant.name }
-                    }
-                });
-            });
-        });
-    });
+            // B. Mapping des paiements
+            return lease.payments.map(payment => ({
+                id: payment.id,
+                amount: payment.amount,
+                type: payment.type,
+                status: payment.status,
+                date: payment.date,
+                lease: {
+                    id: lease.id,
+                    property: { title: property.title },
+                    tenant: { name: lease.tenant.name }
+                }
+            }));
+        })
+    );
 
-    // Tri par date
+    // Tri global par date (du plus récent au plus ancien)
     allPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // 3. RÉPONSE
     return NextResponse.json({
         success: true,
-        walletBalance: owner.walletBalance || 0,
-        escrowBalance: escrowBalance,
-        payments: allPayments,
+        walletBalance: owner.walletBalance || 0, // Argent disponible (Loyers perçus)
+        escrowBalance: escrowBalance,           // Argent bloqué (Cautions)
+        payments: allPayments,                  // Historique complet
         user: {
             name: owner.name,
             email: owner.email

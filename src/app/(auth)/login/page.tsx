@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner"; 
-import Cookies from "js-cookie"; // Importation pour la gestion du middleware
+import Cookies from "js-cookie"; 
 import { 
   Loader2, Lock, Eye, EyeOff, LogIn, Mail, ShieldCheck 
 } from "lucide-react";
@@ -27,8 +27,8 @@ function LoginForm() {
   });
 
   useEffect(() => {
-    // Nettoyage complet à l'arrivée sur la page pour éviter les conflits
-    Cookies.remove('token', { path: '/' }); // On supprime bien le cookie global
+    // Nettoyage complet à l'arrivée sur la page
+    Cookies.remove('token', { path: '/' }); 
     localStorage.removeItem('token');
     localStorage.removeItem('immouser'); 
     localStorage.removeItem('user'); 
@@ -47,29 +47,39 @@ function LoginForm() {
       const data = res.data;
 
       if (data.token) {
-        // --- CORRECTION MAJEURE ICI ---
-        // 1. Stockage du TOKEN dans un Cookie avec une portée GLOBALE (path: '/')
+        // 1. Stockage du TOKEN
         Cookies.set('token', data.token, { 
             expires: 7, 
             secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'lax', // 'lax' est plus robuste que 'strict' pour la navigation
-            path: '/'        // INDISPENSABLE : rend le token visible partout (API, Dashboard, KYC)
+            sameSite: 'lax', 
+            path: '/'        
         });
 
-        // 2. Stockage dans le LocalStorage (Pour la persistance côté client / UI)
+        // 2. Stockage LocalStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('immouser', JSON.stringify(data.user));
         
         toast.success(`Heureux de vous revoir, ${data.user.name?.split(' ')[0] || 'Client'} !`);
 
-        // 3. Redirection intelligente basée sur le rôle
+        // 3. REDIRECTION INTELLIGENTE (CORRIGÉE ✅)
         setTimeout(() => {
-            if (data.user.role === 'ADMIN') {
-                router.push('/dashboard/admin');
-            } else if (data.user.role === 'OWNER') {
-                router.push('/dashboard/owner');
-            } else {
-                router.push('/dashboard/tenant');
+            switch (data.user.role) {
+                case 'ADMIN':
+                    router.push('/dashboard/admin');
+                    break;
+                case 'OWNER':
+                    router.push('/dashboard/owner');
+                    break;
+                case 'AGENT':  // 👈 AJOUTÉ
+                    router.push('/dashboard/agent');
+                    break;
+                case 'ARTISAN': // 👈 AJOUTÉ
+                    router.push('/dashboard/artisan');
+                    break;
+                case 'TENANT':
+                default:
+                    router.push('/dashboard/tenant');
+                    break;
             }
         }, 800);
       }

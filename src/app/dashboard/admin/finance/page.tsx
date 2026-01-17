@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation"; // Ajouté pour redirection si non-auth
+import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api";
-import { Wallet, TrendingUp, DollarSign, Calendar, Search, PieChart, Activity, Loader2 } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Calendar, Search, Activity, Loader2 } from "lucide-react";
 
 export default function FinancePage() {
   const router = useRouter();
@@ -26,7 +26,6 @@ export default function FinancePage() {
         if (!admin) { router.push('/login'); return; }
 
         try {
-            // ✅ SÉCURITÉ : Envoi du header obligatoire
             const res = await api.get('/admin/finance', {
                 headers: { 'x-user-email': admin.email }
             });
@@ -48,12 +47,12 @@ export default function FinancePage() {
       </div>
   );
 
-  const filteredHistory = data?.history.filter((h: any) => 
-    h.lease?.property?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    h.type?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredHistory = data?.history?.filter((h: any) => 
+    (h.lease?.property?.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (h.type || "").toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const stats = data?.stats;
+  const stats = data?.stats || {};
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-white p-6 md:p-8 font-sans">
@@ -71,7 +70,8 @@ export default function FinancePage() {
             </div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Volume Total Encaissé</p>
             <p className="text-2xl font-black text-white">
-                {stats?.volume?.toLocaleString()} <span className="text-xs font-normal text-slate-500">FCFA</span>
+                {/* ✅ SÉCURITÉ : || 0 */}
+                {(stats.volume || 0).toLocaleString()} <span className="text-xs font-normal text-slate-500">FCFA</span>
             </p>
             <p className="text-[10px] text-slate-500 mt-2">Flux brut transitant par la plateforme</p>
         </div>
@@ -83,10 +83,11 @@ export default function FinancePage() {
             </div>
             <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest mb-1">Chiffre d'Affaires Net</p>
             <p className="text-3xl font-black">
-                {stats?.totalRevenue?.toLocaleString()} <span className="text-base">F</span>
+                {/* ✅ SÉCURITÉ : || 0 */}
+                {(stats.totalRevenue || 0).toLocaleString()} <span className="text-base">F</span>
             </p>
             <div className="flex items-center gap-2 mt-2 text-[10px] bg-white/20 w-fit px-2 py-1 rounded">
-                <TrendingUp className="w-3 h-3" /> {stats?.transactionCount || 0} paiements traités
+                <TrendingUp className="w-3 h-3" /> {stats.transactionCount || 0} paiements traités
             </div>
         </div>
 
@@ -97,7 +98,7 @@ export default function FinancePage() {
             </div>
             <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Marge Moyenne</p>
             <p className="text-2xl font-black text-white">
-               {stats?.volume > 0 ? ((stats.totalRevenue / stats.volume) * 100).toFixed(1) : 0} %
+               {(stats.volume > 0 ? ((stats.totalRevenue / stats.volume) * 100) : 0).toFixed(1)} %
             </p>
             <p className="text-[10px] text-slate-500 mt-2">Part conservée sur chaque transaction</p>
         </div>
@@ -150,14 +151,15 @@ export default function FinancePage() {
                             </td>
                             <td className="p-4">
                                 <p className="font-bold text-white">{item.lease?.property?.title || "Transaction Diverse"}</p>
-                                <p className="text-xs text-slate-500">{item.lease?.tenant?.name}</p>
+                                <p className="text-xs text-slate-500">{item.lease?.tenant?.name || "N/A"}</p>
                             </td>
                             <td className="p-4 text-right font-mono font-bold text-slate-300">
-                                {item.amount.toLocaleString()} F
+                                {/* ✅ SÉCURITÉ : || 0 */}
+                                {(item.amount || 0).toLocaleString()} F
                             </td>
                             <td className="p-4 text-right font-mono text-[#F59E0B] font-bold">
-                                {/* ✅ CORRECTION : On affiche la vraie donnée 'amountPlatform' */}
-                                + {item.amountPlatform.toLocaleString()} F
+                                {/* ✅ CORRECTION : Si la part est undefined, on met 0 */}
+                                + {(item.amountPlatform || 0).toLocaleString()} F
                             </td>
                         </tr>
                     ))}

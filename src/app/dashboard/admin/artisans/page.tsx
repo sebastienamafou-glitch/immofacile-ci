@@ -1,18 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation"; // Ajouté
+import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { 
-  ArrowLeft, Plus, Trash2, Phone, MapPin, 
-  Briefcase, Star, Search, ShieldCheck, User, Wrench, Loader2 
+  ArrowLeft, Plus, Trash2, Phone, Briefcase, 
+  Search, ShieldCheck, User, Wrench, Loader2 
 } from "lucide-react";
+
+// ✅ 1. TYPAGE STRICT (Fini les 'any')
+interface Artisan {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  _count?: {
+    incidentsAssigned: number;
+  };
+}
 
 export default function AdminArtisansPage() {
   const router = useRouter();
-  const [artisans, setArtisans] = useState<any[]>([]);
+  const [artisans, setArtisans] = useState<Artisan[]>([]); // Typage appliqué
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -30,11 +42,17 @@ export default function AdminArtisansPage() {
     if (!admin) { router.push('/login'); return; }
 
     try {
-        // ✅ APPEL SÉCURISÉ
         const res = await api.get('/admin/artisans', {
             headers: { 'x-user-email': admin.email }
         });
-        if (res.data.success) setArtisans(res.data.artisans);
+        if (res.data.success) {
+            // Sécurisation des données reçues
+            const cleanData = res.data.artisans.map((a: any) => ({
+                ...a,
+                _count: a._count || { incidentsAssigned: 0 }
+            }));
+            setArtisans(cleanData);
+        }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -47,7 +65,6 @@ export default function AdminArtisansPage() {
     const admin = getAdminUser();
     if (!admin) return;
 
-    // Formulaire Pop-up
     const { value: formValues } = await Swal.fire({
         title: 'Nouvel Artisan 🛠️',
         html: `
@@ -67,7 +84,7 @@ export default function AdminArtisansPage() {
         background: '#0f172a',
         color: '#fff',
         confirmButtonText: 'Créer le compte',
-        confirmButtonColor: '#F59E0B',
+        confirmButtonColor: '#2563EB', // Bleu Pro pour les artisans
         showCancelButton: true,
         preConfirm: () => {
             return {
@@ -82,13 +99,11 @@ export default function AdminArtisansPage() {
         if(!formValues.name || !formValues.phone) return Swal.fire('Erreur', 'Nom et Téléphone requis', 'error');
 
         try {
-            // ✅ CRÉATION SÉCURISÉE
             const res = await api.post('/admin/artisans', formValues, {
                 headers: { 'x-user-email': admin.email }
             });
 
             if (res.data.success) {
-                // AFFICHER LES IDENTIFIANTS GÉNÉRÉS
                 const creds = res.data.credentials;
                 await Swal.fire({
                     title: 'Compte Créé ! ✅',
@@ -105,7 +120,7 @@ export default function AdminArtisansPage() {
                     confirmButtonText: 'C\'est noté',
                     icon: 'success'
                 });
-                fetchArtisans(); // Rafraîchir la liste
+                fetchArtisans(); 
             }
         } catch (error: any) {
             Swal.fire({ title: 'Erreur', text: error.response?.data?.error || "Impossible de créer ce compte.", icon: 'error', background: '#0f172a', color: '#fff' });
@@ -113,7 +128,6 @@ export default function AdminArtisansPage() {
     }
   };
 
-  // Filtrage
   const filtered = artisans.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.phone.includes(searchTerm));
 
   if (loading) return (
@@ -126,7 +140,6 @@ export default function AdminArtisansPage() {
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 p-6 md:p-10 font-sans">
       
-      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto">
             <Link href="/dashboard/admin" className="p-2 bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 transition">
@@ -147,7 +160,6 @@ export default function AdminArtisansPage() {
         </button>
       </div>
 
-      {/* RECHERCHE */}
       <div className="relative max-w-md mb-8">
          <Search className="absolute left-3 top-3.5 w-4 h-4 text-slate-500" />
          <input 
@@ -157,7 +169,6 @@ export default function AdminArtisansPage() {
          />
       </div>
 
-      {/* GRID ARTISANS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filtered.map((artisan) => (
             <div key={artisan.id} className="bg-slate-900/50 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-6 transition group relative overflow-hidden">
@@ -174,7 +185,7 @@ export default function AdminArtisansPage() {
 
                 <div className="relative z-10">
                     <h3 className="text-lg font-bold text-white truncate">{artisan.name}</h3>
-                    <p className="text-slate-500 text-xs font-medium mb-4">{artisan.email}</p>
+                    <p className="text-slate-500 text-xs font-medium mb-4">{artisan.email || "Email non renseigné"}</p>
 
                     <div className="space-y-2 text-sm text-slate-400 bg-black/20 p-3 rounded-xl border border-slate-800">
                         <div className="flex items-center gap-2">
@@ -186,7 +197,6 @@ export default function AdminArtisansPage() {
                     </div>
                 </div>
 
-                {/* Actions */}
                 <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end gap-2 relative z-10">
                     <button className="text-slate-500 hover:text-red-500 transition p-2 hover:bg-red-500/10 rounded-lg" title="Révoquer l'accès">
                         <Trash2 className="w-4 h-4" />
@@ -195,7 +205,6 @@ export default function AdminArtisansPage() {
             </div>
         ))}
 
-        {/* Empty State */}
         {filtered.length === 0 && (
             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
                 <User className="w-12 h-12 text-slate-600 mx-auto mb-3" />

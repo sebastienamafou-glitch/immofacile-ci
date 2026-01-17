@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Home, MapPin, Plus, ArrowRight, Zap } from "lucide-react"; // Ajout de Zap pour l'icône éclair
+import Image from "next/image"; // Optionnel : Si configuré, sinon gardez img
+import { Home, MapPin, Plus, Zap, ImageOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Assurez-vous d'avoir ce composant UI
+import { Button } from "@/components/ui/button";
 
 interface Property {
   id: string;
@@ -11,20 +12,18 @@ interface Property {
   price: number;
   commune: string;
   images: string[];
-  imageUrl?: string;
-  type?: string;
-  isAvailable?: boolean;
+  isAvailable?: boolean; // J'ai simplifié le typage optionnel
 }
 
 interface PropertiesGridProps {
   properties: Property[];
-  onDelegate?: (property: Property) => void; // 👇 NOUVEAU : Fonction reçue du parent
+  onDelegate?: (property: Property) => void;
 }
 
 export default function PropertiesGrid({ properties, onDelegate }: PropertiesGridProps) {
   
   const formatPrice = (price: number) => {
-    return price?.toLocaleString('fr-FR') + ' FCFA';
+    return (price || 0).toLocaleString('fr-FR') + ' FCFA';
   };
 
   return (
@@ -41,69 +40,70 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
         
         <Link 
           href="/dashboard/owner/properties/add" 
-          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-blue-500/20"
+          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-blue-500/20 active:scale-95"
         >
           <Plus className="w-4 h-4" /> Ajouter un bien
         </Link>
       </div>
 
       {/* GRILLE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties && properties.length > 0 ? (
           properties.map((prop) => (
             <div key={prop.id} className="group relative bg-[#131b2e] border border-slate-800/50 rounded-3xl overflow-hidden hover:border-slate-600/50 transition duration-300 shadow-xl flex flex-col">
               
-              {/* IMAGE COVER */}
-              <div className="relative h-48 overflow-hidden shrink-0">
-                <Link href={`/dashboard/owner/properties/${prop.id}`}>
-                    {prop.images && prop.images.length > 0 ? (
+              {/* ZONE IMAGE CLIQUABLE */}
+              <Link href={`/dashboard/owner/properties/${prop.id}`} className="relative h-48 overflow-hidden shrink-0 block">
+                  {prop.images && prop.images.length > 0 ? (
+                    // Note: Si vous utilisez Next/Image, remplacez img par Image (nécessite config next.config.js)
                     <img 
                         src={prop.images[0]} 
                         alt={prop.title} 
                         className="w-full h-full object-cover group-hover:scale-110 transition duration-700 ease-out" 
                     />
-                    ) : (
-                    <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                        <Home className="w-12 h-12 text-slate-700" />
+                  ) : (
+                    <div className="w-full h-full bg-slate-800 flex flex-col items-center justify-center text-slate-500 gap-2">
+                        <ImageOff className="w-8 h-8 opacity-50" />
+                        <span className="text-[10px] font-bold uppercase">Sans image</span>
                     </div>
-                    )}
-                    
-                    {/* OVERLAY */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#131b2e] via-transparent to-transparent opacity-90"></div>
-                </Link>
+                  )}
+                  
+                  {/* OVERLAY PRIX */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#131b2e] via-transparent to-transparent opacity-90"></div>
+                  
+                  <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md border border-white/10 px-2.5 py-1 rounded-lg">
+                      <span className="text-white font-bold text-xs">{formatPrice(prop.price)}</span>
+                  </div>
 
-                <div className="absolute top-4 right-4 bg-white/10 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-lg">
-                    <span className="text-white font-bold text-xs">{formatPrice(prop.price)}</span>
-                </div>
-
-                <div className="absolute top-4 left-4">
-                    <Badge className={`${prop.isAvailable ? 'bg-emerald-500 text-white' : 'bg-orange-500 text-white'} border-0 text-[10px] px-2 py-0.5 shadow-lg`}>
-                        {prop.isAvailable ? 'DISPONIBLE' : 'LOUÉ'}
-                    </Badge>
-                </div>
-              </div>
+                  <div className="absolute top-3 left-3">
+                      <Badge className={`${prop.isAvailable ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-orange-500 hover:bg-orange-600'} text-white border-0 text-[10px] px-2 py-0.5 shadow-lg`}>
+                          {prop.isAvailable ? 'DISPONIBLE' : 'LOUÉ'}
+                      </Badge>
+                  </div>
+              </Link>
 
               {/* INFO CONTENT */}
-              <div className="p-5 pt-2 relative flex flex-col flex-1">
-                <div className="mb-1">
+              <div className="p-5 pt-3 relative flex flex-col flex-1">
+                <div className="mb-4">
                     <Link href={`/dashboard/owner/properties/${prop.id}`}>
                         <h4 className="font-bold text-white text-lg leading-tight group-hover:text-blue-400 transition truncate">{prop.title}</h4>
                     </Link>
-                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {prop.commune}
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-600" /> {prop.commune}
                     </p>
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-slate-800/50 flex items-center gap-3">
                     
-                    {/* Bouton GÉRER (Existant) */}
-                    <Link href={`/dashboard/owner/properties/${prop.id}`} className="flex-1">
-                        <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold h-9">
-                            Gérer
-                        </Button>
+                    {/* ✅ CORRECTION : Pas de Button dans Link. On utilise Link avec classes boutons */}
+                    <Link 
+                        href={`/dashboard/owner/properties/${prop.id}`} 
+                        className="flex-1 inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-bold ring-offset-background transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 border border-slate-700 bg-transparent hover:bg-slate-800 text-slate-300 hover:text-white h-9 px-4 py-2"
+                    >
+                        Gérer
                     </Link>
 
-                    {/* 👇 NOUVEAU BOUTON : DÉLÉGUER (UBER) */}
+                    {/* BOUTON DÉLÉGUER */}
                     {onDelegate && (
                         <Button 
                             onClick={() => onDelegate(prop)}
@@ -118,12 +118,12 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
           ))
         ) : (
           <div className="col-span-full py-16 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
-            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🏠</div>
+            <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl shadow-inner">🏠</div>
             <p className="text-slate-400 font-medium mb-1">Votre parc est vide.</p>
             <p className="text-slate-600 text-xs mb-4">Commencez par ajouter votre premier bien immobilier.</p>
             <Link 
               href="/dashboard/owner/properties/add" 
-              className="text-blue-500 font-bold hover:underline text-sm"
+              className="text-blue-500 font-bold hover:text-blue-400 hover:underline text-sm transition"
             >
               + Ajouter maintenant
             </Link>

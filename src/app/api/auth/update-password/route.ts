@@ -1,39 +1,46 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { verifyToken } from "@/lib/auth";
+import { prisma } from "@/lib/prisma"; // ✅ Utilisation du Singleton (Vital)
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
 export async function PUT(request: Request) {
   try {
-    const userAuth = verifyToken(request);
+    // 1. SÉCURITÉ STANDARDISÉE
+    // On utilise la même méthode que partout ailleurs (Header sécurisé)
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
+
+    // 2. VALIDATION
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
-    // 1. Récupérer le user pour avoir son hash actuel
-    const user = await prisma.user.findUnique({ where: { id: userAuth.id } });
-    
-    if (!user) {
-      return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+    if (!currentPassword || !newPassword) {
+        return NextResponse.json({ error: "Veuillez remplir tous les champs." }, { status: 400 });
     }
 
-    // 2. Vérifier l'ancien mot de passe
+    if (newPassword.length < 6) {
+        return NextResponse.json({ error: "Le nouveau mot de passe doit faire au moins 6 caractères." }, { status: 400 });
+    }
+
+    // 3. VÉRIFICATION DE L'ANCIEN MOT DE PASSE
     const isValid = await bcrypt.compare(currentPassword, user.password);
     if (!isValid) {
-      return NextResponse.json({ error: "Le mot de passe actuel est incorrect" }, { status: 401 });
+      return NextResponse.json({ error: "Le mot de passe actuel est incorrect." }, { status: 401 });
     }
 
-    // 3. Hacher le nouveau mot de passe (Sécurité max: Salt généré auto)
+    // 4. HASHAGE ET MISE À JOUR
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // 4. Sauvegarder
     await prisma.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Mot de passe mis à jour avec succès." });
 
   } catch (error) {
     console.error("Erreur Update Password:", error);

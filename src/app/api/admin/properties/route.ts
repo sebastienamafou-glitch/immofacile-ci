@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client"; // Assurez-vous que cet import est présent
+import { Prisma } from "@prisma/client"; 
 
 export const dynamic = 'force-dynamic';
 
-// On définit le type attendu grâce au helper de Prisma généré
+// Typage avancé (Très bien joué !)
 type AdminProperty = Prisma.PropertyGetPayload<{
   include: {
-    owner: {
-        select: { name: true, email: true, phone: true }
-    },
-    leases: {
-        where: { isActive: true }
-    }
+    owner: { select: { name: true, email: true, phone: true } },
+    leases: { where: { isActive: true } }
   }
 }>;
 
-// --- GET : VOIR TOUS LES BIENS (ADMIN) ---
+// --- GET : VOIR TOUS LES BIENS ---
 export async function GET(request: Request) {
   try {
     const userEmail = request.headers.get("x-user-email");
@@ -39,13 +35,12 @@ export async function GET(request: Request) {
       }
     });
 
-    // Formatage des données
     const formatted = (properties as AdminProperty[]).map(p => ({
         ...p,
         isAvailable: p.leases.length === 0,
-        ownerName: p.owner.name || "Anonyme",
-        ownerEmail: p.owner.email,
-        ownerPhone: p.owner.phone
+        ownerName: p.owner?.name || "Inconnu", // Sécurité null check
+        ownerEmail: p.owner?.email,
+        ownerPhone: p.owner?.phone
     }));
 
     return NextResponse.json({ success: true, properties: formatted });
@@ -56,7 +51,7 @@ export async function GET(request: Request) {
   }
 }
 
-// --- DELETE ---
+// --- DELETE : SUPPRESSION SÉCURISÉE ---
 export async function DELETE(request: Request) {
     try {
         const userEmail = request.headers.get("x-user-email");
@@ -68,16 +63,33 @@ export async function DELETE(request: Request) {
         const admin = await prisma.user.findUnique({ where: { email: userEmail } });
         if (!admin || admin.role !== "ADMIN") return NextResponse.json({ error: "Interdit" }, { status: 403 });
 
-        // Transaction pour nettoyer les dépendances avant de supprimer le bien
+        // 1. VÉRIFICATION AVANT SUPPRESSION (CRITIQUE)
+        const property = await prisma.property.findUnique({
+            where: { id },
+            include: { leases: true } // On vérifie TOUS les baux (actifs ou passés)
+        });
+
+        if (!property) return NextResponse.json({ error: "Bien introuvable" }, { status: 404 });
+
+        // Si le bien a déjà servi (baux existants), on INTERDIT la suppression pour garder l'historique
+        if (property.leases.length > 0) {
+            return NextResponse.json({ 
+                error: "Impossible de supprimer ce bien car il possède un historique de location. Veuillez plutôt le modifier en 'Non publié'." 
+            }, { status: 409 });
+        }
+
+        // 2. NETTOYAGE ET SUPPRESSION
+        // On peut supprimer uniquement s'il est vierge de tout contrat
         await prisma.$transaction([
             prisma.mission.deleteMany({ where: { propertyId: id } }),
             prisma.incident.deleteMany({ where: { propertyId: id } }),
             prisma.property.delete({ where: { id } })
         ]);
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, message: "Bien supprimé définitivement." });
 
     } catch (error) {
-        return NextResponse.json({ error: "Impossible de supprimer." }, { status: 500 });
+        console.error("Erreur Delete Property:", error);
+        return NextResponse.json({ error: "Impossible de supprimer (Dépendances existantes)." }, { status: 500 });
     }
 }

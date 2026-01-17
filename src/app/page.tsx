@@ -6,7 +6,7 @@ import {
   Menu, X, PlayCircle, Wallet, Bell, PieChart, 
   Banknote, PenTool, Gavel, Lock, Check, CheckCircle, 
   ChevronDown, ShieldCheck, FileSignature, Users, 
-  TrendingUp, ArrowRight, Building2
+  TrendingUp, ArrowRight
 } from "lucide-react";
 import Image from "next/image";
 
@@ -64,6 +64,12 @@ export default function LandingPage() {
             {/* MENU DESKTOP */}
             <div className="items-center justify-between hidden w-full md:flex md:w-auto md:order-1">
                 <ul className="flex flex-col p-4 md:p-0 mt-4 font-medium md:flex-row md:space-x-8 md:mt-0 bg-transparent text-sm">
+                    {/* ✅ NOUVEAU LIEN AJOUTÉ ICI */}
+                    <li>
+                        <Link href="/properties" className="block py-2 px-3 text-[#F59E0B] hover:text-orange-400 transition font-bold flex items-center gap-2">
+                            Trouver un bien
+                        </Link>
+                    </li>
                     <li><a href="#features" className="block py-2 px-3 text-slate-400 hover:text-white transition">Fonctionnalités</a></li>
                     <li><a href="#security" className="block py-2 px-3 text-slate-400 hover:text-white transition">Sécurité</a></li>
                     <li><a href="#pricing" className="block py-2 px-3 text-slate-400 hover:text-white transition">Tarifs</a></li>
@@ -75,6 +81,12 @@ export default function LandingPage() {
         {isMenuOpen && (
             <div className="fixed inset-0 z-40 bg-[#020617] pt-24 px-6 md:hidden">
                 <ul className="flex flex-col space-y-6 font-bold text-center text-lg">
+                    {/* ✅ NOUVEAU LIEN MOBILE AJOUTÉ ICI */}
+                    <li>
+                        <Link href="/properties" onClick={toggleMenu} className="block py-4 text-[#F59E0B] border-b border-white/5">
+                            🏠 Trouver un bien
+                        </Link>
+                    </li>
                     <li><a href="#features" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Fonctionnalités</a></li>
                     <li><a href="#security" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Sécurité</a></li>
                     <li><a href="#pricing" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Tarifs</a></li>
@@ -120,9 +132,9 @@ export default function LandingPage() {
                         <Link href="/signup" className="px-8 py-4 bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-black rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
                             Démarrer Gratuitement
                         </Link>
-                        <a href="#features" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
-                            <PlayCircle className="w-5 h-5" /> Démo
-                        </a>
+                        <Link href="/properties" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
+                            <PlayCircle className="w-5 h-5" /> Voir les annonces
+                        </Link>
                     </div>
                 </div>
 

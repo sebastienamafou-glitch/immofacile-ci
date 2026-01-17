@@ -1,328 +1,232 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api"; // Axios gère les cookies automatiquement
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 import { 
-  Users, Wallet, Clock, 
-  Plus, Loader2, X, MapPin, Calendar, 
-  Briefcase, ArrowRight, Check
+  Briefcase, MapPin, Calendar, TrendingUp, 
+  Users, CheckCircle, Clock, ArrowRight, Loader2, Wallet
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-
-// --- TYPES ---
-interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  status: string;
-  createdAt: string;
-}
-
-interface Mission {
-  id: string;
-  type: string;
-  fee: number;
-  commune: string;
-  dateScheduled: string;
-  status: string;
-  property: {
-    title: string;
-    address: string;
-    type: string;
-    images: string[];
-  };
-}
+import { toast } from "sonner";
+import Link from "next/link";
 
 export default function AgentDashboard() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
-  
-  // Onglets : 'market' (Missions Dispo), 'agenda' (Mes Missions), 'leads' (Mes Prospects)
-  const [activeTab, setActiveTab] = useState<'market' | 'agenda' | 'leads'>('market');
-
-  // Données
-  const [stats, setStats] = useState({ totalLeads: 0, commissionEstimate: 0, managedCount: 0 });
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [availableMissions, setAvailableMissions] = useState<Mission[]>([]);
-  const [myMissions, setMyMissions] = useState<Mission[]>([]);
-
-  // Modale & Forms
-  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newLead, setNewLead] = useState({ name: "", phone: "", address: "", photo: null as File | null });
-
-  // --- CHARGEMENT DES DONNÉES ---
-  const fetchAllData = async () => {
-    try {
-        setLoading(true);
-        // ❌ PAS DE HEADERS MANUELS ICI. Le cookie fait le travail.
-        
-        // 1. Stats & Leads
-        const dashboardRes = await api.get('/agent/dashboard');
-        if (dashboardRes.data.success) {
-            setStats(dashboardRes.data.stats);
-            setLeads(dashboardRes.data.recentLeads || []);
-        }
-
-        // 2. Missions Disponibles (Uber Market)
-        // Note: Assurez-vous que cette route existe bien dans /api/agent/missions
-        const marketRes = await api.get('/agent/missions'); 
-        if (marketRes.data.success) {
-            setAvailableMissions(marketRes.data.data.available);
-            setMyMissions(marketRes.data.data.myMissions);
-        }
-
-    } catch (error: any) {
-        console.error("Erreur Sync:", error);
-        if (error.response?.status === 401) {
-             toast.error("Session expirée.");
-             router.push('/login');
-        }
-    } finally {
-        setLoading(false);
-    }
-  };
+  const [data, setData] = useState<any>(null);
+  const [missions, setMissions] = useState<any>(null);
 
   useEffect(() => {
-    fetchAllData();
+    const loadDashboard = async () => {
+      try {
+        // On charge les stats ET les missions en parallèle
+        const [resStats, resMissions] = await Promise.all([
+           api.get('/agent/dashboard'),
+           api.get('/agent/missions')
+        ]);
+
+        if (resStats.data.success) setData(resStats.data);
+        if (resMissions.data.success) setMissions(resMissions.data.data);
+
+      } catch (e) {
+        console.error(e);
+        toast.error("Erreur de chargement du tableau de bord");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDashboard();
   }, []);
 
-  // --- ACTIONS ---
-
-  const handleAcceptMission = async (missionId: string) => {
-    try {
-        // On envoie juste l'ID, le serveur sait qui nous sommes grâce au Cookie
-        await api.post('/agent/missions/accept', { missionId });
-        
-        toast.success("Mission acceptée ! Elle est dans votre agenda.");
-        fetchAllData(); 
-        setActiveTab('agenda'); 
-    } catch (error: any) {
-        toast.error(error.response?.data?.error || "Impossible d'accepter cette mission.");
-    }
-  };
-
-  const handleCompleteMission = async (missionId: string) => {
+  const handleAcceptMission = async (id: string) => {
       try {
-        await api.post('/agent/missions/complete', { 
-            missionId, 
-            reportData: { note: "Mission effectuée via App" } 
-        });
-        toast.success("Mission terminée ! Commission créditée.");
-        fetchAllData();
-      } catch (error) {
-        toast.error("Erreur lors de la clôture.");
+          await api.post(`/agent/missions/${id}/accept`);
+          toast.success("Mission acceptée ! Elle est dans votre agenda.");
+          // Rechargement rapide pour mettre à jour l'interface
+          window.location.reload(); 
+      } catch (e) {
+          toast.error("Impossible d'accepter cette mission.");
       }
   };
 
-  const handleCreateLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
-    try {
-        const formData = new FormData();
-        formData.append('name', newLead.name);
-        formData.append('phone', newLead.phone);
-        formData.append('address', newLead.address);
-        if (newLead.photo) formData.append('leadPhoto', newLead.photo);
-
-        // Axios gère le Content-Type multipart automatiquement quand on envoie du FormData
-        await api.post('/agent/leads', formData);
-        
-        toast.success("Prospect ajouté !");
-        setIsLeadModalOpen(false);
-        setNewLead({ name: "", phone: "", address: "", photo: null });
-        fetchAllData();
-    } catch (error) {
-        toast.error("Erreur ajout prospect.");
-    } finally {
-        setCreating(false);
-    }
-  };
-
   if (loading) return (
-    <div className="h-screen w-full flex flex-col items-center justify-center text-white gap-4 bg-[#0B1120]">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500"/>
-        <p className="text-slate-400 text-sm">Chargement de votre espace...</p>
+    <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white gap-3">
+        <Loader2 className="w-10 h-10 animate-spin text-blue-500"/>
+        <p className="text-sm font-mono text-slate-500">Synchronisation des missions...</p>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen bg-[#060B18] text-slate-200 font-sans">
-      
-      <main className="flex-1 p-4 md:p-8 relative w-full max-w-6xl mx-auto pb-20">
+    <div className="p-6 md:p-10 font-sans text-slate-200 min-h-screen bg-[#020617]">
         
-        {/* HEADER */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-6">
+        {/* HEADER & WELCOME */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
             <div>
-                <h1 className="text-3xl font-black text-white tracking-tight">ESPACE AGENT <span className="text-emerald-500">PRO</span></h1>
-                <p className="text-slate-400 mt-1">Gérez vos missions et encaissez vos gains.</p>
+                <h1 className="text-2xl font-black text-white mb-1">Espace Agent</h1>
+                <p className="text-slate-400 text-sm">Gérez vos missions et vos prospects.</p>
             </div>
-            
-            <div className="bg-gradient-to-r from-emerald-900/40 to-slate-900 p-4 rounded-2xl border border-emerald-500/20 flex items-center gap-4 w-full md:w-auto shadow-2xl shadow-emerald-900/10">
-                <div className="bg-emerald-500/20 p-3 rounded-xl border border-emerald-500/20">
-                    <Wallet className="text-emerald-400 w-6 h-6" />
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+                <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
+                    <Wallet className="w-6 h-6" />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Solde Disponible</p>
-                    <p className="text-2xl font-black text-white">{stats.commissionEstimate?.toLocaleString() || 0} F</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-500">Commissions Estimées</p>
+                    <p className="text-2xl font-black text-white">{data?.stats?.commissionEstimate?.toLocaleString()} F</p>
                 </div>
             </div>
-        </header>
-
-        {/* NAVIGATION TABS */}
-        <div className="flex flex-wrap p-1 bg-slate-900/50 border border-slate-800 rounded-xl mb-8 w-full md:w-fit backdrop-blur-sm gap-2 md:gap-0">
-            <button 
-                onClick={() => setActiveTab('market')}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'market' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-                <MapPin className="w-4 h-4"/> Missions Dispo
-                {availableMissions.length > 0 && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full ml-1 animate-pulse">{availableMissions.length}</span>}
-            </button>
-            <button 
-                onClick={() => setActiveTab('agenda')}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'agenda' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-                <Calendar className="w-4 h-4"/> Mon Agenda
-            </button>
-            <button 
-                onClick={() => setActiveTab('leads')}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'leads' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-            >
-                <Users className="w-4 h-4"/> Prospects
-            </button>
         </div>
 
-        {/* CONTENU */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* KPI CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <Card className="bg-slate-900 border-slate-800 shadow-lg relative overflow-hidden group hover:border-blue-500/30 transition">
+                <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition"><Users className="w-24 h-24 text-white"/></div>
+                <CardContent className="p-6">
+                    <p className="text-slate-500 text-xs font-bold uppercase mb-1">Prospects (Leads)</p>
+                    <p className="text-4xl font-black text-white">{data?.stats?.totalLeads || 0}</p>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900 border-slate-800 shadow-lg relative overflow-hidden group hover:border-blue-500/30 transition">
+                <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition"><Briefcase className="w-24 h-24 text-white"/></div>
+                <CardContent className="p-6">
+                    <p className="text-slate-500 text-xs font-bold uppercase mb-1">Missions Gérées</p>
+                    <p className="text-4xl font-black text-blue-400">{data?.stats?.managedCount || 0}</p>
+                </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-600 to-blue-800 border-none shadow-lg text-white">
+                <CardContent className="p-6 flex flex-col justify-between h-full">
+                    <div>
+                        <p className="text-blue-200 text-xs font-bold uppercase mb-1">Performance</p>
+                        <p className="text-4xl font-black">Top 5%</p>
+                    </div>
+                    <div className="mt-4 flex items-center gap-2 text-sm font-medium bg-black/20 w-fit px-3 py-1 rounded-full">
+                        <TrendingUp className="w-4 h-4" /> Croissance stable
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             
-            {/* ONGLET 1: MARKETPLACE */}
-            {activeTab === 'market' && (
-                <>
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold text-white">📍 Missions disponibles</h3>
-                    </div>
-                    {availableMissions.length === 0 ? (
-                        <div className="text-center py-16 bg-slate-900/30 border border-slate-800 border-dashed rounded-2xl">
-                            <MapPin className="w-8 h-8 opacity-50 mx-auto mb-4 text-slate-500"/>
-                            <p className="text-slate-400">Aucune mission dans votre secteur pour le moment.</p>
+            {/* COLONNE GAUCHE : LE MARCHÉ DES MISSIONS (Uber Style) */}
+            <div className="xl:col-span-2 space-y-6">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <MapPin className="w-5 h-5 text-orange-500" /> Missions Disponibles
+                    </h2>
+                    <Badge variant="outline" className="text-orange-500 border-orange-500 bg-orange-500/10 animate-pulse">
+                        {missions?.available?.length || 0} en attente
+                    </Badge>
+                </div>
+
+                <div className="grid gap-4">
+                    {missions?.available?.length === 0 ? (
+                        <div className="p-10 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50 text-center">
+                            <p className="text-slate-500">Aucune nouvelle mission sur le marché.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {availableMissions.map((mission) => (
-                                <Card key={mission.id} className="bg-slate-900 border-slate-800 text-white overflow-hidden hover:border-emerald-500/50 transition-all">
-                                    <div className="h-32 bg-slate-800 relative">
-                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent z-10"/>
-                                        <div className="absolute bottom-3 left-4 z-20">
-                                            <Badge className="bg-emerald-500 text-black font-bold border-0">{mission.type}</Badge>
+                        missions?.available?.map((m: any) => (
+                            <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-orange-500/50 transition-all group relative overflow-hidden">
+                                <div className="flex flex-col md:flex-row justify-between gap-4 relative z-10">
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <Badge className="bg-blue-600 hover:bg-blue-500 border-none">
+                                                {m.type.replace('_', ' ')}
+                                            </Badge>
+                                            <span className="text-slate-500 text-xs font-mono flex items-center gap-1">
+                                                <Clock className="w-3 h-3"/> {new Date(m.dateScheduled).toLocaleDateString()}
+                                            </span>
                                         </div>
-                                        <div className="absolute top-3 right-3 z-20 bg-black/60 px-3 py-1 rounded-full border border-white/10">
-                                            <span className="text-emerald-400 font-bold text-sm">+{mission.fee.toLocaleString()} F</span>
-                                        </div>
-                                    </div>
-                                    <CardContent className="p-5">
-                                        <h4 className="font-bold text-lg mb-1 truncate">{mission.property?.title || 'Bien Immobilier'}</h4>
-                                        <p className="text-slate-400 text-sm mb-4">{mission.property?.address}</p>
-                                        <p className="text-xs text-slate-500 mb-6 flex items-center gap-2">
-                                            <Calendar className="w-3 h-3"/> {new Date(mission.dateScheduled).toLocaleString()}
+                                        <h3 className="font-bold text-lg text-white mb-1">{m.property.title}</h3>
+                                        <p className="text-slate-400 text-sm flex items-center gap-1">
+                                            <MapPin className="w-3 h-3"/> {m.property.address}
                                         </p>
-                                        <Button onClick={() => handleAcceptMission(mission.id)} className="w-full bg-white text-black hover:bg-emerald-500 font-bold">
-                                            ACCEPTER <ArrowRight className="w-4 h-4 ml-2"/>
-                                        </Button>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* ONGLET 2: AGENDA */}
-            {activeTab === 'agenda' && (
-                <>
-                    <h3 className="text-xl font-bold text-white mb-6">📅 Mes Missions</h3>
-                    {myMissions.length === 0 ? (
-                        <p className="text-slate-500 italic">Agenda vide.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {myMissions.map(mission => (
-                                <div key={mission.id} className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row justify-between items-center gap-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-blue-900/30 text-blue-400 rounded-full flex items-center justify-center border border-blue-500/20">
-                                            <Briefcase className="w-5 h-5"/>
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-white text-lg">{mission.type}</h4>
-                                            <p className="text-slate-400 text-sm">
-                                                {new Date(mission.dateScheduled).toLocaleString()} • <span className="text-emerald-400 font-bold">{mission.fee} F</span>
-                                            </p>
-                                        </div>
                                     </div>
-                                    {mission.status === 'COMPLETED' ? (
-                                        <Badge variant="outline" className="text-green-500 border-green-500">Payée</Badge>
-                                    ) : (
-                                        <Button onClick={() => handleCompleteMission(mission.id)} className="bg-blue-600 hover:bg-blue-700 font-bold">
-                                            <Check className="w-4 h-4 mr-2"/> Valider
+                                    <div className="flex flex-col items-end justify-center gap-2 min-w-[140px]">
+                                        <div className="text-right">
+                                            <p className="text-[10px] uppercase font-bold text-slate-500">Commission</p>
+                                            <p className="text-xl font-black text-emerald-400">{m.fee.toLocaleString()} F</p>
+                                        </div>
+                                        <Button 
+                                            size="sm" 
+                                            onClick={() => handleAcceptMission(m.id)}
+                                            className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-lg shadow-orange-900/20"
+                                        >
+                                            ACCEPTER
                                         </Button>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* ONGLET 3: PROSPECTS */}
-            {activeTab === 'leads' && (
-                <>
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-bold text-white">👥 Mes Prospects</h3>
-                        <Button onClick={() => setIsLeadModalOpen(true)} className="bg-orange-600 hover:bg-orange-700 font-bold">
-                            <Plus className="w-4 h-4 mr-2"/> Ajouter
-                        </Button>
-                    </div>
-                    <div className="grid gap-4">
-                        {leads.map((lead) => (
-                            <div key={lead.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-500">
-                                    {lead.name.charAt(0)}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-white">{lead.name}</h4>
-                                    <p className="text-slate-400 text-sm">{lead.phone}</p>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </>
-            )}
-        </div>
-
-      </main>
-
-      {/* MODALE */}
-      {isLeadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#0f172a] border border-slate-800 w-full max-w-md rounded-2xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">Nouveau Prospect</h3>
-                    <button onClick={() => setIsLeadModalOpen(false)}><X className="text-slate-400 hover:text-white"/></button>
+                        ))
+                    )}
                 </div>
-                <form onSubmit={handleCreateLead} className="space-y-4">
-                    <Input placeholder="Nom" required className="bg-slate-900 border-slate-700 text-white" value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} />
-                    <Input placeholder="Téléphone" required className="bg-slate-900 border-slate-700 text-white" value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})} />
-                    <Input placeholder="Besoin / Adresse" className="bg-slate-900 border-slate-700 text-white" value={newLead.address} onChange={e => setNewLead({...newLead, address: e.target.value})} />
-                    <Button type="submit" disabled={creating} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold">{creating ? <Loader2 className="animate-spin"/> : "Enregistrer"}</Button>
-                </form>
+            </div>
+
+            {/* COLONNE DROITE : MON AGENDA & PROSPECTS */}
+            <div className="space-y-8">
+                
+                {/* AGENDA */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-blue-500" /> Mon Agenda
+                    </h3>
+                    <div className="space-y-4">
+                        {missions?.myMissions?.length === 0 ? (
+                            <p className="text-sm text-slate-500 italic">Agenda vide. Acceptez une mission !</p>
+                        ) : (
+                            missions?.myMissions?.map((m: any) => (
+                                <div key={m.id} className="flex gap-4 items-start border-l-2 border-blue-500 pl-4 py-1">
+                                    <div className="flex flex-col items-center min-w-[50px]">
+                                        <span className="text-xs font-bold text-slate-500 uppercase">{new Date(m.dateScheduled).toLocaleDateString('fr-FR', {month:'short'})}</span>
+                                        <span className="text-xl font-black text-white">{new Date(m.dateScheduled).getDate()}</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white line-clamp-1">{m.type.replace('_', ' ')}</p>
+                                        <p className="text-xs text-slate-400 line-clamp-1">{m.property.address}</p>
+                                        <span className="inline-block mt-1 text-[10px] bg-blue-500/10 text-blue-400 px-2 rounded border border-blue-500/20">
+                                            {m.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* DERNIERS LEADS */}
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                            <Users className="w-5 h-5 text-emerald-500" /> Récents Leads
+                        </h3>
+                        <Link href="/dashboard/agent/leads" className="text-xs text-slate-500 hover:text-white transition">Voir tout</Link>
+                    </div>
+                    <div className="space-y-3">
+                        {data?.recentLeads?.length === 0 ? (
+                            <p className="text-sm text-slate-500 italic">Aucun prospect récent.</p>
+                        ) : (
+                            data?.recentLeads?.map((l: any) => (
+                                <div key={l.id} className="flex items-center justify-between p-3 bg-black/20 rounded-xl hover:bg-black/40 transition cursor-pointer">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
+                                            {l.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-white">{l.name}</p>
+                                            <p className="text-[10px] text-slate-500">{l.phone}</p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-slate-600" />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
             </div>
         </div>
-      )}
-
     </div>
   );
 }

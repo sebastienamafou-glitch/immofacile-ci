@@ -15,7 +15,7 @@ interface KycUser {
   email: string;
   role: string;
   kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  documents: string[];
+  documents: string[]; // Toujours un tableau, jamais null
 }
 
 export default function AdminKycPage() {
@@ -40,8 +40,21 @@ export default function AdminKycPage() {
         const res = await api.get('/admin/kyc', {
             headers: { 'x-user-email': admin.email }
         });
+        
         if (res.data.success) {
-            setUsers(res.data.users);
+            // ✅ SÉCURISATION DES DONNÉES (Nettoyage)
+            // On s'assure que 'documents' est toujours un tableau []
+            // On s'assure que 'name' n'est jamais vide
+            const cleanUsers = (res.data.users || []).map((u: any) => ({
+                id: u.id,
+                name: u.name || "Utilisateur Inconnu",
+                email: u.email || "No Email",
+                role: u.role || "USER",
+                kycStatus: u.kycStatus || "PENDING",
+                documents: Array.isArray(u.documents) ? u.documents : [] 
+            }));
+            
+            setUsers(cleanUsers);
         }
     } catch (error) {
         console.error(error);
@@ -79,7 +92,7 @@ export default function AdminKycPage() {
                 { headers: { 'x-user-email': admin.email } }
             );
             
-            // Mise à jour locale
+            // Mise à jour locale Optimiste
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, kycStatus: decision } : u));
             
             Swal.fire({ 
@@ -95,6 +108,7 @@ export default function AdminKycPage() {
     }
   };
 
+  // Filtrage sécurisé
   const filteredUsers = users.filter(u => filter === 'ALL' ? true : u.kycStatus === 'PENDING');
 
   if (loading) return (
@@ -144,8 +158,9 @@ export default function AdminKycPage() {
                 <div key={user.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-slate-700 transition-all">
                     
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-lg text-slate-400 border border-slate-700">
-                            {user.name.charAt(0).toUpperCase()}
+                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-lg text-slate-400 border border-slate-700 uppercase">
+                            {/* ✅ SÉCURITÉ : Fallback si le nom est vide */}
+                            {(user.name || "U").charAt(0)}
                         </div>
                         <div>
                             <div className="flex items-center gap-3">
@@ -161,8 +176,8 @@ export default function AdminKycPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        {/* Bouton Voir Document */}
-                        {user.documents.length > 0 ? (
+                        {/* ✅ SÉCURITÉ : Vérification robuste du tableau documents */}
+                        {user.documents && user.documents.length > 0 ? (
                             <a 
                                 href={user.documents[0]} 
                                 target="_blank"

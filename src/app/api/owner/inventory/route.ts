@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,11 @@ export async function GET(request: Request) {
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    
+    // ✅ AJOUT SÉCURITÉ : Vérification du Rôle
+    if (!owner || owner.role !== "OWNER") {
+        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+    }
 
     // 2. RÉCUPÉRATION FILTRÉE
     // On cherche les Inventory dont le Lease est lié à une Property appartenant à l'Owner
@@ -18,7 +22,7 @@ export async function GET(request: Request) {
       where: {
         lease: {
             property: {
-                ownerId: owner.id // ✅ Le filtre magique
+                ownerId: owner.id // ✅ Le filtre magique (Anti-IDOR)
             }
         }
       },

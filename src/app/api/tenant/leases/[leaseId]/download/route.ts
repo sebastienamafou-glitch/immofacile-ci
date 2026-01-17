@@ -1,24 +1,32 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { jsPDF } from "jspdf";
+import { prisma } from "@/lib/prisma"; // Singleton
+
+// Import compatible Next.js pour le moteur PDF serveur
+const PDFDocument = require("pdfkit/js/pdfkit.standalone");
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { leaseId: string } }
+  { params }: { params: Promise<{ leaseId: string }> } // ✅ Next.js 15 Promise
 ) {
   try {
-    const { leaseId } = params;
+    const { leaseId } = await params;
 
-    // 1. Récupération des données avec les relations correctes
+    // 1. SÉCURITÉ : Identification
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Compte introuvable" }, { status: 403 });
+
+    // 2. RÉCUPÉRATION DU BAIL
     const lease = await prisma.lease.findUnique({
       where: { id: leaseId },
       include: {
-        property: {
-          include: { owner: true } // Pour avoir le nom du bailleur
-        },
-        tenant: true, // Pour avoir le nom du locataire
-        // ✅ CORRECTION : On récupère les preuves de signature pour avoir la date
-        signatures: true 
+        property: { include: { owner: true } },
+        tenant: true,
+        signatures: true
       },
     });
 
@@ -26,137 +34,89 @@ export async function GET(
       return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
     }
 
-    // 2. Initialisation du document PDF (A4)
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // --- EN-TÊTE ---
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("CONTRAT DE BAIL RÉSIDENTIEL", pageWidth / 2, 20, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Réf: ${lease.id.toUpperCase()}`, pageWidth / 2, 28, { align: "center" });
+    // 3. VÉRIFICATION DES DROITS D'ACCÈS (CRITIQUE)
+    // Seul le locataire du bail ou le propriétaire du bien peut télécharger
+    const isTenant = lease.tenantId === user.id;
+    const isOwner = lease.property.ownerId === user.id;
+    const isAdmin = user.role === 'ADMIN';
 
-    doc.setLineWidth(0.5);
-    doc.line(20, 35, pageWidth - 20, 35); // Ligne de séparation
-
-    // --- 1. LES PARTIES ---
-    let y = 50;
-    
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("1. DÉSIGNATION DES PARTIES", 20, y);
-    y += 10;
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text("Le BAILLEUR (Propriétaire) :", 20, y);
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nom : ${lease.property.owner?.name || "Agence ImmoFacile"}`, 25, y);
-    y += 6;
-    doc.text("Représenté par la plateforme ImmoFacile.", 25, y);
-
-    y += 12;
-    doc.setFont("helvetica", "bold");
-    doc.text("Le PRENEUR (Locataire) :", 20, y);
-    y += 7;
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nom : ${lease.tenant?.name || lease.tenant?.email || "Locataire non renseigné"}`, 25, y);
-    y += 6;
-    doc.text(`ID Client : ${lease.tenantId}`, 25, y);
-
-    // --- 2. LE BIEN LOUÉ ---
-    y += 15;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("2. OBJET DU CONTRAT", 20, y);
-    y += 10;
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("Le Bailleur donne en location les locaux situés à l'adresse suivante :", 20, y);
-    y += 8;
-    doc.setFont("helvetica", "bold");
-    doc.text(`${lease.property.address}, ${lease.property.commune}`, 25, y);
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.text(`Type de bien : ${lease.property.title}`, 20, y);
-
-    // --- 3. CONDITIONS FINANCIÈRES ---
-    y += 15;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("3. CONDITIONS FINANCIÈRES", 20, y);
-    y += 10;
-
-    doc.setFontSize(11);
-    doc.text(`Loyer Mensuel : ${lease.monthlyRent.toLocaleString()} FCFA`, 25, y);
-    y += 7;
-    doc.text(`Dépôt de Garantie (Caution) : ${lease.depositAmount.toLocaleString()} FCFA`, 25, y);
-    y += 7;
-    doc.text("Périodicité du paiement : Mensuelle, avant le 05 du mois.", 25, y);
-
-    // --- 4. DURÉE ---
-    y += 15;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("4. DURÉE DU BAIL", 20, y);
-    y += 10;
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Le bail prend effet le : ${new Date(lease.startDate).toLocaleDateString("fr-FR")}`, 25, y);
-    doc.text("Il est conclu pour une durée indéterminée, résiliable avec préavis de 3 mois.", 25, y + 7);
-
-    // --- ZONE DE SIGNATURE ---
-    y += 30;
-    doc.setLineWidth(0.2);
-    doc.rect(20, y, 80, 40); // Cadre Bailleur
-    doc.rect(110, y, 80, 40); // Cadre Locataire
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Pour le Bailleur", 30, y + 10);
-    doc.text("Pour le Locataire", 120, y + 10);
-
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text("Signature électronique certifiée", 30, y + 35);
-    
-    // ✅ LOGIQUE CORRIGÉE : On cherche une preuve de signature
-    const signatureProof = lease.signatures.length > 0 ? lease.signatures[0] : null;
-    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "COMPLETED";
-
-    if (isSigned && signatureProof) {
-        doc.setTextColor(0, 150, 0); // Vert
-        doc.text(`Signé le ${new Date(signatureProof.signedAt).toLocaleDateString()}`, 120, y + 35);
-    } else {
-        doc.setTextColor(200, 0, 0); // Rouge
-        doc.text("EN ATTENTE DE SIGNATURE", 120, y + 35);
+    if (!isTenant && !isOwner && !isAdmin) {
+        return NextResponse.json({ error: "Accès interdit à ce document." }, { status: 403 });
     }
 
-    // --- FOOTER ---
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text("Document généré automatiquement par la plateforme ImmoFacile SaaS.", pageWidth / 2, 280, { align: "center" });
+    // 4. GÉNÉRATION DU PDF
+    const pdfBuffer = await generateLeasePDF(lease);
 
-    // 3. Renvoi du PDF
-    const pdfBuffer = doc.output("arraybuffer");
-
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Bail_ImmoFacile_${lease.id}.pdf"`,
+        "Content-Disposition": `attachment; filename="Contrat_Bail_${lease.id.substring(0, 8)}.pdf"`,
       },
     });
 
   } catch (error) {
-    console.error("Erreur production PDF:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur lors de la génération du contrat" },
-      { status: 500 }
-    );
+    console.error("Erreur PDF:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
+}
+
+// --- MOTEUR DE GÉNÉRATION (PDFKit) ---
+function generateLeasePDF(lease: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks: Buffer[] = [];
+
+    doc.on('data', (chunk: any) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    // En-tête
+    doc.fontSize(20).font('Helvetica-Bold').text("CONTRAT DE BAIL", { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text(`Réf: ${lease.id}`, { align: 'center' });
+    doc.moveDown(1);
+    
+    // Ligne de séparation
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.moveDown(2);
+
+    // 1. Les Parties
+    doc.fontSize(12).font('Helvetica-Bold').text("1. LES PARTIES");
+    doc.fontSize(10).font('Helvetica')
+       .text(`BAILLEUR : ${lease.property.owner?.name} (${lease.property.owner?.email})`)
+       .text(`LOCATAIRE : ${lease.tenant?.name} (${lease.tenant?.email})`);
+    doc.moveDown(1);
+
+    // 2. Le Bien
+    doc.fontSize(12).font('Helvetica-Bold').text("2. LE BIEN");
+    doc.fontSize(10).font('Helvetica')
+       .text(`Adresse : ${lease.property.address}, ${lease.property.commune}`)
+       .text(`Type : ${lease.property.title}`);
+    doc.moveDown(1);
+
+    // 3. Finances
+    doc.fontSize(12).font('Helvetica-Bold').text("3. CONDITIONS FINANCIÈRES");
+    doc.fontSize(10).font('Helvetica')
+       .text(`Loyer Mensuel : ${lease.monthlyRent.toLocaleString()} FCFA`)
+       .text(`Caution : ${lease.depositAmount.toLocaleString()} FCFA`)
+       .text(`Début du bail : ${new Date(lease.startDate).toLocaleDateString('fr-FR')}`);
+    doc.moveDown(2);
+
+    // 4. Signature & Preuve
+    doc.fontSize(12).font('Helvetica-Bold').text("4. SIGNATURES & VALIDATION");
+    doc.moveDown(1);
+
+    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "COMPLETED";
+    
+    if (isSigned) {
+        doc.fillColor('green').text("[ DOCUMENT SIGNÉ ÉLECTRONIQUEMENT ]", { align: 'center' });
+        doc.fillColor('black').fontSize(8).text(`Date de signature : ${new Date(lease.updatedAt).toLocaleString()}`, { align: 'center' });
+        if(lease.documentHash) {
+            doc.text(`Empreinte numérique (Hash) : ${lease.documentHash}`, { align: 'center' });
+        }
+    } else {
+        doc.fillColor('red').text("[ DOCUMENT PROVISOIRE - NON SIGNÉ ]", { align: 'center' });
+    }
+
+    doc.end();
+  });
 }

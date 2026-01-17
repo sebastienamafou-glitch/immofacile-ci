@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const userEmail = req.headers.get("x-user-email");
+    // 1. SÉCURITÉ : Auth Headers
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    if (!userEmail) {
-      return NextResponse.json({ success: false, error: "Non autorisé." }, { status: 401 });
-    }
-
+    // 2. RÉCUPÉRATION DES DONNÉES (Correction Prisma select/include)
     const owner = await prisma.user.findUnique({
       where: { email: userEmail },
       select: {
@@ -20,16 +19,21 @@ export async function GET(req: NextRequest) {
         role: true,
         walletBalance: true,
         
+        // ✅ CORRECTION : On utilise 'select' ici, pas 'include'
         propertiesOwned: { 
-          include: {
+          select: {
+            id: true,       // Obligatoire de lister les champs qu'on veut
+            title: true,
+            address: true,
+            isPublished: true,
+            // Relations imbriquées
             leases: {
-              where: { isActive: true }, // On ne prend que les baux actifs
+              where: { isActive: true }, 
               select: {
                 monthlyRent: true,
                 isActive: true,
                 status: true,
-                startDate: true, // Pour la date de signature
-                // ✅ AJOUTER CECI :
+                startDate: true,
                 tenant: {
                   select: { name: true }
                 }
@@ -41,7 +45,6 @@ export async function GET(req: NextRequest) {
           }
         },
 
-        // ✅ CORRECTION 2 : Champs conformes au modèle Transaction (pas de status ni date)
         transactions: {
           take: 5,
           orderBy: { createdAt: 'desc' },
@@ -49,15 +52,16 @@ export async function GET(req: NextRequest) {
             id: true,
             amount: true,
             type: true,
-            reason: true,     // Remplace 'status' qui n'existe pas
-            createdAt: true   // Remplace 'date' qui n'existe pas
+            reason: true,
+            createdAt: true
           }
         }
       }
     });
 
-    if (!owner) {
-      return NextResponse.json({ success: false, error: "Compte introuvable." }, { status: 404 });
+    // 3. VÉRIFICATION STRICTE DU RÔLE
+    if (!owner || owner.role !== "OWNER") {
+      return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
     }
 
     // --- LOGIQUE MÉTIER ---
@@ -65,39 +69,48 @@ export async function GET(req: NextRequest) {
     const myProperties = owner.propertiesOwned || []; 
     const totalProperties = myProperties.length;
 
-    // Calculs financiers & occupation
-    const monthlyIncome = myProperties.reduce((total: number, property: any) => {
-      const activeLease = property.leases?.find(
-        (lease: any) => lease.isActive === true && lease.status === 'ACTIVE'
-      );
-      return total + (activeLease?.monthlyRent || 0);
+    // A. Calcul Revenus Mensuels (Basé sur les baux actifs)
+    const monthlyIncome = myProperties.reduce((total, property) => {
+      const propertyIncome = property.leases.reduce((sum, lease) => {
+          return lease.isActive ? sum + lease.monthlyRent : sum;
+      }, 0);
+      return total + propertyIncome;
     }, 0);
 
-    const occupiedCount = myProperties.filter((property: any) =>
-      property.leases?.some((lease: any) => lease.isActive === true && lease.status === 'ACTIVE')
+    // B. Taux d'occupation
+    const occupiedCount = myProperties.filter(property =>
+      property.leases.some(lease => lease.isActive)
     ).length;
 
     const occupancyRate = totalProperties > 0 
       ? Math.round((occupiedCount / totalProperties) * 100) 
       : 0;
 
-    const activeIncidentsCount = myProperties.reduce((total: number, property: any) => {
-        const activePropIncidents = property.incidents?.filter(
-            (i: any) => ['OPEN', 'IN_PROGRESS', 'QUOTATION'].includes(i.status)
-        ).length || 0;
+    // C. Incidents Actifs
+    const activeIncidentsCount = myProperties.reduce((total, property) => {
+        const activePropIncidents = property.incidents.filter(
+            (i) => ['OPEN', 'IN_PROGRESS', 'QUOTATION'].includes(i.status)
+        ).length;
         return total + activePropIncidents;
     }, 0);
 
-    // ✅ MAPPING DES TRANSACTIONS : On transforme les données brutes pour le Frontend
-    const formattedTransactions = (owner.transactions || []).map((t: any) => ({
+    // D. Mapping Transactions
+    const formattedTransactions = owner.transactions.map((t) => ({
         id: t.id,
         amount: t.amount,
         type: t.type,
-        // On simule un status 'COMPLETED' car toutes les transactions en base sont valides
-        status: 'COMPLETED', 
-        // On mappe createdAt vers date pour l'affichage
-        date: t.createdAt,   
+        status: 'COMPLETED',
+        date: t.createdAt,
         reason: t.reason
+    }));
+
+    // E. Mapping Propriétés
+    const formattedProperties = myProperties.map((p) => ({
+        id: p.id,
+        title: p.title,
+        address: p.address,
+        isPublished: p.isPublished,
+        isRented: p.leases.some((l) => l.isActive)
     }));
 
     return NextResponse.json({
@@ -116,16 +129,13 @@ export async function GET(req: NextRequest) {
         activeIncidentsCount,
         walletBalance: owner.walletBalance || 0
       },
-      properties: myProperties.map((p: any) => ({
-        ...p,
-        isRented: p.leases?.some((l: any) => l.isActive && l.status === 'ACTIVE')
-      })),
-      recentTransactions: formattedTransactions, // On envoie la version corrigée
-      artisans: [] 
+      properties: formattedProperties,
+      recentTransactions: formattedTransactions,
+      artisans: []
     });
 
   } catch (error) {
-    console.error("🔥 Erreur Dashboard:", error);
-    return NextResponse.json({ success: false, error: "Erreur serveur." }, { status: 500 });
+    console.error("Erreur Dashboard Owner:", error);
+    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
   }
 }

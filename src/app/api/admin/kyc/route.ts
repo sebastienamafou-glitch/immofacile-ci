@@ -3,17 +3,20 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-// 1. MÉTHODE D'INFÉRENCE STRICTE (Mémoire Rappelée ✅)
+// =====================================================================
+// 1. DÉFINITION DES TYPES (Inférence Native TypeScript - Infaillible)
+// =====================================================================
+
 // On définit la requête type pour que TypeScript comprenne la structure
 const getKycUsersQuery = () => prisma.user.findMany({
   where: { 
-    // On veut ceux qui ont au moins un document ou qui sont en attente
+    // On veut ceux qui sont en attente ou déjà traités
     OR: [
         { kycStatus: "PENDING" },
         { kycStatus: "VERIFIED" },
         { kycStatus: "REJECTED" }
-    ],
-    kycDocuments: { isEmpty: false } 
+    ]
+    // On retire la condition isEmpty pour voir aussi les anciens formats
   },
   orderBy: { updatedAt: 'desc' },
   select: { 
@@ -22,12 +25,17 @@ const getKycUsersQuery = () => prisma.user.findMany({
     email: true, 
     role: true, 
     kycStatus: true, 
-    kycDocuments: true 
+    kycDocuments: true, // Ancien
+    kycDocumentUrl: true // Nouveau
   }
 });
 
 type KycUser = Awaited<ReturnType<typeof getKycUsersQuery>>[number];
 
+
+// =====================================================================
+// 2. FONCTION PRINCIPALE
+// =====================================================================
 export async function GET(request: Request) {
   try {
     // SÉCURITÉ
@@ -42,9 +50,13 @@ export async function GET(request: Request) {
 
     // Mapping pour le frontend (formatage des docs)
     const users = usersRaw.map((u: KycUser) => ({
-        ...u,
-        // On s'assure que le frontend reçoit un tableau propre
-        documents: u.kycDocuments
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        kycStatus: u.kycStatus,
+        // On normalise : Soit la nouvelle URL, soit la première de l'ancien tableau
+        documentUrl: u.kycDocumentUrl || (u.kycDocuments.length > 0 ? u.kycDocuments[0] : null)
     }));
 
     return NextResponse.json({ success: true, users });
@@ -71,8 +83,9 @@ export async function PUT(request: Request) {
         await prisma.user.update({
             where: { id: userId },
             data: { 
-                kycStatus: status 
+                kycStatus: status,
                 // Idéalement, on loguerait la raison du rejet quelque part, mais restons simple
+                updatedAt: new Date()
             }
         });
 

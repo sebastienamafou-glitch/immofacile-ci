@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
@@ -10,23 +10,29 @@ export async function GET(request: Request) {
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const admin = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!admin || admin.role !== "ADMIN") return NextResponse.json({ error: "Interdit" }, { status: 403 });
+    
+    // ✅ RÔLE STRICT ADMIN
+    if (!admin || admin.role !== "ADMIN") {
+        return NextResponse.json({ error: "Accès réservé aux administrateurs." }, { status: 403 });
+    }
 
-    // 2. STATS GLOBALES
+    // 2. STATS GLOBALES (Uniquement les paiements RÉUSSIS)
     const stats = await prisma.payment.aggregate({
+        where: {
+            status: 'SUCCESS' // ✅ CRITIQUE : On ne compte que l'argent réellement encaissé
+        },
         _sum: {
-            amount: true,          
-            amountPlatform: true,  
-            amountOwner: true,     
+            amount: true,          // Volume total brassé
+            amountPlatform: true,  // Notre Com
+            amountOwner: true,     // Reversé aux proprios
         },
         _count: {
             id: true 
         }
     });
 
-    // 3. HISTORIQUE DÉTAILLÉ (Correction ICI)
-    const history = await prisma.payment.findMany({
-        // ✅ CORRECTION : On trie par 'date' car 'createdAt' n'existe pas sur Payment
+    // 3. HISTORIQUE DÉTAILLÉ
+    const rawHistory = await prisma.payment.findMany({
         orderBy: { date: 'desc' }, 
         take: 50,
         include: {
@@ -38,6 +44,19 @@ export async function GET(request: Request) {
             }
         }
     });
+
+    // 4. FORMATAGE (Pour un tableau propre en front)
+    const formattedHistory = rawHistory.map(payment => ({
+        id: payment.id,
+        amount: payment.amount,
+        commission: payment.amountPlatform, // Ce que la plateforme gagne
+        status: payment.status,
+        date: payment.date,
+        type: payment.type, // LOYER, DEPOT, etc.
+        details: payment.lease 
+            ? `${payment.lease.tenant.name} (${payment.lease.property.title})`
+            : "Paiement orphelin"
+    }));
     
     return NextResponse.json({
       success: true,
@@ -46,7 +65,7 @@ export async function GET(request: Request) {
           totalRevenue: stats._sum.amountPlatform || 0, 
           transactionCount: stats._count.id
       },
-      history
+      history: formattedHistory
     });
 
   } catch (error) {

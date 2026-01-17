@@ -1,40 +1,69 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    // 1. SÉCURITÉ AUTH
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const artisan = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!artisan) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
 
-    const { jobId, action } = await request.json(); // ACCEPT, REJECT, COMPLETE
+    // ✅ CHECK RÔLE (Important)
+    if (!artisan || artisan.role !== "ARTISAN") {
+        return NextResponse.json({ error: "Accès réservé aux artisans." }, { status: 403 });
+    }
 
+    // 2. VALIDATION
+    const body = await request.json();
+    const { jobId, action } = body; // ACCEPT, REJECT, COMPLETE
+
+    if (!jobId || !action) return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
+
+    // 3. VÉRIFICATION DE PROPRIÉTÉ
+    // On vérifie que cette mission est bien assignée à CET artisan
+    const job = await prisma.incident.findUnique({
+        where: { id: jobId }
+    });
+
+    if (!job) return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
+    
+    // Sécurité : Seul l'artisan assigné peut agir dessus
+    if (job.assignedToId !== artisan.id) {
+        return NextResponse.json({ error: "Cette mission ne vous est pas assignée." }, { status: 403 });
+    }
+
+    // 4. LOGIQUE MÉTIER
     if (action === 'ACCEPT') {
+        // L'artisan confirme qu'il prend le job
         await prisma.incident.update({
             where: { id: jobId },
             data: { status: 'IN_PROGRESS' }
         });
+
     } else if (action === 'REJECT') {
-        // On désassigne l'artisan pour que quelqu'un d'autre puisse le prendre (si logique Uber)
-        // Ou on le marque juste rejeté par lui
+        // L'artisan refuse le job, on le remet dans le pool (Open et sans assignation)
         await prisma.incident.update({
             where: { id: jobId },
-            data: { assignedToId: null, status: 'OPEN' } // Retourne dans le pool
+            data: { 
+                assignedToId: null, // On retire l'assignation
+                status: 'OPEN'      // Retour case départ
+            }
         });
+
     } else if (action === 'COMPLETE') {
-        // Transaction : On ferme l'incident et on paie (logique simplifiée)
-        await prisma.$transaction([
-            prisma.incident.update({
-                where: { id: jobId },
-                data: { status: 'RESOLVED' }
-            }),
-            // Optionnel : Créditer le wallet de l'artisan ici si le paiement est auto
-        ]);
+        // L'artisan a fini
+        await prisma.incident.update({
+            where: { id: jobId },
+            data: { status: 'RESOLVED' } // En attente de validation finale par Admin/Tenant si besoin
+        });
+    } else {
+        return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: `Action ${action} effectuée.` });
 
   } catch (error: any) {
     console.error("Erreur Job Action:", error);

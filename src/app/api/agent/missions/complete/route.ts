@@ -1,46 +1,67 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. Sécurité Auth
+    // 1. SÉCURITÉ AUTH
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const agent = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!agent || agent.role !== "AGENT") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    
+    // ✅ Check Rôle
+    if (!agent || agent.role !== "AGENT") {
+        return NextResponse.json({ error: "Accès refusé. Réservé aux agents." }, { status: 403 });
+    }
 
-    const { missionId, reportData } = await request.json();
+    const body = await request.json();
+    const { missionId, reportData } = body;
 
-    // 2. Vérification Propriété
-    const mission = await prisma.mission.findUnique({ where: { id: missionId } });
+    if (!missionId) return NextResponse.json({ error: "ID Mission manquant" }, { status: 400 });
+
+    // 2. VÉRIFICATION PROPRIÉTÉ DE LA MISSION
+    const mission = await prisma.mission.findUnique({ 
+        where: { id: missionId },
+        include: { property: { select: { address: true } } } // On récupère l'adresse pour le libellé
+    });
     
     if (!mission) return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
     if (mission.agentId !== agent.id) return NextResponse.json({ error: "Cette mission ne vous appartient pas" }, { status: 403 });
-    if (mission.status !== "ACCEPTED") return NextResponse.json({ error: "Mission déjà terminée" }, { status: 400 });
+    if (mission.status !== "ACCEPTED") return NextResponse.json({ error: "Mission déjà terminée ou pas encore acceptée" }, { status: 400 });
 
-    // 3. TRANSACTION FINANCIÈRE SÉCURISÉE
-    // On met à jour la mission ET le solde de l'agent en même temps
+    // 3. TRANSACTION ATOMIQUE (Validation + Paiement + Trace)
     await prisma.$transaction([
         // A. Marquer la mission comme terminée
         prisma.mission.update({
             where: { id: missionId },
             data: {
                 status: "COMPLETED",
-                // Si vous avez un champ 'report' ou 'note' dans votre schema Prisma, décommentez ceci :
-                // report: reportData?.note || "Mission validée"
+                // report: reportData?.note || "Mission validée" // Décommentez si le champ existe
             }
         }),
-        // B. Verser la commission à l'agent
+
+        // B. Verser la commission (Correction: walletBalance)
         prisma.user.update({
             where: { id: agent.id },
             data: {
-                referralBalance: { increment: mission.fee || 0 } // On ajoute le montant de la mission
+                walletBalance: { increment: mission.fee || 0 } // ✅ Uniformisation avec le reste de l'app
+            }
+        }),
+
+        // C. Créer la preuve comptable (Transaction)
+        prisma.transaction.create({
+            data: {
+                amount: mission.fee || 0,
+                type: "CREDIT",
+                reason: `Mission terminée : ${mission.property.address}`,
+                user: { connect: { id: agent.id } }
             }
         })
     ]);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Mission terminée et payée !" });
 
   } catch (error: any) {
     console.error("Erreur Complete Mission:", error);

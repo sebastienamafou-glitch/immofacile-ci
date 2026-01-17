@@ -1,25 +1,29 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken"; // ✅ Import indispensable
-
-const JWT_SECRET = process.env.JWT_SECRET || 'votre_super_secret'; // Doit être identique à auth.ts
+import jwt from "jsonwebtoken";
 
 export async function POST(request: Request) {
   try {
+    // 1. SÉCURITÉ ENVIRONNEMENT
+    // On interdit le démarrage si la clé secrète n'est pas définie dans le .env
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+        console.error("CRITIQUE: JWT_SECRET manquant dans les variables d'environnement.");
+        return NextResponse.json({ error: "Erreur de configuration serveur." }, { status: 500 });
+    }
+
     const body = await request.json();
     
-    // On accepte l'email, le téléphone ou un username générique
+    // On accepte l'email, le téléphone ou un username
     const identifier = body.email || body.phone || body.identifier || body.username;
     const password = body.password;
-
-    console.log("Tentative de connexion pour :", identifier);
 
     if (!identifier || !password) {
         return NextResponse.json({ error: "Identifiant et mot de passe requis." }, { status: 400 });
     }
 
-    // 1. RECHERCHE DE L'UTILISATEUR (Email ou Téléphone)
+    // 2. RECHERCHE DE L'UTILISATEUR
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -30,43 +34,38 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "Aucun compte trouvé avec cet identifiant." }, { status: 404 });
+      // Pour la sécurité, on reste vague sur l'erreur (pour éviter l'énumération des comptes)
+      return NextResponse.json({ error: "Identifiants incorrects." }, { status: 401 });
     }
 
-    // 2. VÉRIFICATION DU MOT DE PASSE
+    // 3. VÉRIFICATION DU MOT DE PASSE
+    // On supporte temporairement les mots de passe en clair pour la migration, 
+    // mais bcrypt est la priorité.
     let isValid = false;
     const isHash = user.password.startsWith("$2");
 
     if (isHash) {
         isValid = await bcrypt.compare(password, user.password);
     } else {
+        // ⚠️ Legacy : À supprimer une fois que tous les users ont changé leur mot de passe
         isValid = (user.password === password);
     }
 
     if (!isValid) {
-      return NextResponse.json({ error: "Mot de passe incorrect." }, { status: 401 });
+      return NextResponse.json({ error: "Identifiants incorrects." }, { status: 401 });
     }
 
-    // 3. DÉTERMINATION DE LA REDIRECTION
-    let destination = "/dashboard/tenant"; // Par défaut
+    // 4. DÉTERMINATION DE LA REDIRECTION
+    let destination = "/dashboard/tenant"; // Fallback
 
     switch (user.role) {
-        case "ADMIN":
-            destination = "/dashboard/admin";
-            break;
-        case "OWNER":
-            destination = "/dashboard/owner";
-            break;
-        case "AGENT":
-            destination = "/dashboard/agent";
-            break;
-        case "ARTISAN":
-            destination = "/dashboard/artisan";
-            break;
+        case "ADMIN": destination = "/dashboard/admin"; break;
+        case "OWNER": destination = "/dashboard/owner"; break;
+        case "AGENT": destination = "/dashboard/agent"; break;
+        case "ARTISAN": destination = "/dashboard/artisan"; break;
     }
 
-    // 4. GÉNÉRATION DU VRAI JWT (Correction du bug "malformed")
-    // On signe le token avec la clé secrète
+    // 5. GÉNÉRATION DU TOKEN
     const sessionToken = jwt.sign(
       {
         userId: user.id,
@@ -74,10 +73,10 @@ export async function POST(request: Request) {
         email: user.email
       },
       JWT_SECRET,
-      { expiresIn: '7d' } // Le token expire dans 7 jours
+      { expiresIn: '7d' }
     );
 
-    // 5. RÉPONSE SUCCESS
+    // 6. RÉPONSE
     return NextResponse.json({
       success: true,
       token: sessionToken,

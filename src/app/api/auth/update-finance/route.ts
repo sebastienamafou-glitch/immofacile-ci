@@ -1,27 +1,39 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { verifyToken } from "@/lib/auth";
+import { prisma } from "@/lib/prisma"; // ✅ Toujours utiliser le singleton
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
 export async function PUT(request: Request) {
   try {
-    const userAuth = verifyToken(request);
-    const body = await request.json();
+    // 1. SÉCURITÉ (Standard utilisé partout ailleurs)
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // Mise à jour des préférences de paiement
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
+
+    // 2. VALIDATION
+    const body = await request.json();
+    const { provider, number } = body; 
+    // provider attendu : "WAVE", "OM", "MTN", etc.
+
+    if (!provider || !number) {
+        return NextResponse.json({ error: "Moyen de paiement et numéro requis." }, { status: 400 });
+    }
+
+    // 3. MISE À JOUR
     await prisma.user.update({
-      where: { id: userAuth.id },
+      where: { id: user.id },
       data: {
-        paymentMethod: body.provider, // Correspond à 'provider' envoyé par le front
-        paymentNumber: body.number    // Correspond à 'number' envoyé par le front
+        paymentMethod: provider,
+        paymentNumber: number
       }
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Préférences bancaires mises à jour." });
 
   } catch (error) {
     console.error("Erreur Update Finance:", error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour bancaire" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la mise à jour." }, { status: 500 });
   }
 }

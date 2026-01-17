@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
@@ -10,16 +10,21 @@ export async function GET(request: Request) {
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    
+    // ✅ AJOUT SÉCURITÉ RÔLE
+    if (!owner || owner.role !== "OWNER") {
+        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+    }
 
     // 2. RECUPÉRATION DE L'ANNÉE
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
 
-    const startDate = new Date(`${year}-01-01`);
-    const endDate = new Date(`${year}-12-31`);
+    // On force les dates en UTC pour éviter les décalages horaires de fin d'année
+    const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
+    const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
 
-    // 3. REQUÊTE : PROPRIÉTÉS + REVENUS + DÉPENSES (Incidents)
+    // 3. REQUÊTE : PROPRIÉTÉS + REVENUS REELS + DÉPENSES
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       include: {
@@ -28,7 +33,8 @@ export async function GET(request: Request) {
                 payments: {
                     where: {
                         date: { gte: startDate, lte: endDate },
-                        status: 'SUCCESS' // Uniquement les paiements validés
+                        status: 'SUCCESS',
+                        type: 'LOYER' // ✅ CRITIQUE : On ne déclare pas les Cautions aux impôts !
                     }
                 }
             }
@@ -42,19 +48,19 @@ export async function GET(request: Request) {
       }
     });
 
-    // 4. CALCULS ET AGGRÉGATION
+    // 4. CALCULS ET AGGRÉGATION (Sans 'any')
     let totalRevenue = 0;
     let totalExpenses = 0;
 
-    const breakdown = properties.map((prop: any) => {
-        // A. Revenus (Somme des paiements de tous les baux de la propriété)
-        const propRevenue = prop.leases.reduce((sum: number, lease: any) => {
-            const leasePayments = lease.payments.reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0);
+    const breakdown = properties.map((prop) => {
+        // A. Revenus (Somme des loyers encaissés)
+        const propRevenue = prop.leases.reduce((sum, lease) => {
+            const leasePayments = lease.payments.reduce((pSum, p) => pSum + (p.amount || 0), 0);
             return sum + leasePayments;
         }, 0);
 
-        // B. Dépenses (Somme des incidents/travaux liés à la propriété)
-        const propExpenses = prop.incidents.reduce((sum: number, inc: any) => {
+        // B. Dépenses (Somme des travaux payés)
+        const propExpenses = prop.incidents.reduce((sum, inc) => {
             return sum + (inc.finalCost || 0);
         }, 0);
         
@@ -62,6 +68,7 @@ export async function GET(request: Request) {
         totalExpenses += propExpenses;
 
         return {
+            id: prop.id,
             title: prop.title,
             commune: prop.commune,
             rev: propRevenue,
@@ -79,7 +86,7 @@ export async function GET(request: Request) {
           year: year,
           revenue: totalRevenue,
           expenses: totalExpenses,
-          net: totalRevenue - totalExpenses,
+          net: totalRevenue - totalExpenses, // Résultat Foncier Brut
           properties: breakdown
       }
     });

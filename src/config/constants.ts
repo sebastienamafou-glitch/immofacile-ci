@@ -1,13 +1,19 @@
 export const FINANCE_RULES = {
-  TENANT_FIXED_FEE: 20000,      // Les frais de gestion à la charge du locataire
-  PLATFORM_COMMISSION_RATE: 0.05, // 5% de commission plateforme sur le loyer
-  AGENT_COMMISSION_RATE: 0.05,    // 5% de commission agent (1er loyer)
+  TENANT_FIXED_FEE: 20000,        // Frais dossier Locataire (FCFA)
+  PLATFORM_COMMISSION_RATE: 0.05, // 5% pour ImmoFacile
+  AGENT_COMMISSION_RATE: 0.05,    // 5% pour l'Agent
   CURRENCY: 'XOF'
 };
 
+// On sécurise l'URL de base (localhost par défaut si oubli en dev)
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
 export const CINETPAY_CONFIG = {
-  API_KEY: process.env.CINETPAY_API_KEY,
-  SITE_ID: process.env.CINETPAY_SITE_ID,
-  BASE_URL: process.env.CINETPAY_BASE_URL || "https://api-checkout.cinetpay.com/v2/payment",
-  NOTIFY_URL: process.env.APP_URL + "/api/payments/webhook" // Votre URL publique
+  API_KEY: process.env.CINETPAY_API_KEY || "", // Évite le crash si undefined
+  SITE_ID: process.env.CINETPAY_SITE_ID || "",
+  BASE_URL: "https://api-checkout.cinetpay.com/v2/payment",
+  
+  // ✅ CORRECTION ICI : "payment" au singulier pour matcher le Middleware
+  // ✅ SÉCURITÉ : On utilise la variable d'environnement correcte
+  NOTIFY_URL: `${APP_URL}/api/payment/webhook` 
 };

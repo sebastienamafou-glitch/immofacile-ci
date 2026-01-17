@@ -1,31 +1,58 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // Singleton
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    // 1. SÉCURITÉ AUTH
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const artisan = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!artisan || artisan.role !== "ARTISAN") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-
-    // Récupérer les incidents assignés (ou disponibles dans sa zone si vous faites un système Uber-like plus tard)
-    // Pour l'instant : on récupère ceux qui lui sont assignés explicitement
-    const jobs = await prisma.incident.findMany({
-      where: {
-        assignedToId: artisan.id,
-        status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] } // On cache les CLOSED (archivés)
-      },
-      include: {
-        property: { select: { address: true, commune: true } },
-        reporter: { select: { name: true, phone: true } }
-      },
-      orderBy: { createdAt: 'desc' }
+    // 2. RÉCUPÉRATION OPTIMISÉE (Tout en une seule requête)
+    const artisan = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        walletBalance: true,
+        // isAvailable: true, // ⚠️ DÉCOMMENTEZ SI VOUS AVEZ AJOUTÉ LE CHAMP DANS LE SCHEMA
+        
+        // On récupère directement les missions assignées ici
+        incidentsAssigned: {
+          where: {
+            status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] } // On cache les CLOSED
+          },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+            quoteAmount: true,
+            // Relations imbriquées
+            property: { 
+                select: { address: true, commune: true } 
+            },
+            reporter: { 
+                select: { name: true, phone: true } 
+            }
+          }
+        }
+      }
     });
 
-    const formattedJobs = jobs.map(j => ({
+    // 3. VÉRIFICATION RÔLE
+    if (!artisan || artisan.role !== "ARTISAN") {
+        return NextResponse.json({ error: "Accès réservé aux artisans." }, { status: 403 });
+    }
+
+    // 4. FORMATAGE DES DONNÉES
+    const formattedJobs = artisan.incidentsAssigned.map(j => ({
         id: j.id,
         title: j.title,
         description: j.description,
@@ -33,7 +60,7 @@ export async function GET(request: Request) {
         priority: j.priority,
         address: `${j.property.address}, ${j.property.commune}`,
         reporterName: j.reporter.name,
-        reporterPhone: j.reporter.phone,
+        reporterPhone: j.reporter.phone, // Utile pour l'artisan pour appeler avant de venir
         quoteAmount: j.quoteAmount || 0,
         createdAt: j.createdAt
     }));
@@ -44,17 +71,18 @@ export async function GET(request: Request) {
         name: artisan.name,
         email: artisan.email,
         walletBalance: artisan.walletBalance,
-        isAvailable: artisan.isAvailable // ✅ Le nouveau champ
+        // isAvailable: artisan.isAvailable // ⚠️ DÉCOMMENTEZ APRÈS MAJ SCHEMA
+        isAvailable: true // Valeur par défaut temporaire pour ne pas faire planter
       },
       stats: {
-        jobsCount: jobs.filter(j => j.status === 'RESOLVED').length,
-        rating: 4.8, // Simulé pour l'instant (nécessite un système de notation)
-        earnings: artisan.walletBalance // Ou calculé sur l'historique
+        jobsCount: formattedJobs.length,
+        rating: 4.8, // À implémenter plus tard
+        earnings: artisan.walletBalance
       },
       jobs: formattedJobs
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erreur Artisan Dashboard:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }

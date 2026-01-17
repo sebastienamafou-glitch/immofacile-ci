@@ -1,19 +1,36 @@
 "use client";
 
+import { useRouter } from "next/navigation"; // ✅ Indispensable pour rafraichir sans recharger
 import { Button } from "@/components/ui/button";
 import { Wallet, Plus, TrendingUp, TrendingDown, ArrowUpRight, DollarSign, Activity, PieChart } from "lucide-react"; 
 import Swal from 'sweetalert2';
 import { api } from "@/lib/api"; 
 import FinanceChart from "./FinanceChart";
 
-interface StatsProps {
-  user: any;
-  stats: any;
-  properties: any[];
-  onWithdraw: () => void;
+// Interfaces strictes
+interface UserStats {
+  walletBalance: number;
+  escrowBalance: number;
+  referralBalance: number;
 }
 
-export default function StatsOverview({ user, stats, properties, onWithdraw }: StatsProps) {
+interface DashboardStats {
+  totalRent: number;
+  totalExpenses: number;
+  netIncomeYTD: number;
+  [key: string]: any;
+}
+
+interface StatsProps {
+  user: UserStats;
+  stats: DashboardStats;
+  properties: any[];
+  onWithdraw: () => void;
+  onRefresh?: () => void; // ✅ Callback optionnel pour rafraichir les données du parent
+}
+
+export default function StatsOverview({ user, stats, properties, onWithdraw, onRefresh }: StatsProps) {
+  const router = useRouter();
 
   // --- MODALE RECHARGEMENT ---
   const handleRecharge = () => {
@@ -25,7 +42,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
       inputPlaceholder: 'Ex: 50000',
       showCancelButton: true,
       confirmButtonText: 'Procéder au paiement',
-      confirmButtonColor: '#10B981', // Emerald
+      confirmButtonColor: '#10B981',
       cancelButtonText: 'Annuler',
       background: '#0F172A', color: '#fff',
       customClass: { popup: 'border border-white/10 rounded-3xl' }
@@ -39,6 +56,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
         return;
     }
     
+    // Génération propre des options
     const optionsHtml = properties.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
     
     const { value: formValues } = await Swal.fire({
@@ -87,14 +105,22 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
     if (formValues) {
         try {
             await api.post('/owner/expenses', formValues);
+            
             Swal.fire({ 
                 icon: 'success', title: 'Dépense ajoutée', 
                 toast: true, position: 'top-end', showConfirmButton: false, timer: 3000,
                 background: '#10B981', color: '#fff' 
             });
-            window.location.reload(); 
+
+            // ✅ CORRECTION CRITIQUE : Rafraichissement propre SPA
+            if (onRefresh) {
+                onRefresh(); // Si le parent fournit une fonction de refetch
+            } else {
+                router.refresh(); // Sinon on demande à Next.js de revalider les données
+            }
+
         } catch (e) { 
-            Swal.fire({ icon: 'error', title: 'Erreur', background: '#1e293b', color: '#fff' }); 
+            Swal.fire({ icon: 'error', title: 'Erreur', text: "Impossible d'ajouter la dépense.", background: '#1e293b', color: '#fff' }); 
         }
     }
   };
@@ -128,7 +154,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
       {/* --- GRILLE PRINCIPALE --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* 1. GRAPHIQUE (Zone Large) */}
+        {/* 1. GRAPHIQUE */}
         <div className="lg:col-span-2 bg-slate-900 border border-white/5 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-white flex items-center gap-2">
@@ -139,16 +165,16 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
                 </div>
             </div>
             <div className="h-64 w-full"> 
-                {/* On passe les stats au composant graphique */}
+                {/* FinanceChart gère maintenant le typage strict */}
                 <FinanceChart stats={stats} />
             </div>
         </div>
 
-        {/* 2. CARTE WALLET (Zone Étroite) */}
+        {/* 2. CARTE WALLET */}
         <div className="lg:col-span-1 h-auto min-h-[320px] p-8 bg-gradient-to-bl from-orange-400 to-orange-600 rounded-[2rem] shadow-2xl shadow-orange-500/20 text-white relative overflow-hidden flex flex-col justify-between group transform hover:-translate-y-1 transition duration-500">
             
-            {/* Effets de fond (Bruit + Cercles) */}
-            <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+            {/* Effets de fond */}
+            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-noise"></div>
             <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/20 rounded-full blur-3xl group-hover:scale-110 transition duration-1000"></div>
             <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/10 rounded-full blur-2xl"></div>
             
@@ -165,28 +191,27 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
                 <div>
                     <p className="text-orange-100/80 text-xs font-bold uppercase tracking-widest mb-1">Solde Disponible</p>
                     <h2 className="text-4xl lg:text-5xl font-black tracking-tighter text-white drop-shadow-lg truncate">
-                        {user?.walletBalance?.toLocaleString()}
+                        {user?.walletBalance?.toLocaleString('fr-FR') || 0}
                         <span className="text-2xl text-orange-200/90 ml-1">F</span>
                     </h2>
                 </div>
             </div>
 
             <div className="relative z-10 space-y-4">
-                {/* Mini Stats dans la carte */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
                         <span className="block opacity-70 text-[9px] uppercase">Séquestre</span>
-                        <span className="font-bold">{user?.escrowBalance?.toLocaleString()} F</span>
+                        <span className="font-bold">{user?.escrowBalance?.toLocaleString('fr-FR') || 0} F</span>
                     </div>
                     <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
                         <span className="block opacity-70 text-[9px] uppercase">Commissions</span>
-                        <span className="font-bold">{user?.referralBalance?.toLocaleString() || 0} F</span>
+                        <span className="font-bold">{user?.referralBalance?.toLocaleString('fr-FR') || 0} F</span>
                     </div>
                 </div>
 
                 <Button
                     onClick={onWithdraw} 
-                    className="w-full bg-white text-orange-600 hover:bg-orange-50 font-black py-6 rounded-xl shadow-xl transition-all active:scale-95 flex items-center justify-between px-6 group/btn"
+                    className="w-full bg-white text-orange-600 hover:bg-orange-50 font-black py-6 rounded-xl shadow-xl transition-all active:scale-95 flex items-center justify-between px-6 group/btn border-0"
                 >
                     <span className="uppercase tracking-wide text-xs">Retirer des fonds</span>
                     <ArrowUpRight className="w-4 h-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
@@ -195,7 +220,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
         </div>
       </div>
 
-      {/* 3. KPIS (Indicateurs Clés) */}
+      {/* 3. KPIS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* KPI Revenus */}
@@ -211,7 +236,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
             </div>
             <div className="relative z-10">
                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Loyers Encaissés (Annuel)</p>
-                <p className="text-3xl font-black text-white">{stats?.totalRent?.toLocaleString()} <span className="text-sm font-medium text-slate-600">F</span></p>
+                <p className="text-3xl font-black text-white">{stats?.totalRent?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
             </div>
           </div>
 
@@ -228,7 +253,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
             </div>
             <div className="relative z-10">
                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Total Dépenses</p>
-                <p className="text-3xl font-black text-white">{stats?.totalExpenses?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
+                <p className="text-3xl font-black text-white">{stats?.totalExpenses?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
             </div>
           </div>
 
@@ -245,7 +270,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw }: S
             </div>
             <div className="relative z-10">
                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Bénéfice Net (YTD)</p>
-                <p className="text-3xl font-black text-blue-400">{stats?.netIncomeYTD?.toLocaleString() || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
+                <p className="text-3xl font-black text-blue-400">{stats?.netIncomeYTD?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
             </div>
           </div>
       </div>

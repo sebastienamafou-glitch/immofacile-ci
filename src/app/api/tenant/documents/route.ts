@@ -1,24 +1,23 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { verifyToken } from '@/lib/auth'; // On importe notre nouveau vérificateur
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma"; // ✅ Singleton Obligatoire
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : On utilise le vérificateur centralisé
-    let userId;
-    try {
-      const user = verifyToken(request);
-      userId = user.id;
-    } catch (authError) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    // 1. SÉCURITÉ : Via Middleware (Headers)
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!tenant || tenant.role !== "TENANT") {
+        return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 });
     }
 
-    // 2. RÉCUPÉRATION : Bail actif + Quittances (Paiements SUCCESS uniquement)
+    // 2. RÉCUPÉRATION : Bail actif + Quittances
     const lease = await prisma.lease.findFirst({
       where: {
-        tenantId: userId,
+        tenantId: tenant.id,
         status: { in: ['ACTIVE', 'PENDING'] }
       },
       include: {
@@ -36,8 +35,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. RÉPONSE
-    // Même si aucun bail n'est trouvé, on renvoie une structure vide pour ne pas faire planter le frontend
+    // 3. RÉPONSE ROBUSTE
     return NextResponse.json({
       success: true,
       lease: lease ? {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react"; // Ajout Suspense
+import { useState, Suspense, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,18 +9,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, User, Mail, Phone, Lock, Eye, EyeOff } from "lucide-react";
+import { Loader2, ShieldCheck, User, Mail, Phone, Lock, Eye, EyeOff, Building2, Home } from "lucide-react";
+import { cn } from "@/lib/utils"; // Assurez-vous d'avoir clsx/tailwind-merge ou enlevez cn()
 
-// Composant interne pour utiliser useSearchParams
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect'); // On récupère le marqueur
+  const redirectUrl = searchParams.get('redirect');
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   
+  // ✅ NOUVEAU : État pour le rôle
+  // Si on vient d'une annonce, on force TENANT, sinon par défaut TENANT (plus sûr que OWNER)
+  const [role, setRole] = useState<"TENANT" | "OWNER">("TENANT");
+
+  // Si redirectUrl existe, on force le rôle Locataire dès le chargement
+  useEffect(() => {
+    if (redirectUrl) setRole("TENANT");
+  }, [redirectUrl]);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -38,18 +47,13 @@ function SignupForm() {
 
     setLoading(true);
     try {
-      // 1. Inscription
       await api.post('/auth/signup', {
           ...formData,
-          // Si on vient d'une annonce, on est forcément un LOCATAIRE (TENANT)
-          // Sinon (accès direct), on est PROPRIÉTAIRE (OWNER)
-          role: redirectUrl ? "TENANT" : "OWNER" 
+          role: role // ✅ On utilise le rôle choisi par l'utilisateur
       });
 
       toast.success("Compte créé avec succès !");
 
-      // 2. Redirection Intelligente
-      // On envoie vers le login, mais on garde le marqueur "redirect" pour après la connexion
       const nextStep = redirectUrl 
         ? `/login?registered=true&redirect=${encodeURIComponent(redirectUrl)}`
         : '/login?registered=true';
@@ -67,11 +71,42 @@ function SignupForm() {
     <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
             <form onSubmit={handleSubmit} className="space-y-4">
                 
+                {/* --- SÉLECTEUR DE RÔLE (Affiché uniquement si pas de redirection) --- */}
+                {!redirectUrl && (
+                    <div className="grid grid-cols-2 gap-3 mb-4 p-1 bg-black/40 rounded-xl">
+                        <button
+                            type="button"
+                            onClick={() => setRole("TENANT")}
+                            className={cn(
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all",
+                                role === "TENANT" 
+                                    ? "bg-orange-500 text-white shadow-lg" 
+                                    : "text-slate-400 hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <User className="w-4 h-4" /> Locataire
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setRole("OWNER")}
+                            className={cn(
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all",
+                                role === "OWNER" 
+                                    ? "bg-orange-500 text-white shadow-lg" 
+                                    : "text-slate-400 hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            <Building2 className="w-4 h-4" /> Propriétaire
+                        </button>
+                    </div>
+                )}
+
                 {/* --- Message Spécial si on vient d'une annonce --- */}
                 {redirectUrl && (
                     <div className="bg-blue-500/20 border border-blue-500/30 p-3 rounded-xl mb-4 text-center">
-                        <p className="text-blue-200 text-xs font-bold">
-                            👋 Créez votre compte pour postuler à ce bien.
+                        <p className="text-blue-200 text-xs font-bold flex items-center justify-center gap-2">
+                            <Home className="w-4 h-4" />
+                            Création de compte Locataire
                         </p>
                     </div>
                 )}
@@ -82,7 +117,7 @@ function SignupForm() {
                         <User className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
                         <Input 
                             required 
-                            placeholder="Ex: Kouassi Jean" 
+                            placeholder={role === "OWNER" ? "Ex: SCI Immo ou Jean Kouassi" : "Ex: Kouassi Jean"} 
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-11"
                             value={formData.name}
                             onChange={e => setFormData({...formData, name: e.target.value})}
@@ -160,7 +195,7 @@ function SignupForm() {
                     disabled={loading} 
                     className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-bold h-12 rounded-xl mt-4 shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-95"
                 >
-                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : "Créer mon Compte"}
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : `Créer mon Compte ${role === 'OWNER' ? 'Propriétaire' : ''}`}
                 </Button>
 
             </form>
@@ -177,7 +212,7 @@ function SignupForm() {
   );
 }
 
-// Page principale avec Suspense pour éviter les erreurs de rendu côté serveur avec useSearchParams
+// Le reste du fichier (SignupPage) reste identique
 export default function SignupPage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1120] relative overflow-hidden">

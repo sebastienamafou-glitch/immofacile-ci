@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs"; // Assurez-vous d'avoir installé bcryptjs
+import { prisma } from "@/lib/prisma"; // Singleton
+import bcrypt from "bcryptjs"; 
 
 export const dynamic = 'force-dynamic';
 
-// GET : Lister les baux (Déjà existant)
+// GET : Lister les baux du propriétaire
 export async function GET(request: Request) {
   try {
+    // 1. SÉCURITÉ
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    if (!owner || owner.role !== "OWNER") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
+    // 2. RÉCUPÉRATION
     const leases = await prisma.lease.findMany({
       where: { property: { ownerId: owner.id } },
-      orderBy: { startDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
       include: {
         tenant: { select: { name: true, phone: true, email: true } },
         property: { select: { title: true, commune: true } }
@@ -23,12 +25,14 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ success: true, leases });
+
   } catch (error) {
+    console.error("Erreur GET Leases:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
-// POST : CRÉER UN NOUVEAU BAIL (Ajouter Locataire)
+// POST : Créer un nouveau bail
 export async function POST(request: Request) {
   try {
     // 1. SÉCURITÉ
@@ -36,74 +40,95 @@ export async function POST(request: Request) {
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner) return NextResponse.json({ error: "Inconnu" }, { status: 403 });
+    if (!owner || owner.role !== "OWNER") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
     const body = await request.json();
-    // body = { propertyId, tenantName, tenantPhone, tenantEmail, rent, deposit, startDate }
+    
+    // 2. VALIDATION ENTRÉES
+    if (!body.propertyId || !body.tenantEmail || !body.rent || !body.startDate) {
+        return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
+    }
 
-    // 2. VÉRIFICATION DU BIEN
+    const rent = parseInt(body.rent);
+    const deposit = parseInt(body.deposit || '0');
+
+    if (isNaN(rent) || rent <= 0) {
+        return NextResponse.json({ error: "Montant du loyer invalide" }, { status: 400 });
+    }
+
+    // 3. VÉRIFICATION DU BIEN (Anti-IDOR)
     const property = await prisma.property.findUnique({
         where: { id: body.propertyId }
     });
 
     if (!property || property.ownerId !== owner.id) {
-        return NextResponse.json({ error: "Ce bien ne vous appartient pas ou n'existe pas." }, { status: 403 });
+        return NextResponse.json({ error: "Ce bien ne vous appartient pas." }, { status: 403 });
     }
 
-    // 3. GESTION DU LOCATAIRE (Find or Create)
+    // 4. GESTION DU LOCATAIRE
     let tenant = await prisma.user.findUnique({
         where: { email: body.tenantEmail }
     });
+
+    // 🛡️ SÉCURITÉ AJOUTÉE : Vérification du conflit de rôle
+    if (tenant && tenant.role !== "TENANT") {
+        return NextResponse.json({ 
+            error: "Cet email est déjà utilisé par un compte Propriétaire ou Artisan. Impossible de l'assigner comme locataire." 
+        }, { status: 409 });
+    }
 
     let isNewUser = false;
     let tempPassword = "";
 
     if (!tenant) {
-        // Création à la volée
+        // Création du compte Locataire à la volée
         isNewUser = true;
-        tempPassword = Math.random().toString(36).slice(-8) + "Loc!";
+        tempPassword = Math.random().toString(36).slice(-8) + "Immo!"; // Mot de passe fort
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
         try {
             tenant = await prisma.user.create({
                 data: {
-                    name: body.tenantName,
+                    name: body.tenantName || "Locataire",
                     email: body.tenantEmail,
-                    phone: body.tenantPhone,
+                    phone: body.tenantPhone || undefined, // undefined permet d'éviter l'erreur unique sur NULL
                     password: hashedPassword,
                     role: "TENANT",
                     kycStatus: "PENDING"
                 }
             });
-        } catch (e) {
-            return NextResponse.json({ error: "Email ou Téléphone déjà utilisé par un autre compte." }, { status: 409 });
+        } catch (e: any) {
+            if (e.code === 'P2002') {
+                return NextResponse.json({ error: "Ce numéro de téléphone est déjà associé à un autre compte." }, { status: 409 });
+            }
+            throw e;
         }
     }
 
-    // 4. CRÉATION DU BAIL
+    // 5. CRÉATION DU BAIL
     const newLease = await prisma.lease.create({
         data: {
             startDate: new Date(body.startDate),
-            monthlyRent: parseInt(body.rent),
-            depositAmount: parseInt(body.deposit),
-            status: "ACTIVE",
-            isActive: true,
+            monthlyRent: rent,
+            depositAmount: deposit,
+            status: "PENDING",    // En attente de signature
+            isActive: false,      // Inactif par défaut
+            signatureStatus: "PENDING",
             tenant: { connect: { id: tenant.id } },
             property: { connect: { id: property.id } }
         }
     });
 
-    // 5. UPDATE DISPONIBILITÉ BIEN (Optionnel, implicite via lease actif)
-    // Pas besoin de changer un champ 'isAvailable' si on se base sur lease.isActive
-
+    // 6. RÉPONSE
     return NextResponse.json({
         success: true,
         lease: newLease,
+        // On renvoie les identifiants UNIQUEMENT si c'est un nouveau compte
         credentials: isNewUser ? { email: body.tenantEmail, password: tempPassword } : null
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur Création Bail:", error);
-    return NextResponse.json({ error: "Erreur lors de la création du contrat." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la création du bail." }, { status: 500 });
   }
 }

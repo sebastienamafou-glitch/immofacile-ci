@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { verifyToken } from "@/lib/auth";
-import { put } from "@vercel/blob"; // ✅ Le stockage Cloud de Vercel
+import { prisma } from "@/lib/prisma"; // ✅ Singleton
+import { put } from "@vercel/blob";
 import { v4 as uuidv4 } from "uuid";
 
-const prisma = new PrismaClient();
+export const dynamic = 'force-dynamic'; // Sécurité Next.js
 
-// CONFIGURATION DE SÉCURITÉ
+// CONFIGURATION
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Mo
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -17,16 +16,14 @@ const ALLOWED_MIME_TYPES = [
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ : Authentification
-    let userId: string;
-    try {
-      const user = verifyToken(request);
-      userId = user.id;
-    } catch (e) {
-      return NextResponse.json({ error: "Session expirée" }, { status: 401 });
-    }
+    // 1. SÉCURITÉ AUTH
+    const userEmail = request.headers.get("x-user-email");
+    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. PARSING DU FORMULAIRE
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+
+    // 2. PARSING & VALIDATION
     const formData = await request.formData();
     const file = formData.get("document") as File | null;
 
@@ -34,58 +31,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Aucun fichier fourni" }, { status: 400 });
     }
 
-    // 3. VALIDATION STRICTE
-    // A. Taille
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "Fichier trop volumineux (Max 5Mo)" }, 
-        { status: 413 }
-      );
+      return NextResponse.json({ error: "Fichier trop volumineux (Max 5Mo)" }, { status: 413 });
     }
 
-    // B. Type de fichier (MIME)
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Format non supporté. Utilisez JPG, PNG ou PDF." }, 
-        { status: 415 }
-      );
+      return NextResponse.json({ error: "Format non supporté (PDF, JPG, PNG uniquement)." }, { status: 415 });
     }
 
-    // 4. UPLOAD VERS VERCEL BLOB (CLOUD)
-    // On génère un nom unique pour ne pas écraser les fichiers et pour la confidentialité
+    // 3. UPLOAD CLOUD (Vercel Blob)
     const fileExtension = file.name.split('.').pop() || "bin";
-    const uniqueFileName = `kyc/${userId}/${uuidv4()}.${fileExtension}`; // Structure: kyc/USER_ID/UUID.ext
+    // On range par ID utilisateur pour éviter le désordre
+    const uniqueFileName = `kyc/${user.id}/${uuidv4()}.${fileExtension}`; 
 
-    // Envoi direct au cloud Vercel (Rapide & Sécurisé)
     const blob = await put(uniqueFileName, file, {
-      access: 'public',
+      access: 'public', // Attention: URL accessible si connue. Pour du KYC strict, envisagez 'private' + tokens temporaires plus tard.
     });
 
-    // 5. MISE À JOUR BASE DE DONNÉES
-    // On stocke l'URL publique fournie par Vercel (https://...)
+    // 4. MISE À JOUR BASE DE DONNÉES
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: user.id },
       data: {
-        kycStatus: "PENDING",
+        kycStatus: "PENDING", // On repasse en attente de validation
+        // ❌ J'ai supprimé 'kycDocumentUrl' qui n'existe pas dans votre schema
+        // ✅ On utilise 'push' pour ajouter au tableau existant
         kycDocuments: {
           push: blob.url 
-        },
-        updatedAt: new Date()
+        }
       }
     });
 
     return NextResponse.json({ 
       success: true, 
-      message: "Document sécurisé dans le Cloud",
-      status: updatedUser.kycStatus,
+      message: "Document envoyé. En attente de validation.",
       url: blob.url
     });
 
   } catch (error) {
-    console.error("Erreur Upload Vercel Blob:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur lors de l'upload Cloud" }, 
-      { status: 500 }
-    );
+    console.error("Erreur Upload KYC:", error);
+    return NextResponse.json({ error: "Erreur serveur lors de l'envoi." }, { status: 500 });
   }
 }

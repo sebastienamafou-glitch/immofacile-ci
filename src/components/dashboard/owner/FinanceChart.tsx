@@ -2,22 +2,30 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
-export default function FinanceChart({ stats }: { stats: any }) {
+// ✅ Typage strict des props reçues
+interface DashboardStats {
+  totalRent?: number;
+  totalExpensesMonth?: number;
+  netIncome?: number;
+  [key: string]: any; // Flexibilité pour d'autres stats futures
+}
+
+export default function FinanceChart({ stats }: { stats: DashboardStats }) {
   
+  // ✅ Sécurisation des valeurs (0 par défaut)
   const data = [
-    { name: 'Revenus', amount: stats?.totalRent || 0, colorStart: '#4ade80', colorEnd: '#22c55e' }, // Vert Néon
-    { name: 'Dépenses', amount: stats?.totalExpensesMonth || 0, colorStart: '#f87171', colorEnd: '#ef4444' }, // Rouge
-    { name: 'Résultat', amount: stats?.netIncome || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' }, // Bleu
+    { name: 'Revenus', amount: stats?.totalRent || 0, colorStart: '#4ade80', colorEnd: '#22c55e' },
+    { name: 'Dépenses', amount: stats?.totalExpensesMonth || 0, colorStart: '#f87171', colorEnd: '#ef4444' },
+    { name: 'Résultat', amount: stats?.netIncome || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' },
   ];
 
-  // Tooltip Personnalisé (Le petit encadré au survol)
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-[#0B1120]/90 border border-slate-700 backdrop-blur-xl p-4 rounded-xl shadow-2xl">
+        <div className="bg-[#0B1120]/95 border border-slate-700 backdrop-blur-xl p-4 rounded-xl shadow-2xl z-50">
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">{label}</p>
           <p className="text-xl font-black text-white">
-            {payload[0].value.toLocaleString()} <span className="text-xs font-normal text-slate-500">FCFA</span>
+            {payload[0].value.toLocaleString('fr-FR')} <span className="text-xs font-normal text-slate-500">FCFA</span>
           </p>
         </div>
       );
@@ -26,7 +34,7 @@ export default function FinanceChart({ stats }: { stats: any }) {
   };
 
   return (
-    <div className="bg-[#131b2e] border border-slate-800/60 p-6 rounded-[2rem] h-full flex flex-col relative overflow-hidden group">
+    <div className="bg-[#131b2e] border border-slate-800/60 p-6 rounded-[2rem] h-full flex flex-col relative overflow-hidden group min-h-[350px]">
         
         {/* Petit effet de lueur en fond */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
@@ -46,8 +54,7 @@ export default function FinanceChart({ stats }: { stats: any }) {
         
         <div className="flex-1 w-full min-h-[200px] relative z-10">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} barSize={40}> 
-                    {/* Définition des dégradés (SVG Standard) */}
+                <BarChart data={data} barSize={45}> 
                     <defs>
                         {data.map((entry, index) => (
                             <linearGradient key={index} id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
@@ -63,17 +70,16 @@ export default function FinanceChart({ stats }: { stats: any }) {
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} 
+                        tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} 
                         dy={15}
                     />
                     <YAxis hide />
                     
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)', radius: 8 }} />
                     
-                    <Bar dataKey="amount" radius={[10, 10, 10, 10]}>
+                    <Bar dataKey="amount" radius={[12, 12, 12, 12]} animationDuration={1500}>
                         {data.map((entry, index) => (
-                            /* CORRECTION ICI : Cell avec Majuscule */
-                            <Cell key={`cell-${index}`} fill={`url(#gradient-${index})`} />
+                            <Cell key={`cell-${index}`} fill={`url(#gradient-${index})`} strokeWidth={0} />
                         ))}
                     </Bar>
                 </BarChart>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Loader2, ArrowLeft, Printer, Download } from "lucide-react";
+import { Loader2, ArrowLeft, Printer } from "lucide-react";
 import ReceiptTemplate from "@/components/Receipts/ReceiptTemplate";
 
 export default function ReceiptPage() {
@@ -15,8 +15,8 @@ export default function ReceiptPage() {
   useEffect(() => {
     const fetchReceipt = async () => {
       try {
-        // On récupère le paiement avec toutes les relations (Bail -> Bien -> Propriétaire)
         const res = await api.get(`/payment/${id}`);
+        // Gestion robuste de la réponse API
         if (res.data.success || res.data) {
            setPayment(res.data.payment || res.data);
         }
@@ -49,50 +49,47 @@ export default function ReceiptPage() {
     </div>
   );
 
-  // --- PRÉPARATION DES DONNÉES (Adapté au contexte WebappCi) ---
+  // --- PRÉPARATION DES DONNÉES (CORRIGÉE POUR LE TYPE STRICT) ---
   const receiptData = {
     receiptId: payment.id?.substring(0, 12).toUpperCase() || "N/A",
     date: new Date(payment.createdAt || Date.now()).toLocaleDateString('fr-FR'),
     
-    // Période (Mois du loyer)
     periodStart: `01 ${payment.month || 'du mois'}`, 
     periodEnd: `Fin ${payment.month || 'du mois'}`,
     
-    // 1. LE LOCATAIRE (Celui qui paie)
     tenant: {
       name: payment.lease?.tenant?.name || "Locataire",
       address: payment.lease?.tenant?.address || "Adresse renseignée au bail"
     },
 
-    // 2. LE PROPRIÉTAIRE (Le vrai bailleur, pas l'agence)
     owner: {
       name: payment.lease?.property?.owner?.name || "Propriétaire (Client ImmoFacile)", 
       address: payment.lease?.property?.owner?.address || "Adresse postale du propriétaire"
     },
 
-    // 3. LE BIEN LOUÉ
     property: {
       name: payment.lease?.property?.title || "Bien Immobilier",
       address: payment.lease?.property?.address || payment.lease?.property?.commune || "Abidjan, CI"
     },
 
-    // 4. LES CHIFFRES
+    // ✅ CORRECTION ICI : Ajout des champs manquants (totalPaid, balanceDue, paymentDate)
     payment: {
       amount: payment.amount || 0,
       charges: payment.charges || 0,
-      method: payment.provider || "Mobile Money / Carte", // Ex: WAVE, OM
-      transactionId: payment.transactionId
+      totalPaid: (payment.amount || 0) + (payment.charges || 0), // Calcul simple
+      balanceDue: 0, // Pour une quittance, on considère que c'est payé
+      method: payment.provider || "Mobile Money / Carte",
+      transactionId: payment.transactionId || "N/A",
+      paymentDate: new Date(payment.createdAt || Date.now()).toLocaleDateString('fr-FR')
     },
 
-    // 5. MENTIONS LÉGALES (WebappCi)
-    legalFooter: "Ce document est une quittance de loyer générée automatiquement par la plateforme ImmoFacile. Elle atteste du paiement reçu par le propriétaire via nos services de cantonnement sécurisé.",
-    techProvider: "Solution éditée et exploitée par WebappCi SARL."
+    legalFooter: "Ce document est une quittance de loyer générée automatiquement par la plateforme ImmoFacile. Elle atteste du paiement reçu par le propriétaire via nos services de cantonnement sécurisé."
+    // Note : J'ai retiré 'techProvider' car il n'est pas dans l'interface stricte du Template
   };
 
   return (
     <div className="min-h-screen bg-[#0B1120] py-8 print:bg-white print:py-0">
       
-      {/* BARRE D'OUTILS (Invisible à l'impression) */}
       <div className="max-w-[210mm] mx-auto mb-6 flex justify-between items-center px-4 print:hidden">
         <button 
             onClick={() => router.back()} 
@@ -109,15 +106,12 @@ export default function ReceiptPage() {
         </button>
       </div>
 
-      {/* RENDU DU DOCUMENT */}
-      {/* On passe les nouvelles données textuelles au template */}
       <ReceiptTemplate data={receiptData} />
       
-      {/* Note discrète écran uniquement */}
       <p className="text-center text-[10px] text-slate-600 mt-8 print:hidden">
         Propulsé par WebappCi &bull; ImmoFacile 
       </p>
 
     </div>
   );
-} //
+}
