@@ -1,17 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 1. GESTION DES IMAGES
+  // 1. GESTION DES IMAGES (Mode Permissif)
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
+        protocol: "https",
+        hostname: "**", // ✅ Autorise TOUS les domaines d'images
       },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      // Ajoutez ici votre bucket AWS S3 si nécessaire plus tard
     ],
   },
 
@@ -19,24 +14,24 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
           {
-            key: 'X-Frame-Options',
-            value: 'DENY', // Empêche votre site d'être affiché dans une iframe (Anti-Clickjacking)
+            key: "X-Frame-Options",
+            value: "DENY",
           },
           {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff', // Empêche le navigateur de deviner le type de fichier
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
           {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin', // Protège les données de navigation
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
           },
           {
-            key: 'Permissions-Policy',
-            value: "camera=(), microphone=(), geolocation=()", // Bloque l'accès aux capteurs par défaut
-          }
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
         ],
       },
     ];

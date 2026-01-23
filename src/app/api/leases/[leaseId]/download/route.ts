@@ -40,7 +40,7 @@ export async function GET(
     // Seuls le Locataire, le Propriétaire ou un Admin peuvent télécharger
     const isTenant = lease.tenantId === user.id;
     const isOwner = lease.property.ownerId === user.id;
-    const isAdmin = user.role === "ADMIN";
+    const isAdmin = user.role === "SUPER_ADMIN";
 
     if (!isTenant && !isOwner && !isAdmin) {
         return NextResponse.json({ error: "Accès interdit à ce document confidentiel." }, { status: 403 });

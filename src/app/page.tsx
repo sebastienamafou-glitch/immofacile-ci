@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { 
-  Menu, X, PlayCircle, Wallet, Bell, PieChart, 
+  Menu, X, Wallet, Bell, PieChart, 
   Banknote, PenTool, Gavel, Lock, Check, CheckCircle, 
   ChevronDown, ShieldCheck, FileSignature, Users, 
-  TrendingUp, ArrowRight
+  TrendingUp, ArrowRight, Palmtree, Building2, Search // ✅ Ajout de Building2 et Search
 } from "lucide-react";
 import Image from "next/image";
 
@@ -64,14 +64,19 @@ export default function LandingPage() {
             {/* MENU DESKTOP */}
             <div className="items-center justify-between hidden w-full md:flex md:w-auto md:order-1">
                 <ul className="flex flex-col p-4 md:p-0 mt-4 font-medium md:flex-row md:space-x-8 md:mt-0 bg-transparent text-sm">
-                    {/* ✅ NOUVEAU LIEN AJOUTÉ ICI */}
+                    {/* ✅ LIENS NAVIGATION LOCATAIRE / VOYAGEUR */}
                     <li>
-                        <Link href="/properties" className="block py-2 px-3 text-[#F59E0B] hover:text-orange-400 transition font-bold flex items-center gap-2">
-                            Trouver un bien
+                        <Link href="/properties" className="flex items-center gap-2 py-2 px-3 text-white hover:text-[#F59E0B] transition font-bold">
+                            <Building2 className="w-4 h-4 text-slate-500" /> Louer
                         </Link>
                     </li>
+                    <li>
+                        <Link href="/akwaba" className="flex items-center gap-2 py-2 px-3 text-[#F59E0B] hover:text-orange-300 transition font-bold border border-[#F59E0B]/20 bg-[#F59E0B]/5 rounded-lg">
+                            <Palmtree className="w-4 h-4" /> Akwaba
+                        </Link>
+                    </li>
+                    <li className="hidden lg:block w-px h-5 bg-white/10 mx-2"></li>
                     <li><a href="#features" className="block py-2 px-3 text-slate-400 hover:text-white transition">Fonctionnalités</a></li>
-                    <li><a href="#security" className="block py-2 px-3 text-slate-400 hover:text-white transition">Sécurité</a></li>
                     <li><a href="#pricing" className="block py-2 px-3 text-slate-400 hover:text-white transition">Tarifs</a></li>
                 </ul>
             </div>
@@ -81,14 +86,18 @@ export default function LandingPage() {
         {isMenuOpen && (
             <div className="fixed inset-0 z-40 bg-[#020617] pt-24 px-6 md:hidden">
                 <ul className="flex flex-col space-y-6 font-bold text-center text-lg">
-                    {/* ✅ NOUVEAU LIEN MOBILE AJOUTÉ ICI */}
+                    {/* ✅ LIENS MOBILE */}
                     <li>
-                        <Link href="/properties" onClick={toggleMenu} className="block py-4 text-[#F59E0B] border-b border-white/5">
-                            🏠 Trouver un bien
+                        <Link href="/properties" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-white border-b border-white/5">
+                            <Building2 className="w-5 h-5" /> Trouver une location
+                        </Link>
+                    </li>
+                    <li>
+                        <Link href="/akwaba" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-[#F59E0B] border-b border-white/5 bg-[#F59E0B]/5 rounded-xl">
+                            <Palmtree className="w-5 h-5" /> Séjours Akwaba
                         </Link>
                     </li>
                     <li><a href="#features" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Fonctionnalités</a></li>
-                    <li><a href="#security" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Sécurité</a></li>
                     <li><a href="#pricing" onClick={toggleMenu} className="block py-4 text-slate-300 border-b border-white/5">Tarifs</a></li>
                     <li className="pt-6 flex flex-col gap-4">
                         <Link href="/login" onClick={toggleMenu} className="w-full bg-slate-800 text-white py-4 rounded-2xl border border-slate-700">Connexion</Link>
@@ -132,8 +141,10 @@ export default function LandingPage() {
                         <Link href="/signup" className="px-8 py-4 bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-black rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
                             Démarrer Gratuitement
                         </Link>
-                        <Link href="/properties" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
-                            <PlayCircle className="w-5 h-5" /> Voir les annonces
+                        {/* ✅ BOUTON HERO SECONDAIRE MIS À JOUR */}
+                        <Link href="/properties" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide group">
+                            <Search className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" /> 
+                            <span>Chercher une location</span>
                         </Link>
                     </div>
                 </div>
@@ -271,15 +282,69 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====================================================================================
+          ✅ NOUVELLE SECTION : MARKETPLACE (LIEN VERS VOS DEUX PAGES DE RECHERCHE)
+      ==================================================================================== */}
+      <section className="py-32 bg-[#0f172a] relative border-t border-white/5 overflow-hidden">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F59E0B]/5 rounded-full blur-[120px] pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 relative z-10">
+              <div className="text-center mb-16">
+                  <h2 className="text-3xl lg:text-4xl font-black text-white mb-6">Vous cherchez un logement ?</h2>
+                  <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                      Que ce soit pour la vie ou pour un week-end, nous avons la clé qu'il vous faut.
+                  </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                  
+                  {/* CARTE LONGUE DURÉE */}
+                  <Link href="/properties" className="group relative bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 hover:border-[#F59E0B]/50 transition duration-500 overflow-hidden flex flex-col items-center text-center">
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#F59E0B]/0 to-[#F59E0B]/5 group-hover:opacity-100 opacity-0 transition duration-500"></div>
+                      
+                      <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-white/10 group-hover:scale-110 transition duration-500 z-10">
+                          <Building2 className="w-8 h-8 text-white" />
+                      </div>
+                      
+                      <h3 className="text-2xl font-black text-white mb-2 z-10">Location Longue Durée</h3>
+                      <p className="text-slate-400 text-sm mb-8 z-10 leading-relaxed max-w-xs">
+                          Trouvez votre résidence principale parmi des milliers de villas et appartements vérifiés.
+                      </p>
+                      
+                      <span className="mt-auto inline-flex items-center gap-2 text-[#F59E0B] font-bold uppercase text-xs tracking-widest z-10 group-hover:gap-4 transition-all">
+                          Parcourir les annonces <ArrowRight className="w-4 h-4" />
+                      </span>
+                  </Link>
+
+                  {/* CARTE COURTE DURÉE (AKWABA) */}
+                  <Link href="/akwaba" className="group relative bg-[#020617] border border-white/10 rounded-[2.5rem] p-8 hover:border-emerald-500/50 transition duration-500 overflow-hidden flex flex-col items-center text-center">
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 to-emerald-500/5 group-hover:opacity-100 opacity-0 transition duration-500"></div>
+                      
+                      <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-white/10 group-hover:scale-110 transition duration-500 z-10">
+                          <Palmtree className="w-8 h-8 text-emerald-400" />
+                      </div>
+                      
+                      <h3 className="text-2xl font-black text-white mb-2 z-10">Séjours & Vacances</h3>
+                      <p className="text-slate-400 text-sm mb-8 z-10 leading-relaxed max-w-xs">
+                          Villas de luxe, résidences meublées et lofts pour vos voyages d'affaires ou détente.
+                      </p>
+                      
+                      <span className="mt-auto inline-flex items-center gap-2 text-emerald-400 font-bold uppercase text-xs tracking-widest z-10 group-hover:gap-4 transition-all">
+                          Découvrir Akwaba <ArrowRight className="w-4 h-4" />
+                      </span>
+                  </Link>
+
+              </div>
+          </div>
+      </section>
+
       {/* --- SECURITY SECTION (Bank Grade) --- */}
       <section id="security" className="py-32 overflow-hidden bg-[#020617]">
         <div className="max-w-7xl mx-auto px-4">
             <div className="grid lg:grid-cols-2 gap-20 items-center">
-                
                 {/* Visualisation Document */}
                 <div className="order-2 lg:order-1 relative flex justify-center">
                     <div className="absolute inset-0 bg-[#F59E0B]/10 rounded-full blur-[100px]"></div>
-                    
                     <div className="relative w-full max-w-sm bg-[#0B1120] border border-white/10 p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
                         {/* En-tête document */}
                         <div className="flex justify-between items-start mb-8 border-b border-white/5 pb-6">
@@ -317,12 +382,10 @@ export default function LandingPage() {
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-slate-300 mb-8 uppercase tracking-widest">
                         <Lock className="w-3 h-3 text-[#F59E0B]" /> Architecture Sécurisée
                     </div>
-                    
                     <h2 className="text-4xl lg:text-5xl font-black mb-8 leading-tight text-white">
                         La confiance,<br />
                         <span className="text-[#F59E0B]">c'est mathématique.</span>
                     </h2>
-                    
                     <p className="text-slate-400 mb-10 text-lg leading-relaxed">
                         Chaque document est haché (SHA-256) et horodaté. Une fois signé via OTP (SMS), il devient infalsifiable et opposable juridiquement.
                     </p>
@@ -346,118 +409,6 @@ export default function LandingPage() {
                                 <p className="text-sm text-slate-400 leading-relaxed">Validation par code unique envoyé sur le mobile du signataire (Loi 2013-546).</p>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-      </section>
-
-      {/* --- APP MOBILE SECTION --- */}
-      <section className="py-32 bg-[#0B1120] relative border-t border-white/5">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-            <h2 className="text-3xl lg:text-5xl font-black mb-6 text-white">Votre patrimoine dans la poche.</h2>
-            <p className="text-slate-400 mb-16 max-w-2xl mx-auto text-lg">
-                Notifications en temps réel, suivi des incidents et comptabilité automatisée.
-            </p>
-
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-20">
-                
-                {/* MOCKUP PHONE RAFFINÉ */}
-                <div className="w-full max-w-[320px] relative group perspective-[1000px]">
-                     {/* Cadre Téléphone */}
-                    <div className="relative mx-auto border-slate-800 bg-slate-900 border-[8px] rounded-[3rem] h-[640px] w-full shadow-2xl flex flex-col overflow-hidden ring-1 ring-white/10">
-                        {/* Notch */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[24px] w-[120px] bg-slate-950 rounded-b-2xl z-20"></div>
-                        
-                        {/* Écran */}
-                        <div className="w-full h-full bg-[#020617] relative flex flex-col overflow-hidden">
-                            {/* Status Bar */}
-                            <div className="w-full h-12 flex items-end justify-between px-6 pb-2 text-[10px] text-white font-medium z-10">
-                                <span>9:41</span>
-                                <div className="flex gap-1">
-                                    <div className="w-3 h-3 bg-white rounded-full"></div>
-                                    <div className="w-3 h-3 bg-white/50 rounded-full"></div>
-                                </div>
-                            </div>
-
-                            {/* Contenu App */}
-                            <div className="p-5 space-y-5 pt-8 overflow-y-auto no-scrollbar">
-                                <h3 className="text-white font-black text-2xl">Notifications</h3>
-                                
-                                <div className="space-y-3">
-                                    {/* Notif 1 */}
-                                    <div className="bg-slate-800/50 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Reçu</span>
-                                            </div>
-                                            <span className="text-[10px] text-slate-500">2m</span>
-                                        </div>
-                                        <p className="text-sm text-white font-medium leading-snug">Paiement de 150.000 FCFA reçu de M. Kouassi.</p>
-                                    </div>
-
-                                    {/* Notif 2 */}
-                                    <div className="bg-slate-800/50 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-[#F59E0B]"></div>
-                                                <span className="text-[10px] font-black text-[#F59E0B] uppercase tracking-widest">Incident</span>
-                                            </div>
-                                            <span className="text-[10px] text-slate-500">1h</span>
-                                        </div>
-                                        <p className="text-sm text-white font-medium leading-snug">Nouvelle fuite d'eau signalée (Appt B2).</p>
-                                    </div>
-                                    
-                                     {/* Notif 3 */}
-                                    <div className="bg-slate-800/30 p-4 rounded-2xl border border-white/5 backdrop-blur-md opacity-60">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Info</span>
-                                            </div>
-                                            <span className="text-[10px] text-slate-500">Hier</span>
-                                        </div>
-                                        <p className="text-sm text-white font-medium leading-snug">Votre rapport mensuel est disponible.</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Bottom Tab Bar */}
-                            <div className="mt-auto h-20 bg-slate-900/80 backdrop-blur border-t border-white/5 flex items-center justify-around px-4 pb-4">
-                                <div className="p-2 rounded-xl bg-white/10 text-white"><Wallet className="w-5 h-5" /></div>
-                                <div className="p-2 rounded-xl text-slate-600"><PieChart className="w-5 h-5" /></div>
-                                <div className="p-2 rounded-xl text-slate-600"><Users className="w-5 h-5" /></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="text-left space-y-6 max-w-sm w-full">
-                    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition cursor-default">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-[#F59E0B] border border-white/5">
-                                <Bell className="w-5 h-5" />
-                            </div>
-                            <h4 className="font-bold text-white">Alertes Instantanées</h4>
-                        </div>
-                        <p className="text-sm text-slate-400 leading-relaxed">Ne courez plus après l'info. Soyez notifié dès qu'un loyer est payé ou qu'un bail est signé.</p>
-                    </div>
-
-                    <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition cursor-default">
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-blue-500 border border-white/5">
-                                <PieChart className="w-5 h-5" />
-                            </div>
-                            <h4 className="font-bold text-white">Rentabilité Nette</h4>
-                        </div>
-                        <p className="text-sm text-slate-400 leading-relaxed">Suivez vos revenus et dépenses mois par mois. Exportez vos rapports pour les impôts.</p>
-                    </div>
-                    
-                    <div className="pt-4">
-                        <Link href="/signup" className="w-full bg-white text-[#020617] hover:bg-slate-200 font-black py-4 rounded-xl text-center shadow-lg transition flex items-center justify-center gap-2">
-                            Créer mon compte <ArrowRight className="w-4 h-4"/>
-                        </Link>
                     </div>
                 </div>
             </div>
@@ -558,7 +509,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- FOOTER (AVEC LOGO WEBAPPCI) --- */}
+      {/* --- FOOTER --- */}
       <footer className="bg-[#020617] border-t border-white/5 pt-20 pb-10">
         <div className="max-w-7xl mx-auto px-4">
             
@@ -582,10 +533,15 @@ export default function LandingPage() {
                 <div>
                     <h4 className="font-bold text-white mb-6 uppercase text-[10px] tracking-[0.2em]">Plateforme</h4>
                     <ul className="space-y-4 text-sm text-slate-400 font-medium">
+                        <li><Link href="/properties" className="hover:text-[#F59E0B] transition flex items-center gap-2">
+                             Louer (Longue Durée)
+                        </Link></li>
+                        <li><Link href="/akwaba" className="hover:text-[#F59E0B] transition flex items-center gap-2 text-[#F59E0B]">
+                            <Palmtree className="w-3 h-3" /> Akwaba (Séjours)
+                        </Link></li>
                         <li><a href="#features" className="hover:text-[#F59E0B] transition">Fonctionnalités</a></li>
                         <li><a href="#security" className="hover:text-[#F59E0B] transition">Sécurité</a></li>
                         <li><a href="#pricing" className="hover:text-[#F59E0B] transition">Tarifs</a></li>
-                        <li><Link href="/login" className="hover:text-[#F59E0B] transition flex items-center gap-2">Espace Client <ArrowRight className="w-3 h-3"/></Link></li>
                     </ul>
                 </div>
                 
@@ -613,9 +569,9 @@ export default function LandingPage() {
                     </span>
                     <div className="opacity-50 hover:opacity-100 transition-opacity duration-300">
                         <Image 
-                            src="/logo2.png" // Le logo WebappCi
+                            src="/logo2.png" 
                             alt="WebappCi Logo"
-                            width={80} // Ajusté pour être discret mais lisible
+                            width={80} 
                             height={30}
                             className="object-contain grayscale hover:grayscale-0 transition-all"
                         />

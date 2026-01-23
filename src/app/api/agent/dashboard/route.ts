@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION AGENT (Optimisée avec 'select')
+    // 2. RÉCUPÉRATION AGENT
     const agent = await prisma.user.findUnique({
       where: { email: userEmail },
       select: {
@@ -17,58 +17,46 @@ export async function GET(request: Request) {
         name: true,
         email: true,
         role: true,
-        walletBalance: true, // Nécessaire pour les commissions
+        walletBalance: true,
         
-        // On compte les missions terminées
+        // Leads pour stats
+        leads: {
+            take: 5,
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, name: true, phone: true, status: true }
+        },
         _count: {
             select: { 
-                missionsAccepted: { where: { status: "COMPLETED" } } 
-            }
-        },
-        
-        // On récupère les leads (mais uniquement les infos utiles)
-        leads: { 
-            take: 5, 
-            orderBy: { createdAt: 'desc' }, // 'updatedAt' n'existe pas dans votre Lead model, j'ai remis 'createdAt'
-            select: {
-                id: true,
-                name: true,
-                phone: true,
-                status: true,
-                needs: true,
-                budget: true
+                leads: true,
+                missionsAccepted: true 
             }
         }
       }
     });
 
-    // ✅ CHECK RÔLE STRICT
     if (!agent || agent.role !== 'AGENT') {
        return NextResponse.json({ error: "Accès refusé. Profil Agent requis." }, { status: 403 });
     }
 
-    // 3. STATISTIQUES MARCHÉ
-    // Combien de missions attendent un agent ?
-    const availableMissions = await prisma.mission.count({
-        where: { 
-            status: "PENDING",
-            agentId: null 
-        }
+    // 3. CALCULS FINANCIERS AVANCÉS
+    // On calcule la somme des "fees" des missions acceptées par l'agent mais pas encore payées (si applicable)
+    // Ici on simplifie : Commission Estimée = Solde Wallet + Fees des missions en cours
+    const pendingMissions = await prisma.mission.findMany({
+        where: { agentId: agent.id, status: { in: ['ACCEPTED', 'PENDING'] } },
+        select: { fee: true }
     });
+    
+    const pendingCommissions = pendingMissions.reduce((acc, m) => acc + (m.fee || 0), 0);
+    const totalCommissionsEstimate = (agent.walletBalance || 0) + pendingCommissions;
 
-    // 4. RÉPONSE
+    // 4. RÉPONSE FORMATÉE POUR LE FRONT
     return NextResponse.json({
       success: true,
-      user: {
-        name: agent.name,
-        email: agent.email,
-        role: agent.role,
-        walletBalance: agent.walletBalance
-      },
       stats: {
-        completedMissions: agent._count.missionsAccepted,
-        availableMissions: availableMissions,
-        commissionEarned: agent.walletBalance || 0 
+        commissionEstimate: totalCommissionsEstimate,
+        totalLeads: agent._count.leads,
+        managedCount: agent._count.missionsAccepted,
+        walletBalance: agent.walletBalance || 0
       },
       recentLeads: agent.leads
     });

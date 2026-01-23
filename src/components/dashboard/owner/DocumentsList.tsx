@@ -2,42 +2,27 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import dynamic from 'next/dynamic'; // ✅ IMPORT VITAL POUR LE PDF
+import dynamic from 'next/dynamic';
 import { 
-  FileText, Eye, ShieldAlert, Receipt, FileSignature, 
-  ChevronDown, Mail, Share2, Printer
+  FileText, ShieldAlert, Receipt, FileSignature, 
+  ChevronDown, Mail, Share2, Printer, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
-// ✅ CHARGEMENT DYNAMIQUE DU BOUTON PDF (SSR: false est obligatoire)
+// CHARGEMENT DYNAMIQUE DU BOUTON PDF
 const DownloadRentReceipt = dynamic(() => import('@/components/pdf/DownloadRentReceipt'), {
   ssr: false,
   loading: () => (
     <button className="flex-1 bg-slate-800 text-slate-500 text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 cursor-wait">
-       Chargement...
+       ...
     </button>
   )
 });
 
-// Typage minimal pour la sécurité
-interface Payment {
-    id: string;
-    date: string;
-    amount: number;
-}
-
-interface Lease {
-    id: string;
-    startDate: string;
-    tenant: { name: string };
-    property: { title: string; owner: { name: string } };
-    payments?: Payment[];
-}
-
 export default function DocumentsList({ properties }: { properties: any[] }) {
   
-  // 1. APLATISSEMENT SÉCURISÉ & ROBUSTE
+  // APLATISSEMENT SÉCURISÉ
   const leases = properties?.flatMap(p => 
     (p.leases || []).map((l: any) => ({
         ...l, 
@@ -75,7 +60,7 @@ export default function DocumentsList({ properties }: { properties: any[] }) {
   return (
     <div className="space-y-8 mt-12">
         
-        {/* HEADER SECTION */}
+        {/* HEADER */}
         <div className="flex items-center justify-between">
             <div>
                 <h3 className="font-black text-2xl text-white flex items-center gap-3">
@@ -101,7 +86,8 @@ export default function DocumentsList({ properties }: { properties: any[] }) {
 
         {/* LISTE DES DOSSIERS LOCATAIRES */}
         <div className="grid gap-6">
-            {leases.map((lease: any) => {
+            {/* ✅ AJOUT DU PARAMÈTRE INDEX POUR SÉCURISER LA CLÉ */}
+            {leases.map((lease: any, index: number) => {
                 const isExpanded = expandedLeaseId === lease.id;
                 const payments = lease.payments || [];
                 const latestPayment = payments.length > 0 ? payments[payments.length - 1] : null;
@@ -109,15 +95,15 @@ export default function DocumentsList({ properties }: { properties: any[] }) {
                 const tenantName = lease.tenant?.name || "Locataire Inconnu";
                 const propertyTitle = lease.property?.title || "Propriété Inconnue";
 
-                // Gestion date robuste
                 const signedDate = lease.startDate 
                     ? new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'medium' }) 
                     : "En attente";
 
                 return (
-                    <div key={lease.id} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden transition-all hover:border-slate-700 shadow-lg group/card">
+                    // ✅ UTILISATION DE L'INDEX EN FALLBACK
+                    <div key={lease.id || index} className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden transition-all hover:border-slate-700 shadow-lg group/card">
                         
-                        {/* BANDEAU RÉSUMÉ (Clickable) */}
+                        {/* BANDEAU RÉSUMÉ */}
                         <div 
                             onClick={() => toggleLease(lease.id)}
                             className="p-6 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 to-slate-900 hover:from-slate-800/50 hover:to-slate-900 transition duration-300"
@@ -178,7 +164,7 @@ export default function DocumentsList({ properties }: { properties: any[] }) {
                                             </div>
                                         </div>
 
-                                        {/* 2. CARTE : QUITTANCE (AVEC BOUTON PDF DYNAMIQUE) */}
+                                        {/* 2. CARTE : QUITTANCE */}
                                         {latestPayment ? (
                                             <div className="bg-[#0B1120] p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition group relative overflow-hidden flex flex-col h-full">
                                                 <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-20 transition duration-500"><Receipt className="w-24 h-24 text-emerald-500"/></div>
@@ -193,16 +179,13 @@ export default function DocumentsList({ properties }: { properties: any[] }) {
                                                 <p className="text-xs text-slate-500 mb-6 relative z-10">Dernier paiement : {new Date(latestPayment.date).toLocaleDateString('fr-FR')}</p>
 
                                                 <div className="flex gap-2 mt-auto relative z-10">
-                                                    
-                                                    {/* 👇 LE NOUVEAU COMPOSANT PDF ICI 👇 */}
                                                     <DownloadRentReceipt 
                                                         payment={latestPayment} 
                                                         lease={lease} 
                                                         tenant={lease.tenant} 
                                                         property={lease.property} 
-                                                        owner={lease.property.owner} // Assurez-vous que l'owner est bien présent dans les données
+                                                        owner={lease.property.owner}
                                                     />
-
                                                     <button onClick={() => handleSendEmail('Quittance')} className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 hover:text-white transition">
                                                         <Mail className="w-4 h-4" />
                                                     </button>

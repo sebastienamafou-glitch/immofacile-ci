@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // ✅ Utilisation du Singleton (Vital)
+import { prisma } from "@/lib/prisma"; 
 import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
@@ -7,14 +7,20 @@ export const dynamic = 'force-dynamic';
 export async function PUT(request: Request) {
   try {
     // 1. SÉCURITÉ STANDARDISÉE
-    // On utilise la même méthode que partout ailleurs (Header sécurisé)
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
 
-    // 2. VALIDATION
+    // ✅ CORRECTION : Vérifier si l'utilisateur a un mot de passe à modifier
+    if (!user.password) {
+        return NextResponse.json({ 
+            error: "Votre compte utilise une connexion sociale (Google). Vous ne pouvez pas modifier de mot de passe." 
+        }, { status: 400 });
+    }
+
+    // 2. VALIDATION DES ENTRÉES
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
@@ -27,7 +33,9 @@ export async function PUT(request: Request) {
     }
 
     // 3. VÉRIFICATION DE L'ANCIEN MOT DE PASSE
+    // TypeScript sait maintenant que user.password existe grâce au 'if' plus haut
     const isValid = await bcrypt.compare(currentPassword, user.password);
+    
     if (!isValid) {
       return NextResponse.json({ error: "Le mot de passe actuel est incorrect." }, { status: 401 });
     }

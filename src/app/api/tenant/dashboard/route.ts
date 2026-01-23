@@ -1,87 +1,64 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : Auth Serveur
+    // 1. SÉCURITÉ
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
-    
-    // ✅ VÉRIFICATION STRICTE DU RÔLE
-    if (!tenant || tenant.role !== "TENANT") {
-        return NextResponse.json({ error: "Accès refusé. Espace Locataire uniquement." }, { status: 403 });
-    }
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
 
-    // 2. RÉCUPÉRATION DU BAIL ACTIF (Avec 'select' pour la précision)
-    const activeLease = await prisma.lease.findFirst({
+    // ✅ CORRECTION : On accepte GUEST s'il a une candidature
+    // On ne bloque plus strictement sur "TENANT"
+
+    // 2. RECHERCHE DU BAIL (Actif OU En attente)
+    // On priorise le bail ACTIF, sinon on prend le PENDING (Candidature)
+    const lease = await prisma.lease.findFirst({
         where: {
-            tenantId: tenant.id,
-            isActive: true
+            tenantId: user.id,
+            status: { in: ['ACTIVE', 'PENDING'] } // On récupère aussi les candidatures
         },
-        select: {
-            id: true,
-            monthlyRent: true,
-            depositAmount: true,
-            status: true,
-            startDate: true,
-            endDate: true,
-            // Relation Propriété : On ne prend que l'utile (Titre, Adresse, Info Proprio)
+        orderBy: { createdAt: 'desc' }, // Le plus récent
+        include: {
             property: {
                 select: {
                     title: true,
                     address: true,
                     commune: true,
-                    owner: { 
-                        select: { name: true, email: true, phone: true } 
-                    }
+                    owner: { select: { name: true, email: true, phone: true } }
                 }
             },
-            // Historique Paiements
             payments: {
                 orderBy: { date: 'desc' },
-                take: 5,
-                select: {
-                    id: true,
-                    amount: true,
-                    date: true,
-                    status: true,
-                    type: true
-                }
+                take: 5
             }
         }
     });
 
-    // 3. RÉCUPÉRATION DES INCIDENTS
+    // 3. INCIDENTS (Si locataire)
     const incidents = await prisma.incident.findMany({
-        where: { reporterId: tenant.id },
+        where: { reporterId: user.id },
         orderBy: { createdAt: 'desc' },
-        take: 3,
-        select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true,
-            priority: true
-        }
+        take: 3
     });
 
-    // 4. RÉPONSE
     return NextResponse.json({
         success: true,
         user: {
-            id: tenant.id,
-            name: tenant.name,
-            email: tenant.email,
-            walletBalance: tenant.walletBalance,
-            isVerified: tenant.kycStatus === 'VERIFIED'
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            walletBalance: user.walletBalance,
+            isVerified: user.kycStatus === 'VERIFIED',
+            kycStatus: user.kycStatus // Utile pour l'affichage
         },
-        // Si pas de bail actif, on renvoie null proprement
-        lease: activeLease ? activeLease : null,
-        payments: activeLease?.payments || [],
+        lease: lease || null, // Peut être null si nouveau user sans dossier
+        payments: lease?.payments || [],
         incidents: incidents
     });
 

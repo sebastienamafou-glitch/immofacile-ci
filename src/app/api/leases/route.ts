@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     let leases = [];
 
     // B. LOGIQUE DE FILTRAGE SELON LE RÔLE
-    if (user.role === "ADMIN") {
+    if (user.role === "SUPER_ADMIN") {
         // L'Admin voit TOUT
         leases = await prisma.lease.findMany({
             include: {

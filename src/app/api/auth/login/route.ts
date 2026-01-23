@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     // 1. SÉCURITÉ ENVIRONNEMENT
-    // On interdit le démarrage si la clé secrète n'est pas définie dans le .env
     const JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
         console.error("CRITIQUE: JWT_SECRET manquant dans les variables d'environnement.");
@@ -34,20 +35,25 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-      // Pour la sécurité, on reste vague sur l'erreur (pour éviter l'énumération des comptes)
       return NextResponse.json({ error: "Identifiants incorrects." }, { status: 401 });
     }
 
     // 3. VÉRIFICATION DU MOT DE PASSE
-    // On supporte temporairement les mots de passe en clair pour la migration, 
-    // mais bcrypt est la priorité.
+    // ✅ CORRECTION : On vérifie d'abord si l'utilisateur a un mot de passe
+    if (!user.password) {
+        return NextResponse.json({ 
+            error: "Ce compte utilise une connexion sociale (Google). Veuillez vous connecter via le bouton Google." 
+        }, { status: 400 });
+    }
+
     let isValid = false;
+    // Maintenant TypeScript sait que user.password existe, on peut utiliser startsWith
     const isHash = user.password.startsWith("$2");
 
     if (isHash) {
         isValid = await bcrypt.compare(password, user.password);
     } else {
-        // ⚠️ Legacy : À supprimer une fois que tous les users ont changé leur mot de passe
+        // ⚠️ Legacy : Mot de passe en clair (pour le dev)
         isValid = (user.password === password);
     }
 
@@ -59,7 +65,7 @@ export async function POST(request: Request) {
     let destination = "/dashboard/tenant"; // Fallback
 
     switch (user.role) {
-        case "ADMIN": destination = "/dashboard/admin"; break;
+        case "SUPER_ADMIN": destination = "/dashboard/superadmin"; break;
         case "OWNER": destination = "/dashboard/owner"; break;
         case "AGENT": destination = "/dashboard/agent"; break;
         case "ARTISAN": destination = "/dashboard/artisan"; break;

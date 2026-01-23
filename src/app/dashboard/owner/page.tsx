@@ -1,8 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
+import Link from "next/link"; 
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarDays, Wallet, MinusCircle, Phone } from "lucide-react";
+import { 
+  AlertTriangle, CalendarDays, Wallet, MinusCircle, Phone, 
+  Hotel, Key, ArrowRight 
+} from "lucide-react";
 import Swal from 'sweetalert2'; 
 import { api } from "@/lib/api"; 
 
@@ -43,14 +47,65 @@ const PremiumLoader = () => (
     </div>
 );
 
-// --- 2. COMPOSANT DE CONTENU (Logique principale corrigée) ---
+// --- 2. SOUS-COMPOSANT : LISTE DES RÉSERVATIONS AKWABA ---
+const AkwabaBookingsList = ({ bookings }: { bookings: any[] }) => {
+  if (!bookings || bookings.length === 0) return (
+    <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/50">
+        <Hotel className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+        <p className="text-sm text-slate-500 font-bold">Aucune arrivée prévue</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+        {bookings.slice(0, 5).map((booking) => (
+            <div key={booking.id} className="flex items-center justify-between p-4 bg-slate-950/50 border border-white/5 rounded-xl hover:border-purple-500/30 transition group">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
+                        <Key size={16} />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-white group-hover:text-purple-400 transition">
+                            {booking.guest?.name || 'Voyageur'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                            {booking.listing?.title}
+                        </p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-xs font-bold text-slate-300">
+                        {new Date(booking.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    </p>
+                    <span className="text-[10px] uppercase font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        Confirmé
+                    </span>
+                </div>
+            </div>
+        ))}
+    </div>
+  );
+};
+
+// --- 3. COMPOSANT DE CONTENU PRINCIPAL ---
 
 function OwnerDashboardContent() {
   const router = useRouter();
-  
-  // Rétablissement de vos hooks originaux sans erreur de type
   const { data, loading, error } = useDashboardData(); 
-  useTenantAlert(); // Appel sans assignation comme dans votre code original
+  useTenantAlert();
+
+  // ✅ CORRECTION : on accepte l'objet 'property' complet (type any ou Property)
+  // Cela résout l'erreur "Type mismatch"
+  const handleDelegate = (property: any) => {
+      Swal.fire({
+          icon: 'info',
+          title: 'Bientôt disponible',
+          text: `La délégation du bien "${property.title}" à une agence sera bientôt active !`,
+          background: '#1e293b',
+          color: '#fff',
+          confirmButtonColor: '#F59E0B'
+      });
+  };
 
   const handleWithdraw = async () => {
     if (!data?.user) return;
@@ -123,11 +178,14 @@ function OwnerDashboardContent() {
   }
 
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-  const artisans = data.artisans || []; // Extraction correcte depuis data
+  const artisans = data.artisans || [];
+  const listings = data.listings || [];
+  const bookings = data.bookings || [];
 
   return (
     <main className="min-h-screen bg-[#0B1120] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0B1120] to-[#0B1120] text-slate-200 p-6 lg:p-10 font-sans pb-32">
       
+      {/* HEADER */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 animate-in slide-in-from-top-4 duration-500">
         <div>
             <div className="flex items-center gap-2 text-orange-500 mb-2">
@@ -137,20 +195,24 @@ function OwnerDashboardContent() {
             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
                 Bonjour, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">{data.user?.name || 'Propriétaire'}</span> 👋
             </h1>
-            <p className="text-slate-400 mt-2 text-sm">Voici la météo financière de votre parc immobilier.</p>
+            <p className="text-slate-400 mt-2 text-sm">
+                Aperçu global de votre écosystème <span className="text-white font-bold">ImmoFacile</span> & <span className="text-purple-400 font-bold">Akwaba</span>.
+            </p>
         </div>
 
         <div className="flex items-center gap-4">
-             <div className="hidden md:flex flex-col items-end px-4 py-2 border-r border-slate-800/50">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Solde Disponible</span>
+             <Link href="/dashboard/owner/finance" className="hidden md:flex flex-col items-end px-4 py-2 border-r border-slate-800/50 hover:bg-white/5 transition rounded-lg group cursor-pointer">
+                <span className="text-[10px] uppercase font-bold text-slate-500 group-hover:text-orange-400 transition">Solde Disponible</span>
                 <span className="text-xl font-bold text-white flex items-center gap-2">
                     <Wallet className="w-4 h-4 text-emerald-500" />
                     {(data.user?.walletBalance || 0).toLocaleString()} FCFA
+                    <ArrowRight className="w-3 h-3 text-slate-600 group-hover:translate-x-1 transition" />
                 </span>
-             </div>
+             </Link>
         </div>
       </header>
       
+      {/* STATS GLOBALES */}
       <section className="mb-10">
         <StatsOverview 
             user={data.user} 
@@ -160,25 +222,94 @@ function OwnerDashboardContent() {
         />
       </section>
 
+      {/* CONTENU PRINCIPAL */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         
         <div className="xl:col-span-2 space-y-8">
+          
+          {/* Section 1: Immobilier (Long Terme) */}
           <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">🏠 Mes Propriétés</h3>
-                <span className="text-xs font-medium px-2 py-1 bg-white/5 rounded-lg text-slate-400">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    🏠 Gestion Locative
+                </h3>
+                <span className="text-xs font-medium px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
                     {data.properties?.length || 0} Biens
                 </span>
              </div>
-             <PropertiesGrid properties={data.properties || []} />
+             
+             {/* Le composant PropertiesGrid est maintenant content car handleDelegate accepte l'objet */}
+             <PropertiesGrid 
+                properties={data.properties || []} 
+                onDelegate={handleDelegate} 
+             />
           </div>
 
-          <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
-             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">👥 Locataires Actifs</h3>
-             <TenantsList properties={data.properties || []} />
+          {/* Section 2: Akwaba (Court Terme) */}
+          <div className="bg-slate-900/30 border border-purple-500/10 rounded-3xl p-6 backdrop-blur-sm relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-3 opacity-5">
+                <Hotel size={100} />
+             </div>
+             <div className="flex items-center justify-between mb-6 relative z-10">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    ✈️ Akwaba (Court Séjour)
+                </h3>
+                <span className="text-xs font-medium px-2 py-1 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20">
+                    {listings.length} Annonces
+                </span>
+             </div>
+             
+             {listings.length > 0 ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {listings.map((listing: any) => (
+                        <div key={listing.id} className="bg-slate-950 p-4 rounded-xl border border-white/5 flex gap-3">
+                            <div className="w-16 h-16 bg-slate-800 rounded-lg bg-cover bg-center" style={{ backgroundImage: `url(${listing.images?.[0]})`}}></div>
+                            <div>
+                                <h4 className="font-bold text-sm text-white truncate w-32">{listing.title}</h4>
+                                <p className="text-xs text-purple-400 font-bold">{listing.pricePerNight?.toLocaleString()} /nuit</p>
+                                <div className="flex items-center gap-1 mt-1">
+                                    <div className={`w-2 h-2 rounded-full ${listing.isPublished ? 'bg-emerald-500' : 'bg-slate-500'}`}></div>
+                                    <span className="text-[10px] text-slate-500 uppercase">{listing.isPublished ? 'En ligne' : 'Brouillon'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+             ) : (
+                <div className="text-center py-6">
+                    <p className="text-sm text-slate-400">Aucune annonce courte durée.</p>
+                    <button className="mt-2 text-xs font-bold text-purple-400 hover:text-purple-300">
+                        + Publier sur Akwaba
+                    </button>
+                </div>
+             )}
           </div>
+
+          {/* Section 3: Locataires & Clients */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* Widget Locataires */}
+           <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
+               <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">Locataires (Baux)</h3>
+               <TenantsList properties={data.properties || []} />
+          </div>
+
+          {/* Widget Voyageurs */}
+          <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-purple-400 uppercase tracking-widest">Voyageurs (Akwaba)</h3>
+                  <Link href="/dashboard/owner/akwaba/bookings" className="text-[10px] font-bold text-slate-500 hover:text-white transition flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg hover:bg-white/10">
+                      Gérer les réservations <ArrowRight size={12} />
+                  </Link>
+              </div>
+              <AkwabaBookingsList bookings={bookings} />
+          </div>
+
         </div>
 
+        </div>
+
+        {/* SIDEBAR */}
         <aside className="space-y-8">
           <div className="sticky top-8">
               <IncidentWidget count={data.stats?.activeIncidentsCount || 0} />
@@ -227,7 +358,7 @@ function OwnerDashboardContent() {
   );
 }
 
-// --- 3. EXPORT FINAL (Wrapper Suspense) ---
+// --- 4. EXPORT FINAL ---
 
 export default function OwnerDashboard() {
   return (

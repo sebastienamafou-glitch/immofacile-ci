@@ -12,8 +12,8 @@ export async function GET(request: Request) {
     const agent = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!agent || agent.role !== "AGENT") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-    // 2. Récupération des dossiers complets
-    const applications = await prisma.lease.findMany({
+    // 2. Récupération des dossiers complets (Leases en attente)
+    const rawApplications = await prisma.lease.findMany({
       where: {
         status: "PENDING",
       },
@@ -27,14 +27,27 @@ export async function GET(request: Request) {
                 email: true, 
                 phone: true, 
                 kycStatus: true,
-                kycDocumentUrl: true, // ✅ Maintenant supporté !
-                income: true,         // ✅ Maintenant supporté !
-                jobTitle: true        // ✅ Maintenant supporté !
+                // ✅ CORRECTION : On utilise le nouveau champ tableau (List)
+                kycDocuments: true, 
+                income: true,        
+                jobTitle: true       
             }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // 3. Formatage pour le Frontend (Transformation du tableau en string unique)
+    const applications = rawApplications.map(app => ({
+        ...app,
+        tenant: {
+            ...app.tenant,
+            // On prend la première image du tableau, ou null si vide
+            kycDocumentUrl: (app.tenant.kycDocuments && app.tenant.kycDocuments.length > 0) 
+                ? app.tenant.kycDocuments[0] 
+                : null
+        }
+    }));
 
     return NextResponse.json({ success: true, applications });
 

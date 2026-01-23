@@ -1,81 +1,125 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
+    // 1. SÉCURITÉ & IDENTIFICATION
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const owner = await prisma.user.findUnique({ 
-        where: { email: userEmail },
-        include: {
-            propertiesOwned: {
-                include: {
-                    leases: {
-                        include: {
-                            tenant: { select: { name: true } }, // Optimisation: on ne prend que le nom
-                            payments: {
-                                orderBy: { date: 'desc' },
-                                take: 20 
-                            }
-                        }
-                    }
+    // 2. RÉCUPÉRATION DU PROPRIÉTAIRE (Profil & Soldes)
+    // On ne charge pas tout l'historique ici pour alléger la requête initiale
+    const owner = await prisma.user.findUnique({
+      where: { email: userEmail },
+      include: {
+        // Nécessaire pour le calcul de sécurité du séquestre
+        propertiesOwned: {
+            include: {
+                leases: {
+                    where: { OR: [{ isActive: true }, { status: 'ACTIVE' }] },
+                    select: { depositAmount: true }
                 }
             }
         }
+      }
     });
 
-    // ✅ VÉRIFICATION STRICTE DU RÔLE
     if (!owner || owner.role !== "OWNER") {
-        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+      return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
     }
 
-    // 2. CALCULS FINANCIERS
-    let escrowBalance = 0; 
-    
-    // On utilise flatMap pour aplatir la structure proprement sans 'any'
-    // Structure : User -> Properties[] -> Leases[] -> Payments[]
-    const allPayments = owner.propertiesOwned.flatMap(property => 
-        property.leases.flatMap(lease => {
-            
-            // A. Calcul du Séquestre (Somme des cautions des baux actifs)
-            // Note: isActive est prioritaire, mais on vérifie aussi le statut pour être sûr
-            if (lease.isActive || lease.status === 'ACTIVE') {
-                 escrowBalance += lease.depositAmount || 0;
-            }
-
-            // B. Mapping des paiements
-            return lease.payments.map(payment => ({
-                id: payment.id,
-                amount: payment.amount,
-                type: payment.type,
-                status: payment.status,
-                date: payment.date,
-                lease: {
-                    id: lease.id,
-                    property: { title: property.title },
-                    tenant: { name: lease.tenant.name }
-                }
-            }));
-        })
-    );
-
-    // Tri global par date (du plus récent au plus ancien)
-    allPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    // 3. RÉPONSE
-    return NextResponse.json({
-        success: true,
-        walletBalance: owner.walletBalance || 0, // Argent disponible (Loyers perçus)
-        escrowBalance: escrowBalance,           // Argent bloqué (Cautions)
-        payments: allPayments,                  // Historique complet
-        user: {
-            name: owner.name,
-            email: owner.email
+    // 3. RECUPERATION OPTIMISÉE DES TRANSACTIONS (LONGUE DURÉE)
+    // On requête directement la table Payment pour avoir une pagination globale correcte
+    const rawPayments = await prisma.payment.findMany({
+      where: {
+        status: 'SUCCESS', // On ne veut que l'argent encaissé
+        lease: {
+          property: {
+            ownerId: owner.id
+          }
         }
+      },
+      orderBy: { date: 'desc' },
+      take: 20, // Les 20 derniers mouvements globaux
+      include: {
+        lease: {
+          select: {
+            id: true,
+            property: { select: { title: true } },
+            tenant: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    // Mapping propre pour le Frontend
+    const leasePayments = rawPayments.map(p => ({
+      id: p.id,
+      amount: p.amountOwner, // [CORRECTION] Le montant NET pour le propriétaire
+      grossAmount: p.amount, // Montant payé par le locataire (pour info)
+      type: p.type,
+      status: p.status,
+      date: p.date,
+      source: "RENTAL", // Tag pour le frontend
+      details: {
+        property: p.lease.property.title,
+        tenant: p.lease.tenant.name
+      }
+    }));
+
+    // 4. RECUPERATION OPTIMISÉE DES RÉSERVATIONS (COURTE DURÉE / AKWABA)
+    const rawBookings = await prisma.booking.findMany({
+      where: {
+        listing: { hostId: owner.id },
+        status: { in: ['PAID', 'CONFIRMED', 'COMPLETED'] }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        listing: { select: { title: true } },
+        guest: { select: { name: true } },
+        payment: true // Pour le détail financier
+      }
+    });
+
+    // Mapping propre
+    const akwabaBookings = rawBookings.map(b => ({
+      id: b.id,
+      amount: b.payment?.hostPayout || 0, // [CORRECTION] Le montant NET
+      grossAmount: b.totalPrice,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      date: b.createdAt, // Pour tri unifié si besoin
+      status: b.status,
+      source: "AKWABA", // Tag pour le frontend
+      details: {
+        property: b.listing.title,
+        guest: b.guest.name
+      }
+    }));
+
+    // 5. CALCUL DE SÉCURITÉ (SÉQUESTRE)
+    // On recalcule la somme des cautions actives pour être sûr (Source of Truth)
+    const calculatedEscrow = owner.propertiesOwned.reduce((acc, property) => {
+        return acc + property.leases.reduce((sum, lease) => sum + (lease.depositAmount || 0), 0);
+    }, 0);
+
+    // 6. RÉPONSE FINALE
+    return NextResponse.json({
+      success: true,
+      walletBalance: owner.walletBalance, // Argent dispo
+      escrowBalance: calculatedEscrow,    // Argent bloqué (Caution)
+      
+      // Listes de données
+      payments: leasePayments,
+      bookings: akwabaBookings,
+      
+      user: {
+        name: owner.name,
+        email: owner.email
+      }
     });
 
   } catch (error) {

@@ -12,7 +12,7 @@ const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_STR);
 // 2. LISTE EXHAUSTIVE DES ZONES PROTÉGÉES (Basée sur votre structure de dossiers)
 const PROTECTED_PATHS = [
   '/dashboard',      // Le Frontend
-  '/api/admin',      // Rôle Admin
+  '/api/superadmin', // Rôle Super Admin
   '/api/owner',      // Rôle Owner
   '/api/tenant',     // Rôle Tenant
   '/api/agent',      // Rôle Agent

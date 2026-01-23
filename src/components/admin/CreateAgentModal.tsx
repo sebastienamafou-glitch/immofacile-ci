@@ -1,151 +1,169 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
-import { toast } from "sonner";
-import { Loader2, UserPlus, X, Eye, EyeOff, Copy } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Building2, UserCheck, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
-interface CreateAgentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void; // Pour rafraîchir la liste après création
-}
-
-export default function CreateAgentModal({ isOpen, onClose, onSuccess }: CreateAgentModalProps) {
+export default function CreateAgencyModal() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   
+  // États du formulaire
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    password: "" // L'admin définit le mot de passe initial
+    agencyName: "",
+    agencySlug: "",
+    adminName: "",
+    adminEmail: "",
+    adminPhone: ""
   });
 
-  if (!isOpen) return null;
+  // Génération automatique du slug (ex: "Immo Prestige" -> "immo-prestige")
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    setFormData(prev => ({ ...prev, agencyName: name, agencySlug: slug }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Appel à la route que nous avons créée dans adminRoutes.js
-      await api.post('/admin/agents', formData);
+      // ✅ APPEL À VOTRE ROUTE API
+      const res = await fetch("/api/superadmin/agencies", { // Assurez-vous que le fichier route.ts est dans ce dossier
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
 
-      toast.success("Agent créé avec succès !");
-      toast.info(`Mot de passe à transmettre : ${formData.password}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de la création");
+      }
+
+      toast.success(`Agence "${data.credentials.email}" créée !`);
+      toast.info(`Mot de passe temporaire : ${data.credentials.tempPassword}`, {
+        duration: 10000, // Reste affiché 10 secondes
+      });
       
-      onSuccess(); // Rafraîchit la liste
-      onClose();   // Ferme la modale
-      
-      // Reset du formulaire
-      setFormData({ name: "", email: "", phone: "", password: "" });
+      setOpen(false);
+      setFormData({ agencyName: "", agencySlug: "", adminName: "", adminEmail: "", adminPhone: "" });
+      router.refresh();
 
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.response?.data?.error || "Erreur lors de la création.");
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Petit outil pour générer un mot de passe fort automatiquement
-  const generatePassword = () => {
-    const pass = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase();
-    setFormData({ ...formData, password: pass });
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
-        
-        {/* Header */}
-        <div className="bg-slate-50 dark:bg-slate-950/50 px-6 py-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800">
-          <h3 className="font-bold text-lg flex items-center gap-2 text-slate-900 dark:text-white">
-            <UserPlus className="w-5 h-5 text-blue-600" />
-            Nouvel Agent
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold gap-2">
+          <Building2 size={18} /> Créer une Agence
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="bg-[#0f172a] border-slate-800 text-slate-200 sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-black text-white flex items-center gap-2">
+            <Building2 className="text-orange-500" /> Nouvelle Agence Partenaire
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Formulaire */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           
-          <div className="space-y-1">
-            <Label>Nom complet</Label>
-            <Input 
-              required
-              placeholder="Ex: Sophie Martin"
-              value={formData.name}
-              onChange={e => setFormData({...formData, name: e.target.value})}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input 
-                required
-                type="email"
-                placeholder="agent@immo.ci"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Téléphone</Label>
-              <Input 
-                required
-                placeholder="07 00 00 00 00"
-                value={formData.phone}
-                onChange={e => setFormData({...formData, phone: e.target.value})}
-              />
+          {/* SECTION AGENCE */}
+          <div className="space-y-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Structure</h3>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Nom de l'agence</Label>
+                    <Input 
+                        required 
+                        placeholder="Ex: Orpi Abidjan" 
+                        value={formData.agencyName}
+                        onChange={handleNameChange}
+                        className="bg-slate-950 border-slate-800 focus:border-orange-500"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>Slug (URL)</Label>
+                    <Input 
+                        required 
+                        placeholder="orpi-abidjan" 
+                        value={formData.agencySlug}
+                        onChange={(e) => setFormData({...formData, agencySlug: e.target.value})}
+                        className="bg-slate-950 border-slate-800 focus:border-orange-500 font-mono text-xs"
+                    />
+                </div>
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="flex justify-between items-center">
-                <Label>Mot de passe provisoire</Label>
-                <button type="button" onClick={generatePassword} className="text-xs text-blue-500 font-medium hover:underline">
-                    Générer auto
-                </button>
-            </div>
-            <div className="relative">
+          {/* SECTION ADMIN */}
+          <div className="space-y-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <UserCheck size={14} /> Administrateur Local
+            </h3>
+            
+            <div className="space-y-2">
+                <Label>Nom complet du directeur</Label>
                 <Input 
-                  required
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={e => setFormData({...formData, password: e.target.value})}
+                    required 
+                    placeholder="Jean Kouassi" 
+                    value={formData.adminName}
+                    onChange={(e) => setFormData({...formData, adminName: e.target.value})}
+                    className="bg-slate-950 border-slate-800 focus:border-orange-500"
                 />
-                <button 
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-                >
-                    {showPassword ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
-                </button>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              ⚠️ Notez ce mot de passe pour le transmettre à l'agent.
-            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label>Email pro</Label>
+                    <Input 
+                        required 
+                        type="email"
+                        placeholder="direction@orpi.ci" 
+                        value={formData.adminEmail}
+                        onChange={(e) => setFormData({...formData, adminEmail: e.target.value})}
+                        className="bg-slate-950 border-slate-800 focus:border-orange-500"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>Téléphone</Label>
+                    <Input 
+                        required 
+                        placeholder="07 00 00 00 00" 
+                        value={formData.adminPhone}
+                        onChange={(e) => setFormData({...formData, adminPhone: e.target.value})}
+                        className="bg-slate-950 border-slate-800 focus:border-orange-500"
+                    />
+                </div>
+            </div>
           </div>
 
-          <div className="pt-2 flex gap-3">
-            <Button type="button" variant="outline" className="w-full" onClick={onClose}>
-                Annuler
-            </Button>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 animate-spin"/> : "Créer l'Agent"}
-            </Button>
+          <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg flex items-start gap-3 text-xs text-blue-300">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <p>Un mot de passe temporaire sera généré automatiquement et affiché à l'écran après la création.</p>
           </div>
+
+          <Button 
+            type="submit" 
+            disabled={loading} 
+            className="w-full bg-white text-black font-bold hover:bg-slate-200 h-12 text-lg"
+          >
+            {loading ? <Loader2 className="animate-spin" /> : "Créer l'agence & l'admin"}
+          </Button>
 
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

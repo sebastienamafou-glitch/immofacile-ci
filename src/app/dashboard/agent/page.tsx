@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
 import { 
   Briefcase, MapPin, Calendar, TrendingUp, 
-  Users, CheckCircle, Clock, ArrowRight, Loader2, Wallet
+  Users, Wallet, Clock, ArrowRight, Loader2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,20 +13,29 @@ import Link from "next/link";
 
 export default function AgentDashboard() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
-  const [missions, setMissions] = useState<any>(null);
+  const [data, setData] = useState<any>(null); // Stats + Leads
+  const [missions, setMissions] = useState<any>(null); // Missions Market + My Missions
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
+        const stored = localStorage.getItem("immouser");
+        const userEmail = stored ? JSON.parse(stored).email : "";
+
         // On charge les stats ET les missions en parallèle
+        // Note: On utilise fetch standard ici pour éviter les dépendances externes inconnues
+        const headers = { 'x-user-email': userEmail };
+        
         const [resStats, resMissions] = await Promise.all([
-           api.get('/agent/dashboard'),
-           api.get('/agent/missions')
+           fetch('/api/agent/dashboard', { headers }),
+           fetch('/api/agent/missions', { headers })
         ]);
 
-        if (resStats.data.success) setData(resStats.data);
-        if (resMissions.data.success) setMissions(resMissions.data.data);
+        const statsJson = await resStats.json();
+        const missionsJson = await resMissions.json();
+
+        if (resStats.ok) setData(statsJson);
+        if (resMissions.ok) setMissions(missionsJson);
 
       } catch (e) {
         console.error(e);
@@ -41,12 +49,22 @@ export default function AgentDashboard() {
 
   const handleAcceptMission = async (id: string) => {
       try {
-          await api.post(`/agent/missions/${id}/accept`);
-          toast.success("Mission acceptée ! Elle est dans votre agenda.");
-          // Rechargement rapide pour mettre à jour l'interface
-          window.location.reload(); 
+        const stored = localStorage.getItem("immouser");
+        const userEmail = stored ? JSON.parse(stored).email : "";
+
+        const res = await fetch(`/api/agent/missions/${id}/accept`, {
+            method: 'POST',
+            headers: { 'x-user-email': userEmail }
+        });
+
+        if (res.ok) {
+            toast.success("Mission acceptée !");
+            window.location.reload(); 
+        } else {
+            toast.error("Impossible d'accepter cette mission.");
+        }
       } catch (e) {
-          toast.error("Impossible d'accepter cette mission.");
+          toast.error("Erreur serveur.");
       }
   };
 
@@ -58,21 +76,23 @@ export default function AgentDashboard() {
   );
 
   return (
-    <div className="p-6 md:p-10 font-sans text-slate-200 min-h-screen bg-[#020617]">
+    <div className="p-6 md:p-10 font-sans text-slate-200 min-h-screen pb-24">
         
-        {/* HEADER & WELCOME */}
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
             <div>
                 <h1 className="text-2xl font-black text-white mb-1">Espace Agent</h1>
                 <p className="text-slate-400 text-sm">Gérez vos missions et vos prospects.</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center gap-4 shadow-lg">
                 <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
                     <Wallet className="w-6 h-6" />
                 </div>
                 <div>
-                    <p className="text-[10px] uppercase font-bold text-slate-500">Commissions Estimées</p>
-                    <p className="text-2xl font-black text-white">{data?.stats?.commissionEstimate?.toLocaleString()} F</p>
+                    <p className="text-[10px] uppercase font-bold text-slate-500">Commissions Est.</p>
+                    <p className="text-2xl font-black text-white">
+                        {data?.stats?.commissionEstimate?.toLocaleString() || 0} F
+                    </p>
                 </div>
             </div>
         </div>
@@ -110,24 +130,24 @@ export default function AgentDashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             
-            {/* COLONNE GAUCHE : LE MARCHÉ DES MISSIONS (Uber Style) */}
+            {/* COLONNE GAUCHE : LE MARCHÉ DES MISSIONS */}
             <div className="xl:col-span-2 space-y-6">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <MapPin className="w-5 h-5 text-orange-500" /> Missions Disponibles
                     </h2>
-                    <Badge variant="outline" className="text-orange-500 border-orange-500 bg-orange-500/10 animate-pulse">
+                    <Badge variant="outline" className="text-orange-500 border-orange-500 bg-orange-500/10">
                         {missions?.available?.length || 0} en attente
                     </Badge>
                 </div>
 
                 <div className="grid gap-4">
-                    {missions?.available?.length === 0 ? (
+                    {(!missions?.available || missions.available.length === 0) ? (
                         <div className="p-10 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50 text-center">
                             <p className="text-slate-500">Aucune nouvelle mission sur le marché.</p>
                         </div>
                     ) : (
-                        missions?.available?.map((m: any) => (
+                        missions.available.map((m: any) => (
                             <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-orange-500/50 transition-all group relative overflow-hidden">
                                 <div className="flex flex-col md:flex-row justify-between gap-4 relative z-10">
                                     <div>
@@ -136,12 +156,12 @@ export default function AgentDashboard() {
                                                 {m.type.replace('_', ' ')}
                                             </Badge>
                                             <span className="text-slate-500 text-xs font-mono flex items-center gap-1">
-                                                <Clock className="w-3 h-3"/> {new Date(m.dateScheduled).toLocaleDateString()}
+                                                <Clock className="w-3 h-3"/> {new Date(m.createdAt).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        <h3 className="font-bold text-lg text-white mb-1">{m.property.title}</h3>
+                                        <h3 className="font-bold text-lg text-white mb-1">{m.property?.title || "Propriété"}</h3>
                                         <p className="text-slate-400 text-sm flex items-center gap-1">
-                                            <MapPin className="w-3 h-3"/> {m.property.address}
+                                            <MapPin className="w-3 h-3"/> {m.property?.address || "Adresse masquée"}
                                         </p>
                                     </div>
                                     <div className="flex flex-col items-end justify-center gap-2 min-w-[140px]">
@@ -164,7 +184,7 @@ export default function AgentDashboard() {
                 </div>
             </div>
 
-            {/* COLONNE DROITE : MON AGENDA & PROSPECTS */}
+            {/* COLONNE DROITE : AGENDA & PROSPECTS */}
             <div className="space-y-8">
                 
                 {/* AGENDA */}
@@ -173,18 +193,22 @@ export default function AgentDashboard() {
                         <Calendar className="w-5 h-5 text-blue-500" /> Mon Agenda
                     </h3>
                     <div className="space-y-4">
-                        {missions?.myMissions?.length === 0 ? (
-                            <p className="text-sm text-slate-500 italic">Agenda vide. Acceptez une mission !</p>
+                        {(!missions?.myMissions || missions.myMissions.length === 0) ? (
+                            <p className="text-sm text-slate-500 italic">Agenda vide.</p>
                         ) : (
-                            missions?.myMissions?.map((m: any) => (
+                            missions.myMissions.map((m: any) => (
                                 <div key={m.id} className="flex gap-4 items-start border-l-2 border-blue-500 pl-4 py-1">
                                     <div className="flex flex-col items-center min-w-[50px]">
-                                        <span className="text-xs font-bold text-slate-500 uppercase">{new Date(m.dateScheduled).toLocaleDateString('fr-FR', {month:'short'})}</span>
-                                        <span className="text-xl font-black text-white">{new Date(m.dateScheduled).getDate()}</span>
+                                        <span className="text-xs font-bold text-slate-500 uppercase">
+                                            {m.dateScheduled ? new Date(m.dateScheduled).toLocaleDateString('fr-FR', {month:'short'}) : '-'}
+                                        </span>
+                                        <span className="text-xl font-black text-white">
+                                            {m.dateScheduled ? new Date(m.dateScheduled).getDate() : '?'}
+                                        </span>
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-white line-clamp-1">{m.type.replace('_', ' ')}</p>
-                                        <p className="text-xs text-slate-400 line-clamp-1">{m.property.address}</p>
+                                        <p className="text-xs text-slate-400 line-clamp-1">{m.property?.address}</p>
                                         <span className="inline-block mt-1 text-[10px] bg-blue-500/10 text-blue-400 px-2 rounded border border-blue-500/20">
                                             {m.status}
                                         </span>
@@ -204,14 +228,14 @@ export default function AgentDashboard() {
                         <Link href="/dashboard/agent/leads" className="text-xs text-slate-500 hover:text-white transition">Voir tout</Link>
                     </div>
                     <div className="space-y-3">
-                        {data?.recentLeads?.length === 0 ? (
+                        {(!data?.recentLeads || data.recentLeads.length === 0) ? (
                             <p className="text-sm text-slate-500 italic">Aucun prospect récent.</p>
                         ) : (
-                            data?.recentLeads?.map((l: any) => (
+                            data.recentLeads.map((l: any) => (
                                 <div key={l.id} className="flex items-center justify-between p-3 bg-black/20 rounded-xl hover:bg-black/40 transition cursor-pointer">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300">
-                                            {l.name.charAt(0)}
+                                            {l.name ? l.name.charAt(0) : '?'}
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-white">{l.name}</p>

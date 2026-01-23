@@ -10,13 +10,28 @@ import {
   FileText, Settings, LogOut, Shield, 
   ScrollText, Hammer, LifeBuoy,
   ClipboardCheck, MapPin, ClipboardList, UserCheck,
-  ShieldCheck, Receipt, Briefcase, Landmark, Server, CalendarCheck
+  ShieldCheck, Receipt, Briefcase, Landmark, Server, CalendarCheck, CalendarDays, Building2,
+  MessageCircle,
+  Heart,
+  Compass,
+  Map as MapIcon, // ✅ CORRECTION : Import aliasé pour éviter le conflit
+  LucideIcon, 
+  Palmtree
 } from "lucide-react";
 
-// --- 1. DÉFINITION DYNAMIQUE DES MENUS ---
-const MENUS = {
+// 1. DÉFINITION DU TYPE
+type MenuItem = {
+  icon: LucideIcon;
+  label: string;
+  href: string;
+};
+
+// --- 2. DÉFINITION DYNAMIQUE DES MENUS ---
+const MENUS: Record<string, MenuItem[]> = {
   OWNER: [
     { icon: LayoutDashboard, label: "Vue d'ensemble", href: "/dashboard/owner" },
+    { icon: Building2, label: "Mon Agence", href: "/dashboard/owner/agency" },
+    { icon: CalendarDays, label: "Planning Global", href: "/dashboard/owner/akwaba/calendar" },
     { icon: Key, label: "Mes Propriétés", href: "/dashboard/owner/properties" },
     { icon: Users, label: "Mes Locataires", href: "/dashboard/owner/tenants" },
     { icon: UserCheck, label: "Candidatures", href: "/dashboard/owner/candidates" },
@@ -24,6 +39,7 @@ const MENUS = {
     { icon: ClipboardList, label: "États des lieux", href: "/dashboard/owner/inventory" },
     { icon: Hammer, label: "Maintenance", href: "/dashboard/owner/maintenance" },
     { icon: Wallet, label: "Mes Finances", href: "/dashboard/owner/finance" },
+    { icon: FileText, label: "Mon bilan", href: "/dashboard/owner/finance/tax" }
   ],
   TENANT: [
     { icon: LayoutDashboard, label: "Mon Espace", href: "/dashboard/tenant" },
@@ -35,26 +51,43 @@ const MENUS = {
     { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/agent" }, 
     { icon: MapPin, label: "Missions & Marché", href: "/dashboard/agent/visits" }, 
     { icon: ClipboardCheck, label: "Dossiers Locataires", href: "/dashboard/agent/files" }, 
-    { icon: Key, label: "Biens sous Gestion", href: "/dashboard/agent/properties" }
+    { icon: Key, label: "Biens sous Gestion", href: "/dashboard/agent/properties" },
+    { icon: Key, label: "Conciergerie", href: "/dashboard/agent/akwaba" },
   ],
-  ARTISAN: [ // ✅ AJOUT DU MENU MANQUANT
+  ARTISAN: [
     { icon: LayoutDashboard, label: "Mes Missions", href: "/dashboard/artisan" },
     { icon: CalendarCheck, label: "Planning", href: "/dashboard/artisan/schedule" },
     { icon: Wallet, label: "Facturation", href: "/dashboard/artisan/finance" },
     { icon: Settings, label: "Disponibilité", href: "/dashboard/artisan/profile" }
   ],
-  ADMIN: [
-    { icon: Server, label: "Command Center", href: "/dashboard/admin" }, 
-    { icon: Users, label: "Utilisateurs", href: "/dashboard/admin/users" }, 
-    { icon: Key, label: "Parc Immobilier", href: "/dashboard/admin/properties" },
-    { icon: Wallet, label: "Finances Globales", href: "/dashboard/admin/finance" },
-    { icon: Briefcase, label: "Agents Commerciaux", href: "/dashboard/admin/agents" }, 
-    { icon: Hammer, label: "Artisans", href: "/dashboard/admin/artisans" }, 
-    { icon: ShieldCheck, label: "KYC & Sécurité", href: "/dashboard/admin/kyc" },
-  ]
+  SUPER_ADMIN: [
+    { icon: Server, label: "Command Center", href: "/dashboard/superadmin" }, 
+    { icon: Users, label: "Utilisateurs", href: "/dashboard/superadmin/users" }, 
+    { icon: Key, label: "Parc Immobilier", href: "/dashboard/superadmin/properties" },
+    { icon: Wallet, label: "Finances Globales", href: "/dashboard/superadmin/finance" }, 
+    { icon: Briefcase, label: "Agents", href: "/dashboard/superadmin/agents" },
+    { icon: Hammer, label: "Artisans", href: "/dashboard/superadmin/artisans" }, 
+    { icon: ShieldCheck, label: "KYC & Sécurité", href: "/dashboard/superadmin/kyc" },
+    { icon: ScrollText, label: "Journal d'Audit", href: "/dashboard/superadmin/logs" },
+  ],
+  AGENCY_ADMIN: [
+    { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },
+    { icon: Users, label: "Mon Équipe", href: "/dashboard/agency/team" }, // Agents de l'agence
+    { icon: Building2, label: "Biens Gérés", href: "/dashboard/agency/properties" }, // Mandats de gestion
+    { icon: Palmtree, label: "Locations Saisonnières", href: "/dashboard/agency/listings" }, // Airbnb style
+    { icon: Wallet, label: "Portefeuille", href: "/dashboard/agency/wallet" },
+    { icon: Settings, label: "Paramètres Agence", href: "/dashboard/agency/settings" },
+  ],
+  GUEST: [
+    { icon: Compass, label: "Explorer", href: "/dashboard/guest" },
+    { icon: MapIcon, label: "Mes Voyages", href: "/dashboard/guest/trips" }, // ✅ CORRECTION : Utilisation de MapIcon
+    { icon: Heart, label: "Favoris", href: "/dashboard/guest/favorites" },
+    { icon: MessageCircle, label: "Messages", href: "/dashboard/guest/inbox" },
+    { icon: FileText, label: "Historique", href: "/dashboard/guest/history" },
+  ],
 };
 
-const COMMON_ITEMS = [
+const COMMON_ITEMS: MenuItem[] = [
   { icon: Settings, label: "Paramètres", href: "/dashboard/settings" },
   { icon: LifeBuoy, label: "Centre d'aide", href: "/dashboard/help" },
 ];
@@ -68,7 +101,6 @@ export function AppSidebar({ className }: { className?: string }) {
 
   useEffect(() => {
     try {
-        // On récupère l'objet stocké lors du login
         const storedUser = localStorage.getItem('immouser') || localStorage.getItem('user');
         if (storedUser) setUser(JSON.parse(storedUser));
     } catch(e) {
@@ -79,36 +111,31 @@ export function AppSidebar({ className }: { className?: string }) {
   }, []);
 
   const handleLogout = () => {
-    // Nettoyage complet
     localStorage.removeItem('token');
     localStorage.removeItem('immouser');
     localStorage.removeItem('user');
-    
-    // Cookie (au cas où le client l'aurait gardé)
     document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    
     setUser(null);
     router.push('/login');
   };
 
   const getRootPath = () => {
     if (!user) return "/login";
-    if (user.role === 'ADMIN') return "/dashboard/admin";
+    if (user.role === 'SUPER_ADMIN') return "/dashboard/superadmin";
     if (user.role === 'AGENT') return "/dashboard/agent";
     if (user.role === 'TENANT') return "/dashboard/tenant";
-    if (user.role === 'ARTISAN') return "/dashboard/artisan"; // ✅ Ajout
+    if (user.role === 'ARTISAN') return "/dashboard/artisan";
+    if (user.role === 'GUEST') return "/dashboard/guest";
     return "/dashboard/owner";
   };
 
   const currentMenuItems = useMemo(() => {
     if (!user || !user.role) return [];
-    
-    // ✅ SÉCURITÉ : Pas de fallback sur OWNER. Si rôle inconnu = menu vide.
     const roleMenu = MENUS[user.role as keyof typeof MENUS];
     return roleMenu || []; 
   }, [user]);
 
-  // --- RENDER (Identique à votre design, c'est très propre) ---
+  // --- RENDER ---
   return (
     <div className={cn("flex flex-col h-full bg-[#0B1120] text-white border-r border-slate-800 relative select-none", className)}>
       

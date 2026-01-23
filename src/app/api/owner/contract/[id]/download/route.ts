@@ -37,7 +37,7 @@ export async function GET(
     // Seul le locataire du bail, le propriétaire du bien ou un admin peut télécharger
     const isTenant = lease.tenantId === user.id;
     const isOwner = lease.property.ownerId === user.id;
-    const isAdmin = user.role === 'ADMIN';
+    const isAdmin = user.role === 'SUPER_ADMIN';
 
     if (!isTenant && !isOwner && !isAdmin) {
         return NextResponse.json({ error: "Accès interdit à ce document." }, { status: 403 });

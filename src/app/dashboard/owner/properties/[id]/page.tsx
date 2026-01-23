@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react"; // ❌ On retire 'use'
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { 
@@ -13,14 +13,19 @@ import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // ✅ Import Card ajouté
 
-// ✅ CORRECTION NEXT.JS 14 : On utilise params directement
+// Composants Métier
+import PublishAkwabaModal from "@/components/owner/PublishAkwabaModal"; // ✅ Import du Modal Akwaba
+
 export default function PropertyDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params; // Plus besoin de use()
+  const { id } = params;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -176,7 +181,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
-        {/* GALERIE */}
+        {/* GALERIE (GAUCHE) */}
         <div className="space-y-4">
           <div className="relative h-64 lg:h-[500px] w-full rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900 group">
              {property.images && property.images.length > 0 ? (
@@ -218,8 +223,10 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
           )}
         </div>
 
-        {/* INFOS */}
+        {/* INFOS (DROITE) */}
         <div className="flex flex-col gap-6">
+            
+            {/* 1. Description du bien */}
             <div className="bg-[#1E293B] p-8 rounded-3xl border border-slate-700/50 shadow-xl">
                 <h1 className="text-3xl font-black mb-2 leading-tight">{property.title}</h1>
                 <div className="flex items-center gap-2 text-slate-400 mb-8">
@@ -247,6 +254,34 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
                 </p>
             </div>
 
+            {/* ✅ 2. BLOC AKWABA : PASSERELLE COURTE DURÉE (NOUVEAU) */}
+            <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 shadow-xl overflow-hidden relative group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                <CardHeader>
+                    <CardTitle className="text-white text-sm uppercase tracking-wider font-black flex items-center gap-2">
+                        <span className="text-xl">🚀</span> Rentabilité Turbo
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 relative z-10">
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                        Votre bien est vide ? Transformez-le en location saisonnière (type Airbnb) sur 
+                        <strong className="text-emerald-400 ml-1">Akwaba</strong> et multipliez vos revenus.
+                    </p>
+                    
+                    {/* 👇 COMPOSANT MODAL D'ACTIVATION 👇 */}
+                    <PublishAkwabaModal 
+                        propertyId={property.id} 
+                        propertyTitle={property.title}
+                        suggestedPrice={property.price}
+                    />
+                    
+                    <p className="text-[10px] text-slate-600 text-center mt-2">
+                        * Une copie de ce bien sera créée dans l'espace "Séjours".
+                    </p>
+                </CardContent>
+            </Card>
+
+            {/* 3. Centre de Gestion */}
             <div className="bg-[#1E293B] p-8 rounded-3xl border border-slate-700/50 shadow-xl">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
                     <Settings className="w-6 h-6 text-[#F59E0B]" /> Centre de Gestion
@@ -288,7 +323,7 @@ export default function PropertyDetailPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {/* ... MODALE ET LIGHTBOX RESTENT IDENTIQUES ... */}
+      {/* ... MODALE D'ÉDITION ... */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-[#0f172a] border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">

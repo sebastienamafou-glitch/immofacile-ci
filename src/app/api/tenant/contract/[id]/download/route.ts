@@ -36,7 +36,7 @@ export async function GET(
     // Vérification des droits d'accès
     const isOwner = lease.property.owner.email === user.email;
     const isTenant = lease.tenant.email === user.email;
-    const isAdmin = user.role === 'ADMIN';
+    const isAdmin = user.role === 'SUPER_ADMIN';
 
     if (!isOwner && !isTenant && !isAdmin) {
         return NextResponse.json({ error: "Vous n'avez pas accès à ce contrat." }, { status: 403 });

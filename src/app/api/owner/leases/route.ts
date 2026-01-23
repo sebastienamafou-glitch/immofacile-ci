@@ -4,7 +4,9 @@ import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
 
-// GET : Lister les baux du propriétaire
+// ============================================================================
+// GET : Lister les baux du propriétaire (Corrigé et Trié)
+// ============================================================================
 export async function GET(request: Request) {
   try {
     // 1. SÉCURITÉ
@@ -14,13 +16,37 @@ export async function GET(request: Request) {
     const owner = await prisma.user.findUnique({ where: { email: userEmail } });
     if (!owner || owner.role !== "OWNER") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-    // 2. RÉCUPÉRATION
+    // 2. RÉCUPÉRATION AVEC TRI INTELLIGENT
     const leases = await prisma.lease.findMany({
-      where: { property: { ownerId: owner.id } },
-      orderBy: { createdAt: 'desc' },
+      where: { 
+          property: { ownerId: owner.id },
+          // Optionnel : Décommentez pour masquer complètement les dossiers annulés
+          // status: { not: 'CANCELLED' } 
+      },
+      orderBy: [
+          { isActive: 'desc' }, // 1. Les baux ACTIFS en priorité absolue
+          { status: 'asc' },    // 2. Ensuite les PENDING (En attente)
+          { createdAt: 'desc' } // 3. Enfin les plus récents
+      ],
       include: {
-        tenant: { select: { name: true, phone: true, email: true } },
-        property: { select: { title: true, commune: true } }
+        tenant: { 
+            select: { 
+                id: true, 
+                name: true, 
+                phone: true, 
+                email: true,
+                image: true // Pour afficher l'avatar si disponible
+            } 
+        },
+        property: { 
+            select: { 
+                id: true, 
+                title: true, 
+                commune: true,
+                address: true,
+                images: true
+            } 
+        }
       }
     });
 
@@ -32,7 +58,9 @@ export async function GET(request: Request) {
   }
 }
 
-// POST : Créer un nouveau bail
+// ============================================================================
+// POST : Créer un nouveau bail (Avec protection Anti-Confusion)
+// ============================================================================
 export async function POST(request: Request) {
   try {
     // 1. SÉCURITÉ
@@ -70,10 +98,10 @@ export async function POST(request: Request) {
         where: { email: body.tenantEmail }
     });
 
-    // 🛡️ SÉCURITÉ AJOUTÉE : Vérification du conflit de rôle
-    if (tenant && tenant.role !== "TENANT") {
+    // 🛡️ SÉCURITÉ CRITIQUE : Empêche d'ajouter un autre Propriétaire comme Locataire
+    if (tenant && tenant.role !== "TENANT" && tenant.role !== "GUEST") {
         return NextResponse.json({ 
-            error: "Cet email est déjà utilisé par un compte Propriétaire ou Artisan. Impossible de l'assigner comme locataire." 
+            error: `Cet email correspond à un compte '${tenant.role}'. Impossible de l'assigner comme locataire.` 
         }, { status: 409 });
     }
 
@@ -91,7 +119,7 @@ export async function POST(request: Request) {
                 data: {
                     name: body.tenantName || "Locataire",
                     email: body.tenantEmail,
-                    phone: body.tenantPhone || undefined, // undefined permet d'éviter l'erreur unique sur NULL
+                    phone: body.tenantPhone || undefined,
                     password: hashedPassword,
                     role: "TENANT",
                     kycStatus: "PENDING"
@@ -106,13 +134,25 @@ export async function POST(request: Request) {
     }
 
     // 5. CRÉATION DU BAIL
+    // On vérifie s'il n'y a pas déjà un bail actif pour ce bien
+    const existingActiveLease = await prisma.lease.findFirst({
+        where: { 
+            propertyId: property.id,
+            isActive: true
+        }
+    });
+
+    if (existingActiveLease) {
+         return NextResponse.json({ error: "Ce bien a déjà un locataire actif." }, { status: 409 });
+    }
+
     const newLease = await prisma.lease.create({
         data: {
             startDate: new Date(body.startDate),
             monthlyRent: rent,
             depositAmount: deposit,
             status: "PENDING",    // En attente de signature
-            isActive: false,      // Inactif par défaut
+            isActive: false,      // Inactif tant que pas signé/payé
             signatureStatus: "PENDING",
             tenant: { connect: { id: tenant.id } },
             property: { connect: { id: property.id } }
@@ -123,7 +163,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
         success: true,
         lease: newLease,
-        // On renvoie les identifiants UNIQUEMENT si c'est un nouveau compte
         credentials: isNewUser ? { email: body.tenantEmail, password: tempPassword } : null
     });
 

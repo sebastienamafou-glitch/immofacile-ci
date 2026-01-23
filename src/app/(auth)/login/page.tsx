@@ -63,24 +63,42 @@ function LoginForm() {
 
         // 3. REDIRECTION INTELLIGENTE (CORRIGÉE ✅)
         setTimeout(() => {
+            // On récupère l'URL de retour si elle existe (ex: venant d'une réservation)
+            const callbackUrl = searchParams.get('callbackUrl');
+
             switch (data.user.role) {
-                case 'ADMIN':
-                    router.push('/dashboard/admin');
-                    break;
-                case 'OWNER':
-                    router.push('/dashboard/owner');
-                    break;
-                case 'AGENT':  // 👈 AJOUTÉ
-                    router.push('/dashboard/agent');
-                    break;
-                case 'ARTISAN': // 👈 AJOUTÉ
-                    router.push('/dashboard/artisan');
-                    break;
-                case 'TENANT':
-                default:
-                    router.push('/dashboard/tenant');
-                    break;
-            }
+    case 'SUPER_ADMIN':
+        router.push(callbackUrl || '/dashboard/superadmin');
+        break;
+    
+    // 👇 LE CAS MANQUANT QUI PROVOQUAIT L'ERREUR
+    case 'AGENCY_ADMIN':
+        router.push(callbackUrl || '/dashboard/agency');
+        break;
+
+    case 'OWNER':
+        router.push(callbackUrl || '/dashboard/owner');
+        break;
+    case 'AGENT':
+        router.push(callbackUrl || '/dashboard/agent');
+        break;
+    case 'ARTISAN':
+        router.push(callbackUrl || '/dashboard/artisan');
+        break;
+    case 'GUEST':
+        router.push(callbackUrl || '/dashboard/guest');
+        break;
+    
+    // 👇 Seulement les vrais locataires vont ici
+    case 'TENANT':
+        router.push(callbackUrl || '/dashboard/tenant');
+        break;
+
+    // 👇 Par sécurité, le "default" doit aller vers le Dispatcher global
+    default:
+        router.push(callbackUrl || '/dashboard');
+        break;
+}
         }, 800);
       }
     } catch (error: any) {
@@ -172,7 +190,11 @@ function LoginForm() {
             <div className="mt-8 text-center pt-6 border-t border-white/5">
                 <p className="text-slate-400 text-sm">
                     Pas encore de compte ? <br/>
-                    <Link href="/signup" className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group">
+                    {/* On transmet le callbackUrl vers signup si on change d'avis */}
+                    <Link 
+                        href={`/signup${searchParams.get('callbackUrl') ? '?callbackUrl=' + searchParams.get('callbackUrl') : ''}`}
+                        className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group"
+                    >
                         Créer un compte maintenant <ShieldCheck className="w-3 h-3 group-hover:text-orange-500" />
                     </Link>
                 </p>

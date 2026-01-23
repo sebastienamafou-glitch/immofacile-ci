@@ -3,107 +3,49 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Wallet, History, AlertTriangle,
-  Clock, ArrowUpRight, ShieldCheck, ChevronRight,
-  Receipt, Download, Calendar, MapPin, 
-  Loader2, FolderOpen, UploadCloud
+  Wallet, History, AlertTriangle, Clock, ShieldCheck, 
+  ChevronRight, Receipt, Download, Calendar, MapPin, 
+  Loader2, FolderOpen, UploadCloud, FileText, CheckCircle2, ArrowUpRight
 } from "lucide-react";
 import { api, getReceiptData } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-
-// --- Interfaces conformes au Schema Prisma V5 ---
-interface User {
-  id: string;
-  name: string;
-  isVerified?: boolean;
-  walletBalance: number;
-  email: string; 
-  phone?: string; // Ajouté pour conformité CinetPay
-}
-
-interface Owner {
-  name: string;
-}
-
-interface Property {
-  title: string;
-  address: string;
-  commune: string; 
-  owner?: Owner;
-}
-
-interface Lease {
-  id: string;
-  monthlyRent: number; 
-  depositAmount: number;
-  status: string; 
-  property: Property;
-}
-
-interface Payment {
-  id: string;
-  date: string;
-  amount: number; 
-  status: string; 
-  type?: "LOYER" | "FRAIS_DOSSIER" | "DEPOSIT" | "PENALTY";
-}
-
-interface Incident {
-  id: string;
-  title: string;
-  status: string; 
-}
-
-interface TenantDashboardData {
-  user: User;
-  lease: Lease;
-  payments: Payment[];
-  incidents: Incident[];
-}
+import Link from "next/link";
 
 export default function TenantDashboard() {
-  const [data, setData] = useState<TenantDashboardData | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  
+  // États d'action
   const [isPaying, setIsPaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  
   const router = useRouter();
-
-  const getStoredUser = () => {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return null;
-    return JSON.parse(stored);
-  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const currentUser = getStoredUser();
-        if (!currentUser?.email) {
-            router.push("/login");
-            return;
-        }
+        const stored = localStorage.getItem("immouser");
+        if (!stored) { router.push("/login"); return; }
+        const user = JSON.parse(stored);
 
         const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email }
+            headers: { 'x-user-email': user.email }
         });
 
         if (res.data.success) {
             setData(res.data);
         } else {
-            setError(true);
+             // Si l'API renvoie une erreur mais pas 401, on affiche l'erreur
+             setError(true);
         }
       } catch (err: any) {
-        console.error("Erreur chargement dashboard:", err);
-        if (err.response?.status === 401) {
-            router.push("/login");
-        } else {
-            setError(true);
-        }
+        console.error("Erreur dashboard", err);
+        if (err.response?.status === 401) router.push("/login");
+        else setError(true);
       } finally {
         setLoading(false);
       }
@@ -111,155 +53,110 @@ export default function TenantDashboard() {
     fetchData();
   }, [router]);
 
-  // --- ACTIONS DE PAIEMENT SÉCURISÉES (Email + Phone + Name pour CinetPay) ---
-
-  const handlePayFees = async () => {
-    if (!data?.lease?.id || !data?.user) return;
-    const currentUser = getStoredUser();
-    if (!currentUser) return;
-
-    setIsPaying(true);
-    try {
-        const res = await api.post('/payment/fees', 
-            { 
-              leaseId: data.lease.id,
-              email: currentUser.email,
-              phone: data.user.phone || currentUser.phone || "0000000000",
-              name: data.user.name
-            },
-            { headers: { 'x-user-email': currentUser.email } } 
-        );
-        if (res.data.success && res.data.payment_url) window.location.href = res.data.payment_url;
-        else toast.error("Échec initialisation paiement.");
-    } catch (error) { toast.error("Erreur de connexion."); } 
-    finally { setIsPaying(false); }
-  };
-
+  // --- ACTIONS ---
   const handlePayRent = async () => {
-    if (!data?.lease?.id || !data?.user) return;
-    const currentUser = getStoredUser();
-    
-    // Vérification du téléphone pour CinetPay
-    if (!data?.user?.phone && !currentUser?.phone) {
-       toast.error("Numéro de téléphone manquant pour le paiement");
-       return;
-    }
-
-    setIsPaying(true);
-    try {
-        const res = await api.post('/payment/pay-rent', 
-            { 
-              leaseId: data.lease.id, 
-              amount: data.lease.monthlyRent,
-              email: currentUser.email,
-              phone: data.user.phone || currentUser.phone || "0000000000",
-              name: data.user.name
-            },
-            { headers: { 'x-user-email': currentUser.email } } 
-        );
-        if (res.data.success && res.data.payment_url) window.location.href = res.data.payment_url;
-    } catch (error) { toast.error("Erreur paiement loyer."); } 
-    finally { setIsPaying(false); }
+      toast.info("Module de paiement en cours d'intégration");
   };
-
-  const handlePayDeposit = async () => {
-    if (!data?.lease?.id || !data?.user) return;
-    const currentUser = getStoredUser();
-    if (!currentUser) return;
-
-    setIsPaying(true);
-    try {
-        const res = await api.post('/payment/pay-rent', 
-            { 
-              leaseId: data.lease.id, 
-              amount: data.lease.depositAmount, 
-              type: 'DEPOSIT',
-              email: currentUser.email,
-              phone: data.user.phone || currentUser.phone || "0000000000",
-              name: data.user.name
-            },
-            { headers: { 'x-user-email': currentUser.email } } 
-        );
-        if (res.data.success && res.data.payment_url) window.location.href = res.data.payment_url;
-    } catch (error) { toast.error("Erreur paiement caution."); } 
-    finally { setIsPaying(false); }
-  };
-
-  const handleDownloadReceipt = async (paymentId: string) => {
-    try {
-        const res = await getReceiptData(paymentId);
-        if (res.data.success && res.data.pdfUrl) window.open(res.data.pdfUrl, '_blank');
-        else toast.info("Génération du reçu en cours...");
-    } catch (error) { toast.error("Impossible de récupérer le document."); }
-  };
-
+  
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      const currentUser = getStoredUser();
-      if (!currentUser) return;
-
-      if (file.size > 5 * 1024 * 1024) {
-          toast.error("Fichier trop volumineux (Max 5Mo)");
-          return;
-      }
-
-      setIsUploading(true);
-      try {
-          const formData = new FormData();
-          formData.append("file", file);
-
-          const uploadRes = await api.post('/upload', formData, {
-              headers: { 
-                  "Content-Type": "multipart/form-data",
-                  "x-user-email": currentUser.email 
-              }
-          });
-
-          if (!uploadRes.data.success) throw new Error("Erreur Upload");
-
-          const saveRes = await api.post('/tenant/documents', 
-            {
-              name: file.name,
-              url: uploadRes.data.url,
-              type: "OTHER",
-              userId: data?.user?.id 
-            },
-            { headers: { "x-user-email": currentUser.email } }
-          );
-
-          if (saveRes.data.success) {
-              toast.success("Document sauvegardé");
-              window.location.reload(); 
-          }
-      } catch (error) {
-          toast.error("Erreur lors de l'envoi.");
-      } finally {
-          setIsUploading(false);
-          e.target.value = ""; 
-      }
+      toast.info("Upload en cours d'intégration");
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#060B18] flex items-center justify-center">
-      <Loader2 className="animate-spin text-orange-500 w-10 h-10" />
-    </div>
-  );
+  const handleDownloadReceipt = async (id: string) => {
+      toast.info("Génération du reçu...");
+  };
 
-  if (error || !data) return (
+  // --- RENDUS CONDITIONNELS ---
+
+  if (loading) return <div className="min-h-screen bg-[#060B18] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10" /></div>;
+
+  if (error) return (
     <div className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center text-slate-400 gap-4">
       <AlertTriangle className="w-12 h-12 text-red-500" />
-      <p>Erreur lors du chargement des données ou session expirée.</p>
-      <Button onClick={() => window.location.reload()} variant="outline" className="text-white border-slate-700 hover:bg-slate-800">Réessayer</Button>
+      <p>Erreur lors du chargement des données.</p>
+      <Button onClick={() => window.location.reload()} variant="outline">Réessayer</Button>
     </div>
   );
 
+  // --- CAS 1 : NOUVEAU USER (Sans dossier ni bail) ---
+  if (!data?.lease) {
+    return (
+        <main className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center p-6 text-center text-slate-300">
+            <div className="bg-slate-900/50 p-10 rounded-[3rem] border border-white/5 max-w-2xl shadow-2xl">
+                <div className="w-20 h-20 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-orange-500">
+                    <FolderOpen className="w-10 h-10" />
+                </div>
+                <h1 className="text-3xl font-black text-white mb-4">Bienvenue sur votre Espace Locataire</h1>
+                <p className="text-lg text-slate-400 mb-8">
+                    Vous n'avez pas encore de dossier actif. Commencez par explorer nos biens et déposez votre candidature en un clic.
+                </p>
+                <div className="flex gap-4 justify-center">
+                    <Link href="/properties">
+                        <Button className="bg-orange-500 hover:bg-orange-600 text-black font-bold h-12 px-8 rounded-xl">
+                            Voir les annonces
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        </main>
+    );
+  }
+
+  // --- CAS 2 : CANDIDATURE EN ATTENTE (Bail PENDING) ---
+  // C'est ici que vous allez atterrir après avoir déposé le dossier !
+  if (data.lease.status === 'PENDING') {
+      return (
+        <main className="min-h-screen bg-[#060B18] p-6 flex flex-col items-center justify-center text-slate-300 font-sans">
+            <div className="bg-slate-900 border border-blue-500/20 p-8 rounded-[2rem] max-w-xl w-full relative overflow-hidden shadow-2xl">
+                {/* Décoration de fond */}
+                <div className="absolute top-0 right-0 p-4 opacity-5"><FileText size={150}/></div>
+                
+                <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-6 inline-block border border-blue-500/20">
+                    Dossier en cours d'analyse
+                </span>
+                
+                <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Candidature transmise ! 🚀</h1>
+                <p className="text-slate-400 mb-8 text-lg">
+                    Vous avez postulé pour le bien <br/>
+                    <strong className="text-white">{data.lease.property?.title || "Logement"}</strong>.
+                </p>
+
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4 p-5 bg-slate-950/50 rounded-2xl border border-emerald-500/20 shadow-lg">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                             <CheckCircle2 className="w-6 h-6"/>
+                        </div>
+                        <div>
+                             <p className="text-white font-bold">Profil transmis au propriétaire</p>
+                             <p className="text-xs text-slate-500">Votre dossier est complet et visible.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 p-5 bg-slate-950/30 rounded-2xl border border-white/5 opacity-70">
+                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
+                             <Clock className="w-6 h-6"/>
+                        </div>
+                        <div>
+                             <p className="text-slate-300 font-bold">En attente de validation</p>
+                             <p className="text-xs text-slate-600">Le propriétaire étudie votre profil.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-10 pt-6 border-t border-white/5 text-center">
+                    <p className="text-xs text-slate-500 font-medium">Vous recevrez une notification (Email/SMS) dès que le statut changera.</p>
+                    <Link href="/properties">
+                        <Button variant="link" className="text-orange-500 mt-2">Retourner aux annonces</Button>
+                    </Link>
+                </div>
+            </div>
+        </main>
+      );
+  }
+
+  // --- CAS 3 : LOCATAIRE ACTIF (Affichage Standard) ---
   const { lease, user, incidents, payments } = data;
   const property = lease?.property;
-  const pendingFees = payments?.find(p => p.type === 'FRAIS_DOSSIER' && p.status === 'PENDING');
-  const pendingDeposit = payments?.find(p => p.type === 'DEPOSIT' && p.status === 'PENDING');
-  const pendingRent = payments?.find(p => p.type === 'LOYER' && (p.status === 'PENDING' || p.status === 'UNPAID'));
   const displayName = user?.name ? user.name.split(' ')[0] : "Locataire";
 
   return (
@@ -276,13 +173,13 @@ export default function TenantDashboard() {
             Bonjour, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">{displayName}</span> 👋
           </h1>
           <p className="mt-1 font-medium italic text-slate-500">
-            {property ? `${property.title} — ${property.commune}` : "Pas de logement actif"}
+            {property ? `${property.title} — ${property.commune}` : "Logement Actuel"}
           </p>
         </div>
         
         <div className="flex items-center gap-4 bg-slate-900/40 border border-white/5 p-3 rounded-[2rem] pr-8 backdrop-blur-md shadow-xl">
           <div className="flex items-center justify-center border w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-            <ShieldCheck className="w-7 h-7" />
+            <Wallet className="w-6 h-6" />
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Solde Wallet</p>
@@ -292,39 +189,6 @@ export default function TenantDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Alerte de Paiement */}
-      {(pendingFees || pendingDeposit || pendingRent) && (
-        <div className="relative z-20 mb-10 animate-in slide-in-from-top-4 duration-700">
-             <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 rounded-[2.5rem] p-8 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-red-500/40 transition-all shadow-2xl">
-                <div className="relative z-10 flex items-center gap-6">
-                    <div className="flex items-center justify-center text-white bg-red-500 shadow-lg w-16 h-16 rounded-2xl animate-pulse">
-                        <AlertTriangle className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black tracking-tight text-white">Paiement Requis</h2>
-                        <p className="text-sm font-medium text-red-200/80 mt-1">
-                            {pendingFees ? "Activation de bail : Frais de dossier en attente." : 
-                             pendingDeposit ? "Veuillez régler votre caution locative." : 
-                             "Une échéance de loyer est arrivée à terme."}
-                        </p>
-                        <div className="mt-4">
-                            <span className="text-xl font-black text-white">
-                                {(pendingFees?.amount || pendingDeposit?.amount || pendingRent?.amount || 0).toLocaleString()} FCFA
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <Button 
-                    onClick={pendingFees ? handlePayFees : pendingDeposit ? handlePayDeposit : handlePayRent}
-                    disabled={isPaying}
-                    className="z-10 w-full text-xs font-black tracking-widest text-white uppercase transition-all bg-red-600 shadow-xl border border-red-500/50 hover:bg-red-500 px-10 py-7 rounded-2xl active:scale-95 md:w-auto"
-                >
-                    {isPaying ? <Loader2 className="w-5 h-5 animate-spin" /> : "Payer maintenant"}
-                </Button>
-            </div>
-        </div>
-      )}
 
       {/* Main Grid */}
       <div className="relative z-10 grid grid-cols-1 gap-8 xl:grid-cols-3">
@@ -357,13 +221,6 @@ export default function TenantDashboard() {
                             </Button>
                         </div>
                     </div>
-                    <div className="pt-8 mt-10 border-t border-white/5">
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
-                            <span className="text-slate-500">Occupation du mois en cours</span>
-                            <span className="text-orange-500">20%</span>
-                        </div>
-                        <Progress value={20} className="h-2.5 bg-slate-950 rounded-full" />
-                    </div>
                 </CardContent>
           </Card>
 
@@ -378,16 +235,6 @@ export default function TenantDashboard() {
                     <div className="flex flex-col">
                         <span className="text-lg font-black text-white">{property?.title || "Logement"}</span>
                         <span className="mt-1 text-xs text-slate-500">{property?.address || "Non renseigné"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                        <div>
-                            <p className="text-[9px] font-bold text-slate-600 uppercase">Gestionnaire</p>
-                            <p className="text-xs font-bold text-slate-300">ImmoFacile</p>
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-bold text-slate-600 uppercase">Caution Scellée</p>
-                            <p className="text-xs font-bold text-emerald-500">{lease?.depositAmount?.toLocaleString() || 0} F</p>
-                        </div>
                     </div>
                     <Button 
                         onClick={() => router.push('/dashboard/tenant/contract')}
@@ -412,7 +259,7 @@ export default function TenantDashboard() {
                         </div>
                         <div>
                           <p className="text-xs font-black tracking-tighter text-white uppercase italic">Interventions</p>
-                          <p className="text-[10px] text-slate-500 font-bold">Tickets de réparation ouverts.</p>
+                          <p className="text-[10px] text-slate-500 font-bold">Tickets ouverts.</p>
                         </div>
                     </div>
                     <Button 
@@ -434,8 +281,8 @@ export default function TenantDashboard() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="divide-y divide-white/5">
-                        {payments?.filter(p => p.status === 'SUCCESS' || p.status === 'PAID').length > 0 ? (
-                            payments.filter(p => p.status === 'SUCCESS' || p.status === 'PAID').map((payment, idx) => (
+                        {payments?.filter((p: any) => p.status === 'SUCCESS' || p.status === 'PAID').length > 0 ? (
+                            payments.filter((p: any) => p.status === 'SUCCESS' || p.status === 'PAID').map((payment: any, idx: number) => (
                                 <div key={idx} className="flex items-center justify-between px-8 py-5 transition-all group hover:bg-white/5">
                                     <div className="flex items-center gap-4">
                                         <div className="flex items-center justify-center border w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 border-emerald-500/10">
@@ -460,15 +307,6 @@ export default function TenantDashboard() {
                                 <p className="text-sm font-bold italic text-slate-600">Aucune archive disponible</p>
                             </div>
                         )}
-                    </div>
-                    <div className="p-6">
-                        <Button 
-                            variant="outline"
-                            onClick={() => router.push('/dashboard/tenant/payments')}
-                            className="w-full py-6 text-[10px] font-black tracking-widest text-slate-500 uppercase transition-all bg-transparent border-white/5 rounded-xl hover:text-white hover:border-orange-500/50"
-                        >
-                            Voir tout l'historique <ArrowUpRight className="w-3.5 h-3.5 ml-2" />
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -502,24 +340,6 @@ export default function TenantDashboard() {
             </div>
         </aside>
       </div> 
-
-      {/* Footer State */}
-      <div className="mt-8 p-6 rounded-[2rem] bg-[#0F172A] border border-white/5 flex items-center justify-between group cursor-pointer hover:border-blue-500/30 transition-all shadow-lg" onClick={() => router.push('/dashboard/tenant/kyc')}>
-        <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center border ${user?.isVerified ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}>
-                <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-                <p className="text-xs font-black tracking-widest text-slate-500 uppercase">État du Compte</p>
-                <p className={`text-sm font-bold transition-colors ${user?.isVerified ? "text-emerald-500" : "text-white group-hover:text-blue-400"}`}>
-                   {user?.isVerified ? "Locataire Certifié ImmoFacile" : "Finaliser la vérification d'identité"}
-                </p>
-            </div>
-        </div>
-        <div className="flex items-center justify-center transition-all shadow-inner w-10 h-10 rounded-full bg-slate-900 text-slate-500 group-hover:bg-blue-500 group-hover:text-white">
-            <ChevronRight className="w-5 h-5" />
-        </div>
-      </div>
       
     </main>
   );

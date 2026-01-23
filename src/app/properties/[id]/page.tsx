@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react"; // ❌ "use" retiré ici
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/lib/api";
@@ -8,13 +8,16 @@ import Swal from "sweetalert2";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  MapPin, CheckCircle, Share2, ArrowLeft, Heart, Loader2, 
+  MapPin, CheckCircle, Share2, ArrowLeft, Loader2, 
   BedDouble, Bath, Square, ShieldCheck, Home
 } from "lucide-react";
 
-export default function PublicPropertyPage({ params }: { params: Promise<{ id: string }> }) {
-  // Hook 'use' pour compatibilité Next.js 15+
-  const { id } = use(params);
+// ✅ CORRECTION MAJEURE : params n'est pas une Promise ici
+export default function PublicPropertyPage({ params }: { params: { id: string } }) {
+  
+  // ✅ CORRECTION : On récupère l'ID directement
+  const { id } = params;
+  
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
@@ -47,7 +50,7 @@ export default function PublicPropertyPage({ params }: { params: Promise<{ id: s
     if (id) fetchProperty();
   }, [id]);
 
-  // 2. Logique du bouton "Déposer mon dossier" (Version Robuste)
+  // 2. Logique du bouton "Déposer mon dossier"
   const handleApply = async () => {
     // A. Si pas connecté -> Login/Signup
     if (!currentUser) {

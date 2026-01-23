@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : Auth Headers
+    // 1. SÉCURITÉ
     const userEmail = request.headers.get("x-user-email");
     if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION DES DONNÉES (Correction Prisma select/include)
+    // 2. RÉCUPÉRATION HYBRIDE (ImmoFacile + Akwaba)
     const owner = await prisma.user.findUnique({
       where: { email: userEmail },
       select: {
@@ -19,24 +19,30 @@ export async function GET(request: Request) {
         role: true,
         walletBalance: true,
         
-        // ✅ CORRECTION : On utilise 'select' ici, pas 'include'
+        // A. LONGUE DURÉE (Properties)
         propertiesOwned: { 
           select: {
-            id: true,       // Obligatoire de lister les champs qu'on veut
+            id: true,
             title: true,
             address: true,
             isPublished: true,
-            // Relations imbriquées
+            
+            // 👇 AJOUT DES CHAMPS MANQUANTS POUR LA GRILLE 👇
+            price: true,        // CORRECTION DE L'ERREUR
+            commune: true,
+            images: true,
+            bedrooms: true,
+            bathrooms: true,
+            surface: true,
+            type: true,
+            // 👆 FIN DES AJOUTS 👆
+
             leases: {
               where: { isActive: true }, 
               select: {
                 monthlyRent: true,
                 isActive: true,
-                status: true,
-                startDate: true,
-                tenant: {
-                  select: { name: true }
-                }
+                tenant: { select: { name: true, phone: true } }
               }
             },
             incidents: {
@@ -45,6 +51,33 @@ export async function GET(request: Request) {
           }
         },
 
+        // B. COURTE DURÉE (Listings Akwaba)
+        listings: {
+            select: {
+                id: true,
+                title: true,
+                pricePerNight: true,
+                isPublished: true,
+                images: true,
+                bookings: {
+                    where: { 
+                        status: { in: ['PAID', 'CONFIRMED'] },
+                        startDate: { gte: new Date() }
+                    },
+                    orderBy: { startDate: 'asc' },
+                    take: 5,
+                    select: {
+                        id: true,
+                        startDate: true,
+                        endDate: true,
+                        guest: { select: { name: true, phone: true } },
+                        status: true
+                    }
+                }
+            }
+        },
+
+        // C. TRANSACTIONS RÉCENTES
         transactions: {
           take: 5,
           orderBy: { createdAt: 'desc' },
@@ -59,83 +92,62 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. VÉRIFICATION STRICTE DU RÔLE
     if (!owner || owner.role !== "OWNER") {
-      return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
+      return NextResponse.json({ error: "Accès réservé." }, { status: 403 });
     }
 
-    // --- LOGIQUE MÉTIER ---
+    // --- 3. CALCULS UNIFIÉS (KPIs) ---
 
-    const myProperties = owner.propertiesOwned || []; 
-    const totalProperties = myProperties.length;
+    const myProperties = owner.propertiesOwned || [];
+    const myListings = owner.listings || [];
 
-    // A. Calcul Revenus Mensuels (Basé sur les baux actifs)
+    // Calculs inchangés...
     const monthlyIncome = myProperties.reduce((total, property) => {
-      const propertyIncome = property.leases.reduce((sum, lease) => {
-          return lease.isActive ? sum + lease.monthlyRent : sum;
-      }, 0);
-      return total + propertyIncome;
+      const propertyRent = property.leases.reduce((sum, lease) => sum + lease.monthlyRent, 0);
+      return total + propertyRent;
     }, 0);
 
-    // B. Taux d'occupation
-    const occupiedCount = myProperties.filter(property =>
-      property.leases.some(lease => lease.isActive)
-    ).length;
-
-    const occupancyRate = totalProperties > 0 
-      ? Math.round((occupiedCount / totalProperties) * 100) 
+    const occupiedCount = myProperties.filter(p => p.leases.length > 0).length;
+    const occupancyRate = myProperties.length > 0 
+      ? Math.round((occupiedCount / myProperties.length) * 100) 
       : 0;
 
-    // C. Incidents Actifs
     const activeIncidentsCount = myProperties.reduce((total, property) => {
-        const activePropIncidents = property.incidents.filter(
-            (i) => ['OPEN', 'IN_PROGRESS', 'QUOTATION'].includes(i.status)
-        ).length;
-        return total + activePropIncidents;
+        return total + property.incidents.filter(i => ['OPEN', 'IN_PROGRESS'].includes(i.status)).length;
     }, 0);
 
-    // D. Mapping Transactions
-    const formattedTransactions = owner.transactions.map((t) => ({
-        id: t.id,
-        amount: t.amount,
-        type: t.type,
-        status: 'COMPLETED',
-        date: t.createdAt,
-        reason: t.reason
+    // --- 4. FORMATAGE POUR LE FRONTEND ---
+    
+    // On formate les propriétés pour ajouter 'isAvailable' requis par PropertiesGrid
+    const formattedProperties = myProperties.map(p => ({
+        ...p,
+        isAvailable: p.leases.length === 0
     }));
 
-    // E. Mapping Propriétés
-    const formattedProperties = myProperties.map((p) => ({
-        id: p.id,
-        title: p.title,
-        address: p.address,
-        isPublished: p.isPublished,
-        isRented: p.leases.some((l) => l.isActive)
-    }));
+    const allUpcomingBookings = myListings.flatMap(l => 
+        l.bookings.map(b => ({ ...b, listing: { title: l.title } }))
+    ).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
     return NextResponse.json({
       success: true,
       user: {
-        id: owner.id,
         name: owner.name,
-        email: owner.email,
-        role: owner.role,
-        walletBalance: owner.walletBalance || 0,
+        walletBalance: owner.walletBalance,
       },
       stats: {
-        totalProperties,
+        totalProperties: myProperties.length + myListings.length,
         occupancyRate,
         monthlyIncome,
         activeIncidentsCount,
-        walletBalance: owner.walletBalance || 0
       },
-      properties: formattedProperties,
-      recentTransactions: formattedTransactions,
+      properties: formattedProperties, // ✅ On envoie la version formatée avec isAvailable
+      listings: myListings,
+      bookings: allUpcomingBookings,
       artisans: []
     });
 
   } catch (error) {
-    console.error("Erreur Dashboard Owner:", error);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+    console.error("Dashboard API Error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
