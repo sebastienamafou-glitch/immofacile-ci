@@ -19,12 +19,13 @@ export default async function DashboardDispatcher() {
   // AIGUILLAGE
   switch (user.role) {
     case "SUPER_ADMIN": return redirect("/dashboard/superadmin");
-    case "AGENCY_ADMIN": return redirect("/dashboard/agency"); // 👈 Il vous enverra vers votre beau dashboard
+    case "AGENCY_ADMIN": return redirect("/dashboard/agency"); 
     case "AGENT": return redirect("/dashboard/agent");
     case "OWNER": return redirect("/dashboard/owner");
     case "TENANT": return redirect("/dashboard/tenant");
     case "ARTISAN": return redirect("/dashboard/artisan");
     case "GUEST": return redirect("/dashboard/guest");
+    case "INVESTOR": return redirect("/invest/dashboard"); 
     default: return redirect("/");
   }
 }

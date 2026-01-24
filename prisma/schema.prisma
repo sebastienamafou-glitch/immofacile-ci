@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // Ou "mysql" selon ta config
   url      = env("DATABASE_URL")
 }
 
@@ -15,7 +15,6 @@ datasource db {
 // 1. GESTION UTILISATEURS UNIFIÉE (IAM)
 // ==========================================
 
-// Le modèle User combine ImmoFacile (Métier) et NextAuth (Connexion Sociale)
 model User {
   id            String    @id @default(cuid())
   
@@ -23,7 +22,7 @@ model User {
   email         String?   @unique
   phone         String?   @unique
   name          String?
-  password      String?   // Haché (Supporte Login classique + NextAuth)
+  password      String?   // Haché
   image         String?   // Avatar
   
   // --- Sécurité & Verification ---
@@ -31,44 +30,49 @@ model User {
   phoneVerified DateTime?
   isVerified    Boolean   @default(false)
   kycStatus     VerificationStatus @default(PENDING)
-  kycDocuments  String[]  // URLs CNI/Passeport
+  kycDocuments  String[]  
   
   // --- Rôles & Métier ---
   role          Role      @default(GUEST)
   
   // Infos Profil (ImmoFacile)
+  jobTitle      String?   
   address       String?
-  jobTitle      String?   // Profession
   income        Int?      // Revenus mensuels
   paymentMethod String?   // WAVE, OM...
   paymentNumber String?   // 07xx...
-  isAvailable   Boolean   @default(false) // Pour les artisans/agents
+  isAvailable   Boolean   @default(false) 
 
   // --- Fintech / Wallet (ImmoFacile) ---
   walletBalance   Int     @default(0)
-  escrowBalance   Int     @default(0) // Caution bloquée
+  escrowBalance   Int     @default(0) 
   referralBalance Int     @default(0)
 
+  // --- Module Investisseur (CROWDFUNDING) ---
+  isBacker        Boolean @default(false)
+  backerTier      String? // "SUPPORTER", "AMBASSADEUR", "VISIONNAIRE"
+  
   // --- Relations (NextAuth) ---
   accounts      Account[]
   sessions      Session[]
 
-  // --- Relations Métier (Longue Durée - ImmoFacile) ---
+  // --- Relations Métier (Longue Durée) ---
   propertiesOwned    Property[]      @relation("PropertyOwner")
-  leases             Lease[]         // En tant que locataire
+  leases             Lease[]         
   missionsAccepted   Mission[]       @relation("AgentMissions")
   leads              Lead[]
   incidentsReported  Incident[]      @relation("IncidentReporter")
   incidentsAssigned  Incident[]      @relation("ArtisanIncidents")
   transactions       Transaction[]
-  signatureProofs    SignatureProof[]
+  
+  // ✅ CORRECTION CLEAN CODE : Séparation des responsabilités
+  signatureProofs    SignatureProof[] // Pour les Baux (Technique)
+  investmentContracts InvestmentContract[] // Pour les Investisseurs (Juridique)
 
-  // --- Relations Métier (Courte Durée - Akwaba) ---
-  listings           Listing[]       // Propriétés mises en location courte durée
-  bookings           Booking[]       // Voyages effectués en tant que Guest
-  reviews            Review[]        // Avis laissés
-
-  // ✅ AJOUTS GUEST :
+  // --- Relations Métier (Courte Durée) ---
+  listings           Listing[]       
+  bookings           Booking[]       
+  reviews            Review[]        
   wishlists          Wishlist[]
   sentMessages       Message[]
   conversationsAsGuest Conversation[] @relation("GuestConversations")
@@ -79,34 +83,35 @@ model User {
   agency             Agency?         @relation(fields: [agencyId], references: [id])
 
   lastMessageAt      DateTime        @default(now())
-
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
 
-// --- Modèle Agence (Ex-Tenant du fichier B) ---
-// Représente une structure pro (Agence Immobilière) qui utilise votre SaaS
+// ==========================================
+// 2. MODÈLE AGENCE (SaaS B2B)
+// ==========================================
+
 model Agency {
   id           String   @id @default(cuid())
   name         String   @unique
-  slug         String   @unique // sous-domaine (ex: orpi.immofacile.ci)
+  slug         String   @unique 
   logoUrl      String?
-  email        String?  // Email public de l'agence
-  phone        String?  // Standard téléphonique de l'agence
-  primaryColor String?  @default("#FF7900") // Orange CI par défaut
-  taxId        String?  // N° Compte Contribuable
-  isActive     Boolean  @default(false) // Validation par SuperAdmin requise
+  email        String?  
+  phone        String?
+  primaryColor String?  @default("#FF7900") 
+  taxId        String?
+  isActive     Boolean  @default(false) 
 
-  users        User[]   // Agents et Admins de cette agence
-  listings     Listing[] // Leurs annonces
-  properties   Property[] // Leur parc immobilier
+  users        User[]   
+  listings     Listing[] 
+  properties   Property[] 
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
 // ==========================================
-// 2. AUTHENTIFICATION TECHNIQUE (NextAuth)
+// 3. AUTHENTIFICATION TECHNIQUE (NextAuth)
 // ==========================================
 
 model Account {
@@ -145,7 +150,7 @@ model VerificationToken {
 }
 
 // ==========================================
-// 3. PATRIMOINE PHYSIQUE (Long Terme)
+// 4. PATRIMOINE PHYSIQUE (Long Terme)
 // ==========================================
 
 model Property {
@@ -154,7 +159,7 @@ model Property {
   description String?
   address     String
   commune     String
-  price       Int      // Loyer de référence (Mensuel)
+  price       Int      
   type        PropertyType
   bedrooms    Int
   bathrooms   Int
@@ -165,17 +170,14 @@ model Property {
   ownerId     String
   owner       User     @relation("PropertyOwner", fields: [ownerId], references: [id])
   
-  // Relations Gestion
   leases      Lease[]
   incidents   Incident[]
   missions    Mission[]
   inventories Inventory[]
 
-  // Relation avec l'Agence SaaS (Optionnel)
   agencyId    String?
   agency      Agency?  @relation(fields: [agencyId], references: [id])
 
-  // Lien vers le Court Terme (Si ce bien est aussi sur Airbnb)
   listings    Listing[] 
 
   createdAt   DateTime @default(now())
@@ -183,7 +185,7 @@ model Property {
 }
 
 // ==========================================
-// 4. GESTION LOCATIVE (Baux, États des lieux)
+// 5. GESTION LOCATIVE (Baux)
 // ==========================================
 
 model Lease {
@@ -195,7 +197,6 @@ model Lease {
   status          LeaseStatus     @default(PENDING)
   isActive        Boolean         @default(false)
   
-  // Légal
   contractUrl     String?
   documentHash    String?
   signatureStatus SignatureStatus @default(PENDING)
@@ -216,7 +217,7 @@ model Lease {
 model Inventory {
   id          String        @id @default(cuid())
   date        DateTime      @default(now())
-  type        MissionType   // ENTREE ou SORTIE
+  type        MissionType   
   notes       String?
   reportUrl   String?
   
@@ -224,16 +225,16 @@ model Inventory {
   lease       Lease         @relation(fields: [leaseId], references: [id])
   propertyId  String
   property    Property      @relation(fields: [propertyId], references: [id])
-  agentId     String?       // L'agent responsable
+  agentId     String?
   
   items       InventoryItem[]
 }
 
 model InventoryItem {
   id          String   @id @default(cuid())
-  roomName    String   // ex: "Cuisine"
-  element     String   // ex: "Mur"
-  condition   String   // ex: "Bon"
+  roomName    String   
+  element     String   
+  condition   String   
   comment     String?
   photos      String[]
   
@@ -241,31 +242,56 @@ model InventoryItem {
   inventory   Inventory @relation(fields: [inventoryId], references: [id])
 }
 
+// Preuves de signature pour les BAUX (Contexte Location)
 model SignatureProof {
   id        String   @id @default(cuid())
   ipAddress String
   signedAt  DateTime @default(now())
   userAgent String?
+  
+  signatureData String?  @db.Text
   otpToken  String?
   
+  // Liaison stricte avec le bail
   leaseId   String
   lease     Lease    @relation(fields: [leaseId], references: [id])
+
+  // Le signataire (Locataire ou Propriétaire)
   signerId  String
   signer    User     @relation(fields: [signerId], references: [id])
+  
+  documentType String   @default("LEASE")
+}
+
+// ✅ NOUVEAU : Preuves de signature pour les INVESTISSEURS (Contexte Crowdfunding)
+model InvestmentContract {
+  id            String   @id @default(cuid())
+  signedAt      DateTime @default(now())
+  
+  // Preuves techniques (Loi 2013-546)
+  ipAddress     String
+  userAgent     String?
+  signatureData String   @db.Text // L'image Base64
+  
+  // Liaison directe avec l'investisseur
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+
+  // Métadonnées du contrat figées à la signature
+  packName      String?  // "VISIONNAIRE", etc.
+  amount        Int      // Le montant engagé
 }
 
 // ==========================================
-// 5. RÉSERVATION COURT SÉJOUR (Airbnb-like)
+// 6. COURT SÉJOUR (Airbnb-like)
 // ==========================================
 
 model Listing {
   id             String   @id @default(cuid())
   title          String
   description    String   @db.Text
+  pricePerNight  Int      
   
-  pricePerNight  Int      // FCFA
-  
-  // Localisation précise (Maps)
   address        String
   city           String
   neighborhood   String?
@@ -277,26 +303,24 @@ model Listing {
   maxGuests      Int      @default(2)
   
   images         String[]
-  amenities      Json     // { wifi: true, pool: false ... }
-  accessVideoUrl String?  // Vidéo Youtube/S3 pour trouver les clés
+  amenities      Json     
+  accessVideoUrl String?
 
   isPublished    Boolean  @default(false)
 
-  // Relations
   hostId         String
   host           User     @relation(fields: [hostId], references: [id])
   
-  agencyId       String?  // Si géré par une agence SaaS
+  agencyId       String?
   agency         Agency?  @relation(fields: [agencyId], references: [id])
 
-  propertyId     String?  // Lien optionnel avec le bien physique (Long terme)
+  propertyId     String?
   property       Property? @relation(fields: [propertyId], references: [id])
   
   bookings       Booking[]
   reviews        Review[]
-
-  wishlists      Wishlist[]       // Qui a mis ce bien en favori ?
-  conversations  Conversation[]   // Discussions liées à ce bien
+  wishlists      Wishlist[]       
+  conversations  Conversation[]   
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -311,12 +335,10 @@ model Booking {
 
   guestId     String
   guest       User          @relation(fields: [guestId], references: [id])
-  
   listingId   String
   listing     Listing       @relation(fields: [listingId], references: [id])
 
   payment     BookingPayment?
-
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -325,31 +347,27 @@ model Review {
   id        String   @id @default(cuid())
   rating    Int
   comment   String?
-  
   listingId String
   listing   Listing  @relation(fields: [listingId], references: [id])
-  
   authorId  String
   author    User     @relation(fields: [authorId], references: [id])
-
   createdAt DateTime @default(now())
 }
 
 // ==========================================
-// 6. FINANCE & PAIEMENTS (Séparés)
+// 7. FINANCE & PAIEMENTS
 // ==========================================
 
-// A. Paiements Longue Durée (Loyers, Splits)
+// Paiements Loyers
 model Payment {
   id             String        @id @default(cuid())
   amount         Int          
   date           DateTime      @default(now())
   type           PaymentType
   status         PaymentStatus @default(PENDING)
-  method         String?       // WAVE, ORANGE_MONEY
-  reference      String?       // ID Transaction
+  method         String?       // WAVE, OM...
+  reference      String?
 
-  // Logique de Split
   amountOwner    Int           @default(0)
   amountPlatform Int           @default(0)
   amountAgent    Int           @default(0)
@@ -358,11 +376,11 @@ model Payment {
   lease          Lease         @relation(fields: [leaseId], references: [id])
 }
 
-// B. Paiements Courte Durée (Réservations)
+// Paiements Réservations
 model BookingPayment {
   id               String          @id @default(cuid())
   amount           Int
-  provider         PaymentProvider // Enum spécifique gateway
+  provider         PaymentProvider 
   transactionId    String          @unique
   status           String
   
@@ -375,19 +393,21 @@ model BookingPayment {
   createdAt        DateTime        @default(now())
 }
 
+// Transactions Génériques (Wallet / Crowdfunding)
 model Transaction {
   id          String   @id @default(cuid())
   amount      Int
-  type        String   // CREDIT / DEBIT
-  reason      String
-  createdAt   DateTime @default(now())
+  type        String   // "CREDIT" | "DEBIT"
+  reason      String   // Ex: "CROWDFUNDING_PACK_GOLD"
   
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
 }
 
 // ==========================================
-// 7. OPÉRATIONS & MAINTENANCE
+// 8. OPÉRATIONS & MAINTENANCE
 // ==========================================
 
 model Mission {
@@ -445,18 +465,62 @@ model Lead {
 }
 
 // ==========================================
+// 9. MESSAGERIE & COMMUNAUTÉ
+// ==========================================
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId]) 
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  
+  guestId   String
+  guest     User      @relation("GuestConversations", fields: [guestId], references: [id])
+  hostId    String
+  host      User      @relation("HostConversations", fields: [hostId], references: [id])
+  
+  listingId String?   
+  listing   Listing?  @relation(fields: [listingId], references: [id])
+
+  messages  Message[]
+  lastMessageAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  content        String       @db.Text
+  isRead         Boolean      @default(false)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  createdAt      DateTime     @default(now())
+}
+
+// ==========================================
 // ENUMS UNIFIÉS
 // ==========================================
 
 enum Role {
-  SUPER_ADMIN   // Vous
-  AGENCY_ADMIN  // Patron Agence SaaS
-  ADMIN         // Admin système ImmoFacile
-  OWNER         // Bailleur / Host
-  TENANT        // Locataire Longue Durée
-  GUEST         // Voyageur Courte Durée
-  AGENT         // Agent Immo
-  ARTISAN       // Prestataire
+  SUPER_ADMIN
+  AGENCY_ADMIN
+  ADMIN
+  OWNER
+  TENANT
+  GUEST
+  AGENT
+  ARTISAN
+  INVESTOR      // ✅ RÔLE INVESTISSEUR
 }
 
 enum VerificationStatus {
@@ -540,57 +604,4 @@ enum MissionType {
   ETAT_DES_LIEUX_ENTREE
   ETAT_DES_LIEUX_SORTIE
   PHOTOS
-}
-
-// ==========================================
-// 8. EXTENSIONS GUEST (Favoris & Messagerie)
-// ==========================================
-
-// ✅ Pour la page "Favoris"
-model Wishlist {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  listingId String
-  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([userId, listingId]) // Un utilisateur ne peut liker qu'une fois le même bien
-}
-
-// ✅ Pour la page "Messages" (Chat Hôte <-> Voyageur)
-model Conversation {
-  id        String    @id @default(cuid())
-  
-  guestId   String
-  guest     User      @relation("GuestConversations", fields: [guestId], references: [id])
-  
-  hostId    String
-  host      User      @relation("HostConversations", fields: [hostId], references: [id])
-  
-  listingId String?   // Optionnel : Lier la conversation à un bien spécifique
-  listing   Listing?  @relation(fields: [listingId], references: [id])
-
-  messages  Message[]
-
-  lastMessageAt DateTime @default(now())
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model Message {
-  id             String       @id @default(cuid())
-  content        String       @db.Text
-  isRead         Boolean      @default(false)
-  
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
-
-  createdAt      DateTime     @default(now())
 }

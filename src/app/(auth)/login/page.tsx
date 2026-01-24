@@ -61,44 +61,54 @@ function LoginForm() {
         
         toast.success(`Heureux de vous revoir, ${data.user.name?.split(' ')[0] || 'Client'} !`);
 
-        // 3. REDIRECTION INTELLIGENTE (CORRIGÉE ✅)
+        // 3. REDIRECTION INTELLIGENTE
         setTimeout(() => {
-            // On récupère l'URL de retour si elle existe (ex: venant d'une réservation)
+            // A. LOGIQUE INVESTISSEUR (PRIORITAIRE) 🚀
+            // Si l'utilisateur vient du parcours Crowdfunding, on l'envoie vers son dashboard spécial
+            const investType = searchParams.get('type');
+            if (investType === 'investor') {
+                const packId = searchParams.get('pack');
+                const amount = searchParams.get('amount');
+                
+                // On redirige vers le dashboard investisseur en gardant les infos du pack
+                router.push(`/invest/dashboard?pack=${packId}&amount=${amount}&welcome=true`);
+                return; // ⛔ IMPORTANT : On arrête ici pour ne pas exécuter le switch ci-dessous
+            }
+
+            // B. LOGIQUE STANDARD (Par Rôle)
             const callbackUrl = searchParams.get('callbackUrl');
 
             switch (data.user.role) {
-    case 'SUPER_ADMIN':
-        router.push(callbackUrl || '/dashboard/superadmin');
-        break;
-    
-    // 👇 LE CAS MANQUANT QUI PROVOQUAIT L'ERREUR
-    case 'AGENCY_ADMIN':
-        router.push(callbackUrl || '/dashboard/agency');
-        break;
+                case 'SUPER_ADMIN':
+                    router.push(callbackUrl || '/dashboard/superadmin');
+                    break;
+                case 'AGENCY_ADMIN':
+                    router.push(callbackUrl || '/dashboard/agency');
+                    break;
+                case 'OWNER':
+                    router.push(callbackUrl || '/dashboard/owner');
+                    break;
+                case 'AGENT':
+                    router.push(callbackUrl || '/dashboard/agent');
+                    break;
+                case 'ARTISAN':
+                    router.push(callbackUrl || '/dashboard/artisan');
+                    break;
+                case 'GUEST':
+                    router.push(callbackUrl || '/dashboard/guest');
+                    break;
+                case 'TENANT':
+                    router.push(callbackUrl || '/dashboard/tenant');
+                    break;
+                // Cas spécifique si le rôle est déjà défini comme INVESTOR en base
+                case 'INVESTOR':
+                    router.push('/invest/dashboard');
+                    break;
 
-    case 'OWNER':
-        router.push(callbackUrl || '/dashboard/owner');
-        break;
-    case 'AGENT':
-        router.push(callbackUrl || '/dashboard/agent');
-        break;
-    case 'ARTISAN':
-        router.push(callbackUrl || '/dashboard/artisan');
-        break;
-    case 'GUEST':
-        router.push(callbackUrl || '/dashboard/guest');
-        break;
-    
-    // 👇 Seulement les vrais locataires vont ici
-    case 'TENANT':
-        router.push(callbackUrl || '/dashboard/tenant');
-        break;
-
-    // 👇 Par sécurité, le "default" doit aller vers le Dispatcher global
-    default:
-        router.push(callbackUrl || '/dashboard');
-        break;
-}
+                default:
+                    router.push(callbackUrl || '/dashboard');
+                    break;
+            }
         }, 800);
       }
     } catch (error: any) {
@@ -190,7 +200,6 @@ function LoginForm() {
             <div className="mt-8 text-center pt-6 border-t border-white/5">
                 <p className="text-slate-400 text-sm">
                     Pas encore de compte ? <br/>
-                    {/* On transmet le callbackUrl vers signup si on change d'avis */}
                     <Link 
                         href={`/signup${searchParams.get('callbackUrl') ? '?callbackUrl=' + searchParams.get('callbackUrl') : ''}`}
                         className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group"

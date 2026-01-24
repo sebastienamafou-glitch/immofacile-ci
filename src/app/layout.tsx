@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "sonner"; // ✅ 1. IMPORT OBLIGATOIRE
 
 // 1. Configuration des polices
 const fontSans = Inter({
@@ -13,19 +14,19 @@ const fontMono = Roboto_Mono({
   subsets: ["latin"],
 });
 
-// 2. Configuration PWA (Barre de statut & Zoom)
+// 2. Configuration PWA
 export const viewport: Viewport = {
-  themeColor: '#0B1120', // La couleur exacte de votre fond pour une immersion totale
+  themeColor: '#0B1120',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Empêche le zoom accidentel sur mobile (sensation app native)
+  userScalable: false,
 };
 
 export const metadata: Metadata = {
   title: "ImmoFacile C.I",
   description: "Gestion immobilière intelligente",
-  manifest: '/manifest.json', // Lien explicite vers le manifeste (optionnel mais recommandé)
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -36,8 +37,10 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-[#0B1120]`}>
-        {/* Le Layout s'occupe juste d'envelopper l'app, la Sidebar est gérée dans dashboard/layout.tsx */}
         {children}
+        
+        {/* ✅ 2. LE COMPOSANT QUI AFFICHE LES POPUPS (INDISPENSABLE) */}
+        <Toaster position="top-right" richColors theme="dark" closeButton />
       </body>
     </html>
   );

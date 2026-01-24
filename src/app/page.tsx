@@ -63,23 +63,36 @@ export default function LandingPage() {
 
             {/* MENU DESKTOP */}
             <div className="items-center justify-between hidden w-full md:flex md:w-auto md:order-1">
-                <ul className="flex flex-col p-4 md:p-0 mt-4 font-medium md:flex-row md:space-x-8 md:mt-0 bg-transparent text-sm">
-                    {/* ✅ LIENS NAVIGATION LOCATAIRE / VOYAGEUR */}
+                <ul className="flex flex-col p-4 md:p-0 mt-4 font-medium md:flex-row items-center md:space-x-6 md:mt-0 bg-transparent text-sm">
+        
+                    {/* 1. LOUER (Standard) */}
                     <li>
-                        <Link href="/properties" className="flex items-center gap-2 py-2 px-3 text-white hover:text-[#F59E0B] transition font-bold">
+                        <Link href="/properties" className="flex items-center gap-2 py-2 px-3 text-slate-300 hover:text-white transition font-bold text-xs uppercase tracking-wide">
                             <Building2 className="w-4 h-4 text-slate-500" /> Louer
                         </Link>
                     </li>
-                    <li>
-                        <Link href="/akwaba" className="flex items-center gap-2 py-2 px-3 text-[#F59E0B] hover:text-orange-300 transition font-bold border border-[#F59E0B]/20 bg-[#F59E0B]/5 rounded-lg">
-                            <Palmtree className="w-4 h-4" /> Akwaba
-                        </Link>
-                    </li>
-                    <li className="hidden lg:block w-px h-5 bg-white/10 mx-2"></li>
-                    <li><a href="#features" className="block py-2 px-3 text-slate-400 hover:text-white transition">Fonctionnalités</a></li>
-                    <li><a href="#pricing" className="block py-2 px-3 text-slate-400 hover:text-white transition">Tarifs</a></li>
-                </ul>
-            </div>
+
+                   {/* 2. INVESTIR (Mis en avant - "Star du show") */}
+                   <li>
+                     <Link href="/invest" className="group flex items-center gap-2 py-2 px-4 text-[#F59E0B] font-black tracking-widest uppercase text-[10px] border border-[#F59E0B]/30 bg-[#F59E0B]/5 hover:bg-[#F59E0B]/10 rounded-full transition-all hover:scale-105 hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                         <TrendingUp className="w-3 h-3 group-hover:animate-bounce" /> 
+                         <span>Investir</span>
+                    </Link>
+                  </li>
+
+                  {/* 3. AKWABA (Allégé pour ne pas gêner Investir) */}
+                  <li>
+                      <Link href="/akwaba" className="flex items-center gap-2 py-2 px-3 text-emerald-400 hover:text-emerald-300 transition font-bold text-xs uppercase tracking-wide">
+                          <Palmtree className="w-4 h-4" /> Akwaba
+                      </Link>
+                 </li>
+
+                 <li className="hidden lg:block w-px h-4 bg-white/10 mx-2"></li>
+        
+                 <li><a href="#features" className="block py-2 px-3 text-slate-400 hover:text-white transition text-xs font-medium">Fonctionnalités</a></li>
+                 <li><a href="#pricing" className="block py-2 px-3 text-slate-400 hover:text-white transition text-xs font-medium">Tarifs</a></li>
+            </ul>
+        </div>
         </div>
 
         {/* MENU MOBILE */}
@@ -533,12 +546,16 @@ export default function LandingPage() {
                 <div>
                     <h4 className="font-bold text-white mb-6 uppercase text-[10px] tracking-[0.2em]">Plateforme</h4>
                     <ul className="space-y-4 text-sm text-slate-400 font-medium">
-                        <li><Link href="/properties" className="hover:text-[#F59E0B] transition flex items-center gap-2">
+                        {/* ✅ AJOUT DU LIEN ICI */}
+                        <li>
+                            <Link href="/invest" className="hover:text-[#F59E0B] transition flex items-center gap-2 text-white font-bold">
+                                <TrendingUp className="w-3 h-3 text-[#F59E0B]" /> Devenir Investisseur
+                         </Link>
+                     </li>
+
+                     <li><Link href="/properties" className="hover:text-[#F59E0B] transition flex items-center gap-2">
                              Louer (Longue Durée)
-                        </Link></li>
-                        <li><Link href="/akwaba" className="hover:text-[#F59E0B] transition flex items-center gap-2 text-[#F59E0B]">
-                            <Palmtree className="w-3 h-3" /> Akwaba (Séjours)
-                        </Link></li>
+                     </Link></li>
                         <li><a href="#features" className="hover:text-[#F59E0B] transition">Fonctionnalités</a></li>
                         <li><a href="#security" className="hover:text-[#F59E0B] transition">Sécurité</a></li>
                         <li><a href="#pricing" className="hover:text-[#F59E0B] transition">Tarifs</a></li>

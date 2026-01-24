@@ -38,7 +38,7 @@ export default function AdminLogsPage() {
     const fetchLogs = async () => {
         try {
             // ✅ 2. APPEL SÉCURISÉ (Le cookie fait tout le travail)
-            const res = await api.get('/admin/logs');
+            const res = await api.get('/superadmin/logs');
             
             if (res.data.success) {
                 setLogs(res.data.logs);

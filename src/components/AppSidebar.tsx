@@ -16,7 +16,8 @@ import {
   Compass,
   Map as MapIcon, // ✅ CORRECTION : Import aliasé pour éviter le conflit
   LucideIcon, 
-  Palmtree
+  Palmtree,
+  TrendingUp
 } from "lucide-react";
 
 // 1. DÉFINITION DU TYPE
@@ -62,7 +63,8 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   SUPER_ADMIN: [
     { icon: Server, label: "Command Center", href: "/dashboard/superadmin" }, 
-    { icon: Users, label: "Utilisateurs", href: "/dashboard/superadmin/users" }, 
+    { icon: Users, label: "Utilisateurs", href: "/dashboard/superadmin/users" },
+    { icon: TrendingUp, label: "Actionnaires", href: "/dashboard/superadmin/investors/new" },
     { icon: Key, label: "Parc Immobilier", href: "/dashboard/superadmin/properties" },
     { icon: Wallet, label: "Finances Globales", href: "/dashboard/superadmin/finance" }, 
     { icon: Briefcase, label: "Agents", href: "/dashboard/superadmin/agents" },
