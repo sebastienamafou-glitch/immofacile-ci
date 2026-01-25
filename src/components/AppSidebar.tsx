@@ -71,6 +71,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Hammer, label: "Artisans", href: "/dashboard/superadmin/artisans" }, 
     { icon: ShieldCheck, label: "KYC & Sécurité", href: "/dashboard/superadmin/kyc" },
     { icon: ScrollText, label: "Journal d'Audit", href: "/dashboard/superadmin/logs" },
+    { icon: Landmark, label: "Trésorerie", href: "/dashboard/superadmin/treasury" },
   ],
   AGENCY_ADMIN: [
     { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },

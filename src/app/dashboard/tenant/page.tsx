@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Wallet, History, AlertTriangle, Clock, ShieldCheck, 
-  ChevronRight, Receipt, Download, Calendar, MapPin, 
-  Loader2, FolderOpen, UploadCloud, FileText, CheckCircle2, ArrowUpRight
+  Wallet, History, AlertTriangle, Clock, 
+  Receipt, Download, Calendar, MapPin, 
+  Loader2, FolderOpen, UploadCloud, FileText, CheckCircle2 
 } from "lucide-react";
-import { api, getReceiptData } from "@/lib/api";
+// ✅ IMPORT COMPLET (api + initiatePayment + getReceiptData)
+import { api, initiatePayment, getReceiptData } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -39,7 +39,6 @@ export default function TenantDashboard() {
         if (res.data.success) {
             setData(res.data);
         } else {
-             // Si l'API renvoie une erreur mais pas 401, on affiche l'erreur
              setError(true);
         }
       } catch (err: any) {
@@ -52,18 +51,52 @@ export default function TenantDashboard() {
     };
     fetchData();
   }, [router]);
-
-  // --- ACTIONS ---
-  const handlePayRent = async () => {
-      toast.info("Module de paiement en cours d'intégration");
-  };
   
+
+  // ===========================================================================
+  // 💸 ACTION DE PAIEMENT (Connectée à CinetPay)
+  // ===========================================================================
+  const handlePayRent = async () => {
+    // Vérification stricte des données requises par le Schema
+    if (!data?.lease?.id || !data?.user?.phone) {
+        toast.error("Données incomplètes (Bail ou Téléphone manquant)");
+        return;
+    }
+
+    setIsPaying(true); 
+
+    try {
+        // Appel à notre API Gateway Universelle
+        const result = await initiatePayment({
+            type: 'RENT',                 
+            referenceId: data.lease.id,   
+            phone: data.user.phone        
+        });
+
+        if (result.success && result.paymentUrl) {
+            toast.success("Redirection vers CinetPay...");
+            window.location.href = result.paymentUrl;
+        } else {
+            throw new Error("L'URL de paiement n'a pas été générée.");
+        }
+
+    } catch (err: any) {
+        console.error("Erreur Paiement:", err);
+        const errorMessage = err.response?.data?.error || err.message || "Impossible d'initialiser le paiement.";
+        toast.error(errorMessage);
+    } finally {
+        setIsPaying(false); 
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Placeholder pour l'upload (à implémenter si besoin)
       toast.info("Upload en cours d'intégration");
   };
 
   const handleDownloadReceipt = async (id: string) => {
-      toast.info("Génération du reçu...");
+      // Placeholder pour le téléchargement
+      toast.info("Téléchargement du reçu...");
   };
 
   // --- RENDUS CONDITIONNELS ---
@@ -103,12 +136,10 @@ export default function TenantDashboard() {
   }
 
   // --- CAS 2 : CANDIDATURE EN ATTENTE (Bail PENDING) ---
-  // C'est ici que vous allez atterrir après avoir déposé le dossier !
   if (data.lease.status === 'PENDING') {
       return (
         <main className="min-h-screen bg-[#060B18] p-6 flex flex-col items-center justify-center text-slate-300 font-sans">
             <div className="bg-slate-900 border border-blue-500/20 p-8 rounded-[2rem] max-w-xl w-full relative overflow-hidden shadow-2xl">
-                {/* Décoration de fond */}
                 <div className="absolute top-0 right-0 p-4 opacity-5"><FileText size={150}/></div>
                 
                 <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-6 inline-block border border-blue-500/20">
@@ -154,7 +185,7 @@ export default function TenantDashboard() {
       );
   }
 
-  // --- CAS 3 : LOCATAIRE ACTIF (Affichage Standard) ---
+  // --- CAS 3 : LOCATAIRE ACTIF ---
   const { lease, user, incidents, payments } = data;
   const property = lease?.property;
   const displayName = user?.name ? user.name.split(' ')[0] : "Locataire";
@@ -217,7 +248,8 @@ export default function TenantDashboard() {
                                 disabled={isPaying}
                                 className="w-full text-sm font-black tracking-widest text-white uppercase transition-all shadow-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 h-16 rounded-2xl shadow-orange-500/20"
                             >
-                                {isPaying ? <Loader2 className="animate-spin" /> : "Payer le loyer"}
+                                {isPaying ? <Loader2 className="animate-spin mr-2" /> : null}
+                                {isPaying ? "Connexion CinetPay..." : "Payer le loyer"}
                             </Button>
                         </div>
                     </div>
@@ -293,7 +325,7 @@ export default function TenantDashboard() {
                                                 {new Date(payment.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}
                                             </p>
                                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
-                                                {payment.type === 'FRAIS_DOSSIER' ? 'Frais de Dossier' : 'Loyer Mensuel'}
+                                                {payment.type === 'DEPOSIT' ? 'Caution & Loyer' : 'Loyer Mensuel'}
                                             </p>
                                         </div>
                                     </div>

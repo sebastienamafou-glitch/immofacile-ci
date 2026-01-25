@@ -47,7 +47,7 @@ api.interceptors.response.use(
   }
 );
 
-// 3. EXPORTS DES FONCTIONS MÉTIERS (Ceux qui manquaient et causaient le crash)
+// 3. EXPORTS DES FONCTIONS MÉTIERS (CONSERVÉS INTÉGRALEMENT)
 export const getContractData = async (leaseId: string) => api.get(`/owner/contract/${leaseId}`);
 export const getReceiptData = async (paymentId: string) => api.get(`/owner/receipt/${paymentId}`);
 export const getFormalNoticeData = async (leaseId: string) => api.get(`/owner/formal-notice/${leaseId}`);
@@ -59,4 +59,18 @@ export const addArtisan = async (data: { name: string; job: string; phone: strin
 
 export const endLeaseWithProposals = async (data: { leaseId: string; deduction: number; comment: string }) => {
   return api.post('/owner/leases/end', data);
+};
+
+// =============================================================================
+// ✅ 4. NOUVEAU : UNIVERSAL PAYMENT GATEWAY (Frontend Service)
+// =============================================================================
+// Cette fonction gère à la fois les Loyers (RENT) et les Investissements (INVESTMENT)
+export const initiatePayment = async (data: {
+  type: 'RENT' | 'INVESTMENT'; 
+  referenceId: string;         // leaseId OU investmentContractId
+  phone: string;               // Numéro Mobile Money
+}) => {
+  // Appelle notre route Next.js blindée (src/app/api/payment/initiate/route.ts)
+  const response = await api.post('/payment/initiate', data);
+  return response.data; // Retourne { success: true, paymentUrl: "..." }
 };

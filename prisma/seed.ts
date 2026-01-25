@@ -81,6 +81,15 @@ async function main() {
       agencyId: null,
     },
     {
+      email: 'investisseur@gmail.com',
+      name: 'Ivan Investisseur',
+      role: Role.INVESTOR, // ✅ Nouveau Rôle
+      jobTitle: 'Business Angel',
+      isBacker: true, // ✅ Badge activé
+      backerTier: 'VISIONNAIRE',
+      agencyId: null,
+    },
+    {
       email: 'touriste@gmail.com',
       name: 'Thomas Touriste',
       role: Role.GUEST,
@@ -89,9 +98,10 @@ async function main() {
   ];
 
   for (const u of users) {
+    // @ts-ignore (Pour ignorer les champs dynamiques comme isBacker qui n'existent pas sur tous les users)
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { agencyId: u.agencyId }, // Mise à jour lien agence si relancé
+      update: { agencyId: u.agencyId, role: u.role }, 
       create: {
         email: u.email,
         name: u.name,
@@ -101,8 +111,10 @@ async function main() {
         isVerified: true,
         kycStatus: VerificationStatus.VERIFIED,
         jobTitle: u.jobTitle,
-        income: u.income,
-        phone: u.role === Role.ARTISAN ? u.phone : undefined,
+        income: u.income, // @ts-ignore
+        phone: u.role === Role.ARTISAN ? u.phone : undefined, // @ts-ignore
+        isBacker: u.isBacker || false, // @ts-ignore
+        backerTier: u.backerTier || null,
       },
     });
   }
@@ -112,13 +124,15 @@ async function main() {
   const ownerManaged = await prisma.user.findUnique({ where: { email: 'proprio.agence@gmail.com' } });
   const tenant = await prisma.user.findUnique({ where: { email: 'locataire@gmail.com' } });
   const agent = await prisma.user.findUnique({ where: { email: 'agent@immoprestige.ci' } });
+  const investor = await prisma.user.findUnique({ where: { email: 'investisseur@gmail.com' } });
 
   // ==========================================
-  // 3. CRÉATION D'UN BIEN GÉRÉ (Pour tester le Dashboard Agence)
+  // 3. CRÉATION D'UN BIEN GÉRÉ 
   // ==========================================
+  let propertyId = 'prop-demo-01'; // Variable pour réutilisation
   if (ownerManaged) {
     const property = await prisma.property.upsert({
-      where: { id: 'prop-demo-01' }, // ID fixe pour éviter doublons
+      where: { id: 'prop-demo-01' }, 
       update: {},
       create: {
         id: 'prop-demo-01',
@@ -133,14 +147,15 @@ async function main() {
         surface: 250,
         isPublished: true,
         ownerId: ownerManaged.id,
-        agencyId: agency.id, // Bien sous mandat
+        agencyId: agency.id, 
         images: ['https://placehold.co/800x600/1e293b/white?text=Villa+Cocody'],
       },
     });
+    propertyId = property.id;
     console.log(`🏠 Bien créé : ${property.title}`);
 
     // ==========================================
-    // 4. CRÉATION D'UN BAIL ACTIF (Pour tester les Revenus)
+    // 4. CRÉATION D'UN BAIL ACTIF 
     // ==========================================
     if (tenant) {
       await prisma.lease.create({
@@ -154,6 +169,8 @@ async function main() {
           propertyId: property.id,
           tenantId: tenant.id,
           contractUrl: 'https://example.com/contract.pdf',
+          // On lie l'agent pour tester les commissions
+          agentId: agent ? agent.id : null, 
         },
       });
       console.log(`📜 Bail actif créé pour ${tenant.name}`);
@@ -175,6 +192,25 @@ async function main() {
         });
         console.log(`🕵️ Mission assignée à ${agent.name}`);
     }
+  }
+
+  // ==========================================
+  // 6. ✅ CRÉATION D'UN CONTRAT D'INVESTISSEMENT (CROWDFUNDING)
+  // ==========================================
+  if (investor) {
+      await prisma.investmentContract.create({
+          data: {
+              userId: investor.id,
+              amount: 5000000, // 5 Millions
+              packName: 'VISIONNAIRE',
+              status: 'ACTIVE', // Déjà payé
+              paymentReference: 'INV-SEED-REF-001', // Simulation ID CinetPay
+              ipAddress: '192.168.1.1',
+              signatureData: 'data:image/png;base64,fake_signature...',
+              signedAt: new Date(),
+          }
+      });
+      console.log(`🚀 Contrat Investisseur créé pour ${investor.name} (5.000.000 FCFA)`);
   }
 
   console.log('✅ Seeding terminé avec succès ! 🚀');

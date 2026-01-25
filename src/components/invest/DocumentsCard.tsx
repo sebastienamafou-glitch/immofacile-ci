@@ -1,41 +1,32 @@
 'use client';
 
-import { FileText, Download, Lock, CheckCircle } from "lucide-react";
+import { FileText, Download, CheckCircle, Lock } from "lucide-react";
 import { toast } from "sonner";
+// Import du générateur que nous venons de créer
+import { generateInvestmentContract } from "@/lib/pdfGenerator"; 
 
 interface DocumentsCardProps {
   contracts: any[];
+  user: any; // Important : L'objet User complet
 }
 
-export default function DocumentsCard({ contracts }: DocumentsCardProps) {
+export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
   
-  const handleDownload = (contract: any) => {
-    // 1. On lance le feedback visuel
-    const toastId = toast.loading("Téléchargement de la preuve...");
+  const handleDownloadPDF = (contract: any) => {
+    // Petit feedback UX
+    const toastId = toast.loading("Génération du contrat officiel...");
 
     try {
-        // 2. Vérification défensive : Est-ce qu'on a bien la signature ?
-        if (!contract || !contract.signatureData) {
-            throw new Error("Données de signature manquantes");
-        }
+        if (!contract) throw new Error("Données manquantes");
 
-        // 3. Création immédiate du lien de téléchargement
-        // On utilise directement le thread principal pour éviter que le navigateur ne bloque le popup
-        const link = document.createElement("a");
-        link.href = contract.signatureData; // L'image Base64
-        link.download = `Preuve_Investissement_${contract.id.slice(-4)}.png`;
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Action : On lance le générateur PDF
+        generateInvestmentContract(user, contract);
 
-        // 4. Succès : On transforme le message de chargement en succès
-        toast.success("Document enregistré !", { id: toastId });
+        toast.success("Téléchargement lancé !", { id: toastId });
 
     } catch (error) {
-        console.error("Erreur download:", error);
-        // 5. Erreur : On transforme le message de chargement en erreur
-        toast.error("Impossible de télécharger le fichier.", { id: toastId });
+        console.error("Erreur PDF:", error);
+        toast.error("Erreur lors de la génération.", { id: toastId });
     }
   };
 
@@ -53,7 +44,8 @@ export default function DocumentsCard({ contracts }: DocumentsCardProps) {
                 contracts.map((contract, idx) => (
                     <div 
                         key={contract.id || idx} 
-                        onClick={() => handleDownload(contract)}
+                        // Au clic, on déclenche le PDF
+                        onClick={() => handleDownloadPDF(contract)}
                         className="flex items-center justify-between p-4 bg-white/[0.03] rounded-2xl border border-white/5 hover:border-[#F59E0B]/30 hover:bg-white/[0.05] transition cursor-pointer group"
                     >
                         <div className="flex items-center gap-4">
@@ -61,7 +53,7 @@ export default function DocumentsCard({ contracts }: DocumentsCardProps) {
                                 <FileText className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-white group-hover:text-[#F59E0B] transition">Contrat d'Investissement</p>
+                                <p className="text-sm font-bold text-white group-hover:text-[#F59E0B] transition">Contrat_Investissement.pdf</p>
                                 <p className="text-[10px] text-slate-500">
                                     Signé le {new Date(contract.signedAt).toLocaleDateString()}
                                 </p>
@@ -77,15 +69,16 @@ export default function DocumentsCard({ contracts }: DocumentsCardProps) {
                     <p className="text-xs text-slate-500 italic">Aucun contrat signé.</p>
                 </div>
             )}
-
-            <div className="flex items-center justify-between p-4 bg-white/[0.03] rounded-2xl border border-white/5 opacity-50 hover:opacity-80 transition cursor-not-allowed" onClick={() => toast.info("Disponible fin 2026")}>
+            
+            {/* Emplacement pour le Relevé Fiscal (Futur) */}
+             <div className="flex items-center justify-between p-4 bg-white/[0.03] rounded-2xl border border-white/5 opacity-50 cursor-not-allowed">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
                         <FileText className="w-5 h-5" />
                     </div>
                     <div>
                         <p className="text-sm font-bold text-white">Relevé Fiscal 2026</p>
-                        <p className="text-[10px] text-slate-500">Sera disponible en Fin d'Exercice</p>
+                        <p className="text-[10px] text-slate-500">Disponible fin d'exercice</p>
                     </div>
                 </div>
                 <Lock className="w-4 h-4 text-slate-600" />

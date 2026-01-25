@@ -1,139 +1,242 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // ✅ Singleton Obligatoire
+import { prisma } from "@/lib/prisma";
 import axios from "axios";
+import { Role } from "@prisma/client";
 
-// Configuration
+// =============================================================================
+// 🔧 CONFIGURATION & SÉCURITÉ
+// =============================================================================
 const CINETPAY_CONFIG = {
   API_KEY: process.env.CINETPAY_API_KEY,
   SITE_ID: process.env.CINETPAY_SITE_ID,
   CHECK_URL: "https://api-checkout.cinetpay.com/v2/payment/check"
 };
 
-const PLATFORM_COMMISSION_RATE = 0.05; // 5% de commission sur les loyers
+// =============================================================================
+// 💰 RÈGLES FINANCIÈRES STRICTES (Business Logic)
+// =============================================================================
+const FEES = {
+  TENANT_ENTRANCE_FEE: 20000, 
+  PLATFORM_RECURRING_RATE: 0.05, // 5%
+  AGENT_SUCCESS_FEE_RATE: 0.05, // 5%
+  AGENCY_DEFAULT_RATE: 0.10 // 10%
+};
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  let transactionId = "";
+
   try {
-    // 1. EXTRACTION ROBUSTE (FormData ou JSON)
-    let transactionId = "";
-    
+    // 1. EXTRACTION
     const contentType = request.headers.get("content-type") || "";
-    
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
         const formData = await request.formData();
         transactionId = (formData.get('cpm_trans_id') || formData.get('cpm_custom')) as string;
     } else {
-        try {
-            const jsonBody = await request.json();
-            transactionId = jsonBody.cpm_trans_id || jsonBody.cpm_custom;
-        } catch (e) {
-            console.warn("Webhook: Impossible de parser le JSON");
-        }
+        const jsonBody = await request.json();
+        transactionId = jsonBody.cpm_trans_id || jsonBody.cpm_custom;
     }
 
-    if (!transactionId) {
-      return NextResponse.json({ error: "Transaction ID manquant" }, { status: 400 });
-    }
+    if (!transactionId) return NextResponse.json({ error: "Missing Transaction ID" }, { status: 400 });
 
-    // 2. VÉRIFICATION CINETPAY (Serveur à Serveur)
-    // On ne fait jamais confiance aux données envoyées directement, on interroge l'API CinetPay
-    const checkPayload = {
+    // 2. VÉRIFICATION
+    const verificationPayload = {
       apikey: CINETPAY_CONFIG.API_KEY,
       site_id: CINETPAY_CONFIG.SITE_ID,
       transaction_id: transactionId
     };
 
-    const response = await axios.post(CINETPAY_CONFIG.CHECK_URL, checkPayload);
+    const response = await axios.post(CINETPAY_CONFIG.CHECK_URL, verificationPayload);
     const data = response.data.data;
-    const isSuccess = response.data.code === "00" && data.status === "ACCEPTED";
+    
+    const isValidPayment = response.data.code === "00" && data.status === "ACCEPTED";
+    const paymentMethod = data.payment_method || "MOBILE_MONEY";
+    const amountPaid = parseInt(data.amount); 
 
-    // 3. TRAITEMENT TRANSACTIONNEL (Base de données)
+    // 3. EXÉCUTION ATOMIQUE
     await prisma.$transaction(async (tx) => {
-        // A. Retrouver le paiement en attente
-        const payment = await tx.payment.findFirst({
+        
+        // A. CONTEXTE
+        const rentalPayment = await tx.payment.findFirst({
             where: { reference: transactionId },
-            include: { lease: { include: { property: true } } }
+            include: { lease: { include: { property: { include: { agency: true } } } } }
         });
 
-        if (!payment) {
-            // Si le paiement n'existe pas, on loggue et on ignore (pour ne pas bloquer CinetPay)
-            console.error(`Paiement introuvable pour ref: ${transactionId}`);
-            return; 
-        }
+        const investmentContract = !rentalPayment 
+            ? await tx.investmentContract.findUnique({ where: { paymentReference: transactionId } })
+            : null;
 
-        if (payment.status === "SUCCESS") {
-            return; // Déjà traité (Idempotence)
-        }
+        // B. GESTION LOCATIVE
+        if (rentalPayment) {
+            if (rentalPayment.status === "SUCCESS") return;
 
-        if (isSuccess) {
-            // B. CALCUL DES COMMISSIONS (Split)
-            let platformFee = 0;
-            let ownerAmount = payment.amount;
+            if (isValidPayment) {
+                // DISTRIBUTION
+                let platformShare = 0; 
+                let agentShare = 0;    
+                let agencyShare = 0;   
+                let ownerShare = 0;    
 
-            // Logique : Commission prise uniquement sur les Loyers, pas sur les Cautions
-            if (payment.type === "LOYER") {
-                platformFee = Math.floor(payment.amount * PLATFORM_COMMISSION_RATE);
-                ownerAmount = payment.amount - platformFee;
-            }
-
-            // C. MISE À JOUR DU PAIEMENT
-            await tx.payment.update({
-                where: { id: payment.id },
-                data: {
-                    status: "SUCCESS",
-                    method: data.payment_method || "CINETPAY",
-                    amountPlatform: platformFee,
-                    amountOwner: ownerAmount,
-                    // Si c'était un dépôt, on met à jour le montantCaution
-                    // amountDeposit est géré implicitement si type == DEPOSIT
+                const baseRent = rentalPayment.lease.monthlyRent; 
+                
+                // CALCUL TAUX AGENCE
+                let appliedAgencyRate = 0;
+                if (rentalPayment.lease.property.agency) {
+                    if (rentalPayment.lease.agencyCommissionRate) {
+                        appliedAgencyRate = rentalPayment.lease.agencyCommissionRate;
+                    } else if (rentalPayment.lease.property.agency.defaultCommissionRate) {
+                        appliedAgencyRate = rentalPayment.lease.property.agency.defaultCommissionRate;
+                    } else {
+                        appliedAgencyRate = FEES.AGENCY_DEFAULT_RATE;
+                    }
                 }
-            });
 
-            // D. ALIMENTATION DU WALLET PROPRIÉTAIRE
-            if (ownerAmount > 0) {
-                await tx.user.update({
-                    where: { id: payment.lease.property.ownerId },
+                // SPLIT
+                if (rentalPayment.type === "DEPOSIT") {
+                    platformShare += FEES.TENANT_ENTRANCE_FEE;
+                    platformShare += Math.floor(baseRent * FEES.PLATFORM_RECURRING_RATE);
+
+                    if (rentalPayment.lease.agentId) {
+                        agentShare = Math.floor(baseRent * FEES.AGENT_SUCCESS_FEE_RATE);
+                    }
+                    if (appliedAgencyRate > 0) {
+                        agencyShare = Math.floor(baseRent * appliedAgencyRate);
+                    }
+                    ownerShare = amountPaid - platformShare - agentShare - agencyShare;
+
+                } else if (rentalPayment.type === "LOYER") {
+                    platformShare = Math.floor(amountPaid * FEES.PLATFORM_RECURRING_RATE);
+                    agentShare = 0;
+                    if (appliedAgencyRate > 0) {
+                        agencyShare = Math.floor(amountPaid * appliedAgencyRate);
+                    }
+                    ownerShare = amountPaid - platformShare - agencyShare;
+                }
+
+                // UPDATES
+                await tx.payment.update({
+                    where: { id: rentalPayment.id },
                     data: {
-                        walletBalance: { increment: ownerAmount }
+                        status: "SUCCESS",
+                        method: paymentMethod,
+                        amountPlatform: platformShare,
+                        amountAgent: agentShare,
+                        amountAgency: agencyShare,
+                        amountOwner: ownerShare,
                     }
                 });
 
-                // Trace comptable Owner
+                // PROPRIÉTAIRE
+                if (ownerShare > 0) {
+                    await tx.user.update({
+                        where: { id: rentalPayment.lease.property.ownerId },
+                        data: { walletBalance: { increment: ownerShare } }
+                    });
+                    await tx.transaction.create({
+                        data: {
+                            amount: ownerShare,
+                            type: "CREDIT",
+                            reason: `LOYER_NET_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
+                            status: "SUCCESS",
+                            userId: rentalPayment.lease.property.ownerId
+                        }
+                    });
+                }
+
+                // AGENT (Uber)
+                if (agentShare > 0 && rentalPayment.lease.agentId) {
+                    await tx.user.update({
+                        where: { id: rentalPayment.lease.agentId },
+                        data: { walletBalance: { increment: agentShare } }
+                    });
+                    await tx.transaction.create({
+                        data: {
+                            amount: agentShare,
+                            type: "CREDIT",
+                            reason: `COM_AGENT_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
+                            status: "SUCCESS",
+                            userId: rentalPayment.lease.agentId
+                        }
+                    });
+                }
+                
+                // ✅ AGENCE B2B (CORRECTION ICI)
+                // On utilise enfin le modèle AgencyTransaction 
+                if (agencyShare > 0 && rentalPayment.lease.property.agencyId) {
+                    // 1. Crédit du Solde
+                    await tx.agency.update({
+                        where: { id: rentalPayment.lease.property.agencyId },
+                        data: { walletBalance: { increment: agencyShare } }
+                    });
+                    
+                    // 2. Trace Comptable DÉDIÉE (Plus de commentaire, du vrai code)
+                    await tx.agencyTransaction.create({
+                        data: {
+                            amount: agencyShare,
+                            type: "CREDIT",
+                            reason: `COM_AGENCE_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
+                            status: "SUCCESS",
+                            agencyId: rentalPayment.lease.property.agencyId
+                        }
+                    });
+                }
+
+                // ACTIVATION BAIL
+                if (rentalPayment.lease.status === "PENDING" && rentalPayment.type === "DEPOSIT") {
+                    await tx.lease.update({
+                        where: { id: rentalPayment.lease.id },
+                        data: { status: "ACTIVE", isActive: true }
+                    });
+                }
+
+            } else {
+                await tx.payment.update({
+                    where: { id: rentalPayment.id },
+                    data: { status: "FAILED" }
+                });
+            }
+        } 
+        
+        // C. INVESTISSEMENT
+        else if (investmentContract) {
+            if (investmentContract.status === "ACTIVE") return;
+
+            if (isValidPayment) {
+                await tx.investmentContract.update({
+                    where: { id: investmentContract.id },
+                    data: { status: "ACTIVE" }
+                });
+                await tx.user.update({
+                    where: { id: investmentContract.userId },
+                    data: { 
+                        role: Role.INVESTOR,
+                        isBacker: true,
+                        backerTier: investmentContract.packName || "SUPPORTER"
+                    }
+                });
                 await tx.transaction.create({
                     data: {
-                        amount: ownerAmount,
-                        type: "CREDIT",
-                        reason: `Loyer reçu - ${payment.lease.property.title}`,
-                        userId: payment.lease.property.ownerId
+                        amount: amountPaid,
+                        type: "DEBIT", 
+                        reason: `INVESTISSEMENT_PACK_${(investmentContract.packName || 'STANDARD').toUpperCase()}`,
+                        status: "SUCCESS",
+                        userId: investmentContract.userId
                     }
                 });
-            }
-
-            // E. UPDATE BAIL (Si premier paiement, le bail devient actif)
-            if (payment.lease.status === "PENDING" && payment.type === "DEPOSIT") {
-                await tx.lease.update({
-                    where: { id: payment.lease.id },
-                    data: { 
-                        status: "ACTIVE",
-                        isActive: true
-                    }
+            } else {
+                 await tx.investmentContract.update({
+                    where: { id: investmentContract.id },
+                    data: { status: "FAILED" }
                 });
             }
-
-        } else {
-            // F. GESTION ÉCHEC
-            await tx.payment.update({
-                where: { id: payment.id },
-                data: { status: "FAILED" }
-            });
         }
     });
 
-    // 4. RÉPONSE À CINETPAY (Toujours 200 OK pour arrêter les relances)
     return new NextResponse("OK", { status: 200 });
 
-  } catch (error) {
-    console.error("Webhook Critical Error:", error);
-    // On renvoie 200 même en cas d'erreur interne pour éviter que CinetPay ne spamme le webhook
-    return new NextResponse("Webhook Handled with Error", { status: 200 });
+  } catch (error: any) {
+    console.error(`[Webhook Fatal Error] Tx: ${transactionId}`, error);
+    return new NextResponse("Error Handled", { status: 200 });
   }
 }

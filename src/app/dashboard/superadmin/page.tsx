@@ -294,7 +294,7 @@ export default function AdminDashboard() {
                     <Server className="text-white w-5 h-5" />
                 </div>
                 <div>
-                    <h1 className="font-bold text-white tracking-tight text-lg">ImmoFacile <span className="text-slate-500 font-normal">Command Center</span></h1>
+                    <h1 className="font-bold text-white tracking-tight text-lg">ImmoFacile <span className="text-slate-500 font-normal">Admin</span></h1>
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                         <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest">Système Opérationnel</span>

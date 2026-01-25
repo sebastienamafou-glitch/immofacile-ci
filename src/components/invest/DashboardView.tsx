@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation'; // ✅ Pour rafraîchir les données après retrait
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  TrendingUp, Wallet, ShieldCheck, Bell, Lock, X 
+  TrendingUp, Wallet, ShieldCheck, Bell, Lock, X, ArrowDownLeft 
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// ✅ IMPORTS DES MODULES CRÉÉS PRÉCÉDEMMENT
+// ✅ IMPORTS DES MODULES
 import LogoutButton from './LogoutButton';
 import DocumentsCard from './DocumentsCard';
 import NewsFeed from './NewsFeed';
+import WithdrawModal from './WithdrawModal'; // ✅ Le nouveau module de retrait
 
 // Définition des types étendus pour TypeScript
 interface ExtendedUser {
@@ -31,8 +33,10 @@ interface DashboardViewProps {
 }
 
 export default function DashboardView({ user }: DashboardViewProps) {
+  const router = useRouter();
   const [timeRange, setTimeRange] = useState<'6M' | '1Y'>('1Y');
   const [showNotifs, setShowNotifs] = useState(false);
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false); // ✅ État du modal retrait
 
   // --- 1. ALGORITHME DE CALCUL DU GRAPHIQUE ---
   const chartData = useMemo(() => {
@@ -45,7 +49,10 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
 
     let runningBalance = 0;
-    const data = user.transactions.map(tx => {
+    // On doit trier les transactions par date croissante pour construire le graphique
+    const sortedTx = [...user.transactions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    const data = sortedTx.map(tx => {
         if (tx.type === 'CREDIT') runningBalance += tx.amount;
         else if (tx.type === 'DEBIT') runningBalance -= tx.amount;
         
@@ -55,6 +62,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
         };
     });
 
+    // On ajoute le point actuel final si nécessaire
+    if (data.length > 0) {
+        data.push({
+            date: 'Actuel',
+            solde: user.walletBalance
+        });
+    }
+
     return data;
   }, [user.transactions, user.walletBalance]);
 
@@ -63,6 +78,11 @@ export default function DashboardView({ user }: DashboardViewProps) {
     toast.info("Un conseiller VIP va vous contacter.", {
         description: "Merci de votre confiance renouvelée."
     });
+  };
+
+  const handleWithdrawSuccess = () => {
+      // On rafraîchit les données serveur (Next.js Server Actions / ISR)
+      router.refresh(); 
   };
 
   return (
@@ -82,7 +102,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
            </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
             {/* --- Notifications --- */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
                 <button 
@@ -116,6 +136,14 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 )}
             </div>
 
+            {/* ✅ BOUTON RETIRER (NOUVEAU) */}
+            <button 
+                onClick={() => setIsWithdrawOpen(true)}
+                className="px-5 py-3 bg-[#0B1120] border border-white/10 text-white font-bold rounded-xl hover:bg-white/5 transition flex items-center gap-2 text-sm"
+            >
+                <ArrowDownLeft className="w-4 h-4 text-slate-400" /> <span className="hidden sm:inline">Retirer</span>
+            </button>
+
             {/* Bouton Réinvestir */}
             <button 
                 onClick={handleReinvest}
@@ -124,7 +152,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 <TrendingUp className="w-4 h-4" /> <span className="hidden sm:inline">Réinvestir</span>
             </button>
 
-            {/* ✅ BOUTON DÉCONNEXION (MODULAIRE) */}
+            {/* BOUTON DÉCONNEXION */}
             <LogoutButton />
         </div>
       </header>
@@ -141,7 +169,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 <div className="bg-[#0B1120] p-6 rounded-3xl border border-white/5 relative overflow-hidden group hover:border-[#F59E0B]/30 transition duration-500">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 bg-[#F59E0B]/10 rounded-lg text-[#F59E0B]"><Wallet className="w-5 h-5" /></div>
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Capital Investi</p>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Solde Wallet</p>
                     </div>
                     <p className="text-2xl font-black text-white">
                         {user.walletBalance.toLocaleString('fr-FR')} <span className="text-sm font-medium text-slate-500">FCFA</span>
@@ -228,18 +256,30 @@ export default function DashboardView({ user }: DashboardViewProps) {
         {/* --- COLONNE DROITE (Modules) --- */}
         <div className="space-y-8 flex flex-col h-full">
             
-            {/* ✅ MODULE DOCUMENTS (Via Component) */}
+            {/* MODULE DOCUMENTS */}
             <div className="flex-1 min-h-[250px]">
-                <DocumentsCard contracts={user.investmentContracts} />
+                <DocumentsCard 
+                    contracts={user.investmentContracts} 
+                    user={user} 
+                />
             </div>
 
-            {/* ✅ MODULE ACTUALITÉS (Via Component) */}
+            {/* MODULE ACTUALITÉS */}
             <div className="flex-1 min-h-[300px]">
                 <NewsFeed />
             </div>
         </div>
 
       </div>
+
+      {/* ✅ MODAL DE RETRAIT (Invisible par défaut) */}
+      <WithdrawModal 
+        isOpen={isWithdrawOpen} 
+        onClose={() => setIsWithdrawOpen(false)} 
+        userBalance={user.walletBalance}
+        onSuccess={handleWithdrawSuccess}
+      />
+
     </div>
   );
 }

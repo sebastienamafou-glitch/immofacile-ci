@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Ou "mysql" selon ta config
+  provider = "postgresql" // Ou "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -36,7 +36,7 @@ model User {
   role          Role      @default(GUEST)
   
   // Infos Profil (ImmoFacile)
-  jobTitle      String?   
+  jobTitle      String?
   address       String?
   income        Int?      // Revenus mensuels
   paymentMethod String?   // WAVE, OM...
@@ -58,14 +58,16 @@ model User {
 
   // --- Relations Métier (Longue Durée) ---
   propertiesOwned    Property[]      @relation("PropertyOwner")
-  leases             Lease[]         
+  leases             Lease[]         @relation("LeaseTenant") // Le locataire
+  leasesManaged      Lease[]         @relation("LeaseAgent")  // ✅ L'agent qui gère le bail
   missionsAccepted   Mission[]       @relation("AgentMissions")
   leads              Lead[]
+ 
   incidentsReported  Incident[]      @relation("IncidentReporter")
   incidentsAssigned  Incident[]      @relation("ArtisanIncidents")
   transactions       Transaction[]
   
-  // ✅ CORRECTION CLEAN CODE : Séparation des responsabilités
+  // ✅ Clean Code : Séparation des responsabilités
   signatureProofs    SignatureProof[] // Pour les Baux (Technique)
   investmentContracts InvestmentContract[] // Pour les Investisseurs (Juridique)
 
@@ -80,7 +82,8 @@ model User {
   
   // --- Multi-Tenant SaaS (Agence) ---
   agencyId           String?
-  agency             Agency?         @relation(fields: [agencyId], references: [id])
+  agency             Agency?        @relation(fields: [agencyId], references: [id])
+  isActive           Boolean        @default(true)
 
   lastMessageAt      DateTime        @default(now())
   createdAt          DateTime        @default(now())
@@ -102,12 +105,21 @@ model Agency {
   taxId        String?
   isActive     Boolean  @default(false) 
 
+  // ✅ Fintech Agence : Encaissement direct
+  walletBalance Int      @default(0) 
+
   users        User[]   
   listings     Listing[] 
   properties   Property[] 
+  
+  // ✅ Relation ajoutée : Historique financier B2B
+  transactions AgencyTransaction[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  
+  // Configuration Financière
+  defaultCommissionRate Float @default(0.10)
 }
 
 // ==========================================
@@ -202,9 +214,14 @@ model Lease {
   signatureStatus SignatureStatus @default(PENDING)
   
   tenantId        String
-  tenant          User            @relation(fields: [tenantId], references: [id])
+  tenant          User            @relation("LeaseTenant", fields: [tenantId], references: [id])
+  
   propertyId      String
   property        Property        @relation(fields: [propertyId], references: [id])
+  
+  // ✅ AJOUT CRITIQUE POUR LE WEBHOOK (Commissions Agent)
+  agentId         String?
+  agent           User?           @relation("LeaseAgent", fields: [agentId], references: [id])
   
   payments        Payment[]
   signatures      SignatureProof[]
@@ -212,6 +229,9 @@ model Lease {
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  
+  // Configuration Spécifique du Taux (Prioritaire sur l'agence)
+  agencyCommissionRate  Float?
 }
 
 model Inventory {
@@ -225,8 +245,10 @@ model Inventory {
   lease       Lease         @relation(fields: [leaseId], references: [id])
   propertyId  String
   property    Property      @relation(fields: [propertyId], references: [id])
-  agentId     String?
   
+  // Note: Cet agentId est pour celui qui FAIT l'état des lieux (Mission ponctuelle)
+  // Différent de l'agent qui GÈRE le bail (Lease.agentId)
+  agentId     String? 
   items       InventoryItem[]
 }
 
@@ -248,7 +270,6 @@ model SignatureProof {
   ipAddress String
   signedAt  DateTime @default(now())
   userAgent String?
-  
   signatureData String?  @db.Text
   otpToken  String?
   
@@ -263,7 +284,7 @@ model SignatureProof {
   documentType String   @default("LEASE")
 }
 
-// ✅ NOUVEAU : Preuves de signature pour les INVESTISSEURS (Contexte Crowdfunding)
+// ✅ Preuves de signature pour les INVESTISSEURS (Contexte Crowdfunding)
 model InvestmentContract {
   id            String   @id @default(cuid())
   signedAt      DateTime @default(now())
@@ -272,13 +293,16 @@ model InvestmentContract {
   ipAddress     String
   userAgent     String?
   signatureData String   @db.Text // L'image Base64
+
+  paymentReference String? @unique // L'ID de transaction CinetPay (cpm_trans_id)
+  status           String   @default("PENDING") // PENDING, ACTIVE, FAILED
   
   // Liaison directe avec l'investisseur
   userId        String
   user          User     @relation(fields: [userId], references: [id])
 
   // Métadonnées du contrat figées à la signature
-  packName      String?  // "VISIONNAIRE", etc.
+  packName      String? // "VISIONNAIRE", etc.
   amount        Int      // Le montant engagé
 }
 
@@ -305,7 +329,6 @@ model Listing {
   images         String[]
   amenities      Json     
   accessVideoUrl String?
-
   isPublished    Boolean  @default(false)
 
   hostId         String
@@ -367,10 +390,12 @@ model Payment {
   status         PaymentStatus @default(PENDING)
   method         String?       // WAVE, OM...
   reference      String?
-
-  amountOwner    Int           @default(0)
-  amountPlatform Int           @default(0)
-  amountAgent    Int           @default(0)
+  
+  // ✅ VENTILATION FINANCIÈRE COMPLÈTE
+  amountOwner    Int           @default(0) // Part Propriétaire
+  amountPlatform Int           @default(0) // Part ImmoFacile
+  amountAgent    Int           @default(0) // Part Agent Indépendant
+  amountAgency   Int           @default(0) // Part Agence B2B
 
   leaseId        String
   lease          Lease         @relation(fields: [leaseId], references: [id])
@@ -393,15 +418,31 @@ model BookingPayment {
   createdAt        DateTime        @default(now())
 }
 
-// Transactions Génériques (Wallet / Crowdfunding)
+// Transactions Utilisateurs (Personnes Physiques)
 model Transaction {
   id          String   @id @default(cuid())
   amount      Int
   type        String   // "CREDIT" | "DEBIT"
   reason      String   // Ex: "CROWDFUNDING_PACK_GOLD"
+  status      String   @default("SUCCESS") // "PENDING", "SUCCESS", "FAILED"
   
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+// ✅ NOUVEAU : Transactions Agences (Personnes Morales B2B)
+// Sépare la trésorerie entreprise des comptes personnels
+model AgencyTransaction {
+  id          String   @id @default(cuid())
+  amount      Int
+  type        String   // "CREDIT" | "DEBIT"
+  reason      String   // Ex: "COMMISSION_LOYER_LE_PLATEAU", "CASHOUT_ORANGE"
+  status      String   @default("SUCCESS") // "PENDING", "SUCCESS", "FAILED"
+  
+  agencyId    String
+  agency      Agency   @relation(fields: [agencyId], references: [id])
   
   createdAt   DateTime @default(now())
 }
@@ -487,7 +528,7 @@ model Conversation {
   hostId    String
   host      User      @relation("HostConversations", fields: [hostId], references: [id])
   
-  listingId String?   
+  listingId String?
   listing   Listing?  @relation(fields: [listingId], references: [id])
 
   messages  Message[]
@@ -502,6 +543,7 @@ model Message {
   isRead         Boolean      @default(false)
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id])
   createdAt      DateTime     @default(now())

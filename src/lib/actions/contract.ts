@@ -12,23 +12,28 @@ export async function signInvestmentContract(userId: string, signatureData: stri
     const ip = headersList.get('x-forwarded-for') || 'Unknown IP';
     const userAgent = headersList.get('user-agent') || 'Unknown User-Agent';
 
-    // On récupère d'abord l'user pour avoir le montant et le pack (pour l'historique)
+    // 1. On récupère les infos user
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
-    // ✅ ON CRÉE DANS LA NOUVELLE TABLE DÉDIÉE
-    await prisma.investmentContract.create({
+    // 2. ✅ ON CRÉE LE CONTRAT ET ON LE STOCKE DANS UNE VARIABLE
+    const newContract = await prisma.investmentContract.create({
       data: {
         userId: userId,
         ipAddress: ip,
         userAgent: userAgent,
         signatureData: signatureData,
-        amount: user?.walletBalance || 0, // On fige le montant dans le contrat
+        amount: user?.walletBalance || 0, 
         packName: user?.backerTier || "Standard"
       }
     });
 
     revalidatePath('/invest/dashboard');
-    return { success: true };
+    
+    // 3. ✅ RETURN CRITIQUE : ON RENVOIE L'ID POUR LE PAIEMENT
+    return { 
+        success: true, 
+        contractId: newContract.id 
+    };
 
   } catch (error) {
     console.error("Erreur signature:", error);

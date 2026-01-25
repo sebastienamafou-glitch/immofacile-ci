@@ -4,18 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Swal from "sweetalert2";
+import { toast } from "sonner"; // ✅ Standard du projet
 import { 
-  ShieldCheck, Search, CheckCircle, XCircle, Eye, Loader2, FileText, AlertTriangle
+  ShieldCheck, CheckCircle, XCircle, FileText, AlertTriangle, Loader2, ExternalLink
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+// ✅ Typage Strict
 interface KycUser {
   id: string;
   name: string;
   email: string;
   role: string;
   kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  documents: string[]; // Toujours un tableau, jamais null
+  documents: string[];
+  createdAt: string;
 }
 
 export default function AdminKycPage() {
@@ -24,40 +27,25 @@ export default function AdminKycPage() {
   const [users, setUsers] = useState<KycUser[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING'>('PENDING');
 
-  const getAdminUser = () => {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return null;
-    const user = JSON.parse(stored);
-    return user.role === 'SUPER_ADMIN' ? user : null;
-  };
-
+  // --- CHARGEMENT DES DONNÉES ---
   const fetchKycUsers = async () => {
-    const admin = getAdminUser();
-    if (!admin) { router.push('/login'); return; }
-
     try {
-        const res = await api.get('/admin/kyc', {
-            headers: { 'x-user-email': admin.email }
-        });
+        setLoading(true);
+        // ❌ Pas de headers manuels ! Le cookie fait le travail via le Middleware.
+        const res = await api.get('/superadmin/kyc'); 
         
         if (res.data.success) {
-            // ✅ SÉCURISATION DES DONNÉES (Nettoyage)
-            // On s'assure que 'documents' est toujours un tableau []
-            // On s'assure que 'name' n'est jamais vide
-            const cleanUsers = (res.data.users || []).map((u: any) => ({
-                id: u.id,
-                name: u.name || "Utilisateur Inconnu",
-                email: u.email || "No Email",
-                role: u.role || "USER",
-                kycStatus: u.kycStatus || "PENDING",
-                documents: Array.isArray(u.documents) ? u.documents : [] 
-            }));
-            
-            setUsers(cleanUsers);
+            setUsers(res.data.users);
         }
-    } catch (error) {
-        console.error(error);
+    } catch (error: any) {
+        console.error("Erreur Fetch KYC", error);
+        // Gestion intelligente de la redirection
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+             toast.error("Session expirée, veuillez vous reconnecter.");
+             router.push('/login');
+        } else {
+             toast.error("Impossible de charger les dossiers.");
+        }
     } finally {
         setLoading(false);
     }
@@ -68,144 +56,154 @@ export default function AdminKycPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- ACTION DE MODÉRATION ---
   const handleDecision = async (userId: string, name: string, decision: 'VERIFIED' | 'REJECTED') => {
-    const admin = getAdminUser();
-    if (!admin) return;
-
     const isApprove = decision === 'VERIFIED';
 
+    // 1. Confirmation visuelle (Swal pour l'impact)
     const result = await Swal.fire({
-        title: isApprove ? 'Valider le dossier ?' : 'Rejeter le dossier ?',
-        text: isApprove ? `Confirmer l'identité de ${name}` : "L'utilisateur devra resoumettre ses documents.",
+        title: isApprove ? 'Valider ce dossier ?' : 'Rejeter ce dossier ?',
+        text: isApprove 
+            ? `Cela donnera le badge "Vérifié" à ${name}.` 
+            : `L'utilisateur ${name} recevra une notification pour resoumettre.`,
         icon: isApprove ? 'question' : 'warning',
         showCancelButton: true,
         confirmButtonColor: isApprove ? '#10b981' : '#ef4444',
         cancelButtonColor: '#1e293b',
         confirmButtonText: isApprove ? 'Oui, Valider' : 'Rejeter',
-        background: '#0f172a', color: '#fff'
+        cancelButtonText: 'Annuler',
+        background: '#0f172a', color: '#fff',
+        iconColor: isApprove ? '#10b981' : '#ef4444'
     });
 
     if (result.isConfirmed) {
+        // 2. Feedback immédiat
+        const toastId = toast.loading("Traitement en cours...");
+
         try {
-            await api.put('/admin/kyc', 
-                { userId, status: decision },
-                { headers: { 'x-user-email': admin.email } }
-            );
+            // 3. Appel API
+            await api.put('/superadmin/kyc', { userId, status: decision });
             
-            // Mise à jour locale Optimiste
+            // 4. Mise à jour Optimiste (UI)
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, kycStatus: decision } : u));
             
-            Swal.fire({ 
-                title: isApprove ? 'Validé !' : 'Rejeté', 
-                icon: 'success', 
-                timer: 1500, 
-                showConfirmButton: false, 
-                background: '#0f172a', color: '#fff' 
-            });
-        } catch (e) {
-            Swal.fire({ title: 'Erreur', icon: 'error', background: '#0f172a', color: '#fff' });
+            toast.success(isApprove ? "Dossier validé !" : "Dossier rejeté.", { id: toastId });
+
+        } catch (error) {
+            toast.error("Une erreur est survenue.", { id: toastId });
         }
     }
   };
 
-  // Filtrage sécurisé
+  // Filtrage
   const filteredUsers = users.filter(u => filter === 'ALL' ? true : u.kycStatus === 'PENDING');
 
   if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white gap-3">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-500"/>
-        <p className="text-sm font-mono text-slate-500">Chargement des dossiers KYC...</p>
+    <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white gap-4">
+        <Loader2 className="w-12 h-12 animate-spin text-emerald-500"/>
+        <p className="text-sm font-mono text-slate-500 animate-pulse">Analyse biométrique en cours...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#0B1120] p-6 md:p-10 text-slate-200">
+    <div className="min-h-screen bg-[#020617] p-6 md:p-8 text-slate-200 font-sans">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
         <div>
-            <h1 className="text-3xl font-black text-white flex items-center gap-3">
-                <ShieldCheck className="text-emerald-500" /> Vérifications Identité
+            <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-tight">
+                <ShieldCheck className="w-8 h-8 text-emerald-500" /> Conformité KYC
             </h1>
-            <p className="text-slate-400 mt-1">Conformité et sécurité des utilisateurs.</p>
+            <p className="text-slate-400 mt-1 text-sm">
+                Vérification des pièces d'identité (CNI, Passeport) des utilisateurs.
+            </p>
         </div>
         
-        <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
+        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
             <button 
                 onClick={() => setFilter('PENDING')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'PENDING' ? 'bg-orange-500 text-black' : 'text-slate-400 hover:text-white'}`}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${filter === 'PENDING' ? 'bg-[#F59E0B] text-black shadow-lg' : 'text-slate-400 hover:text-white'}`}
             >
-                En Attente ({users.filter(u => u.kycStatus === 'PENDING').length})
+                <AlertTriangle className="w-3 h-3"/> À Traiter ({users.filter(u => u.kycStatus === 'PENDING').length})
             </button>
             <button 
                 onClick={() => setFilter('ALL')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'ALL' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${filter === 'ALL' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
             >
-                Historique
+                Historique Complet
             </button>
         </div>
       </div>
 
-      {/* LISTE */}
-      <div className="grid gap-4">
+      {/* LISTE DES DOSSIERS */}
+      <div className="space-y-4">
         {filteredUsers.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
-                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20 text-emerald-500" />
-                <p>Aucun dossier en attente. Tout est propre !</p>
+            <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
+                <CheckCircle className="w-16 h-16 mb-4 text-emerald-500/20" />
+                <p className="text-lg font-bold text-white">Tout est à jour !</p>
+                <p className="text-sm text-slate-500">Aucun dossier en attente de validation.</p>
             </div>
         ) : (
             filteredUsers.map((user) => (
-                <div key={user.id} className="bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-slate-700 transition-all">
+                <div key={user.id} className="bg-[#0B1120] border border-white/10 rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:border-white/20 transition-all shadow-lg shadow-black/20">
                     
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-lg text-slate-400 border border-slate-700 uppercase">
-                            {/* ✅ SÉCURITÉ : Fallback si le nom est vide */}
-                            {(user.name || "U").charAt(0)}
+                    {/* INFO UTILISATEUR */}
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center font-black text-xl text-slate-300 border border-white/10 shadow-inner">
+                            {(user.name || "?").charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <div className="flex items-center gap-3">
-                                <h3 className="font-bold text-white text-lg">{user.name}</h3>
-                                {user.kycStatus === 'PENDING' && <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20">En Attente</Badge>}
-                                {user.kycStatus === 'VERIFIED' && <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Vérifié</Badge>}
-                                {user.kycStatus === 'REJECTED' && <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Rejeté</Badge>}
+                            <div className="flex items-center gap-3 mb-1">
+                                <h3 className="font-bold text-white text-lg tracking-tight">{user.name}</h3>
+                                {user.kycStatus === 'PENDING' && <Badge className="bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20 hover:bg-[#F59E0B]/20">En Attente</Badge>}
+                                {user.kycStatus === 'VERIFIED' && <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">Vérifié</Badge>}
+                                {user.kycStatus === 'REJECTED' && <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Rejeté</Badge>}
                             </div>
-                            <p className="text-sm text-slate-500 flex items-center gap-2">
-                                {user.email} • <span className="font-mono text-slate-400 uppercase text-xs">{user.role}</span>
-                            </p>
+                            <div className="flex items-center gap-3 text-xs text-slate-500 font-mono">
+                                <span>{user.email}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-700"></span>
+                                <span className="uppercase text-slate-400 font-bold">{user.role}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        {/* ✅ SÉCURITÉ : Vérification robuste du tableau documents */}
+                    {/* ACTIONS & DOCUMENTS */}
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        
+                        {/* Bouton Document */}
                         {user.documents && user.documents.length > 0 ? (
                             <a 
                                 href={user.documents[0]} 
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-bold transition"
+                                className="group flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-300 border border-white/10 hover:border-blue-500/30 rounded-xl text-xs font-bold transition"
                             >
-                                <FileText className="w-4 h-4" /> Voir Pièce
+                                <FileText className="w-4 h-4" /> 
+                                <span>Voir Pièce</span>
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"/>
                             </a>
                         ) : (
-                            <span className="text-xs text-red-400 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Pas de fichier</span>
+                            <div className="flex items-center gap-2 px-4 py-2.5 bg-red-500/5 text-red-500 border border-red-500/10 rounded-xl text-xs font-bold cursor-not-allowed">
+                                <AlertTriangle className="w-4 h-4"/> Document Manquant
+                            </div>
                         )}
 
-                        {/* Actions (Uniquement si PENDING) */}
+                        {/* Boutons de Décision */}
                         {user.kycStatus === 'PENDING' && (
-                            <>
+                            <div className="flex items-center gap-2 pl-2 border-l border-white/10 ml-2">
                                 <button 
                                     onClick={() => handleDecision(user.id, user.name, 'VERIFIED')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-emerald-900/20"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-emerald-900/20 hover:scale-105 active:scale-95"
                                 >
                                     <CheckCircle className="w-4 h-4" /> Valider
                                 </button>
                                 <button 
                                     onClick={() => handleDecision(user.id, user.name, 'REJECTED')}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-lg text-sm font-bold transition"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-red-500 hover:text-white text-slate-400 border border-white/10 hover:border-red-500 rounded-xl text-xs font-bold transition hover:scale-105 active:scale-95"
                                 >
                                     <XCircle className="w-4 h-4" /> Refuser
                                 </button>
-                            </>
+                            </div>
                         )}
                     </div>
 
