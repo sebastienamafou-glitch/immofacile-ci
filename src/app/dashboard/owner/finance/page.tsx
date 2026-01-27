@@ -9,40 +9,41 @@ import {
   Info, Loader2, Plane
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { User } from "@prisma/client";
+import { toast } from "sonner";
 
+// Chargement PDF Dynamique
 const DownloadRentReceipt = dynamic(
   () => import('@/components/pdf/DownloadRentReceipt'),
   { ssr: false }
 );
 
-// --- 1. INTERFACES SYNCHRONISÉES AVEC L'API ---
+// --- 1. INTERFACES STRICTES ---
 
 interface TransactionDetails {
   property: string;
-  tenant?: string; // Pour Location
-  guest?: string;  // Pour Akwaba
+  tenant?: string; 
+  guest?: string;  
 }
 
 interface FinanceItem {
   id: string;
-  amount: number;       // LE MONTANT NET (Reçu par le owner)
-  grossAmount: number;  // LE MONTANT BRUT (Payé par le client)
-  date: string;
+  amount: number;       // NET Owner
+  grossAmount: number;  // BRUT Client
+  type?: string;        // 'LOYER', etc.
   status: string;
+  date: string;
   source: 'RENTAL' | 'AKWABA';
   details: TransactionDetails;
-  
-  // Champs spécifiques pour reconstruire les objets si besoin
-  type?: string; 
-  leaseId?: string; // Si dispo
+  leaseId?: string;
 }
 
 interface FinanceData {
   walletBalance: number;
   escrowBalance: number;
-  payments: FinanceItem[]; // L'API renvoie maintenant ce format unifié
-  bookings: FinanceItem[]; // L'API renvoie maintenant ce format unifié
-  user: any;
+  payments: FinanceItem[]; 
+  bookings: FinanceItem[]; 
+  user: Pick<User, 'name' | 'email' | 'phone' | 'address'>; 
 }
 
 export default function OwnerFinancePage() {
@@ -50,82 +51,76 @@ export default function OwnerFinancePage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FinanceData | null>(null);
   
-  // États Modale (Inchangés)
+  // États Modale Retrait
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // --- 2. CHARGEMENT ---
+  // --- 2. CHARGEMENT (ZERO TRUST) ---
   const fetchData = async () => {
-    const stored = localStorage.getItem("immouser");
-    if (!stored) {
-        router.push('/login');
-        return;
-    }
-    const user = JSON.parse(stored);
-
     try {
-      const res = await api.get('/owner/finance', {
-        headers: { 'x-user-email': user.email }
-      });
-      setData(res.data);
-    } catch (error) {
+      // ✅ APPEL SÉCURISÉ : Cookie Only
+      const res = await api.get('/owner/finance');
+      if(res.data.success) {
+          setData(res.data);
+      }
+    } catch (error: any) {
       console.error("Erreur finance", error);
+      if (error.response?.status === 401) {
+          router.push('/login');
+      } else {
+          toast.error("Impossible de charger les données financières.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  // --- 3. RETRAIT (Inchangé) ---
+  // --- 3. RETRAIT RAPIDE ---
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!data) return;
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return;
+    
     const amount = parseInt(withdrawAmount);
 
     if (amount > data.walletBalance) {
-      alert("Fonds insuffisants !");
+      toast.error("Fonds insuffisants !");
       return;
     }
     if (amount < 1000) {
-      alert("Minimum 1000 FCFA");
+      toast.error("Minimum 1000 FCFA");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // ✅ APPEL POST SÉCURISÉ (utilise route.ts validé précédemment)
       await api.post('/owner/withdraw', {
         amount: amount,
-        paymentDetails: phoneNumber
-      }, {
-        headers: { 'x-user-email': JSON.parse(stored).email }
+        paymentDetails: `MOBILE MONEY - ${phoneNumber}`
       });
+      
       setSuccessMsg("Retrait initié avec succès !");
       setWithdrawAmount('');
       setPhoneNumber('');
-      await fetchData();
+      await fetchData(); // Rafraîchir le solde affiché
+      
       setTimeout(() => { setIsModalOpen(false); setSuccessMsg(''); }, 2000);
-    } catch (error) {
-      console.error(error);
-      alert("Erreur lors du retrait.");
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Erreur lors du retrait.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- 4. PRÉPARATION DU TABLEAU UNIFIÉ ---
+  // --- 4. TABLEAU UNIFIÉ ---
   const transactions: FinanceItem[] = React.useMemo(() => {
     if (!data) return [];
-    
-    // Fusion et Tri par date décroissante
-    // L'API a déjà formaté les données, on a juste à concaténer
+    // Fusion et tri par date décroissante
     return [...(data.payments || []), ...(data.bookings || [])].sort((a, b) => {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
@@ -137,7 +132,7 @@ export default function OwnerFinancePage() {
     </div>
   );
 
-  const walletBalance = data?.walletBalance || 0;
+  const walletBalance = data?.walletBalance ?? 0;
 
   return (
     <main className="min-h-screen bg-[#0B1120] text-slate-200 p-6 lg:p-10 font-sans pb-20 relative">
@@ -173,7 +168,7 @@ export default function OwnerFinancePage() {
             </p>
             <button 
                 onClick={() => setIsModalOpen(true)}
-                className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest w-full hover:bg-orange-400 transition shadow-lg flex justify-center items-center gap-2"
+                className="bg-orange-500 text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-widest w-full hover:bg-orange-400 transition shadow-lg flex justify-center items-center gap-2 active:scale-95"
             >
                 Retirer mes fonds
             </button>
@@ -188,9 +183,9 @@ export default function OwnerFinancePage() {
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Compte Séquestre</h3>
             </div>
             <div className="text-4xl font-black text-white mb-2 tracking-tighter">
-                {data?.escrowBalance.toLocaleString()} <span className="text-lg text-slate-600">FCFA</span>
+                {(data?.escrowBalance ?? 0).toLocaleString()} <span className="text-lg text-slate-600">FCFA</span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">Total des cautions actives.</p>
+            <p className="text-xs text-slate-500 font-medium">Total des cautions actives (Bloqué).</p>
         </div>
 
         {/* Carte Info Commissions */}
@@ -198,13 +193,13 @@ export default function OwnerFinancePage() {
             <div className="flex items-start gap-3">
                 <Info className="w-6 h-6 text-blue-400 shrink-0" />
                 <div>
-                    <h3 className="text-sm font-bold text-white mb-2">Commissions</h3>
+                    <h3 className="text-sm font-bold text-white mb-2">Structure des Commissions</h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
                         • <span className="text-blue-400 font-bold">Location</span> : 5% (Gestion & Assurance).
                         <br/>
-                        • <span className="text-purple-400 font-bold">Akwaba</span> : Variable (Service).
+                        • <span className="text-purple-400 font-bold">Akwaba</span> : Variable selon la saison.
                         <br/>
-                        • <span className="text-emerald-400 font-bold">Net</span> : Ce qui arrive dans votre poche.
+                        • <span className="text-emerald-400 font-bold">Net</span> : Montant affiché dans votre solde.
                     </p>
                 </div>
             </div>
@@ -225,9 +220,9 @@ export default function OwnerFinancePage() {
                             <th className="p-6">Date</th>
                             <th className="p-6">Origine</th>
                             <th className="p-6">Détails</th>
-                            <th className="p-6 text-right">Montant Client (Brut)</th>
-                            <th className="p-6 text-right text-red-400">Commission</th>
-                            <th className="p-6 text-right text-emerald-500">Votre Gain (Net)</th>
+                            <th className="p-6 text-right">Montant Brut</th>
+                            <th className="p-6 text-right text-red-400">Com.</th>
+                            <th className="p-6 text-right text-emerald-500">Net Reçu</th>
                             <th className="p-6 text-right">Document</th>
                         </tr>
                     </thead>
@@ -235,12 +230,10 @@ export default function OwnerFinancePage() {
                         {transactions.map((tx, idx) => {
                             const isAkwaba = tx.source === 'AKWABA';
                             
-                            // Données pré-calculées par l'API = Pas d'erreur de math en Front
                             const gross = tx.grossAmount;
                             const net = tx.amount;
                             const commission = gross - net;
 
-                            // Badge & Style
                             const badgeLabel = isAkwaba ? "Court Séjour" : "Loyer";
                             const badgeColor = isAkwaba 
                                 ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
@@ -284,18 +277,21 @@ export default function OwnerFinancePage() {
                                     </td>
 
                                     <td className="p-6 text-right">
-                                      {!isAkwaba && (
+                                      {!isAkwaba && data?.user && (
                                         <div className="flex justify-end">
-                                            {/* Reconstruction d'un objet partiel pour le PDF */}
                                             <DownloadRentReceipt 
-                                                payment={tx as any} 
+                                                payment={{
+                                                    id: tx.id,
+                                                    amount: tx.amount, // Net reçu
+                                                    date: new Date(tx.date),
+                                                    type: tx.type || 'LOYER'
+                                                }} 
                                                 lease={{ 
-                                                    property: { title: propertyTitle },
-                                                    tenant: { name: clientName }
-                                                } as any}
-                                                tenant={{ name: clientName } as any}
-                                                property={{ title: propertyTitle } as any}
-                                                owner={data?.user} 
+                                                    property: { title: propertyTitle }
+                                                }}
+                                                tenant={{ name: clientName || "Inconnu" }}
+                                                property={{ title: propertyTitle }}
+                                                owner={data.user} 
                                             />
                                         </div>
                                       )}
@@ -319,17 +315,15 @@ export default function OwnerFinancePage() {
         )}
       </div>
 
-      {/* MODALE DE RETRAIT (Reste identique à votre code précédent) */}
+      {/* MODALE DE RETRAIT */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
            <div className="bg-[#0F172A] border border-slate-700 w-full max-w-md rounded-[2rem] p-8 relative shadow-2xl animate-in zoom-in-95">
               <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition bg-white/5 hover:bg-white/10 p-2 rounded-full">
                 <X size={20} />
               </button>
-              {/* Contenu Formulaire identique... */}
-              {/* J'ai abrégé cette partie car elle ne change pas logiquement, 
-                  mais assurez-vous de garder tout le bloc JSX du form ici */}
-                 <div className="text-center mb-8">
+              
+              <div className="text-center mb-8">
                 <div className="bg-orange-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-orange-500/20 shadow-lg shadow-orange-500/10">
                     <span className="text-4xl">💸</span>
                 </div>
@@ -377,7 +371,7 @@ export default function OwnerFinancePage() {
                         disabled={isSubmitting}
                         className="w-full bg-orange-500 hover:bg-orange-400 text-white font-black py-4 rounded-xl shadow-xl shadow-orange-500/20 transition-all mt-4 disabled:opacity-50 flex justify-center items-center gap-2 active:scale-95 text-sm uppercase tracking-widest"
                     >
-                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmer le retrait'}
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'CONFIRMER LE RETRAIT'}
                     </button>
                 </form>
               ) : (

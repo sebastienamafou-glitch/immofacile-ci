@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "sonner"; // ✅ 1. IMPORT OBLIGATOIRE
+import { Toaster } from "sonner"; 
+import { Providers } from "@/components/Providers";
 
 // 1. Configuration des polices
 const fontSans = Inter({
@@ -37,10 +38,11 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-[#0B1120]`}>
-        {children}
-        
-        {/* ✅ 2. LE COMPOSANT QUI AFFICHE LES POPUPS (INDISPENSABLE) */}
-        <Toaster position="top-right" richColors theme="dark" closeButton />
+        {/* ✅ CORRECTION : Providers englobe TOUT (Application + Toaster) */}
+        <Providers> 
+          {children}
+          <Toaster position="top-right" richColors theme="dark" closeButton />
+        </Providers>
       </body>
     </html>
   );

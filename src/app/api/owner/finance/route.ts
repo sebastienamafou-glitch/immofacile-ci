@@ -5,16 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ & IDENTIFICATION
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION DU PROPRIÉTAIRE (Profil & Soldes)
-    // On ne charge pas tout l'historique ici pour alléger la requête initiale
     const owner = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: { id: userId },
       include: {
-        // Nécessaire pour le calcul de sécurité du séquestre
+        // Nécessaire pour le calcul de sécurité du séquestre (Cautions)
         propertiesOwned: {
             include: {
                 leases: {
@@ -31,18 +30,17 @@ export async function GET(request: Request) {
     }
 
     // 3. RECUPERATION OPTIMISÉE DES TRANSACTIONS (LONGUE DURÉE)
-    // On requête directement la table Payment pour avoir une pagination globale correcte
     const rawPayments = await prisma.payment.findMany({
       where: {
-        status: 'SUCCESS', // On ne veut que l'argent encaissé
+        status: 'SUCCESS',
         lease: {
           property: {
-            ownerId: owner.id
+            ownerId: owner.id // Verrouillage par ID
           }
         }
       },
       orderBy: { date: 'desc' },
-      take: 20, // Les 20 derniers mouvements globaux
+      take: 20,
       include: {
         lease: {
           select: {
@@ -54,15 +52,15 @@ export async function GET(request: Request) {
       }
     });
 
-    // Mapping propre pour le Frontend
+    // Mapping propre
     const leasePayments = rawPayments.map(p => ({
       id: p.id,
-      amount: p.amountOwner, // [CORRECTION] Le montant NET pour le propriétaire
-      grossAmount: p.amount, // Montant payé par le locataire (pour info)
+      amount: p.amountOwner, // Montant NET
+      grossAmount: p.amount, // Montant BRUT
       type: p.type,
       status: p.status,
       date: p.date,
-      source: "RENTAL", // Tag pour le frontend
+      source: "RENTAL",
       details: {
         property: p.lease.property.title,
         tenant: p.lease.tenant.name
@@ -72,7 +70,7 @@ export async function GET(request: Request) {
     // 4. RECUPERATION OPTIMISÉE DES RÉSERVATIONS (COURTE DURÉE / AKWABA)
     const rawBookings = await prisma.booking.findMany({
       where: {
-        listing: { hostId: owner.id },
+        listing: { hostId: owner.id }, // Verrouillage par ID
         status: { in: ['PAID', 'CONFIRMED', 'COMPLETED'] }
       },
       orderBy: { createdAt: 'desc' },
@@ -80,20 +78,19 @@ export async function GET(request: Request) {
       include: {
         listing: { select: { title: true } },
         guest: { select: { name: true } },
-        payment: true // Pour le détail financier
+        payment: true
       }
     });
 
-    // Mapping propre
     const akwabaBookings = rawBookings.map(b => ({
       id: b.id,
-      amount: b.payment?.hostPayout || 0, // [CORRECTION] Le montant NET
+      amount: b.payment?.hostPayout || 0, // Montant NET
       grossAmount: b.totalPrice,
       startDate: b.startDate,
       endDate: b.endDate,
-      date: b.createdAt, // Pour tri unifié si besoin
+      date: b.createdAt,
       status: b.status,
-      source: "AKWABA", // Tag pour le frontend
+      source: "AKWABA",
       details: {
         property: b.listing.title,
         guest: b.guest.name
@@ -101,7 +98,6 @@ export async function GET(request: Request) {
     }));
 
     // 5. CALCUL DE SÉCURITÉ (SÉQUESTRE)
-    // On recalcule la somme des cautions actives pour être sûr (Source of Truth)
     const calculatedEscrow = owner.propertiesOwned.reduce((acc, property) => {
         return acc + property.leases.reduce((sum, lease) => sum + (lease.depositAmount || 0), 0);
     }, 0);
@@ -110,15 +106,16 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       walletBalance: owner.walletBalance, // Argent dispo
-      escrowBalance: calculatedEscrow,    // Argent bloqué (Caution)
+      escrowBalance: calculatedEscrow,    // Argent bloqué
       
-      // Listes de données
       payments: leasePayments,
       bookings: akwabaBookings,
       
       user: {
         name: owner.name,
-        email: owner.email
+        email: owner.email,
+        phone: owner.phone,
+        address: owner.address
       }
     });
 

@@ -1,28 +1,23 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
+// ==========================================
 // GET : Historique complet (Incidents + Transactions)
+// ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-
-    const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    
-    // ✅ Vérification Rôle
-    if (!owner || owner.role !== "OWNER") {
-        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
-    }
+    // 1. SÉCURITÉ ZERO TRUST (Via ID)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION
-    // A. Les incidents ayant un coût (Maintenance)
+    // A. Les incidents avec coût (Maintenance + Dépenses manuelles)
     const incidents = await prisma.incident.findMany({
       where: {
-        property: { ownerId: owner.id },
-        finalCost: { not: null, gt: 0 } // gt = greater than 0
+        property: { ownerId: userId }, // 🔒 Verrouillage Propriétaire
+        finalCost: { not: null, gt: 0 } 
       },
       include: { 
         property: { select: { title: true } } 
@@ -30,20 +25,20 @@ export async function GET(request: Request) {
       orderBy: { updatedAt: 'desc' }
     });
 
-    // B. Les transactions de débit (Frais plateforme, etc.)
+    // B. Les transactions de débit (Frais plateforme, Retraits, etc.)
     const transactions = await prisma.transaction.findMany({
       where: { 
-        userId: owner.id, 
+        userId: userId, // 🔒 Verrouillage Propriétaire
         type: "DEBIT" 
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // 3. FUSION ET FORMATAGE (Sans 'any')
+    // 3. FUSION ET FORMATAGE
     const expensesFromIncidents = incidents.map((inc) => ({
         id: `INC-${inc.id}`,
         date: inc.updatedAt,
-        category: "MAINTENANCE",
+        category: inc.title.startsWith('[Dépense:') ? "MANUEL" : "MAINTENANCE", // Distinction visuelle
         description: inc.title,
         amount: inc.finalCost || 0,
         propertyTitle: inc.property.title,
@@ -56,13 +51,13 @@ export async function GET(request: Request) {
         category: "TRANSACTION",
         description: tx.reason || "Opération bancaire",
         amount: tx.amount,
-        propertyTitle: "Compte Général", // Souvent lié au wallet, pas à un bien précis
+        propertyTitle: "Global", 
         source: "WALLET"
     }));
 
     const expenseList = [...expensesFromIncidents, ...expensesFromTransactions];
-
-    // Tri par date décroissante
+    
+    // Tri décroissant
     expenseList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json({ success: true, expenses: expenseList });
@@ -73,17 +68,14 @@ export async function GET(request: Request) {
   }
 }
 
+// ==========================================
 // POST : Ajouter une dépense manuelle
+// ==========================================
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-
-    const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!owner || owner.role !== "OWNER") {
-        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    }
+    // 1. SÉCURITÉ ZERO TRUST
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await request.json();
     const { propertyId, amount, category, description } = body;
@@ -93,31 +85,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Montant et Propriété requis" }, { status: 400 });
     }
 
-    // 3. VÉRIFICATION DE PROPRIÉTÉ (CRUCIAL !)
-    // On vérifie que le bien appartient bien à celui qui déclare la dépense
+    // 3. VÉRIFICATION DE PROPRIÉTÉ (Anti-IDOR)
     const property = await prisma.property.findFirst({
         where: {
             id: propertyId,
-            ownerId: owner.id
+            ownerId: userId // 🔒 Le bien doit appartenir à l'utilisateur connecté
         }
     });
 
     if (!property) {
-        return NextResponse.json({ error: "Bien introuvable ou ne vous appartient pas." }, { status: 403 });
+        return NextResponse.json({ error: "Bien introuvable ou accès refusé." }, { status: 403 });
     }
 
-    // 4. CRÉATION (Via astuce Incident Résolu)
-    // C'est une bonne astuce pour lier la dépense au bien sans changer le schéma.
+    // 4. CRÉATION (Stockage via Incident Résolu)
     const expense = await prisma.incident.create({
         data: {
             title: `[Dépense: ${category || 'AUTRE'}] ${description || 'Frais divers'}`,
-            description: description || "Ajout manuel",
+            description: description || "Ajout manuel depuis le dashboard",
             status: "RESOLVED",
             priority: "NORMAL",
             finalCost: parseFloat(amount),
-            photos: [], // Tableau vide obligatoire si défini dans le schema
+            photos: [], // Tableau vide pour respecter le schéma
             propertyId: property.id,
-            reporterId: owner.id // Le propriétaire est le reporter
+            reporterId: userId // Le déclarant est le propriétaire
         }
     });
 

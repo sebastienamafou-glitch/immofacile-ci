@@ -1,39 +1,34 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
+// ========================================================
 // GET : Récupérer les détails d'un bail spécifique
+// ========================================================
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Correct Next.js 15
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
 
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    
-    // ✅ AJOUT SÉCURITÉ : Rôle Strict
-    if (!owner || owner.role !== "OWNER") {
-        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
-    }
-
-    // 2. RÉCUPÉRATION SÉCURISÉE
+    // 2. RÉCUPÉRATION SÉCURISÉE (Vérification propriétaire implicite)
     const lease = await prisma.lease.findFirst({
       where: {
         id: id,
-        property: { ownerId: owner.id } // On s'assure que le bien appartient au demandeur
+        property: { ownerId: userId } // 🔒 VERROU CRITIQUE : Seul le propriétaire accède
       },
       include: {
         property: { select: { id: true, title: true, address: true, commune: true } },
-        tenant: { select: { id: true, name: true, email: true, phone: true } },
+        tenant: { select: { id: true, name: true, email: true, phone: true, image: true } },
         payments: {
             orderBy: { date: 'desc' },
-            take: 12 // Historique sur 1 an glissant
+            take: 12 // Historique 12 derniers mois
         }
       }
     });
@@ -45,54 +40,52 @@ export async function GET(
     return NextResponse.json({ success: true, lease });
 
   } catch (error) {
-    console.error("Erreur GET Lease ID:", error);
+    console.error("🚨 Erreur GET Lease Detail:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
-// PUT : Résilier le bail (Terminer le contrat)
+// ========================================================
+// PUT : Actions sur le bail (Résilier / Modifier)
+// ========================================================
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // ✅ Correct Next.js 15
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const body = await request.json();
 
-    const owner = await prisma.user.findUnique({ where: { email: userEmail } });
-    
-    // ✅ AJOUT SÉCURITÉ : Rôle Strict
-    if (!owner || owner.role !== "OWNER") {
-        return NextResponse.json({ error: "Accès réservé aux propriétaires." }, { status: 403 });
-    }
-
-    // 2. VÉRIFICATION AVANT ACTION
+    // 1. VÉRIFICATION D'APPARTENANCE
     const existingLease = await prisma.lease.findFirst({
-        where: { id: id, property: { ownerId: owner.id } }
+        where: { id: id, property: { ownerId: userId } }
     });
 
     if (!existingLease) {
         return NextResponse.json({ error: "Bail introuvable" }, { status: 404 });
     }
 
-    // 3. MISE À JOUR (RÉSILIATION)
-    const updatedLease = await prisma.lease.update({
-        where: { id: id },
-        data: {
-            isActive: false,
-            status: 'TERMINATED',
-            endDate: new Date(), // Date de fin = Maintenant
-            updatedAt: new Date()
-        }
-    });
+    // 2. ACTION : RÉSILIATION (TERMINATE)
+    if (body.action === 'TERMINATE') {
+        const updatedLease = await prisma.lease.update({
+            where: { id: id },
+            data: {
+                isActive: false,
+                status: 'TERMINATED',
+                endDate: new Date(), // Date de fin effective = Maintenant
+                updatedAt: new Date()
+            }
+        });
+        return NextResponse.json({ success: true, lease: updatedLease });
+    }
 
-    return NextResponse.json({ success: true, lease: updatedLease });
+    return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
 
   } catch (error) {
-    console.error("Erreur PUT Lease ID:", error);
-    return NextResponse.json({ error: "Impossible de résilier ce bail" }, { status: 500 });
+    console.error("🚨 Erreur PUT Lease:", error);
+    return NextResponse.json({ error: "Impossible de modifier ce bail" }, { status: 500 });
   }
 }

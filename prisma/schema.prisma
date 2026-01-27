@@ -97,6 +97,7 @@ model User {
 model Agency {
   id           String   @id @default(cuid())
   name         String   @unique
+  code         String   @unique  
   slug         String   @unique 
   logoUrl      String?
   email        String?  
@@ -178,6 +179,7 @@ model Property {
   surface     Float?
   images      String[]
   isPublished Boolean  @default(true)
+  isAvailable Boolean  @default(true)
   
   ownerId     String
   owner       User     @relation("PropertyOwner", fields: [ownerId], references: [id])

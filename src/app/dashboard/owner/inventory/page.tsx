@@ -1,33 +1,36 @@
-'use client';
+"use client";
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
-import { Loader2, ClipboardList, Plus, MapPin, Calendar } from 'lucide-react';
+import { Loader2, ClipboardList, Plus, MapPin, Calendar, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Inventory, Lease, Property, User } from '@prisma/client';
+
+// Type composite pour l'UI
+type InventoryWithDetails = Inventory & {
+    lease: Lease & {
+        property: Property;
+        tenant: User;
+    }
+};
 
 export default function InventoryListPage() {
-  const [inventories, setInventories] = useState<any[]>([]);
+  const [inventories, setInventories] = useState<InventoryWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchInventories = async () => {
-        // 1. Récupération User
-        const stored = localStorage.getItem("immouser");
-        if (!stored) return;
-        const user = JSON.parse(stored);
-
         try {
-            // 2. Appel Sécurisé
-            const res = await api.get('/owner/inventory', {
-                headers: { 'x-user-email': user.email }
-            });
+            // ✅ APPEL SÉCURISÉ (Cookie Only)
+            const res = await api.get('/owner/inventory');
+            
             if(res.data.success) {
                 setInventories(res.data.inventories);
             }
         } catch (error) {
             console.error(error);
-            toast.error("Impossible de charger les états des lieux");
+            toast.error("Impossible de charger l'historique.");
         } finally {
             setLoading(false);
         }
@@ -36,47 +39,103 @@ export default function InventoryListPage() {
     fetchInventories();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="animate-spin text-[#F59E0B]" /></div>;
+  if (loading) return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] gap-4">
+          <Loader2 className="animate-spin text-[#F59E0B] w-12 h-12" />
+          <p className="text-slate-500 font-mono text-sm">Chargement des dossiers...</p>
+      </div>
+  );
 
   return (
     <main className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 pb-20">
-      <div className="flex justify-between items-center mb-8">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
-           <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">📋 États des lieux</h1>
-           <p className="text-slate-400 text-sm mt-1">Entrées et sorties locataires.</p>
+           <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
+               <ClipboardList className="w-8 h-8 text-[#F59E0B]" /> États des lieux
+           </h1>
+           <p className="text-slate-400 text-sm mt-1">
+               {inventories.length} constats numériques archivés.
+           </p>
         </div>
-        <Link href="/dashboard/owner/inventory/new" className="bg-[#F59E0B] text-black px-4 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-yellow-400 transition shadow-lg">
-           <Plus size={20} /> <span className="hidden md:inline">Nouvel EDL</span>
+        <Link 
+            href="/dashboard/owner/inventory/new" 
+            className="bg-[#F59E0B] text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-yellow-400 transition shadow-lg shadow-yellow-500/10 active:scale-95"
+        >
+           <Plus size={20} /> <span>Nouveau Constat</span>
         </Link>
       </div>
 
       {inventories.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50">
-           <ClipboardList className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-           <p className="text-slate-400">Aucun état des lieux enregistré.</p>
+        /* EMPTY STATE */
+        <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
+           <div className="bg-slate-800 p-6 rounded-full mb-6">
+                <ClipboardList className="w-12 h-12 text-slate-500" />
+           </div>
+           <h3 className="text-xl font-bold text-white mb-2">Aucun constat enregistré</h3>
+           <p className="text-slate-500 max-w-sm text-center mb-8 text-sm">
+               Réalisez votre premier état des lieux numérique (Entrée ou Sortie) pour protéger votre bien contre les dégradations.
+           </p>
+           <Link href="/dashboard/owner/inventory/new" className="text-[#F59E0B] hover:text-white transition font-bold border-b-2 border-[#F59E0B] pb-1">
+                Démarrer un état des lieux &rarr;
+           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-           {inventories.map((inv) => (
-             <div key={inv.id} className="bg-slate-900 border border-slate-800 p-5 rounded-2xl hover:border-slate-600 transition group">
-                <div className="flex justify-between items-start mb-3">
-                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${inv.type === 'ENTREE' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {inv.type === 'ENTREE' ? 'Entrée' : 'Sortie'}
-                    </span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Calendar size={12} /> {new Date(inv.date).toLocaleDateString()}
-                    </span>
-                </div>
-                {/* On sécurise l'affichage avec le ?. au cas où une relation manque */}
-                <h3 className="font-bold text-lg mb-1">{inv.lease?.property?.title || "Bien Inconnu"}</h3>
-                <p className="text-slate-400 text-xs mb-4 flex items-center gap-1">
-                    <MapPin size={12} /> {inv.lease?.property?.commune || "-"}
-                </p>
-                <div className="pt-4 border-t border-slate-800 text-sm text-slate-300">
-                    Locataire : <span className="font-bold text-white">{inv.lease?.tenant?.name || "Inconnu"}</span>
-                </div>
-             </div>
-           ))}
+        /* GRID LIST */
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+           {inventories.map((inv) => {
+             // Détection du type pour le badge
+             const isEntry = inv.type === 'ETAT_DES_LIEUX_ENTREE';
+             
+             return (
+                <Link key={inv.id} href={`/dashboard/owner/inventory/${inv.id}`} className="group block h-full">
+                    <div className="bg-[#0F172A] border border-slate-800 p-6 rounded-2xl hover:border-[#F59E0B]/50 hover:bg-slate-900 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden shadow-lg">
+                        
+                        {/* Status Badge */}
+                        <div className="flex justify-between items-start mb-6">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                isEntry 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}>
+                                {isEntry ? '📥 Entrée' : '📤 Sortie'}
+                            </span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1 font-mono bg-slate-950 px-2 py-1 rounded-md border border-slate-800">
+                                <Calendar size={12} /> {new Date(inv.date).toLocaleDateString()}
+                            </span>
+                        </div>
+
+                        {/* Corps de Carte */}
+                        <div className="mb-6">
+                            <h3 className="font-bold text-lg text-white mb-1 group-hover:text-[#F59E0B] transition truncate pr-8">
+                                {inv.lease?.property?.title || "Propriété inconnue"}
+                            </h3>
+                            <p className="text-slate-400 text-xs flex items-center gap-1 font-medium">
+                                <MapPin size={12} className="text-[#F59E0B]" /> {inv.lease?.property?.commune || "Adresse N/A"}
+                            </p>
+                        </div>
+
+                        {/* Footer Locataire */}
+                        <div className="pt-4 border-t border-slate-800 flex items-center justify-between mt-auto">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-slate-700">
+                                    {inv.lease?.tenant?.name?.charAt(0) || "?"}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-white leading-none">{inv.lease?.tenant?.name || "Locataire Inconnu"}</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5">Locataire</p>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-slate-800 p-2 rounded-lg text-slate-400 group-hover:bg-[#F59E0B] group-hover:text-black transition shadow-sm">
+                                <Eye size={16} />
+                            </div>
+                        </div>
+                    </div>
+                </Link>
+             );
+           })}
         </div>
       )}
     </main>

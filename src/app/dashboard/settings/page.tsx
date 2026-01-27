@@ -218,8 +218,8 @@ export default function SettingsPage() {
                                 <Label>Opérateur</Label>
                                 {/* CORRECTION : On utilise le controller field de React Hook Form pour le Select */}
                                 <Select 
-                                    onValueChange={(v) => financeForm.setValue("provider", v as "WAVE" | "OM" | "MTN" | "BANK")} 
-                                    defaultValue={financeForm.getValues("provider")}
+                                    onValueChange={(v) => financeForm.setValue("provider", v as "WAVE" | "OM" | "MTN" | "BANK")}
+                                    value={financeForm.watch("provider")}
                                 >
                                     <SelectTrigger className="bg-[#0B1120] border-slate-700"><SelectValue placeholder="Choisir..." /></SelectTrigger>
                                     <SelectContent className="bg-slate-900 border-slate-700 text-white">

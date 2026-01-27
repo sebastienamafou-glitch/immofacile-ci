@@ -5,27 +5,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RECUPERER LE USER ID
-    const owner = await prisma.user.findUnique({
-      where: { email: userEmail },
-      select: { id: true }
-    });
-
-    if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
-
-    // 3. RECUPERER LES RÉSERVATIONS (Côté Host)
+    // 2. RECUPERER LES RÉSERVATIONS (Côté Host)
+    // On cherche les bookings dont le listing appartient au userId
     const bookings = await prisma.booking.findMany({
       where: {
         listing: {
-          hostId: owner.id // Je suis l'hôte
+          hostId: userId // 🔒 Verrouillage par ID
         }
       },
       orderBy: {
-        startDate: 'desc' // Les plus récentes en premier
+        startDate: 'desc'
       },
       include: {
         guest: {
@@ -34,7 +27,7 @@ export async function GET(request: Request) {
             email: true,
             image: true,
             phone: true,
-            kycStatus: true // Pour savoir si l'identité est vérifiée
+            kycStatus: true
           }
         },
         listing: {
@@ -49,14 +42,13 @@ export async function GET(request: Request) {
             select: {
                 status: true,
                 hostPayout: true, // MONTANT NET
-                amount: true // MONTANT BRUT (Payé par client)
+                amount: true // MONTANT BRUT
             }
         }
       }
     });
 
-    // 4. CALCUL DES STATS RAPIDES
-    // On filtre en mémoire pour éviter 3 requêtes DB supplémentaires
+    // 3. STATS
     const stats = {
         upcoming: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) > new Date()).length,
         active: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) <= new Date() && new Date(b.endDate) >= new Date()).length,

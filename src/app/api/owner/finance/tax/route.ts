@@ -1,34 +1,30 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; 
+import { prisma } from "@/lib/prisma";
 
-// Force le mode dynamique pour ne pas mettre en cache les données financières
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : On fait confiance au Middleware qui a déjà validé le token
-    const userEmail = request.headers.get("x-user-email");
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
     
-    if (!userEmail) {
-        return NextResponse.json({ error: "Session invalide" }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: "Session invalide" }, { status: 401 });
 
+    // 2. RÉCUPÉRATION PROPRIÉTAIRE (Via ID)
     const owner = await prisma.user.findUnique({ 
-        where: { email: userEmail } 
+        where: { id: userId },
+        select: { id: true, name: true, email: true }
     });
 
-    if (!owner) {
-        return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
-    }
+    if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
 
-    // 2. PARAMÈTRES DE DATE
+    // PARAMÈTRES DATE
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
-
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
 
-    // 3. REQUÊTE OPTIMISÉE
+    // REQUÊTE OPTIMISÉE
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       include: {
@@ -37,7 +33,8 @@ export async function GET(request: Request) {
                 payments: {
                     where: {
                         date: { gte: startDate, lte: endDate },
-                        status: 'SUCCESS'
+                        status: 'SUCCESS',
+                        type: { not: 'DEPOSIT' } // ✅ FISCALITÉ : On exclut les cautions !
                     }
                 }
             }
@@ -51,18 +48,18 @@ export async function GET(request: Request) {
       }
     });
 
-    // 4. AGRÉGATION DES DONNÉES
+    // CALCULS
     let totalRevenue = 0;
     let totalExpenses = 0;
 
-    const breakdown = properties.map((prop: any) => {
-        // Revenus
-        const propRevenue = prop.leases.reduce((sum: number, lease: any) => {
-            return sum + lease.payments.reduce((pSum: number, p: any) => pSum + (p.amount || 0), 0);
+    const breakdown = properties.map((prop) => {
+        // Revenus (Loyers + Charges)
+        const propRevenue = prop.leases.reduce((sum, lease) => {
+            return sum + lease.payments.reduce((pSum, p) => pSum + (p.amount || 0), 0);
         }, 0);
 
-        // Dépenses
-        const propExpenses = prop.incidents.reduce((sum: number, inc: any) => {
+        // Dépenses (Incidents / Travaux)
+        const propExpenses = prop.incidents.reduce((sum, inc) => {
             return sum + (inc.finalCost || 0);
         }, 0);
         
@@ -83,6 +80,8 @@ export async function GET(request: Request) {
       success: true,
       data: {
           year,
+          ownerName: owner.name,
+          ownerEmail: owner.email,
           revenue: totalRevenue,
           expenses: totalExpenses,
           net: totalRevenue - totalExpenses,
@@ -92,9 +91,6 @@ export async function GET(request: Request) {
 
   } catch (error: any) {
     console.error("Erreur API Tax:", error);
-    return NextResponse.json(
-        { error: "Erreur serveur", details: error.message }, 
-        { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

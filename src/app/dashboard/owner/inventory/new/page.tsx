@@ -1,193 +1,305 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { useRouter } from 'next/navigation';
-import { Loader2, Camera, CheckCircle, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Camera, CheckCircle, ArrowLeft, Home, Utensils, Armchair, Bath, Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Lease, Property, User } from "@prisma/client";
 
-export default function NewInventoryPage() {
+// Typage strict (Jointure)
+type LeaseWithDetails = Lease & {
+    property: Property;
+    tenant: User;
+};
+
+// --- COMPOSANT INTERNE (LOGIQUE FORMULAIRE) ---
+function InventoryForm() {
   const router = useRouter();
-  const [leases, setLeases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const searchParams = useSearchParams();
+  
+  // --- ÉTAPE 1 : GESTION ID ---
+  const initialLeaseId = searchParams.get('leaseId') || "";
+  
+  const [leases, setLeases] = useState<LeaseWithDetails[]>([]);
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string>(initialLeaseId);
+  const [step, setStep] = useState(initialLeaseId ? 2 : 1);
+  const [selectedLease, setSelectedLease] = useState<LeaseWithDetails | null>(null);
 
-  // États du formulaire
-  const [selectedLeaseId, setSelectedLeaseId] = useState('');
-  const [type, setType] = useState('ENTREE');
-  const [formData, setFormData] = useState({
-    kitchenState: 'BON', kitchenPhoto: null as File | null,
-    livingState: 'BON', livingPhoto: null as File | null,
-    bathState: 'BON', bathPhoto: null as File | null,
-    comment: ''
+  // --- ÉTAPE 2 : FORMULAIRE ---
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  
+  // ENUMS PRISMA STRICTS
+  const [type, setType] = useState<"ETAT_DES_LIEUX_ENTREE" | "ETAT_DES_LIEUX_SORTIE">("ETAT_DES_LIEUX_ENTREE");
+  
+  const [rooms, setRooms] = useState({
+    kitchen: { state: "BON", photo: null as File | null, preview: "" },
+    living: { state: "BON", photo: null as File | null, preview: "" },
+    bath: { state: "BON", photo: null as File | null, preview: "" },
   });
+  const [comment, setComment] = useState("");
 
-  // Charger les baux pour le menu déroulant
+  // 1. CHARGEMENT DES DONNÉES (ZERO TRUST)
   useEffect(() => {
     const fetchLeases = async () => {
-      try {
-        console.log("🔍 Chargement des baux...");
-        // 👇 On appelle bien la liste des baux (route que nous avons créée avant)
-        const res = await api.get('/owner/leases');
-        console.log("✅ Baux reçus:", res.data);
-        
-        setLeases(res.data.leases || []);
-      } catch (e) {
-        console.error("❌ Erreur chargement baux:", e);
-      } finally {
-        setLoading(false);
-      }
+        try {
+            // ✅ APPEL SÉCURISÉ : Cookie Only
+            const res = await api.get('/owner/leases');
+            
+            if (res.data.success) {
+                // On ne prend que les baux ACTIFS ou EN ATTENTE pour un état des lieux
+                const activeLeases = res.data.leases.filter((l: Lease) => l.status !== 'CANCELLED');
+                setLeases(activeLeases);
+                
+                // Hydratation si ID présent
+                if (selectedLeaseId) {
+                    const found = activeLeases.find((l: LeaseWithDetails) => l.id === selectedLeaseId);
+                    if (found) setSelectedLease(found);
+                }
+            }
+        } catch (e: any) { 
+            console.error(e);
+            if (e.response?.status === 401) router.push('/login');
+            else toast.error("Impossible de charger les contrats.");
+        } finally {
+            setFetching(false);
+        }
     };
     fetchLeases();
-  }, []);
+  }, [selectedLeaseId, router]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+  // Gestion Photos
+  const handlePhoto = (roomKey: 'kitchen' | 'living' | 'bath', e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, [field]: e.target.files[0] });
+        const file = e.target.files[0];
+        // Preview locale immédiate
+        const previewUrl = URL.createObjectURL(file);
+        setRooms(prev => ({
+            ...prev,
+            [roomKey]: { ...prev[roomKey], photo: file, preview: previewUrl }
+        }));
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLeaseId) return alert("Veuillez sélectionner un bail.");
-    
-    setSubmitting(true);
-    
-    const data = new FormData();
-    data.append('leaseId', selectedLeaseId);
-    data.append('type', type);
-    data.append('kitchenState', formData.kitchenState);
-    data.append('livingState', formData.livingState);
-    data.append('bathState', formData.bathState);
-    data.append('comment', formData.comment);
-    
-    if (formData.kitchenPhoto) data.append('kitchenPhoto', formData.kitchenPhoto);
-    if (formData.livingPhoto) data.append('livingPhoto', formData.livingPhoto);
-    if (formData.bathPhoto) data.append('bathPhoto', formData.bathPhoto);
+  // Gestion États
+  const handleState = (roomKey: 'kitchen' | 'living' | 'bath', val: string) => {
+    setRooms(prev => ({ ...prev, [roomKey]: { ...prev[roomKey], state: val } }));
+  };
 
+  // SOUMISSION (MULTIPART/FORM-DATA)
+  const handleSubmit = async () => {
+    if (!selectedLeaseId) return;
+    setLoading(true);
+    
     try {
-      await api.post('/owner/inventory', data, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      alert("État des lieux enregistré avec succès !");
-      router.push('/dashboard/owner/inventory'); 
-    } catch (error) {
-      console.error(error);
-      alert("Erreur lors de l'enregistrement.");
+        const formData = new FormData();
+        formData.append('leaseId', selectedLeaseId);
+        formData.append('type', type);
+        
+        // Données textuelles
+        formData.append('kitchenState', rooms.kitchen.state);
+        formData.append('livingState', rooms.living.state);
+        formData.append('bathState', rooms.bath.state);
+        formData.append('comment', comment);
+        
+        // Fichiers Binaires
+        if(rooms.kitchen.photo) formData.append('kitchenPhoto', rooms.kitchen.photo);
+        if(rooms.living.photo) formData.append('livingPhoto', rooms.living.photo);
+        if(rooms.bath.photo) formData.append('bathPhoto', rooms.bath.photo);
+
+        // ✅ APPEL SÉCURISÉ
+        const res = await api.post('/owner/inventory', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        if (res.data.success) {
+            toast.success("État des lieux enregistré et archivé ! 📸");
+            router.push('/dashboard/owner/inventory');
+        }
+    } catch (e: any) {
+        console.error(e);
+        toast.error(e.response?.data?.error || "Erreur lors de l'enregistrement.");
     } finally {
-      setSubmitting(false);
+        setLoading(false);
     }
   };
 
-  if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-[#F59E0B]" />
-        <p>Chargement du formulaire...</p>
-    </div>
-  );
+  // --- VUE 1 : SÉLECTEUR DE BAIL ---
+  if (step === 1) {
+      if (fetching) return <div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-[#F59E0B]"/></div>;
+
+      return (
+        <div className="min-h-screen bg-[#0B1120] text-white p-6 flex flex-col items-center justify-center font-sans">
+            <div className="w-full max-w-md space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="text-center">
+                    <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Nouvel État des Lieux</h1>
+                    <p className="text-slate-400">Sélectionnez le contrat concerné :</p>
+                </div>
+                
+                <div className="space-y-3">
+                    {leases.map(lease => (
+                        <button 
+                            key={lease.id}
+                            onClick={() => { 
+                                setSelectedLeaseId(lease.id); 
+                                setSelectedLease(lease);
+                                setStep(2); 
+                            }}
+                            className="w-full bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center justify-between hover:bg-slate-800 hover:border-[#F59E0B] transition group text-left shadow-lg"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-500 border border-slate-700">
+                                    {(lease.tenant.name || "?").charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-white group-hover:text-[#F59E0B] transition">{lease.property.title}</p>
+                                    <p className="text-xs text-slate-500">
+                                        {lease.tenant.name || "Locataire sans nom"}
+                                    </p>
+                                </div>
+                            </div>
+                            <ArrowLeft className="w-5 h-5 text-slate-600 rotate-180" />
+                        </button>
+                    ))}
+                    {leases.length === 0 && (
+                        <div className="text-center text-slate-500 py-8 bg-slate-900/50 rounded-xl border border-dashed border-slate-800 flex flex-col items-center gap-2">
+                            <AlertCircle className="w-8 h-8 opacity-50"/>
+                            <p>Aucun bail actif disponible.</p>
+                        </div>
+                    )}
+                </div>
+                <Button variant="outline" onClick={() => router.back()} className="w-full border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white">Annuler</Button>
+            </div>
+        </div>
+      );
+  }
+
+  // --- VUE 2 : FORMULAIRE ---
+  if (!selectedLease) return <div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-[#F59E0B]"/></div>;
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-white pb-20 font-sans">
+    <div className="min-h-screen bg-[#0B1120] text-white pb-32 font-sans">
       
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#0B1120]/90 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between">
-        <Link href="/dashboard/owner/inventory" className="text-slate-400 text-sm flex items-center gap-1"><ArrowLeft size={16}/> Annuler</Link>
-        <h1 className="text-sm font-bold uppercase tracking-widest text-[#F59E0B]">Nouvel État des Lieux</h1>
+      {/* HEADER MOBILE */}
+      <header className="sticky top-0 z-20 bg-[#0B1120]/90 backdrop-blur-md border-b border-slate-800 p-4 flex items-center justify-between shadow-sm">
+        <button onClick={() => setStep(1)} className="text-slate-400 text-sm flex items-center gap-1 hover:text-white transition">
+            <ArrowLeft className="w-4 h-4" /> Retour
+        </button>
+        <h1 className="text-sm font-bold uppercase tracking-widest text-[#F59E0B]">Constat Numérique</h1>
         <div className="w-10"></div>
       </header>
 
-      <main className="p-4 max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <main className="p-4 max-w-md mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
         
-        <form onSubmit={handleSubmit} className="space-y-8">
+        {/* INFO CONTEXTE */}
+        <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-[#F59E0B]/10 rounded-bl-full -mr-4 -mt-4"></div>
             
-            {/* SÉLECTION DU BAIL & TYPE */}
-            <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 space-y-4">
-                <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Bail Concerné</label>
-                    <select 
-                        className="w-full bg-black border border-slate-700 rounded-xl p-3 text-sm focus:border-[#F59E0B] outline-none transition"
-                        value={selectedLeaseId}
-                        onChange={(e) => setSelectedLeaseId(e.target.value)}
-                        required
-                    >
-                        <option value="">-- Choisir un contrat --</option>
-                        {leases.map(l => (
-                            <option key={l.id} value={l.id}>
-                                {l.property.title} ({l.tenant.name})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-500 mb-1 block">Type d'EDL</label>
-                    <div className="flex bg-black rounded-xl p-1 border border-slate-700">
-                        <button type="button" onClick={() => setType('ENTREE')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${type === 'ENTREE' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>ENTRÉE</button>
-                        <button type="button" onClick={() => setType('SORTIE')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${type === 'SORTIE' ? 'bg-red-600 text-white' : 'text-slate-400 hover:text-white'}`}>SORTIE</button>
-                    </div>
-                </div>
+            <p className="text-[10px] text-slate-500 uppercase font-bold mb-2 flex items-center gap-1">
+                <Home className="w-3 h-3" /> Propriété & Locataire
+            </p>
+            <p className="font-bold text-white text-lg leading-tight truncate">{selectedLease.property.title}</p>
+            <p className="text-sm text-slate-400 mt-1">{selectedLease.tenant.name || "Locataire"}</p>
+            
+            {/* Switch Type */}
+            <div className="flex bg-black rounded-xl p-1 mt-5 border border-slate-700">
+                <button 
+                    onClick={() => setType("ETAT_DES_LIEUX_ENTREE")} 
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 ${type === "ETAT_DES_LIEUX_ENTREE" ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    ENTRÉE 📥
+                </button>
+                <button 
+                    onClick={() => setType("ETAT_DES_LIEUX_SORTIE")} 
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 ${type === "ETAT_DES_LIEUX_SORTIE" ? 'bg-red-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    SORTIE 📤
+                </button>
             </div>
+        </div>
 
-            {/* SECTIONS CUISINE / SALON / BAIN (Code identique mais sécurisé) */}
-            {['Cuisine', 'Salon', 'Salle de Bain'].map((room, idx) => {
-                const fieldState = idx === 0 ? 'kitchenState' : idx === 1 ? 'livingState' : 'bathState';
-                const fieldPhoto = idx === 0 ? 'kitchenPhoto' : idx === 1 ? 'livingPhoto' : 'bathPhoto';
-                // @ts-ignore
-                const currentPhoto = formData[fieldPhoto];
+        {/* --- PIÈCES --- */}
+        {[
+            { id: 'kitchen', icon: Utensils, label: 'Cuisine', color: 'text-blue-400', bg: 'bg-blue-900/20', border: 'focus:border-blue-500' },
+            { id: 'living', icon: Armchair, label: 'Salon', color: 'text-orange-400', bg: 'bg-orange-900/20', border: 'focus:border-orange-500' },
+            { id: 'bath', icon: Bath, label: 'SDB', color: 'text-teal-400', bg: 'bg-teal-900/20', border: 'focus:border-teal-500' }
+        ].map((room) => (
+            <section key={room.id} className="space-y-3">
+                <div className={`flex items-center gap-3 ${room.color}`}>
+                    <span className={`${room.bg} p-2 rounded-lg`}><room.icon className="w-5 h-5" /></span>
+                    <h2 className="text-lg font-bold text-white">{room.label}</h2>
+                </div>
+                
+                <div className="grid gap-3">
+                    <select 
+                        className={`bg-slate-950 border border-slate-800 text-white h-12 rounded-xl px-4 w-full outline-none ${room.border} transition-colors appearance-none font-medium`}
+                        onChange={(e) => handleState(room.id as any, e.target.value)}
+                        value={(rooms as any)[room.id].state}
+                    >
+                        <option value="NEUF">✨ État Neuf</option>
+                        <option value="BON">✅ Bon état</option>
+                        <option value="MOYEN">⚠️ État d'usage</option>
+                        <option value="DEGRADE">❌ Dégradé</option>
+                    </select>
 
-                return (
-                    <section key={room} className="space-y-3">
-                        <div className="flex items-center gap-3">
-                            <span className="bg-slate-800 text-white p-2 rounded-lg text-xl">
-                                {idx === 0 ? '🍳' : idx === 1 ? '🛋️' : '🚿'}
-                            </span>
-                            <h2 className="text-lg font-bold">{room}</h2>
+                    <label className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl transition-all cursor-pointer overflow-hidden h-40 group ${(rooms as any)[room.id].preview ? 'border-emerald-500 bg-emerald-900/10' : 'border-slate-800 bg-slate-900/30 hover:bg-slate-900'}`}>
+                        {(rooms as any)[room.id].preview && (
+                            <img src={(rooms as any)[room.id].preview} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition" />
+                        )}
+                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhoto(room.id as any, e)} />
+                        <div className="relative z-10 flex flex-col items-center">
+                            {(rooms as any)[room.id].preview ? (
+                                <>
+                                    <CheckCircle className="w-10 h-10 text-emerald-500 mb-2 shadow-black drop-shadow-lg" />
+                                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide bg-emerald-900/80 px-2 py-1 rounded">Photo Enregistrée</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Camera className="w-8 h-8 text-slate-500 mb-2 group-hover:text-white transition" />
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide group-hover:text-white">Ajouter Photo</span>
+                                </>
+                            )}
                         </div>
-                        <div className="grid gap-3">
-                            <select 
-                                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 text-sm outline-none focus:border-[#F59E0B]"
-                                // @ts-ignore
-                                onChange={(e) => setFormData({...formData, [fieldState]: e.target.value})}
-                            >
-                                <option value="NEUF">État Neuf</option>
-                                <option value="BON">Bon état</option>
-                                <option value="MOYEN">État d'usage</option>
-                                <option value="DEGRADE">Dégradé</option>
-                            </select>
-                            
-                            <label className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl transition cursor-pointer group ${currentPhoto ? 'border-green-500 bg-green-500/10' : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800'}`}>
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, fieldPhoto)} />
-                                {currentPhoto ? (
-                                    <><CheckCircle className="w-8 h-8 text-green-500 mb-2"/><span className="text-xs font-bold text-green-400">Photo ajoutée</span></>
-                                ) : (
-                                    <><Camera className="w-8 h-8 text-slate-500 mb-2 group-hover:text-white transition"/><span className="text-xs font-bold text-slate-400 group-hover:text-white">Ajouter photo</span></>
-                                )}
-                            </label>
-                        </div>
-                    </section>
-                )
-            })}
-
-            {/* COMMENTAIRE */}
-            <section className="space-y-2">
-                <h2 className="text-xs font-bold text-slate-500 uppercase">Commentaire global</h2>
-                <textarea 
-                    rows={4} 
-                    className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm outline-none focus:border-[#F59E0B]"
-                    placeholder="Dégâts particuliers, observations..."
-                    onChange={(e) => setFormData({...formData, comment: e.target.value})}
-                ></textarea>
+                    </label>
+                </div>
             </section>
+        ))}
 
+        {/* COMMENTAIRE */}
+        <section className="space-y-2 pt-4 border-t border-slate-800">
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Observations Finales</h2>
+            <Textarea 
+                placeholder="Dégâts constatés, relevé compteurs, nombre de clés remises..." 
+                className="w-full bg-slate-950 border border-slate-800 text-white min-h-[120px] rounded-xl p-4 focus:border-[#F59E0B] outline-none placeholder:text-slate-700 resize-none"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+            />
+        </section>
+
+        {/* BOUTON VALIDATION */}
+        <div className="fixed bottom-0 left-0 w-full bg-[#0B1120]/80 backdrop-blur-lg p-4 border-t border-slate-800">
             <button 
-                type="submit" 
-                disabled={submitting}
-                className="w-full bg-[#F59E0B] hover:bg-yellow-400 text-[#0B1120] font-black py-5 rounded-2xl shadow-xl shadow-orange-500/20 active:scale-95 transition flex justify-center items-center gap-2 mb-10"
+                onClick={handleSubmit} 
+                disabled={loading}
+                className="w-full max-w-md mx-auto h-14 bg-[#F59E0B] hover:bg-yellow-400 text-black font-black text-lg rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                {submitting ? <Loader2 className="animate-spin"/> : '🚀 VALIDER L\'ÉTAT DES LIEUX'}
+                {loading ? <Loader2 className="animate-spin w-6 h-6"/> : "✍️ SIGNER ET VALIDER"}
             </button>
+        </div>
 
-        </form>
       </main>
     </div>
   );
+}
+
+// --- PAGE PRINCIPALE (WRAPPER SUSPENSE) ---
+export default function NewInventoryPage() {
+    return (
+        <Suspense fallback={<div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-[#F59E0B] w-10 h-10"/></div>}>
+            <InventoryForm />
+        </Suspense>
+    );
 }

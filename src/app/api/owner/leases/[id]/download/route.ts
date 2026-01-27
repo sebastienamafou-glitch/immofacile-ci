@@ -1,28 +1,31 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import PDFDocument from "pdfkit";
-
-const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ✅ Next.js 15
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
-    // 1. Récupération des données
+    // 1. SÉCURITÉ ZERO TRUST : Qui demande le fichier ?
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    // 2. RÉCUPÉRATION SÉCURISÉE
+    // On cherche le bail, mais on vérifiera les droits juste après
     const lease = await prisma.lease.findUnique({
       where: { id },
       include: {
         property: { 
             include: { 
-                owner: { select: { name: true, email: true, phone: true, address: true } } 
+                owner: { select: { id: true, name: true, email: true, phone: true, address: true } } 
             } 
         },
-        tenant: { select: { name: true, email: true, phone: true, address: true } },
+        tenant: { select: { id: true, name: true, email: true, phone: true, address: true } },
         signatures: true
       },
     });
@@ -31,30 +34,38 @@ export async function GET(
       return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
     }
 
-    // 2. On force la génération dynamique (Cache bypassé pour le dev/prod)
-    /* if (lease.contractUrl) {
-        return NextResponse.redirect(lease.contractUrl);
-    } */
+    // 3. CONTRÔLE D'ACCÈS (ACL)
+    const isOwner = lease.property.owner.id === userId;
+    const isTenant = lease.tenant.id === userId;
 
-    // 3. Génération du PDF
+    if (!isOwner && !isTenant) {
+        return NextResponse.json({ error: "Accès refusé à ce document confidentiel." }, { status: 403 });
+    }
+
+    // 4. GÉNÉRATION DU PDF
     const pdfBuffer = await generateLeasePDF(lease);
+
+    // Nom de fichier propre (Ex: Bail_Villa_Cocody.pdf)
+    const safeTitle = lease.property.title.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+    const filename = `Bail_${safeTitle}.pdf`;
 
     return new NextResponse(pdfBuffer as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Bail_${lease.property.title.replace(/\s+/g, '_')}.pdf"`,
+        "Content-Disposition": `inline; filename="${filename}"`,
       },
     });
 
   } catch (error) {
     console.error("Erreur PDF:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la génération" }, { status: 500 });
   }
 }
 
-// --- GÉNÉRATEUR PDF COMPLET (ARTICLES 1 à 6) ---
+// --- GÉNÉRATEUR PDF COMPLET (Moteur Graphique) ---
 function generateLeasePDF(lease: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    // Création du document
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks: Buffer[] = [];
 
@@ -71,10 +82,10 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
        .text("Régis par la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.", { align: 'center' });
     doc.moveDown(2);
 
-    // --- BLOCS PARTIES ---
+    // --- BLOCS PARTIES (Cadres grisés) ---
     const startY = doc.y;
     
-    // BAILLEUR
+    // BAILLEUR (Cadre Gauche)
     doc.rect(50, startY, 240, 110).fill('#f8fafc'); 
     doc.rect(50, startY, 240, 110).stroke('#e2e8f0'); 
     
@@ -86,7 +97,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
        .text(`Email : ${lease.property.owner?.email}`, 65, startY + 65)
        .text(`Tél : ${lease.property.owner?.phone}`, 65, startY + 80);
 
-    // PRENEUR
+    // PRENEUR (Cadre Droite)
     doc.rect(305, startY, 240, 110).fill('#f8fafc');
     doc.rect(305, startY, 240, 110).stroke('#e2e8f0');
 
@@ -105,7 +116,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
        .text("IL A ÉTÉ ARRÊTÉ ET CONVENU CE QUI SUIT :", 50, doc.y);
     doc.moveDown(1.5);
 
-    // ARTICLE 1
+    // ARTICLE 1 : OBJET
     doc.font('Helvetica-Bold').text("ARTICLE 1 : OBJET ET CONSISTANCE", { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').text(`Le Bailleur donne en location au Preneur, qui accepte, les locaux à usage d'habitation sis à :`, { continued: true });
@@ -113,13 +124,13 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.font('Helvetica').text(`Le bien loué, objet du présent bail, consiste en : ${lease.property.title}. Le Preneur déclare bien connaître les lieux pour les avoir visités.`);
     doc.moveDown(1);
 
-    // ARTICLE 2
+    // ARTICLE 2 : DURÉE
     doc.font('Helvetica-Bold').text("ARTICLE 2 : DURÉE ET RENOUVELLEMENT", { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').text(`Le présent bail est consenti pour une durée ferme d'un (1) an, commençant à courir le ${new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })}. Il se renouvellera ensuite par tacite reconduction pour la même durée, sauf congé donné par l'une des parties par acte extrajudiciaire ou lettre recommandée avec avis de réception.`, { align: 'justify' });
     doc.moveDown(1);
 
-    // ARTICLE 3 (Finance)
+    // ARTICLE 3 : FINANCE (Encadré)
     const yFinance = doc.y;
     doc.rect(50, yFinance - 5, 495, 80).fill('#fcfdfc').stroke('#e5e7eb'); 
     
@@ -137,13 +148,13 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
 
     doc.moveDown(5);
 
-    // ARTICLE 4
+    // ARTICLE 4 : RÉVISION
     doc.font('Helvetica-Bold').text("ARTICLE 4 : RÉVISION DU LOYER", { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').text(`Conformément à la Loi, le loyer pourra être révisé tous les trois (3) ans. La majoration ne pourra excéder la variation de l'indice de référence des loyers publié par l'autorité compétente.`, { align: 'justify' });
     doc.moveDown(1);
 
-    // ARTICLE 5
+    // ARTICLE 5 : OBLIGATIONS
     doc.font('Helvetica-Bold').text("ARTICLE 5 : OBLIGATIONS ET ENTRETIEN", { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').text(`Le Preneur est tenu : De payer le loyer aux termes convenus, d'user paisiblement des lieux ("en bon père de famille"), d'assurer l'entretien courant et les menues réparations locatives. Il est responsable des dégradations survenant pendant la location.`, { align: 'justify' });
@@ -151,7 +162,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.text(`Le Bailleur est tenu : De délivrer un logement décent, d'assurer au locataire la jouissance paisible des lieux et d'effectuer toutes les grosses réparations (structure, toiture) nécessaires au maintien en état du logement.`, { align: 'justify' });
     doc.moveDown(1);
 
-    // ARTICLE 6
+    // ARTICLE 6 : CLAUSE RÉSOLUTOIRE
     doc.font('Helvetica-Bold').text("ARTICLE 6 : CLAUSE RÉSOLUTOIRE", { underline: true });
     doc.moveDown(0.5);
     doc.font('Helvetica').text(`À défaut de paiement d'un seul terme de loyer à son échéance, ou d'inexécution d'une seule des clauses du bail, et un mois après un simple commandement de payer ou une mise en demeure restée infructueuse, le bail sera résilié de plein droit si bon semble au Bailleur.`, { align: 'justify' });
@@ -174,12 +185,16 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.font('Helvetica').fontSize(10).text(lease.tenant?.name?.toUpperCase(), 350, yBox + 15);
     doc.font('Helvetica-Oblique').fontSize(8).text("(Lu et approuvé)", 350, yBox + 30);
 
-    // TAMPON SIGNATURE
-    const signatureProof = lease.signatures.length > 0 ? lease.signatures[0] : null;
+    // --- TAMPON SIGNATURE ÉLECTRONIQUE ---
+    // Logique : Si le statut est "SIGNED_TENANT" ou "COMPLETED", on affiche le tampon
     const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "COMPLETED";
+    
+    // On prend la preuve de signature la plus récente
+    const signatureProof = lease.signatures && lease.signatures.length > 0 ? lease.signatures[0] : null;
 
     if (isSigned && signatureProof) {
-        doc.rect(340, yBox + 40, 180, 50).stroke('#22c55e');
+        // Cadre Vert
+        doc.lineWidth(2).rect(340, yBox + 40, 180, 50).stroke('#22c55e');
         
         doc.fillColor('#15803d') 
            .fontSize(10).font('Helvetica-Bold')
@@ -187,6 +202,12 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
            .font('Helvetica').fontSize(8)
            .text(`Date : ${new Date(signatureProof.signedAt).toLocaleString('fr-FR')}`, 350, yBox + 65)
            .text(`IP : ${signatureProof.ipAddress}`, 350, yBox + 75);
+           
+        // Filigrane de fond
+        doc.save();
+        doc.rotate(-45, { origin: [300, 400] });
+        doc.fontSize(60).fillColor('red').opacity(0.1).text('IMMOFACILE ORIGINAL', 100, 400);
+        doc.restore();
     }
 
     doc.end();

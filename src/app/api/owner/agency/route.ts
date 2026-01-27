@@ -1,105 +1,98 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { PropertyType } from "@prisma/client";
+
+export const dynamic = 'force-dynamic';
 
 // ==========================================
-// 1. GET : Lister MES biens (Espace Propriétaire)
+// 1. GET : INFOS AGENCE DU PROPRIÉTAIRE
 // ==========================================
 export async function GET(req: Request) {
   try {
-    const userEmail = req.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = req.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const owner = await prisma.user.findUnique({
-      where: { email: userEmail }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { 
+        agency: true,
+        propertiesOwned: {
+            where: { agencyId: { not: null } },
+            select: { id: true }
+        }
+      }
     });
 
-    if (!owner || owner.role !== "OWNER") {
-      return NextResponse.json({ error: "Espace réservé aux propriétaires" }, { status: 403 });
+    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
+
+    if (!user.agency) {
+        return NextResponse.json({ hasAgency: false });
     }
 
-    const properties = await prisma.property.findMany({
-      where: {
-        ownerId: owner.id // 🔒 FILTRE : Uniquement MES biens
-      },
-      include: {
-        leases: { where: { isActive: true }, select: { id: true } },
-        _count: { select: { incidents: true } }
-      },
-      orderBy: { createdAt: 'desc' }
+    // Calcul stats basiques pour le dashboard
+    // Dans une app réelle, on ferait des agrégations plus complexes sur les Payments
+    const stats = {
+        totalRevenue: 0, // À implémenter avec la table Payment
+        managedListings: user.propertiesOwned.length
+    };
+
+    return NextResponse.json({
+        hasAgency: true,
+        agency: {
+            name: user.agency.name,
+            logoUrl: user.agency.logoUrl,
+            phone: user.agency.phone,
+            email: user.agency.email
+        },
+        stats
     });
 
-    const formatted = properties.map((p) => ({
-      ...p,
-      isAvailable: p.leases.length === 0,
-    }));
-
-    return NextResponse.json({ success: true, properties: formatted });
-
   } catch (error) {
-    console.error("Erreur GET Owner Properties:", error);
+    console.error("API Agency Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
 // ==========================================
-// 2. POST : Ajouter un bien (Mode JSON / Client Upload)
+// 2. POST : LIER À UNE AGENCE
 // ==========================================
 export async function POST(req: Request) {
   try {
-    // A. Authentification
-    const userEmail = req.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = req.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
+    const { agencyCode } = await req.json();
+    if (!agencyCode) return NextResponse.json({ error: "Code requis" }, { status: 400 });
+
+    // Recherche Agence
+    const agency = await prisma.agency.findUnique({
+        where: { code: agencyCode.toUpperCase() }
     });
 
-    // B. Sécurité Rôle : Êtes-vous bien un Propriétaire ?
-    // ⚠️ Si vous avez toujours une erreur 403 ici, vérifiez dans Prisma Studio que votre user a bien le role "OWNER"
-    if (!user || user.role !== "OWNER") {
-      return NextResponse.json({ error: "Vous devez être propriétaire pour publier." }, { status: 403 });
+    if (!agency) {
+        return NextResponse.json({ error: "Code agence invalide." }, { status: 404 });
     }
 
-    // C. Lecture du JSON (Compatible avec AddPropertyPage)
-    const body = await req.json();
+    // Mise à jour User + Ses Propriétés existantes
+    await prisma.$transaction([
+        // 1. Lier le User
+        prisma.user.update({
+            where: { id: userId },
+            data: { agencyId: agency.id }
+        }),
+        // 2. Transférer la gestion de ses propriétés existantes (Optionnel, selon règle métier)
+        prisma.property.updateMany({
+            where: { ownerId: userId },
+            data: { agencyId: agency.id }
+        })
+    ]);
 
-    // D. Validation des champs
-    if (!body.title || !body.address || !body.price || !body.type) {
-        return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
-    }
-
-    // E. Création en base
-    const property = await prisma.property.create({
-      data: {
-        title: body.title,
-        address: body.address,
-        commune: body.commune || "Abidjan",
-        description: body.description || "",
-        
-        // Conversions sécurisées (le front envoie déjà des nombres, mais on s'assure)
-        price: Number(body.price),
-        type: body.type as PropertyType,
-        bedrooms: Number(body.bedrooms) || 0,
-        bathrooms: Number(body.bathrooms) || 0,
-        surface: body.surface ? Number(body.surface) : null,
-        
-        // Les images sont déjà des URLs (String[])
-        images: body.images || [], 
-        isPublished: true,
-
-        // 🟢 PROPRIÉTAIRE : C'est VOUS
-        ownerId: user.id,
-
-        // 🔗 AGENCE : Si vous êtes rattaché à une agence, on lie le bien automatiquement
-        agencyId: user.agencyId 
-      }
+    return NextResponse.json({ 
+        success: true, 
+        agencyName: agency.name 
     });
 
-    return NextResponse.json({ success: true, property });
-
-  } catch (error: any) {
-    console.error("Erreur création propriété owner:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  } catch (error) {
+    console.error("API Agency Link Error:", error);
+    return NextResponse.json({ error: "Erreur lors de la liaison" }, { status: 500 });
   }
 }

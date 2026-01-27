@@ -1,13 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation"; // ✅ Indispensable pour rafraichir sans recharger
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Wallet, Plus, TrendingUp, TrendingDown, ArrowUpRight, DollarSign, Activity, PieChart } from "lucide-react"; 
 import Swal from 'sweetalert2';
 import { api } from "@/lib/api"; 
 import FinanceChart from "./FinanceChart";
+// ✅ SÉCURITÉ : Import du type officiel Prisma
+import { Property } from "@prisma/client";
 
-// Interfaces strictes
 interface UserStats {
   walletBalance: number;
   escrowBalance: number;
@@ -24,9 +25,10 @@ interface DashboardStats {
 interface StatsProps {
   user: UserStats;
   stats: DashboardStats;
-  properties: any[];
+  // ✅ CORRECTION : Typage strict. On est sûr que p.id et p.title existent.
+  properties: Property[];
   onWithdraw: () => void;
-  onRefresh?: () => void; // ✅ Callback optionnel pour rafraichir les données du parent
+  onRefresh?: () => void;
 }
 
 export default function StatsOverview({ user, stats, properties, onWithdraw, onRefresh }: StatsProps) {
@@ -56,7 +58,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
         return;
     }
     
-    // Génération propre des options
+    // ✅ Génération sécurisée grâce au typage Property[]
     const optionsHtml = properties.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
     
     const { value: formValues } = await Swal.fire({
@@ -112,11 +114,10 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 background: '#10B981', color: '#fff' 
             });
 
-            // ✅ CORRECTION CRITIQUE : Rafraichissement propre SPA
             if (onRefresh) {
-                onRefresh(); // Si le parent fournit une fonction de refetch
+                onRefresh();
             } else {
-                router.refresh(); // Sinon on demande à Next.js de revalider les données
+                router.refresh();
             }
 
         } catch (e) { 
@@ -165,7 +166,6 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 </div>
             </div>
             <div className="h-64 w-full"> 
-                {/* FinanceChart gère maintenant le typage strict */}
                 <FinanceChart stats={stats} />
             </div>
         </div>

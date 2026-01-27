@@ -3,17 +3,26 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { listingId, userEmail } = body; // En prod, userEmail viendra du token/session
-
-    if (!listingId || !userEmail) {
-      return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
+    // 1. SÉCURITÉ : L'identité vient du Middleware, JAMAIS du body
+    const userEmail = req.headers.get("x-user-email");
+    
+    if (!userEmail) {
+      return NextResponse.json({ error: "Non autorisé. Veuillez vous connecter." }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 401 });
+    const body = await req.json();
+    const { listingId } = body; // On ne lit que l'ID du bien
 
-    // 1. Vérifier si le favori existe déjà
+    if (!listingId) {
+      return NextResponse.json({ error: "ID du logement requis" }, { status: 400 });
+    }
+
+    // 2. Vérification Utilisateur
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
+
+    // 3. Mécanisme de TOGGLE (Ajout / Suppression)
+    // On utilise la clé composée définie dans le schema : @@unique([userId, listingId])
     const existing = await prisma.wishlist.findUnique({
       where: {
         userId_listingId: {
@@ -24,20 +33,28 @@ export async function POST(req: Request) {
     });
 
     if (existing) {
-      // 2. Si existe -> SUPPRIMER (Unlike)
+      // CAS A : Déjà favori -> ON SUPPRIME
       await prisma.wishlist.delete({
         where: { id: existing.id }
       });
-      return NextResponse.json({ status: "removed", message: "Retiré des favoris" });
+      return NextResponse.json({ 
+          success: true, 
+          action: "removed", 
+          message: "Retiré des favoris" 
+      });
     } else {
-      // 3. Si existe pas -> CRÉER (Like)
+      // CAS B : Pas encore favori -> ON CRÉE
       await prisma.wishlist.create({
         data: {
           userId: user.id,
           listingId: listingId
         }
       });
-      return NextResponse.json({ status: "added", message: "Ajouté aux favoris" });
+      return NextResponse.json({ 
+          success: true, 
+          action: "added", 
+          message: "Ajouté aux favoris" 
+      });
     }
 
   } catch (error) {

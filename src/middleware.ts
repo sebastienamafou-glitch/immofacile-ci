@@ -1,105 +1,83 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+// ✅ IMPORT CRUCIAL : C'est lui qui fait le pont avec NextAuth
+import { getToken } from 'next-auth/jwt'; 
 
-// 1. SÉCURITÉ : Pas de fallback en prod. Si la clé manque, l'app doit crasher au démarrage.
-const JWT_SECRET_STR = process.env.JWT_SECRET;
-if (!JWT_SECRET_STR) {
-    throw new Error("FATAL: JWT_SECRET manquant dans les variables d'environnement.");
-}
-const JWT_SECRET = new TextEncoder().encode(JWT_SECRET_STR);
-
-// 2. LISTE EXHAUSTIVE DES ZONES PROTÉGÉES (Basée sur votre structure de dossiers)
+// ZONES PROTÉGÉES
 const PROTECTED_PATHS = [
-  '/dashboard',      // Le Frontend
-  '/api/superadmin', // Rôle Super Admin
-  '/api/owner',      // Rôle Owner
-  '/api/tenant',     // Rôle Tenant
-  '/api/agent',      // Rôle Agent
-  '/api/artisan',    // Rôle Artisan (Oublié précédemment)
-  '/api/kyc',        // Identité
-  '/api/upload',     // Fichiers
-  '/api/leases',     // Contrats
-  '/api/incidents',  // Signalements
-  '/api/settings'    // Paramètres (Si existe)
+  '/dashboard',      
+  '/api/superadmin', 
+  '/api/owner',      
+  '/api/tenant',     
+  '/api/agent',      
+  '/api/artisan',    
+  '/api/kyc',        
+  '/api/upload',     
+  '/api/leases',     
+  '/api/incidents',  
+  '/api/settings',  
+  '/api/payment',
+  '/api/profile',
+  '/api/guest',
+  '/api/akwaba',
+  '/api/auth/me'
 ];
 
-// 3. ROUTES PUBLIQUES SPÉCIFIQUES (Exceptions)
-// Les Webhooks de paiement doivent être publics (CinetPay/Wave appellent votre serveur)
+// EXCEPTIONS PUBLIQUES (Webhooks + Auth)
 const PUBLIC_EXCEPTIONS = [
   '/api/payment/webhook',
-  '/api/payment/callback'
+  '/api/payment/callback',
+  '/api/auth' // ✅ Indispensable pour laisser passer le login
 ];
 
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
-  // A. Vérification Exception Publique (Webhooks)
+  // 1. Laisser passer les exceptions publiques
   if (PUBLIC_EXCEPTIONS.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  // B. Est-ce une route protégée ?
+  // 2. Vérifier si la route est protégée
   const isProtected = PROTECTED_PATHS.some(path => pathname.startsWith(path));
 
   if (isProtected) {
-    
-    // 1. Absence de Token
-    if (!token) {
-      // Si c'est une page (Dashboard), on redirige vers le login
+    // ✅ LE CORRECTIF EST ICI
+    // Au lieu de chercher 'token' manuellement, on utilise getToken.
+    // Il détecte automatiquement le cookie "next-auth.session-token"
+    // et le décrypte avec le NEXTAUTH_SECRET défini dans Vercel.
+    const session = await getToken({ 
+        req: request, 
+        secret: process.env.NEXTAUTH_SECRET 
+    });
+
+    // Si pas de session valide NextAuth -> Redirection Login
+    if (!session) {
       if (pathname.startsWith('/dashboard')) {
         const loginUrl = new URL('/login', request.url);
-        // On peut ajouter ?redirect=... pour renvoyer l'user au bon endroit après login
+        loginUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(loginUrl);
       }
-      // Si c'est une API, on renvoie une erreur JSON propre
       return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
     }
 
-    try {
-      // 2. Vérification Cryptographique du Token
-      const { payload } = await jwtVerify(token, JWT_SECRET);
-      
-      // 3. Injection des Headers (Identity Propagation)
-      // C'est grâce à ça que vos API routes (request.headers.get("x-user-email")) fonctionnent !
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set('x-user-email', payload.email as string);
-      requestHeaders.set('x-user-role', payload.role as string); 
-      requestHeaders.set('x-user-id', payload.userId as string); // Utile d'avoir l'ID aussi
+    // ✅ SÉCURITÉ : On propage l'identité validée vers l'API
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-user-email', session.email as string);
+    requestHeaders.set('x-user-role', session.role as string); 
+    requestHeaders.set('x-user-id', session.id as string);
 
-      return NextResponse.next({
-        request: { headers: requestHeaders },
-      });
-
-    } catch (err) {
-      console.error("Middleware Auth Error:", err);
-      // Token invalide, expiré ou falsifié
-      
-      // Nettoyage du cookie côté client (optionnel mais propre via header)
-      const response = pathname.startsWith('/dashboard')
-        ? NextResponse.redirect(new URL('/login', request.url))
-        : NextResponse.json({ error: "Session expirée ou invalide" }, { status: 401 });
-      
-      response.cookies.delete('token');
-      return response;
-    }
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
   }
 
-  // Route publique (Login, Homepage, Landing page...)
   return NextResponse.next();
 }
 
-// CONFIGURATION DU MATCHER (Pour ne pas charger le middleware sur les images/css)
+// Optimisation des performances (ne pas exécuter sur les images/static)
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public files)
-     */
     '/((?!_next/static|_next/image|favicon.ico|public|logo.png).*)',
   ],
 };

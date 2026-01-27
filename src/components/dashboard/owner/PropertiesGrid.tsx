@@ -1,30 +1,26 @@
+"use client";
+
 import Link from "next/link";
 import { MapPin, BedDouble, Bath, Ruler, ArrowRight, Image as ImageIcon, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+// ✅ IMPORT DU TYPE OFFICIEL (Source de vérité)
+import { Property } from "@prisma/client";
 
-interface Property {
-  id: string;
-  title: string;
-  address: string;
-  commune: string;
-  price: number;
-  images: string[];
-  bedrooms: number;
-  bathrooms: number;
-  surface: number | null;
-  isPublished: boolean;
-  isAvailable: boolean;
+// ✅ INTERFACE ÉTENDUE : On prend tout Prisma + les stats optionnelles
+// Cela permet d'accepter à la fois une Property simple ET une PropertyWithStats
+interface RichProperty extends Property {
+  activeLeaseCount?: number;
+  totalRentGenerated?: number;
 }
 
 interface PropertiesGridProps {
-  properties: Property[];
-  onDelegate: (property: Property) => void;
+  properties: RichProperty[]; // On accepte le format riche
+  onDelegate: (property: RichProperty) => void;
 }
 
 export default function PropertiesGrid({ properties, onDelegate }: PropertiesGridProps) {
   
-  // Sécurité : Si properties est undefined ou vide
   if (!properties || properties.length === 0) {
     return (
         <div className="text-center py-20 bg-slate-900/50 border border-slate-800 rounded-3xl border-dashed">
@@ -63,7 +59,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
             
             <div className="absolute top-3 right-3">
                  <Badge variant="outline" className="bg-slate-950/80 text-white border-slate-700 backdrop-blur-sm">
-                    {/* ✅ FIX CRITIQUE : (property.price || 0) empêche le crash */}
                     {(property.price || 0).toLocaleString()} F
                  </Badge>
             </div>

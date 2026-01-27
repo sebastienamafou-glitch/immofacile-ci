@@ -1,50 +1,42 @@
-'use client';
+"use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation"; // ✅ Ajout du router pour rediriger si pas connecté
+import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api"; 
-import { Loader2, FileText, Plus, MapPin, User, Wallet } from "lucide-react";
+import { Loader2, FileText, Plus, MapPin, Wallet, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner"; // ✅ Ajout pour feedback utilisateur
+import { toast } from "sonner";
+import { Lease, Property, User } from "@prisma/client";
 
-interface Lease {
-  id: string;
-  isActive: boolean;
-  startDate: string;
-  monthlyRent: number;
-  tenant: { name: string; phone: string; };
-  property: { title: string; commune: string; };
-}
+// Type étendu pour l'affichage (Jointures)
+type LeaseWithDetails = Lease & {
+  property: Property;
+  tenant: User;
+};
 
-export default function LeasesPage() {
+export default function LeasesListPage() {
   const router = useRouter();
-  const [leases, setLeases] = useState<Lease[]>([]);
+  const [leases, setLeases] = useState<LeaseWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchLeases = useCallback(async () => {
-    // 1. SÉCURITÉ : On vérifie qui est connecté
-    const stored = localStorage.getItem("immouser");
-    if (!stored) {
-        // Pas connecté ? On renvoie au login sans faire d'erreur API
-        router.push('/login');
-        return;
-    }
-    const user = JSON.parse(stored);
-
-    setIsLoading(true);
     try {
-      // 2. APPEL API SÉCURISÉ
-      const res = await api.get('/owner/leases', {
-          headers: { 'x-user-email': user.email } // ✅ La clé magique !
-      });
+      // ✅ APPEL SÉCURISÉ : Le cookie fait tout le travail
+      const res = await api.get('/owner/leases');
       
-      if (res.data) {
-         const data = Array.isArray(res.data) ? res.data : (res.data.leases || []);
-         setLeases(data);
+      if (res.data.success) {
+         setLeases(res.data.leases);
+      } else {
+         throw new Error(res.data.error);
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("Impossible de charger les contrats.");
+      // Redirection si 401 (Session morte)
+      if (err.response?.status === 401) {
+          router.push('/login');
+      } else {
+          toast.error("Erreur de chargement des contrats.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -53,82 +45,102 @@ export default function LeasesPage() {
   useEffect(() => { fetchLeases(); }, [fetchLeases]);
 
   if (isLoading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-[#0B1120] text-slate-400 gap-4">
+    <div className="flex flex-col items-center justify-center h-screen bg-[#0B1120] gap-4">
       <Loader2 className="w-10 h-10 text-[#F59E0B] animate-spin" />
-      <p className="font-bold uppercase tracking-widest text-xs">Chargement des baux...</p>
+      <p className="text-slate-500 text-sm font-mono">Récupération des dossiers...</p>
     </div>
   );
 
   return (
-    <main className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 pb-20">
+    <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 pb-20">
       
-      {/* Header */}
+      {/* En-tête */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
            <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
-             <FileText className="text-[#F59E0B]" /> Baux & Contrats
+             <FileText className="text-[#F59E0B] w-8 h-8" /> Mes Contrats
            </h1>
            <p className="text-slate-500 text-sm mt-1">
-             Gestion juridique et suivi des {leases.length} contrat(s) actif(s).
+             Gérez vos {leases.length} baux actifs et archivés.
            </p>
         </div>
-        <Link href="/dashboard/owner/tenants" className="bg-[#F59E0B] text-[#0B1120] px-6 py-3 rounded-xl font-black text-sm hover:scale-105 transition shadow-lg flex items-center gap-2">
+        
+        <Link 
+            href="/dashboard/owner/leases/new" 
+            className="bg-[#F59E0B] text-[#0B1120] px-6 py-3 rounded-xl font-bold text-sm hover:bg-yellow-400 transition shadow-lg shadow-yellow-500/10 flex items-center gap-2 active:scale-95"
+        >
            <Plus className="w-5 h-5" /> NOUVEAU BAIL
         </Link>
       </div>
 
-      {/* Liste des Baux */}
+      {/* Grille des Contrats */}
       {leases.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
            {leases.map((lease) => (
-             <Link key={lease.id} href={`/dashboard/owner/leases/${lease.id}`} className="block group">
-               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 hover:border-[#F59E0B]/50 transition-all duration-300 relative overflow-hidden h-full flex flex-col justify-between shadow-xl">
+             <Link key={lease.id} href={`/dashboard/owner/leases/${lease.id}`} className="block group h-full">
+               <div className="bg-[#0f172a] border border-white/5 rounded-3xl p-6 hover:border-[#F59E0B]/50 hover:bg-slate-900 transition-all duration-300 h-full flex flex-col justify-between relative overflow-hidden shadow-xl">
                   
+                  {/* Badge Statut */}
+                  <div className="absolute top-6 right-6 z-10">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                        lease.isActive 
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                        : 'bg-slate-700/30 text-slate-500 border-slate-700/50'
+                    }`}>
+                        {lease.isActive ? 'ACTIF' : lease.status === 'PENDING' ? 'EN ATTENTE' : lease.status}
+                    </span>
+                  </div>
+
+                  {/* Corps de la carte */}
                   <div>
-                    <div className="flex justify-between items-start mb-6">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-xl group-hover:bg-[#F59E0B] group-hover:text-black transition shadow-inner border border-slate-700">
-                            📜
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${lease.isActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-slate-800 text-slate-500'}`}>
-                            {lease.isActive ? 'Bail Actif' : 'Clôturé'}
-                        </span>
+                    <div className="w-12 h-12 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition shadow-inner">
+                        🏠
                     </div>
                     
-                    <h3 className="font-black text-xl text-white mb-1 group-hover:text-[#F59E0B] transition truncate">{lease.property?.title}</h3>
-                    <p className="text-slate-500 text-xs mb-6 flex items-center gap-1 font-bold">
-                        <MapPin className="w-3 h-3" /> {lease.property?.commune}
+                    <h3 className="font-bold text-lg text-white mb-1 truncate pr-20">{lease.property?.title || "Bien supprimé"}</h3>
+                    <p className="text-slate-500 text-xs mb-6 flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {lease.property?.commune || "N/A"}
                     </p>
 
-                    <div className="flex items-center gap-2 mb-6">
-                        <Wallet className="w-4 h-4 text-emerald-500" />
-                        <span className="text-lg font-black text-emerald-400">{lease.monthlyRent.toLocaleString()} F</span>
-                        <span className="text-[10px] text-slate-600 font-bold uppercase">/ mois</span>
+                    <div className="bg-slate-950/50 rounded-xl p-3 border border-white/5 flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase">
+                             <Wallet className="w-4 h-4 text-slate-500"/> Loyer
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400 text-lg">
+                            {lease.monthlyRent.toLocaleString()} F
+                        </span>
                     </div>
                   </div>
                   
-                  <div className="pt-5 border-t border-slate-800/50 flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-slate-600" />
-                        <span className="text-slate-400 font-bold text-xs uppercase tracking-tighter">Locataire</span>
+                  {/* Footer Locataire */}
+                  <div className="pt-4 border-t border-white/5 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-white/5">
+                          {lease.tenant?.name?.charAt(0) || "?"}
                       </div>
-                      <span className="text-white font-black truncate max-w-[140px]">{lease.tenant?.name}</span>
+                      <div>
+                          <p className="text-sm font-bold text-white leading-none">{lease.tenant?.name || "Locataire Inconnu"}</p>
+                          <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Locataire</p>
+                      </div>
                   </div>
                </div>
              </Link>
            ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-800 rounded-[3rem] bg-slate-900/30 text-center">
-           <div className="bg-slate-800 w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-2xl">
-                <FileText className="w-12 h-12 text-slate-600" />
+        /* Empty State */
+        <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/20 text-center animate-in fade-in zoom-in-95 duration-500">
+           <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                <AlertCircle className="w-8 h-8 text-slate-600" />
            </div>
-           <h3 className="text-2xl font-black text-white mb-2">Aucun contrat</h3>
-           <p className="text-slate-500 max-w-sm mx-auto mb-8 font-medium">Officialisez vos locations en générant votre premier bail numérique certifié conforme.</p>
-           <Link href="/dashboard/owner/tenants" className="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-[#F59E0B] transition">
-                CRÉER MON PREMIER CONTRAT
+           <h3 className="text-xl font-bold text-white mb-2">Aucun contrat actif</h3>
+           <p className="text-slate-500 max-w-xs mx-auto mb-6 text-sm">
+               Créez votre premier contrat de location pour commencer à générer des revenus.
+           </p>
+           <Link href="/dashboard/owner/leases/new" className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition text-sm shadow-xl">
+                Créer un bail maintenant
            </Link>
         </div>
       )}
-    </main>
+    </div>
   );
 }

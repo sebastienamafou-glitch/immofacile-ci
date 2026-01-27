@@ -4,37 +4,42 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
+// ✅ 1. IMPORT OFFICIEL NEXTAUTH + GETSESSION (Le Pont)
+import { signIn, getSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner"; 
-import Cookies from "js-cookie"; 
-import { 
-  Loader2, Lock, Eye, EyeOff, LogIn, Mail, ShieldCheck 
+import { toast } from "sonner";
+import Cookies from "js-cookie";
+import {
+  Loader2, Lock, Eye, EyeOff, LogIn, Mail, ShieldCheck
 } from "lucide-react";
 
-// --- COMPOSANT INTERNE POUR LE FORMULAIRE ---
+// --- COMPOSANT INTERNE ---
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     identifier: "",
     password: ""
   });
 
+  // --- NETTOYAGE AU DÉMARRAGE ---
   useEffect(() => {
-    // Nettoyage complet à l'arrivée sur la page
-    Cookies.remove('token', { path: '/' }); 
+    // On rase tout pour garantir une session propre au chargement
+    Cookies.remove('token');
     localStorage.removeItem('token');
-    localStorage.removeItem('immouser'); 
-    localStorage.removeItem('user'); 
-    
+    localStorage.removeItem('immouser');
+    localStorage.removeItem('user');
+
     if (searchParams.get('registered') === 'true') {
         toast.success("Compte créé ! Connectez-vous maintenant.");
+    }
+    if (searchParams.get('error') === 'CredentialsSignin') {
+        toast.error("Identifiants incorrects.");
     }
   }, [searchParams]);
 
@@ -43,78 +48,63 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/login', formData);
-      const data = res.data;
+      // ✅ 2. AUTHENTIFICATION SÉCURISÉE (Côté Serveur)
+      const result = await signIn("credentials", {
+        redirect: false,
+        identifier: formData.identifier,
+        password: formData.password,
+      });
 
-      if (data.token) {
-        // 1. Stockage du TOKEN
-        Cookies.set('token', data.token, { 
-            expires: 7, 
-            secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'lax', 
-            path: '/'        
-        });
+      if (result?.error) {
+        console.error("Erreur Auth:", result.error);
+        toast.error("Email ou mot de passe incorrect.");
+        setLoading(false);
+        return;
+      }
 
-        // 2. Stockage LocalStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('immouser', JSON.stringify(data.user));
+      if (result?.ok) {
+        // ✅ 3. LE PONT (BRIDGE) : SYNCHRONISATION FRONTEND
+        // On récupère la session fraîchement créée pour satisfaire le code Legacy (api.ts)
+        const session = await getSession();
         
-        toast.success(`Heureux de vous revoir, ${data.user.name?.split(' ')[0] || 'Client'} !`);
+        if (session?.user) {
+            // A. On remplit 'immouser' pour l'affichage UI (Nom, Rôle...)
+            localStorage.setItem('immouser', JSON.stringify(session.user));
+            
+            // B. On met un token "Passe-partout" pour que les guards clients (api.ts) laissent passer
+            // (La vraie sécurité est gérée par le cookie HttpOnly invisible ici)
+            localStorage.setItem('token', 'secure-session-active'); 
+        }
 
-        // 3. REDIRECTION INTELLIGENTE
+        toast.success(`Connexion réussie !`);
+
+        // ✅ 4. REDIRECTION "MILITARY GRADE" (Zero Trust)
+        // On force le rechargement (window.location) pour valider les cookies côté serveur
         setTimeout(() => {
-            // A. LOGIQUE INVESTISSEUR (PRIORITAIRE) 🚀
-            // Si l'utilisateur vient du parcours Crowdfunding, on l'envoie vers son dashboard spécial
+            const callbackUrl = searchParams.get('callbackUrl');
             const investType = searchParams.get('type');
+
+            // A. Cas Investisseur
             if (investType === 'investor') {
                 const packId = searchParams.get('pack');
                 const amount = searchParams.get('amount');
-                
-                // On redirige vers le dashboard investisseur en gardant les infos du pack
-                router.push(`/invest/dashboard?pack=${packId}&amount=${amount}&welcome=true`);
-                return; // ⛔ IMPORTANT : On arrête ici pour ne pas exécuter le switch ci-dessous
+                window.location.href = `/invest/dashboard?pack=${packId}&amount=${amount}&welcome=true`;
+                return;
             }
 
-            // B. LOGIQUE STANDARD (Par Rôle)
-            const callbackUrl = searchParams.get('callbackUrl');
-
-            switch (data.user.role) {
-                case 'SUPER_ADMIN':
-                    router.push(callbackUrl || '/dashboard/superadmin');
-                    break;
-                case 'AGENCY_ADMIN':
-                    router.push(callbackUrl || '/dashboard/agency');
-                    break;
-                case 'OWNER':
-                    router.push(callbackUrl || '/dashboard/owner');
-                    break;
-                case 'AGENT':
-                    router.push(callbackUrl || '/dashboard/agent');
-                    break;
-                case 'ARTISAN':
-                    router.push(callbackUrl || '/dashboard/artisan');
-                    break;
-                case 'GUEST':
-                    router.push(callbackUrl || '/dashboard/guest');
-                    break;
-                case 'TENANT':
-                    router.push(callbackUrl || '/dashboard/tenant');
-                    break;
-                // Cas spécifique si le rôle est déjà défini comme INVESTOR en base
-                case 'INVESTOR':
-                    router.push('/invest/dashboard');
-                    break;
-
-                default:
-                    router.push(callbackUrl || '/dashboard');
-                    break;
+            // B. Cas Redirection URL spécifique
+            if (callbackUrl) {
+                window.location.href = callbackUrl;
+            }
+            // C. Cas par défaut (Dashboard)
+            else {
+                window.location.href = '/dashboard';
             }
         }, 800);
       }
-    } catch (error: any) {
-      console.error("Erreur Login:", error);
-      toast.error(error.response?.data?.error || "Identifiants incorrects ou erreur serveur.");
-    } finally {
+    } catch (error) {
+      console.error("Erreur Critique Login:", error);
+      toast.error("Erreur de connexion au serveur.");
       setLoading(false);
     }
   };
@@ -146,11 +136,11 @@ function LoginForm() {
                     <Label className="text-xs uppercase font-bold text-slate-400 ml-1">Email ou Téléphone</Label>
                     <div className="relative group">
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
-                        <Input 
-                            required 
+                        <Input
+                            required
                             autoFocus
                             type="text"
-                            placeholder="Ex: admin@immofacile.ci" 
+                            placeholder="Ex: koffi@immofacile.ci"
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-12"
                             value={formData.identifier}
                             onChange={e => setFormData({...formData, identifier: e.target.value})}
@@ -167,15 +157,15 @@ function LoginForm() {
                     </div>
                     <div className="relative group">
                         <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
-                        <Input 
-                            required 
-                            type={showPassword ? "text" : "password"} 
-                            placeholder="••••••••" 
+                        <Input
+                            required
+                            type={showPassword ? "text" : "password"}
+                            placeholder="••••••••"
                             className="pl-10 pr-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-12"
                             value={formData.password}
                             onChange={e => setFormData({...formData, password: e.target.value})}
                         />
-                        <button 
+                        <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-3 text-slate-500 hover:text-white transition p-1"
@@ -186,9 +176,9 @@ function LoginForm() {
                     </div>
                 </div>
 
-                <Button 
-                    type="submit" 
-                    disabled={loading} 
+                <Button
+                    type="submit"
+                    disabled={loading}
                     className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold h-12 rounded-xl shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.01] active:scale-95 mt-2"
                 >
                     {loading ? <Loader2 className="animate-spin w-5 h-5" /> : (
@@ -200,7 +190,7 @@ function LoginForm() {
             <div className="mt-8 text-center pt-6 border-t border-white/5">
                 <p className="text-slate-400 text-sm">
                     Pas encore de compte ? <br/>
-                    <Link 
+                    <Link
                         href={`/signup${searchParams.get('callbackUrl') ? '?callbackUrl=' + searchParams.get('callbackUrl') : ''}`}
                         className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group"
                     >
@@ -214,7 +204,7 @@ function LoginForm() {
   );
 }
 
-// --- EXPORT PRINCIPAL AVEC SUSPENSE ---
+// --- EXPORT PRINCIPAL ---
 export default function LoginPage() {
   return (
     <Suspense fallback={

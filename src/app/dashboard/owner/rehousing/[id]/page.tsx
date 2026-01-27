@@ -16,21 +16,18 @@ export default function RehousingPage() {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    // API V5: GET /leases/[id]/rehousing-check
     const fetchCheck = async () => {
-        // Simulation des données (À remplacer par API réelle)
-        setTimeout(() => {
-            setData({
-                tenant: { name: "M. Kouamé Michel", phone: "0707000000" },
-                property: { title: "Villa Duplex Cocody" },
-                isGoodTenant: true, // Calculé par le backend (0 retard, caution rendue)
-                vacantProperties: [
-                    { id: "p2", title: "Appartement Riviera 3", price: 350000, commune: "Cocody" },
-                    { id: "p3", title: "Studio Zone 4", price: 200000, commune: "Marcory" }
-                ]
-            });
+        try {
+            // Appel de la vraie API
+            const res = await api.get(`/owner/rehousing/${id}`);
+            if (res.data.success) {
+                setData(res.data.data);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
             setLoading(false);
-        }, 800);
+        }
     };
     if(id) fetchCheck();
   }, [id]);

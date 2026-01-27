@@ -1,57 +1,47 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; 
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-
-export const dynamic = 'force-dynamic';
 
 export async function PUT(request: Request) {
   try {
-    // 1. SÉCURITÉ STANDARDISÉE
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 404 });
-
-    // ✅ CORRECTION : Vérifier si l'utilisateur a un mot de passe à modifier
-    if (!user.password) {
-        return NextResponse.json({ 
-            error: "Votre compte utilise une connexion sociale (Google). Vous ne pouvez pas modifier de mot de passe." 
-        }, { status: 400 });
-    }
-
-    // 2. VALIDATION DES ENTRÉES
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
     if (!currentPassword || !newPassword) {
-        return NextResponse.json({ error: "Veuillez remplir tous les champs." }, { status: 400 });
+        return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
     }
 
     if (newPassword.length < 6) {
-        return NextResponse.json({ error: "Le nouveau mot de passe doit faire au moins 6 caractères." }, { status: 400 });
+        return NextResponse.json({ error: "Le mot de passe est trop court (min 6 car.)" }, { status: 400 });
     }
 
-    // 3. VÉRIFICATION DE L'ANCIEN MOT DE PASSE
-    // TypeScript sait maintenant que user.password existe grâce au 'if' plus haut
-    const isValid = await bcrypt.compare(currentPassword, user.password);
+    // 1. Récupération utilisateur pour vérifier le hash actuel
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     
-    if (!isValid) {
-      return NextResponse.json({ error: "Le mot de passe actuel est incorrect." }, { status: 401 });
+    if (!user || !user.password) {
+        return NextResponse.json({ error: "Action impossible (Compte Google ?)" }, { status: 403 });
     }
 
-    // 4. HASHAGE ET MISE À JOUR
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // 2. Vérification Ancien Mot de passe
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+        return NextResponse.json({ error: "Mot de passe actuel incorrect" }, { status: 403 });
+    }
+
+    // 3. Hashage et Sauvegarde
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
 
     await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword }
+        where: { id: userId },
+        data: { password: hashedPassword }
     });
 
-    return NextResponse.json({ success: true, message: "Mot de passe mis à jour avec succès." });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error("Erreur Update Password:", error);
-    return NextResponse.json({ error: "Erreur technique serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur changement mot de passe" }, { status: 500 });
   }
 }

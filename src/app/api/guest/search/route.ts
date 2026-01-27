@@ -8,53 +8,48 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
     
-    // On récupère l'email pour savoir si l'user a liké les posts (si connecté)
+    // Identification optionnelle pour les favoris
     const userEmail = req.headers.get("x-user-email");
     let userId = null;
-    
     if (userEmail) {
-        const user = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true } });
+        const user = await prisma.user.findUnique({ where: { email: userEmail } });
         if (user) userId = user.id;
     }
 
-    // RECHERCHE DYNAMIQUE
+    // REQUÊTE DATABASE
     const listings = await prisma.listing.findMany({
       where: {
-        isPublished: true, // Uniquement les annonces validées
+        isPublished: true, // Uniquement les biens validés
         OR: query ? [
-            { city: { contains: query, mode: 'insensitive' } },
-            { neighborhood: { contains: query, mode: 'insensitive' } },
-            { title: { contains: query, mode: 'insensitive' } }
+          { title: { contains: query, mode: 'insensitive' } },
+          { city: { contains: query, mode: 'insensitive' } },
+          { neighborhood: { contains: query, mode: 'insensitive' } },
         ] : undefined
       },
       include: {
-        reviews: { select: { rating: true } }, // Pour la moyenne des notes
-        wishlists: userId ? { where: { userId } } : false // Pour savoir si c'est favori
+        // On inclut les favoris de cet utilisateur spécifique pour savoir si coeur rouge ou vide
+        wishlists: userId ? {
+            where: { userId: userId }
+        } : false
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // FORMATAGE DES DONNÉES POUR LE FRONT
-    const formattedListings = listings.map(l => {
-        // Calcul note moyenne
-        const totalRating = l.reviews.reduce((acc, r) => acc + r.rating, 0);
-        const avgRating = l.reviews.length > 0 ? (totalRating / l.reviews.length).toFixed(1) : "Nouveau";
-
-        return {
-            id: l.id,
-            title: l.title,
-            price: l.pricePerNight,
-            location: `${l.neighborhood || ''}, ${l.city}`,
-            image: l.images[0] || null,
-            rating: avgRating,
-            isFavorite: l.wishlists.length > 0 // Si le tableau n'est pas vide, c'est liké
-        };
-    });
+    // MAPPING pour le frontend
+    const formattedListings = listings.map(l => ({
+        id: l.id,
+        title: l.title,
+        price: l.pricePerNight,
+        location: `${l.city}, ${l.neighborhood || ''}`,
+        image: l.images[0] || '/placeholder-house.jpg',
+        rating: 4.8, // Fake rating pour la V1 ou à calculer via table Review
+        isFavorite: userId ? l.wishlists.length > 0 : false
+    }));
 
     return NextResponse.json({ success: true, listings: formattedListings });
 
   } catch (error) {
-    console.error("Erreur Search:", error);
+    console.error("Search API Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

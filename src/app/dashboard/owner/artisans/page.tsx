@@ -4,13 +4,31 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { 
-  Plus, Search, Phone, MapPin, Star, MoreVertical, 
-  Wrench, Hammer, Paintbrush, Key, HardHat, Zap, Trash2, Loader2
+  Plus, Search, Phone, MapPin, Star, 
+  Wrench, Hammer, Paintbrush, Key, HardHat, Zap, Loader2, LucideIcon
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-// Mapping des icônes par métier
-const JOB_ICONS: any = {
+// --- TYPAGE STRICT ---
+interface Artisan {
+  id: string;
+  name: string;
+  job: string;
+  phone: string;
+  location: string;
+  email: string | null;
+  rating: number;
+}
+
+interface JobConfig {
+  icon: LucideIcon;
+  color: string;
+  bg: string;
+}
+
+// Configuration visuelle par métier
+const JOB_ICONS: Record<string, JobConfig> = {
   PLOMBIER: { icon: Wrench, color: "text-blue-400", bg: "bg-blue-400/10" },
   ELECTRICIEN: { icon: Zap, color: "text-yellow-400", bg: "bg-yellow-400/10" },
   PEINTRE: { icon: Paintbrush, color: "text-pink-400", bg: "bg-pink-400/10" },
@@ -21,52 +39,58 @@ const JOB_ICONS: any = {
 
 export default function ArtisansListPage() {
   const router = useRouter();
-  const [artisans, setArtisans] = useState<any[]>([]);
+  const [artisans, setArtisans] = useState<Artisan[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Récupération des données au chargement
+  // CHARGEMENT (ZERO TRUST)
   useEffect(() => {
     const fetchArtisans = async () => {
       try {
+        // ✅ APPEL SÉCURISÉ : Cookie Only
         const res = await api.get('/owner/artisans'); 
         if (res.data.success) {
           setArtisans(res.data.artisans);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erreur chargement artisans", error);
+        if (error.response?.status === 401) {
+             router.push('/login');
+        } else {
+             toast.error("Impossible de charger l'annuaire.");
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchArtisans();
-  }, []);
+  }, [router]);
 
-  // Filtrage
+  // Filtrage local
   const filteredArtisans = artisans.filter(a => 
     a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     a.job.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-200 p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#0B1120] text-slate-200 p-6 lg:p-10 font-sans pb-20">
       
       {/* EN-TÊTE */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
-          <h1 className="text-3xl font-black text-white flex items-center gap-3 uppercase italic">
+          <h1 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tight">
             <HardHat className="text-orange-500 w-8 h-8" /> Mes Artisans
           </h1>
-          <p className="text-slate-500 text-sm font-bold mt-1">
-            Gérez votre réseau de partenaires de confiance
+          <p className="text-slate-400 text-sm mt-1">
+            Gérez votre réseau de partenaires de confiance.
           </p>
         </div>
 
         <Link 
           href="/dashboard/owner/artisans/add" 
-          className="bg-orange-500 hover:bg-orange-600 text-black px-6 py-3 rounded-xl font-black flex items-center gap-2 transition shadow-lg shadow-orange-500/20 active:scale-95"
+          className="bg-orange-500 hover:bg-orange-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition shadow-lg shadow-orange-500/20 active:scale-95 uppercase text-xs tracking-wider"
         >
-          <Plus className="w-5 h-5" /> NOUVEAU CONTACT
+          <Plus className="w-5 h-5" /> Nouveau Contact
         </Link>
       </div>
 
@@ -76,7 +100,7 @@ export default function ArtisansListPage() {
         <input 
           type="text" 
           placeholder="Rechercher un plombier, un nom..." 
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-orange-500 outline-none transition"
+          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-12 pr-4 py-3 text-white focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-none transition placeholder:text-slate-600"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -84,56 +108,56 @@ export default function ArtisansListPage() {
 
       {/* LISTE (GRILLE) */}
       {loading ? (
-        <div className="flex justify-center py-20">
-            <Loader2 className="animate-spin w-10 h-10 text-orange-500" />
+        <div className="flex justify-center py-32">
+            <Loader2 className="animate-spin w-12 h-12 text-orange-500" />
         </div>
       ) : filteredArtisans.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredArtisans.map((artisan) => {
-            const style = JOB_ICONS[artisan.job] || JOB_ICONS.AUTRE;
+            // Fallback sur "AUTRE" si le métier n'est pas reconnu
+            const jobKey = artisan.job.toUpperCase();
+            const style = JOB_ICONS[jobKey] || JOB_ICONS.AUTRE;
             const Icon = style.icon;
 
             return (
-              <div key={artisan.id} className="bg-slate-900 border border-white/5 rounded-2xl p-6 hover:border-slate-700 transition group relative overflow-hidden">
+              <div key={artisan.id} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 hover:border-orange-500/30 transition duration-300 group relative overflow-hidden shadow-xl">
                 
-                {/* Fond coloré subtil */}
-                <div className={`absolute top-0 right-0 w-24 h-24 ${style.bg} rounded-bl-full -mr-4 -mt-4 opacity-50 transition group-hover:scale-110`}></div>
+                {/* DÉCORATION D'ARRIÈRE-PLAN */}
+                <div className={`absolute top-0 right-0 w-32 h-32 ${style.bg} rounded-bl-full -mr-6 -mt-6 opacity-20 transition group-hover:scale-110 group-hover:opacity-30`}></div>
 
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <div className={`w-12 h-12 rounded-xl ${style.bg} flex items-center justify-center border border-white/5`}>
-                    <Icon className={`w-6 h-6 ${style.color}`} />
+                <div className="flex justify-between items-start mb-5 relative z-10">
+                  <div className={`w-14 h-14 rounded-2xl ${style.bg} flex items-center justify-center border border-white/5 shadow-inner`}>
+                    <Icon className={`w-7 h-7 ${style.color}`} />
                   </div>
                 </div>
 
-                <h3 className="text-xl font-bold text-white mb-1">{artisan.name}</h3>
-                <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded bg-slate-950 border border-slate-800 ${style.color}`}>
+                <h3 className="text-xl font-bold text-white mb-2 truncate">{artisan.name}</h3>
+                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 ${style.color}`}>
                   {artisan.job}
                 </span>
 
-                <div className="mt-6 space-y-3">
-                  <a href={`tel:${artisan.phone}`} className="flex items-center gap-3 text-slate-400 hover:text-orange-500 transition group/link">
-                    <div className="w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center group-hover/link:bg-orange-500 group-hover/link:text-black transition">
+                <div className="mt-8 space-y-4">
+                  <a href={`tel:${artisan.phone}`} className="flex items-center gap-3 text-slate-400 hover:text-white transition group/link bg-black/20 p-3 rounded-xl border border-transparent hover:border-slate-700">
+                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center group-hover/link:bg-orange-500 group-hover/link:text-black transition shrink-0">
                         <Phone className="w-4 h-4" />
                     </div>
-                    <span className="font-mono font-medium">{artisan.phone}</span>
+                    <span className="font-mono font-bold tracking-wide">{artisan.phone}</span>
                   </a>
                   
-                  <div className="flex items-center gap-3 text-slate-400">
-                    <div className="w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center">
-                        <MapPin className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm">{artisan.location || "Abidjan"}</span>
+                  <div className="flex items-center gap-3 text-slate-500 px-3">
+                    <MapPin className="w-4 h-4 shrink-0" />
+                    <span className="text-xs font-medium truncate">{artisan.location || "Abidjan, Côte d'Ivoire"}</span>
                   </div>
                 </div>
 
-                {/* Score */}
-                <div className="mt-6 pt-4 border-t border-white/5 flex justify-between items-center">
-                    <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                        <span className="font-bold text-white">{artisan.rating || "5.0"}</span>
+                {/* FOOTER CARTE */}
+                <div className="mt-6 pt-4 border-t border-slate-800 flex justify-between items-center">
+                    <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                        <span className="font-bold text-white text-xs">{artisan.rating.toFixed(1)}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-500 uppercase">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-500 uppercase tracking-wide">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
                         Disponible
                     </div>
                 </div>
@@ -143,17 +167,17 @@ export default function ArtisansListPage() {
         </div>
       ) : (
         /* ETAT VIDE */
-        <div className="text-center py-20 bg-slate-900/50 rounded-3xl border border-dashed border-slate-800">
-          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <HardHat className="w-8 h-8 text-slate-600" />
+        <div className="flex flex-col items-center justify-center py-24 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-[3rem]">
+          <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-slate-700">
+            <HardHat className="w-10 h-10 text-slate-600" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Votre carnet est vide</h3>
-          <p className="text-slate-500 max-w-md mx-auto mb-6">
-            Ajoutez des plombiers, électriciens ou peintres pour pouvoir les assigner rapidement en cas d'incident.
+          <p className="text-slate-500 max-w-md text-center text-sm mb-8">
+            Ajoutez des plombiers, électriciens ou peintres pour intervenir rapidement en cas d'incident.
           </p>
           <Link 
             href="/dashboard/owner/artisans/add" 
-            className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold transition"
+            className="inline-flex items-center gap-2 bg-slate-800 hover:bg-white hover:text-black text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"
           >
             <Plus className="w-4 h-4" /> Ajouter mon premier artisan
           </Link>

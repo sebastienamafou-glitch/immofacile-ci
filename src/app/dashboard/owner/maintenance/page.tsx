@@ -3,65 +3,40 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api";
-import { Loader2, AlertCircle, CheckCircle2, Clock, Wrench, Home } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Clock, Wrench, Home, User, DollarSign, Plus } from "lucide-react";
+import Link from "next/link";
 import Swal from "sweetalert2";
+import { toast } from "sonner";
+import { Incident, Property, User as PrismaUser } from "@prisma/client";
 
-// ✅ 1. TYPAGE STRICT (Pour éviter les bugs silencieux)
-interface Incident {
-  id: string;
-  title: string;
-  description: string;
-  status: 'OPEN' | 'RESOLVED' | 'IN_PROGRESS';
-  createdAt: string;
-  propertyTitle: string; // Champ ajouté lors du mapping
-}
+// TYPAGE STRICT (Extension des types Prisma pour les jointures)
+type IncidentWithDetails = Incident & {
+  property: Property;
+  reporter?: PrismaUser;
+};
 
 export default function MaintenancePage() {
   const router = useRouter();
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [incidents, setIncidents] = useState<IncidentWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 1. CHARGEMENT DES TICKETS (ZERO TRUST)
   const fetchIncidents = async () => {
-    // 1. SÉCURITÉ AUTH
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("immouser");
-    if (!stored) {
-        router.push('/login');
-        return;
-    }
-    const user = JSON.parse(stored);
-
     try {
-      // 2. APPEL API
-      const res = await api.get('/owner/dashboard', {
-          headers: { 'x-user-email': user.email }
-      });
+      // ✅ APPEL SÉCURISÉ : L'authentification passe par le Cookie HTTP-Only
+      const res = await api.get('/owner/incidents');
 
       if (res.data.success) {
-        // ✅ 3. SÉCURISATION DU MAPPING (Le point critique)
-        // On utilise ( || []) pour garantir que ce sont des tableaux, même si l'API renvoie null
-        const rawProperties = res.data.properties || [];
-
-        const allIncidents: Incident[] = rawProperties.flatMap((p: any) => {
-            const propIncidents = p.incidents || []; // Sécurité ici aussi
-            
-            return propIncidents.map((i: any) => ({
-                id: i.id,
-                title: i.title || "Incident technique",
-                description: i.description || "Pas de description",
-                status: i.status || "OPEN",
-                createdAt: i.createdAt || new Date().toISOString(),
-                propertyTitle: p.title || "Bien Inconnu"
-            }));
-        });
-
-        // Tri par date (plus récent en haut)
-        allIncidents.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        setIncidents(allIncidents);
+        setIncidents(res.data.incidents);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Erreur chargement incidents", e);
+      // Redirection automatique si la session est expirée
+      if (e.response?.status === 401) {
+          router.push('/login');
+      } else {
+          toast.error("Impossible de charger les tickets de maintenance.");
+      }
     } finally {
       setLoading(false);
     }
@@ -69,116 +44,158 @@ export default function MaintenancePage() {
 
   useEffect(() => { fetchIncidents(); }, []);
 
+  // 2. ACTION : RÉSOUDRE UN INCIDENT
   const handleResolve = async (id: string) => {
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return;
-    const user = JSON.parse(stored);
-
-    const confirm = await Swal.fire({
-      title: "Clôturer l'incident ?",
-      text: "Cela confirmera que les réparations sont terminées.",
-      icon: "question",
+    // Modale de saisie du coût (SweetAlert2)
+    const { value: cost } = await Swal.fire({
+      title: "Clôturer le ticket ?",
+      text: "Veuillez saisir le coût final de la réparation (si applicable) pour la comptabilité.",
+      input: 'number',
+      inputLabel: 'Coût total (FCFA)',
+      inputPlaceholder: 'Ex: 15000',
+      inputValue: 0,
       showCancelButton: true,
-      confirmButtonColor: "#10B981", // Emerald Green
+      confirmButtonColor: "#F59E0B", // Orange ImmoFacile
       cancelButtonColor: "#334155",
-      confirmButtonText: "Oui, c'est réparé",
+      confirmButtonText: "Valider la réparation",
       cancelButtonText: "Annuler",
       background: "#0F172A", 
-      color: "#fff"
+      color: "#fff",
+      customClass: {
+        input: 'text-black font-bold'
+      }
     });
 
-    if (confirm.isConfirmed) {
+    // Si l'utilisateur n'a pas annulé
+    if (cost !== undefined) { 
       try {
-        await api.post('/owner/incidents/resolve', { incidentId: id }, {
-            headers: { 'x-user-email': user.email }
+        // ✅ MISE À JOUR SÉCURISÉE
+        await api.put('/owner/incidents', { 
+            id, 
+            status: 'RESOLVED',
+            finalCost: Number(cost) // Typage strict
         });
         
-        // Feedback positif
-        const Toast = Swal.mixin({
-            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000,
-            timerProgressBar: true, background: '#10B981', color: '#fff'
-        });
-        Toast.fire({ icon: 'success', title: 'Incident résolu !' });
-
-        fetchIncidents(); // Rafraîchir la liste
+        toast.success("Incident clôturé et archivé !");
+        fetchIncidents(); // Rafraîchir la liste pour voir les changements
       } catch (e) {
-        Swal.fire({ title: "Erreur", text: "Impossible de mettre à jour.", icon: "error", background: "#0F172A", color: "#fff" });
+        console.error(e);
+        toast.error("Erreur lors de la clôture du ticket.");
       }
     }
   };
 
   if (loading) return (
     <div className="flex min-h-screen flex-col gap-4 items-center justify-center bg-[#0B1120]">
-        <Loader2 className="animate-spin text-orange-500 w-10 h-10" />
-        <p className="text-slate-500 text-sm font-mono animate-pulse">Analyse des rapports techniques...</p>
+        <Loader2 className="animate-spin text-[#F59E0B] w-12 h-12" />
+        <p className="text-slate-500 text-sm font-mono animate-pulse">Chargement des opérations...</p>
     </div>
   );
 
   return (
-    <div className="p-6 lg:p-10 bg-[#0B1120] min-h-screen text-white pb-20">
-      <div className="flex justify-between items-center mb-10 border-b border-slate-800 pb-6">
+    <div className="p-6 lg:p-10 bg-[#0B1120] min-h-screen text-white pb-20 font-sans">
+      
+      {/* HEADER AVEC ACTIONS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 border-b border-slate-800 pb-6">
         <div>
             <h1 className="text-3xl font-black uppercase flex items-center gap-3 tracking-tight">
-            <Wrench className="text-orange-500" /> Maintenance
+                <Wrench className="text-[#F59E0B] w-8 h-8" /> Maintenance
             </h1>
-            <p className="text-slate-400 text-sm mt-2">Suivez et résolvez les incidents signalés par vos locataires.</p>
+            <p className="text-slate-400 text-sm mt-2">Suivi des réparations et interventions techniques.</p>
         </div>
-        <div className="bg-slate-900 px-4 py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-400">
-            {incidents.filter(i => i.status !== 'RESOLVED').length} en cours
+        
+        <div className="flex flex-wrap items-center gap-4">
+             {/* Compteur de tickets */}
+             <div className="bg-slate-900 px-4 py-3 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${incidents.some(i => i.status !== 'RESOLVED') ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                {incidents.filter(i => i.status !== 'RESOLVED').length} En cours
+            </div>
+
+            {/* BOUTON CRÉATION (NOUVEAU) */}
+            <Link 
+                href="/dashboard/owner/incidents/new"
+                className="bg-[#F59E0B] hover:bg-yellow-500 text-black px-5 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-orange-500/20 transition active:scale-95 uppercase tracking-wider"
+            >
+                <Plus className="w-4 h-4" /> Signaler une panne
+            </Link>
         </div>
       </div>
 
-      <div className="grid gap-6 max-w-5xl mx-auto">
+      {/* GRILLE DES INCIDENTS */}
+      <div className="grid gap-6 max-w-6xl mx-auto">
         {incidents.length > 0 ? (
             incidents.map((inc) => (
-            <div key={inc.id} className="group bg-slate-900/50 border border-slate-800 hover:border-orange-500/30 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center shadow-xl gap-6 transition-all duration-300">
+            <div key={inc.id} className="group bg-slate-900/50 border border-slate-800 hover:border-[#F59E0B]/50 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center shadow-xl gap-6 transition-all duration-300">
                 
                 <div className="flex gap-5 w-full md:w-auto">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border border-white/5 shadow-inner ${
-                        inc.status === 'RESOLVED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500 animate-pulse'
+                    {/* ICONE STATUS */}
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border border-white/5 shadow-inner ${
+                        inc.status === 'RESOLVED' 
+                        ? 'bg-emerald-500/10 text-emerald-500' 
+                        : 'bg-red-500/10 text-red-500 animate-pulse'
                     }`}>
-                        <AlertCircle className="w-7 h-7" />
+                        {inc.status === 'RESOLVED' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
                     </div>
                     
                     <div className="flex-1">
-                        <h3 className="font-black text-xl text-white mb-1">{inc.title}</h3>
-                        <p className="text-slate-400 text-sm mb-4 leading-relaxed max-w-xl">{inc.description}</p>
+                        <h3 className="font-black text-xl text-white mb-2">{inc.title}</h3>
+                        <p className="text-slate-400 text-sm mb-4 leading-relaxed max-w-xl bg-black/20 p-3 rounded-lg border border-white/5">
+                            {inc.description}
+                        </p>
                         
+                        {/* TAGS D'INFORMATION */}
                         <div className="flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest">
-                            <span className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-lg text-slate-400 border border-white/5">
-                                <Home className="w-3 h-3 text-orange-500"/> {inc.propertyTitle}
+                            <span className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 border border-slate-700">
+                                <Home className="w-3 h-3 text-[#F59E0B]"/> {inc.property?.title || "Propriété inconnue"}
                             </span>
-                            <span className="flex items-center gap-1.5 bg-black/30 px-3 py-1.5 rounded-lg text-slate-400 border border-white/5">
+                            <span className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 border border-slate-700">
                                 <Clock className="w-3 h-3 text-blue-500"/> {new Date(inc.createdAt).toLocaleDateString()}
                             </span>
+                            {inc.reporter && (
+                                <span className="flex items-center gap-1.5 bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 border border-slate-700">
+                                    <User className="w-3 h-3 text-purple-500"/> {inc.reporter.name || "Utilisateur"}
+                                </span>
+                            )}
+                            {/* Affichage du Coût si résolu */}
+                            {inc.finalCost !== null && inc.finalCost > 0 && (
+                                <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1.5 rounded-lg text-emerald-400 border border-emerald-500/30">
+                                    <DollarSign className="w-3 h-3"/> Coût: {inc.finalCost.toLocaleString()} F
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
 
+                {/* BOUTONS D'ACTION */}
                 <div className="w-full md:w-auto flex justify-end">
                     {inc.status === 'RESOLVED' ? (
-                        <span className="flex items-center gap-2 text-emerald-500 font-black text-xs uppercase bg-emerald-500/10 px-5 py-3 rounded-xl border border-emerald-500/20">
-                            <CheckCircle2 className="w-4 h-4" /> Résolu
+                        <span className="flex items-center gap-2 text-emerald-500 font-black text-xs uppercase bg-emerald-500/10 px-6 py-4 rounded-xl border border-emerald-500/20 cursor-default select-none">
+                            <CheckCircle2 className="w-4 h-4" /> Incident Clos
                         </span>
                     ) : (
                         <button 
-                        onClick={() => handleResolve(inc.id)}
-                        className="w-full md:w-auto bg-orange-500 hover:bg-orange-400 text-black font-black px-6 py-3 rounded-xl text-xs transition-all shadow-[0_0_20px_rgba(249,115,22,0.2)] hover:shadow-[0_0_30px_rgba(249,115,22,0.4)] flex items-center justify-center gap-2"
+                            onClick={() => handleResolve(inc.id)}
+                            className="w-full md:w-auto bg-[#F59E0B] hover:bg-yellow-500 text-black font-black px-6 py-4 rounded-xl text-xs transition-all shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 flex items-center justify-center gap-2 active:scale-95 uppercase tracking-wider"
                         >
-                        <Wrench className="w-4 h-4" />
-                        CLÔTURER
+                            <Wrench className="w-4 h-4" />
+                            Marquer comme résolu
                         </button>
                     )}
                 </div>
             </div>
             ))
         ) : (
-          <div className="flex flex-col items-center justify-center py-24 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-[2rem]">
-            <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6">
+          /* EMPTY STATE */
+          <div className="flex flex-col items-center justify-center py-24 bg-slate-900/30 border-2 border-dashed border-slate-800 rounded-[2rem] animate-in fade-in zoom-in-95 duration-500">
+            <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-slate-700">
                 <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Tout va bien !</h3>
-            <p className="text-slate-500 font-medium text-sm">Aucun incident technique n'a été signalé.</p>
+            <h3 className="text-xl font-bold text-white mb-2">Aucun incident à traiter</h3>
+            <p className="text-slate-500 font-medium text-sm mb-6">Tout semble fonctionner correctement dans vos propriétés.</p>
+            
+            <Link href="/dashboard/owner/incidents/new" className="text-[#F59E0B] font-bold border-b border-[#F59E0B] pb-1 hover:text-white hover:border-white transition text-sm">
+                Signaler un problème manuellement
+            </Link>
           </div>
         )}
       </div>

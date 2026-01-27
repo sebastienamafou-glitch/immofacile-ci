@@ -152,7 +152,7 @@ export default function AkwabaSignupPage() {
           <div className="text-center mt-4">
             <p className="text-sm text-slate-400">
               Déjà un compte ?{' '}
-              <Link href="/login" className="font-medium text-orange-500 hover:text-orange-400 transition-colors">
+              <Link href="/akwaba/login" className="font-medium text-orange-500 hover:text-orange-400 transition-colors">
                 Se connecter
               </Link>
             </p>

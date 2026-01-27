@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react"; 
 import { cn } from "@/lib/utils";
+import Swal from "sweetalert2";
 
 interface BookingWidgetProps {
   listingId: string;
@@ -19,6 +21,8 @@ interface BookingWidgetProps {
 
 export default function BookingWidget({ listingId, pricePerNight, blockedDates }: BookingWidgetProps) {
   const router = useRouter();
+  const { data: session, status } = useSession(); 
+  
   const [date, setDate] = useState<DateRange | undefined>();
   const [loading, setLoading] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -26,29 +30,56 @@ export default function BookingWidget({ listingId, pricePerNight, blockedDates }
   // --- 1. CALCULS FINANCIERS ---
   const nightCount = date?.from && date?.to ? differenceInDays(date.to, date.from) : 0;
   const subTotal = nightCount * pricePerNight;
-  const serviceFee = Math.round(subTotal * 0.10); // 10% frais plateforme
+  const serviceFee = Math.round(subTotal * 0.10); 
   const total = subTotal + serviceFee;
 
-  // --- 2. LOGIQUE DE REDIRECTION (CORRIGÉE) ---
+  // --- 2. LOGIQUE DE REDIRECTION (MODIFIÉE) ---
   const handleReserve = () => {
     if (!date?.from || !date?.to) return;
-    
     setLoading(true);
 
-    // A. On prépare les infos du voyage pour ne pas les perdre
+    // Préparation des paramètres pour le Checkout
     const bookingParams = new URLSearchParams();
     bookingParams.set("listingId", listingId);
     bookingParams.set("from", date.from.toISOString());
     bookingParams.set("to", date.to.toISOString());
     bookingParams.set("guests", "2"); 
     bookingParams.set("total", total.toString());
-
-    // B. Destination finale après inscription (Page de Paiement / Checkout)
+    
+    // L'URL finale de paiement (où on ira après l'inscription)
     const checkoutUrl = `/checkout?${bookingParams.toString()}`;
 
-    // C. REDIRECTION VERS SIGNUP AKWABA (Spécifique)
-    // On passe 'checkoutUrl' en callback pour revenir ici après l'inscription
-    router.push(`/akwaba/signup?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+    // SCÉNARIO A : Pas connecté -> DIRECTION SIGNUP
+    if (status === "unauthenticated") {
+        Swal.fire({
+            icon: 'info',
+            title: 'Création de compte requise',
+            text: 'Pour sécuriser votre réservation, veuillez créer un compte Akwaba.',
+            confirmButtonColor: '#F97316',
+            confirmButtonText: 'Créer mon compte', // ✅ Texte adapté
+            showCancelButton: true,
+            cancelButtonText: 'J\'ai déjà un compte',
+            cancelButtonColor: '#334155',
+            background: '#020617', 
+            color: '#fff',
+            customClass: {
+              popup: 'border border-slate-700 rounded-2xl'
+            }
+        }).then((result) => {
+             if (result.isConfirmed) {
+                // ✅ OPTION 1 : Il clique sur "Créer mon compte" -> Signup
+                router.push(`/akwaba/signup?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+             } else if (result.dismiss === Swal.DismissReason.cancel) {
+                // ✅ OPTION 2 : Il clique sur "J'ai déjà un compte" -> Login
+                router.push(`/login?callbackUrl=${encodeURIComponent(checkoutUrl)}`);
+             }
+        });
+        setLoading(false);
+        return;
+    }
+
+    // SCÉNARIO B : Déjà connecté -> On va direct au paiement
+    router.push(checkoutUrl);
   };
 
   return (
@@ -132,7 +163,7 @@ export default function BookingWidget({ listingId, pricePerNight, blockedDates }
         </Popover>
       </div>
 
-      {/* DÉTAILS DU PRIX (Visible seulement si dates sélectionnées) */}
+      {/* DÉTAILS PRIX */}
       {nightCount > 0 ? (
         <div className="space-y-4 mb-6 bg-slate-950/50 p-4 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2">
             <div className="flex justify-between text-slate-300 text-sm">
@@ -163,7 +194,7 @@ export default function BookingWidget({ listingId, pricePerNight, blockedDates }
         onClick={handleReserve}
       >
         {loading ? <Loader2 className="animate-spin mr-2" /> : null}
-        {loading ? "Redirection..." : "Réserver maintenant"}
+        {loading ? "Redirection..." : "RÉSERVER MAINTENANT"}
       </Button>
       
       <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">

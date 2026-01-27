@@ -2,19 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+// import { api } from "@/lib/api"; // Optionnel si vous préférez axios
 
 interface CheckoutButtonProps {
   listingId: string;
   startDate: string;
   endDate: string;
   totalPrice: number;
-  userEmail: string;
+  userEmail?: string; // Optionnel car géré par le backend via headers
 }
 
-export default function CheckoutButton({ listingId, startDate, endDate, totalPrice, userEmail }: CheckoutButtonProps) {
+export default function CheckoutButton({ listingId, startDate, endDate }: CheckoutButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -22,15 +23,15 @@ export default function CheckoutButton({ listingId, startDate, endDate, totalPri
     setLoading(true);
 
     try {
-      const res = await fetch("/api/guest/book", {
+      // ✅ CORRECTION DU CHEMIN API : /booking (et non /book)
+      const res = await fetch("/api/guest/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           listingId,
           startDate,
           endDate,
-          totalPrice,
-          userEmail
+          // Pas besoin d'envoyer le prix ou l'email, le serveur les récupère de façon sécurisée
         }),
       });
 
@@ -40,13 +41,17 @@ export default function CheckoutButton({ listingId, startDate, endDate, totalPri
         throw new Error(data.error || "Erreur lors du paiement");
       }
 
-      toast.success("Réservation confirmée avec succès ! 🌴");
+      // Succès
+      toast.success("Réservation confirmée ! 🌴", {
+        description: "Préparez vos valises, c'est validé."
+      });
       
-      // Redirection vers la liste des voyages
+      // Redirection vers le Dashboard Guest
       router.push("/dashboard/guest/trips");
 
     } catch (error: any) {
-      toast.error(error.message);
+      console.error(error);
+      toast.error(error.message || "Échec de la transaction");
     } finally {
       setLoading(false);
     }
@@ -55,16 +60,18 @@ export default function CheckoutButton({ listingId, startDate, endDate, totalPri
   return (
     <Button 
       size="lg"
-      className="w-full h-14 text-lg font-bold bg-[#F59E0B] hover:bg-orange-500 text-black shadow-lg shadow-orange-500/20 rounded-xl transition-all"
+      className="w-full h-14 text-lg font-bold bg-gradient-to-r from-[#F59E0B] to-orange-600 hover:from-orange-500 hover:to-orange-700 text-white shadow-lg shadow-orange-900/20 rounded-xl transition-all active:scale-95"
       onClick={handlePayment}
       disabled={loading}
     >
       {loading ? (
         <>
-            <Loader2 className="animate-spin mr-2" /> Traitement...
+            <Loader2 className="animate-spin mr-2 w-5 h-5" /> Traitement sécurisé...
         </>
       ) : (
-        "Confirmer et payer"
+        <span className="flex items-center gap-2">
+            <Lock className="w-5 h-5" /> CONFIRMER ET PAYER
+        </span>
       )}
     </Button>
   );

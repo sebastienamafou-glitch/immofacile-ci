@@ -6,11 +6,10 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Démarrage du "Full Ecosystem Seed"...');
 
-  // Mot de passe unique pour TOUS les comptes de test
   const password = await hash('password123', 10);
 
   // ==========================================
-  // 1. CRÉATION DE L'AGENCE (Le SaaS Tenant)
+  // 1. CRÉATION DE L'AGENCE (Avec le code OBLIGATOIRE)
   // ==========================================
   const agency = await prisma.agency.upsert({
     where: { slug: 'immo-prestige' },
@@ -18,90 +17,37 @@ async function main() {
     create: {
       name: 'Immo Prestige International',
       slug: 'immo-prestige',
+      code: 'IMMO-PRESTIGE', // <--- ✅ AJOUTÉ ICI (Obligatoire désormais)
       email: 'contact@immoprestige.ci',
       phone: '+225 0707070707',
-      primaryColor: '#F59E0B', // Orange
+      primaryColor: '#F59E0B',
       isActive: true,
       taxId: 'CC-1234567-X',
       logoUrl: 'https://placehold.co/400x400/0f172a/white?text=IP',
     },
   });
-  console.log(`🏢 Agence créée : ${agency.name}`);
+  console.log(`🏢 Agence créée : ${agency.name} (Code: ${agency.code})`);
 
   // ==========================================
-  // 2. CRÉATION DES UTILISATEURS (Les Acteurs)
+  // 2. CRÉATION DES UTILISATEURS
   // ==========================================
-  
   const users = [
-    {
-      email: 'superadmin@immofacile.ci',
-      name: 'Dieu (Super Admin)',
-      role: Role.SUPER_ADMIN,
-      agencyId: null,
-    },
-    {
-      email: 'directeur@immoprestige.ci',
-      name: 'M. le Directeur',
-      role: Role.AGENCY_ADMIN,
-      agencyId: agency.id, // Patron de l'agence
-    },
-    {
-      email: 'agent@immoprestige.ci',
-      name: 'Alexandre Agent',
-      role: Role.AGENT,
-      jobTitle: 'Négociateur Immobilier',
-      agencyId: agency.id, // Employé de l'agence
-    },
-    {
-      email: 'proprio.agence@gmail.com',
-      name: 'Pierre Propriétaire (Géré)',
-      role: Role.OWNER,
-      agencyId: agency.id, // A délégué ses biens à l'agence
-    },
-    {
-      email: 'proprio.solo@gmail.com',
-      name: 'Sophie Indépendante',
-      role: Role.OWNER,
-      agencyId: null, // Gère ses biens seule
-    },
-    {
-      email: 'locataire@gmail.com',
-      name: 'Luc Locataire',
-      role: Role.TENANT,
-      jobTitle: 'Informaticien',
-      income: 800000,
-      agencyId: null,
-    },
-    {
-      email: 'plombier@pro.ci',
-      name: 'Mario Plombier',
-      role: Role.ARTISAN,
-      jobTitle: 'Plombier Certifié',
-      phone: '+225 05050505',
-      agencyId: null,
-    },
-    {
-      email: 'investisseur@gmail.com',
-      name: 'Ivan Investisseur',
-      role: Role.INVESTOR, // ✅ Nouveau Rôle
-      jobTitle: 'Business Angel',
-      isBacker: true, // ✅ Badge activé
-      backerTier: 'VISIONNAIRE',
-      agencyId: null,
-    },
-    {
-      email: 'touriste@gmail.com',
-      name: 'Thomas Touriste',
-      role: Role.GUEST,
-      agencyId: null,
-    },
+    { email: 'superadmin@immofacile.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null },
+    { email: 'directeur@immoprestige.ci', name: 'M. le Directeur', role: Role.AGENCY_ADMIN, agencyId: agency.id },
+    { email: 'agent@immoprestige.ci', name: 'Alexandre Agent', role: Role.AGENT, jobTitle: 'Négociateur Immobilier', agencyId: agency.id },
+    { email: 'proprio.agence@gmail.com', name: 'Pierre Propriétaire (Géré)', role: Role.OWNER, agencyId: agency.id },
+    { email: 'proprio.solo@gmail.com', name: 'Sophie Indépendante', role: Role.OWNER, agencyId: null },
+    { email: 'locataire@gmail.com', name: 'Luc Locataire', role: Role.TENANT, jobTitle: 'Informaticien', income: 800000, agencyId: null },
+    { email: 'plombier@pro.ci', name: 'Mario Plombier', role: Role.ARTISAN, jobTitle: 'Plombier Certifié', phone: '+225 05050505', agencyId: null },
+    { email: 'investisseur@gmail.com', name: 'Ivan Investisseur', role: Role.INVESTOR, jobTitle: 'Business Angel', isBacker: true, backerTier: 'VISIONNAIRE', agencyId: null },
+    { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null },
   ];
 
   for (const u of users) {
-    // @ts-ignore (Pour ignorer les champs dynamiques comme isBacker qui n'existent pas sur tous les users)
+    // @ts-ignore
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { agencyId: u.agencyId, role: u.role }, 
+      update: { agencyId: u.agencyId, role: u.role },
       create: {
         email: u.email,
         name: u.name,
@@ -118,21 +64,21 @@ async function main() {
       },
     });
   }
-  console.log(`👥 ${users.length} Utilisateurs créés/mis à jour.`);
+  console.log(`👥 ${users.length} Utilisateurs traités.`);
 
-  // Récupération des IDs pour les relations
+  // Récupération ID
   const ownerManaged = await prisma.user.findUnique({ where: { email: 'proprio.agence@gmail.com' } });
   const tenant = await prisma.user.findUnique({ where: { email: 'locataire@gmail.com' } });
   const agent = await prisma.user.findUnique({ where: { email: 'agent@immoprestige.ci' } });
   const investor = await prisma.user.findUnique({ where: { email: 'investisseur@gmail.com' } });
 
   // ==========================================
-  // 3. CRÉATION D'UN BIEN GÉRÉ 
+  // 3. PROPRIÉTÉ
   // ==========================================
-  let propertyId = 'prop-demo-01'; // Variable pour réutilisation
+  let propertyId = 'prop-demo-01';
   if (ownerManaged) {
     const property = await prisma.property.upsert({
-      where: { id: 'prop-demo-01' }, 
+      where: { id: 'prop-demo-01' },
       update: {},
       create: {
         id: 'prop-demo-01',
@@ -147,16 +93,17 @@ async function main() {
         surface: 250,
         isPublished: true,
         ownerId: ownerManaged.id,
-        agencyId: agency.id, 
+        agencyId: agency.id,
         images: ['https://placehold.co/800x600/1e293b/white?text=Villa+Cocody'],
       },
     });
-    propertyId = property.id;
-    console.log(`🏠 Bien créé : ${property.title}`);
+    console.log(`🏠 Bien créé/vérifié : ${property.title}`);
 
-    // ==========================================
-    // 4. CRÉATION D'UN BAIL ACTIF 
-    // ==========================================
+    // NETTOYAGE PRÉVENTIF (Anti-doublons)
+    await prisma.lease.deleteMany({ where: { propertyId: property.id } });
+    await prisma.mission.deleteMany({ where: { propertyId: property.id } });
+
+    // 4. BAIL
     if (tenant) {
       await prisma.lease.create({
         data: {
@@ -169,48 +116,45 @@ async function main() {
           propertyId: property.id,
           tenantId: tenant.id,
           contractUrl: 'https://example.com/contract.pdf',
-          // On lie l'agent pour tester les commissions
-          agentId: agent ? agent.id : null, 
+          agentId: agent ? agent.id : null,
         },
       });
-      console.log(`📜 Bail actif créé pour ${tenant.name}`);
+      console.log(`📜 Bail actif réinitialisé pour ${tenant.name}`);
     }
 
-    // ==========================================
-    // 5. CRÉATION D'UNE MISSION AGENT
-    // ==========================================
+    // 5. MISSION
     if (agent) {
         await prisma.mission.create({
             data: {
                 type: MissionType.ETAT_DES_LIEUX_SORTIE,
                 status: 'PENDING',
                 fee: 50000,
-                dateScheduled: new Date(new Date().setDate(new Date().getDate() + 5)), // Dans 5 jours
+                dateScheduled: new Date(new Date().setDate(new Date().getDate() + 5)),
                 propertyId: property.id,
                 agentId: agent.id
             }
         });
-        console.log(`🕵️ Mission assignée à ${agent.name}`);
+        console.log(`🕵️ Mission réinitialisée pour ${agent.name}`);
     }
   }
 
-  // ==========================================
-  // 6. ✅ CRÉATION D'UN CONTRAT D'INVESTISSEMENT (CROWDFUNDING)
-  // ==========================================
+  // 6. INVESTISSEMENT
   if (investor) {
+      await prisma.investmentContract.deleteMany({ where: { userId: investor.id } });
+
       await prisma.investmentContract.create({
           data: {
               userId: investor.id,
-              amount: 5000000, // 5 Millions
+              amount: 5000000,
               packName: 'VISIONNAIRE',
-              status: 'ACTIVE', // Déjà payé
-              paymentReference: 'INV-SEED-REF-001', // Simulation ID CinetPay
+              status: 'ACTIVE',
+              paymentReference: 'INV-SEED-REF-001',
               ipAddress: '192.168.1.1',
               signatureData: 'data:image/png;base64,fake_signature...',
               signedAt: new Date(),
           }
       });
-      console.log(`🚀 Contrat Investisseur créé pour ${investor.name} (5.000.000 FCFA)`);
+      console.log(`🚀 Contrat Investisseur réinitialisé pour ${investor.name}`);
   }
 
   console.log('✅ Seeding terminé avec succès ! 🚀');

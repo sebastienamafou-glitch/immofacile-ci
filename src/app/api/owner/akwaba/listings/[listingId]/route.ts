@@ -1,34 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// On force le mode dynamique car on utilise des params d'URL
 export const dynamic = "force-dynamic";
 
-// 1. GET - Récupérer une annonce spécifique pour l'édition
+// 1. GET - Récupérer une annonce spécifique
 export async function GET(
   request: Request,
   { params }: { params: { listingId: string } }
 ) {
   try {
-    // Sécurité Auth
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // On vérifie que l'annonce appartient bien à cet utilisateur
+    // 2. RÉCUPÉRATION SÉCURISÉE
     const listing = await prisma.listing.findUnique({
       where: {
         id: params.listingId,
-        host: { email: userEmail } // Sécurité : doit appartenir au Host
+        hostId: userId // 🔒 Verrouillage par ID
       },
       include: {
         _count: {
-            select: { bookings: true } // Info utile pour le front
+            select: { bookings: true }
         }
       }
     });
 
     if (!listing) {
-      return NextResponse.json({ error: "Annonce introuvable ou accès refusé" }, { status: 404 });
+      return NextResponse.json({ error: "Annonce introuvable." }, { status: 404 });
     }
 
     return NextResponse.json(listing);
@@ -45,12 +44,12 @@ export async function PUT(
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // Vérif Owner
+    // Vérification Existence + Propriété
     const existingListing = await prisma.listing.findUnique({
-      where: { id: params.listingId, host: { email: userEmail } }
+      where: { id: params.listingId, hostId: userId }
     });
 
     if (!existingListing) {
@@ -65,16 +64,15 @@ export async function PUT(
       data: {
         title: body.title,
         description: body.description,
-        pricePerNight: body.pricePerNight ? parseInt(body.pricePerNight) : undefined,
+        pricePerNight: body.pricePerNight ? Number(body.pricePerNight) : undefined,
         
         address: body.address,
         city: body.city,
         neighborhood: body.neighborhood,
         
-        images: body.images, // Array de strings
-        amenities: body.amenities, // JSON
+        images: body.images, 
+        amenities: body.amenities, 
         
-        // On peut aussi gérer la publication ici
         isPublished: body.isPublished !== undefined ? body.isPublished : undefined
       }
     });
@@ -87,58 +85,45 @@ export async function PUT(
   }
 }
 
-// 3. DELETE - Supprimer (avec sécurité Réservations)
+// 3. DELETE - Supprimer
 export async function DELETE(
   request: Request,
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 1. Vérifier si l'annonce existe et appartient au user
+    // 1. Vérif Owner
     const listing = await prisma.listing.findUnique({
-      where: { id: params.listingId, host: { email: userEmail } }
+      where: { id: params.listingId, hostId: userId }
     });
 
     if (!listing) {
       return NextResponse.json({ error: "Introuvable" }, { status: 404 });
     }
 
-    // 2. SÉCURITÉ CRITIQUE : Vérifier les réservations futures actives
-    // On ne peut pas supprimer une annonce si un client a payé pour venir demain !
+    // 2. SÉCURITÉ : Vérifier réservations futures
     const activeBookingsCount = await prisma.booking.count({
       where: {
         listingId: params.listingId,
-        status: { in: ['CONFIRMED', 'PAID'] }, // Statuts valides
-        endDate: { gte: new Date() } // Se termine dans le futur
+        status: { in: ['CONFIRMED', 'PAID'] },
+        endDate: { gte: new Date() }
       }
     });
 
     if (activeBookingsCount > 0) {
       return NextResponse.json({ 
-        error: `Impossible de supprimer : ${activeBookingsCount} réservation(s) active(s) ou future(s).` 
+        error: `Impossible de supprimer : ${activeBookingsCount} réservation(s) active(s).` 
       }, { status: 400 });
     }
 
-    // 3. Suppression (On supprime d'abord les bookings passés/annulés via cascade si configuré, sinon prisma le gère souvent mal sans cascade explicite dans le schema. 
-    // Ici, par prudence, on supprime l'annonce. Si Prisma bloque à cause des clés étrangères, il faudra supprimer les bookings archivés avant.)
-    
-    // NOTE: Si votre schema n'a pas "onDelete: Cascade" sur la relation Booking->Listing, 
-    // cette ligne plantera s'il y a des vieux bookings.
-    // Solution sûre : supprimer d'abord les bookings liés (puisqu'on a vérifié qu'il n'y en a pas d'actifs).
-    await prisma.booking.deleteMany({
-        where: { listingId: params.listingId }
-    });
-    
-    // Idem pour les avis s'il y en a
-    await prisma.review.deleteMany({
-        where: { listingId: params.listingId }
-    });
-
-    await prisma.listing.delete({
-      where: { id: params.listingId }
-    });
+    // 3. Suppression en cascade manuelle (Cleaner)
+    await prisma.$transaction([
+        prisma.booking.deleteMany({ where: { listingId: params.listingId } }),
+        prisma.review.deleteMany({ where: { listingId: params.listingId } }),
+        prisma.listing.delete({ where: { id: params.listingId } })
+    ]);
 
     return NextResponse.json({ success: true });
 

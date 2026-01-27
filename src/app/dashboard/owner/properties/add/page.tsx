@@ -12,13 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft, Home, MapPin, Banknote, ImageIcon, Bed, Bath, Ruler } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import ImageUpload from "@/components/shared/ImageUpload"; // ✅ Le composant magique
+import ImageUpload from "@/components/shared/ImageUpload";
 
 export default function AddPropertyPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  
-  // ✅ On stocke les URLs Cloudinary ici (et non plus des fichiers bruts)
   const [images, setImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
@@ -26,7 +24,7 @@ export default function AddPropertyPage() {
     address: "",
     commune: "Cocody",
     price: "",
-    type: "APPARTEMENT", // Valeur par défaut conforme à l'Enum
+    type: "APPARTEMENT",
     bedrooms: "1",
     bathrooms: "1",
     surface: "",
@@ -46,47 +44,42 @@ export default function AddPropertyPage() {
     e.preventDefault();
     
     if (images.length === 0) {
-        toast.error("Veuillez ajouter au moins une photo.");
+        toast.error("Veuillez ajouter au moins une photo pour mettre en valeur votre bien.");
         return;
     }
-
-    const stored = localStorage.getItem("immouser");
-    if (!stored) {
-        toast.error("Session expirée.");
-        router.push('/login');
-        return;
-    }
-    const user = JSON.parse(stored);
 
     setLoading(true);
 
     try {
-      // ✅ Préparation du payload JSON propre (Typage conforme Schema)
+      // Préparation du payload (Typage strict)
       const payload = {
           ...formData,
           price: parseInt(formData.price),
           bedrooms: parseInt(formData.bedrooms),
           bathrooms: parseInt(formData.bathrooms),
           surface: formData.surface ? parseFloat(formData.surface) : null,
-          images: images // Tableau d'URLs
+          images: images
       };
 
-      const res = await api.post('/owner/properties', payload, {
-          headers: {
-            'Content-Type': 'application/json', // JSON standard
-            'x-user-email': user.email
-          }
-      });
+      // ✅ APPEL SÉCURISÉ : Plus aucun header manuel. 
+      // Le cookie HttpOnly géré par le navigateur authentifie la requête.
+      const res = await api.post('/owner/properties', payload);
       
       if (res.data.success) {
         toast.success("Bien publié avec succès !");
-        router.refresh();
-        router.push('/dashboard/owner');
+        router.refresh(); // Rafraîchit les Server Components
+        router.push('/dashboard/owner/properties'); // Redirection vers la liste
       }
     } catch (error: any) {
       console.error(error);
-      const msg = error.response?.data?.error || "Erreur lors de la publication.";
-      toast.error(msg);
+      // Gestion des erreurs (401, 403, 500)
+      if (error.response?.status === 401) {
+          toast.error("Session expirée. Veuillez vous reconnecter.");
+          router.push('/login');
+      } else {
+          const msg = error.response?.data?.error || "Erreur lors de la publication.";
+          toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -211,7 +204,7 @@ export default function AddPropertyPage() {
                 </Card>
             </div>
 
-            {/* COLONNE DROITE : PHOTOS & ACTIONS */}
+            {/* COLONNE DROITE : PHOTOS */}
             <div className="space-y-6">
                 <Card className="bg-slate-900 border-slate-800 shadow-xl sticky top-6">
                     <CardHeader>
@@ -220,7 +213,6 @@ export default function AddPropertyPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {/* ✅ LE GAIN DE PLACE EST ICI : LE COMPOSANT REUTILISABLE */}
                         <ImageUpload 
                             value={images} 
                             onChange={(urls) => setImages(urls)}

@@ -1,170 +1,195 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation"; // ✅ useParams préféré
 import { api } from "@/lib/api";
 import { 
   ArrowLeft, Download, Ban, User, MapPin, Calendar, 
   Wallet, CheckCircle, FileText, Loader2, 
-  AlertTriangle, PenTool 
+  AlertTriangle 
 } from "lucide-react";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+// IMPORT TYPES OFFICIELS
+import { Lease, Property, User as PrismaUser, Payment } from "@prisma/client";
 
-export default function LeaseDetailPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+// TYPAGE STRICT (Relations incluses)
+type LeaseDetail = Lease & {
+    property: Property;
+    tenant: PrismaUser;
+    payments: Payment[];
+};
+
+export default function LeaseDetailPage() {
+  const params = useParams(); // Hook sécurisé
+  const id = params?.id as string;
   const router = useRouter();
+  
   const [loading, setLoading] = useState(true);
-  const [lease, setLease] = useState<any>(null);
+  const [lease, setLease] = useState<LeaseDetail | null>(null);
 
+  // 1. CHARGEMENT
   const fetchLease = async () => {
-    // Récupération user (simulation auth)
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return;
-    const user = JSON.parse(stored);
-
     try {
-       const res = await api.get(`/owner/leases/${id}`, {
-          headers: { 'x-user-email': user.email }
-       });
+       // ✅ APPEL ZERO TRUST (Cookie Only)
+       const res = await api.get(`/owner/leases/${id}`);
+       
        if (res.data.success) {
          setLease(res.data.lease);
+       } else {
+         throw new Error(res.data.error || "Erreur API");
        }
-    } catch (error) {
-       toast.error("Impossible de charger les détails du bail.");
+    } catch (error: any) {
+       console.error(error);
+       // Redirection si non autorisé
+       if (error.response?.status === 401 || error.response?.status === 404) {
+           router.push("/dashboard/owner/leases");
+       } else {
+           toast.error("Impossible de charger le bail.");
+       }
     } finally {
        setLoading(false);
     }
   };
 
-  useEffect(() => { fetchLease(); }, [id]);
+  useEffect(() => { 
+      if(id) fetchLease(); 
+  }, [id]);
 
-  // Action : Résilier
+  // 2. ACTION : RÉSILIER
   const handleTerminate = async () => {
     const result = await Swal.fire({
-        title: 'Êtes-vous sûr ?',
-        text: "La résiliation est irréversible. Le bien sera remis sur le marché.",
+        title: 'Confirmer la résiliation ?',
+        text: "Cette action clôturera le contrat immédiatement. Le bien redeviendra disponible.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#1e293b',
-        confirmButtonText: 'Oui, résilier',
+        confirmButtonText: 'Oui, résilier le bail',
+        cancelButtonText: 'Annuler',
         background: '#0f172a', color: '#fff'
     });
 
     if (result.isConfirmed) {
         try {
+            // ✅ APPEL SÉCURISÉ
             await api.put(`/owner/leases/${id}`, { action: 'TERMINATE' });
-            toast.success("Bail résilié.");
-            fetchLease();
+            
+            toast.success("Bail résilié avec succès.");
+            fetchLease(); // Rafraîchir les données
         } catch (e) {
-            toast.error("Erreur technique.");
+            toast.error("Erreur lors de la résiliation.");
         }
     }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-[#0B1120]"><Loader2 className="w-10 h-10 animate-spin text-[#F59E0B]" /></div>;
-  if (!lease) return <div className="text-white text-center mt-20">Bail introuvable.</div>;
+  if (loading) return (
+    <div className="flex flex-col h-screen items-center justify-center bg-[#0B1120] gap-4">
+        <Loader2 className="w-12 h-12 animate-spin text-[#F59E0B]" />
+        <p className="text-slate-500 font-mono text-sm">Récupération du dossier...</p>
+    </div>
+  );
+  
+  if (!lease) return null;
 
   const isSigned = lease.signatureStatus === 'SIGNED_TENANT' || lease.signatureStatus === 'COMPLETED';
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans pb-20">
         
-        {/* HEADER DE NAVIGATION */}
+        {/* HEADER NAVIGATION */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <Link href="/dashboard/owner/leases" className="flex items-center text-slate-400 hover:text-white gap-2 transition group">
-                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <Link href="/dashboard/owner/leases" className="flex items-center text-slate-400 hover:text-white gap-2 transition group text-sm font-bold">
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                 Retour aux contrats
             </Link>
             
             <div className="flex flex-wrap gap-3">
-                {/* 1. BOUTON TÉLÉCHARGEMENT (Lien corrigé) */}
+                {/* Bouton Juridique (Mise en demeure) */}
+                {lease.isActive && (
+                    <Link 
+                        href={`/dashboard/owner/leases/${lease.id}/notice`}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-600/20 rounded-xl transition text-sm font-bold"
+                    >
+                        <AlertTriangle className="w-4 h-4" />
+                        Mise en Demeure
+                    </Link>
+                )}
+
+                {/* Bouton PDF */}
                 <a 
-                    href={`/api/owner/leases/${id}/download`} 
+                    href={`/api/owner/leases/${id}/download`} // Supposant que cette route PDF existe ou existera
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex items-center gap-2 px-4 py-2 border rounded-xl transition text-sm font-bold ${isSigned ? 'bg-emerald-600 border-emerald-500 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300'}`}
+                    className={`flex items-center gap-2 px-4 py-2 border rounded-xl transition text-sm font-bold ${
+                        isSigned 
+                        ? 'bg-emerald-600 border-emerald-500 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                        : 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300'
+                    }`}
                 >
                     {isSigned ? <CheckCircle className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-                    {isSigned ? "CONTRAT SIGNÉ (PDF)" : "Télécharger PDF"}
+                    {isSigned ? "Contrat Signé (PDF)" : "Télécharger PDF"}
                 </a>
 
-                {/* 2. ACTIONS PROPRIÉTAIRE */}
+                {/* Bouton Résilier */}
                 {lease.isActive && (
-                    <>
-                        <button 
-                            onClick={handleTerminate}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl transition text-sm font-bold"
-                        >
-                            <Ban className="w-4 h-4" /> Résilier
-                        </button>
-
-                        <Link 
-                            href={`/dashboard/owner/leases/${id}/notice`}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/20 rounded-xl transition text-sm font-bold"
-                        >
-                            <AlertTriangle className="w-4 h-4" /> Mise en Demeure
-                        </Link>
-                    </>
+                    <button 
+                        onClick={handleTerminate}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-red-950/30 text-slate-400 hover:text-red-500 border border-slate-700 hover:border-red-500/30 rounded-xl transition text-sm font-bold"
+                    >
+                        <Ban className="w-4 h-4" /> Clôturer
+                    </button>
                 )}
             </div>
         </div>
 
-        {/* STATUS BAR SI SIGNÉ */}
-        {isSigned && (
-            <div className="mb-8 p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-xl flex items-center gap-3 text-emerald-400">
-                <PenTool className="w-5 h-5" />
-                <span className="font-bold">Ce document a été signé électroniquement par le locataire le {new Date(lease.signatures?.[0]?.signedAt || lease.updatedAt).toLocaleDateString()}.</span>
-            </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* COLONNE GAUCHE : DÉTAILS */}
+            {/* GAUCHE : DÉTAILS CONTRAT */}
             <div className="lg:col-span-2 space-y-6">
                 
-                {/* CARTE BIEN */}
-                <Card className="bg-slate-900 border-slate-800">
+                {/* CARTE PRINCIPALE */}
+                <Card className="bg-slate-900 border-slate-800 shadow-xl">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-white">
+                        <CardTitle className="flex items-center gap-2 text-white text-lg">
                             <FileText className="text-[#F59E0B]" /> Termes du Contrat
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between items-center p-4 bg-slate-950 rounded-xl border border-slate-800">
+                    <CardContent className="space-y-6">
+                        
+                        {/* Statut & Bien */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950 rounded-xl border border-slate-800 gap-4">
                             <div>
-                                <p className="text-xs text-slate-500 uppercase font-bold">Bien loué</p>
+                                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Bien Immobilier</p>
                                 <p className="font-bold text-lg text-white">{lease.property.title}</p>
-                                <div className="flex items-center gap-1 text-slate-400 text-sm">
-                                    <MapPin className="w-3 h-3"/> {lease.property.address}
+                                <div className="flex items-center gap-1 text-slate-400 text-sm mt-1">
+                                    <MapPin className="w-3 h-3 text-[#F59E0B]"/> {lease.property.address}, {lease.property.commune}
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs text-slate-500 uppercase font-bold">Statut</p>
                                 {lease.isActive ? (
-                                    <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30">ACTIF</Badge>
+                                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 px-3 py-1">ACTIF</Badge>
                                 ) : (
-                                    <Badge className="bg-slate-700 text-slate-400">CLÔTURÉ</Badge>
+                                    <Badge variant="destructive" className="bg-slate-700 text-slate-300 hover:bg-slate-700">RÉSILIÉ</Badge>
                                 )}
                             </div>
                         </div>
 
+                        {/* Infos Financières */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
-                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Date d'effet</p>
+                            <div className="p-4 bg-[#0B1120] rounded-xl border border-slate-800">
+                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Date d'entrée</p>
                                 <div className="flex items-center gap-2 text-white font-mono">
                                     <Calendar className="w-4 h-4 text-[#F59E0B]" /> 
                                     {new Date(lease.startDate).toLocaleDateString()}
                                 </div>
                             </div>
-                            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
-                                <p className="text-xs text-slate-500 uppercase font-bold mb-1">Loyer Mensuel</p>
-                                <div className="flex items-center gap-2 text-white font-mono font-bold">
+                            <div className="p-4 bg-[#0B1120] rounded-xl border border-slate-800">
+                                <p className="text-[10px] text-slate-500 uppercase font-bold mb-2">Loyer Mensuel</p>
+                                <div className="flex items-center gap-2 text-white font-mono font-bold text-lg">
                                     <Wallet className="w-4 h-4 text-emerald-500" /> 
                                     {lease.monthlyRent.toLocaleString()} F
                                 </div>
@@ -173,69 +198,78 @@ export default function LeaseDetailPage({ params }: { params: { id: string } }) 
                     </CardContent>
                 </Card>
 
-                {/* HISTORIQUE */}
+                {/* HISTORIQUE DES PAIEMENTS */}
                 <Card className="bg-slate-900 border-slate-800">
                     <CardHeader>
-                        <CardTitle className="text-white text-lg">Paiements de Loyer</CardTitle>
+                        <CardTitle className="text-white text-lg flex items-center justify-between">
+                            <span>Historique Financier</span>
+                            <span className="text-xs font-normal text-slate-500 bg-slate-800 px-2 py-1 rounded-full">12 derniers mois</span>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">
-                            {lease.payments?.length > 0 ? lease.payments.map((pay: any) => (
-                                <div key={pay.id} className="flex justify-between items-center p-3 hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">
+                        <div className="space-y-1">
+                            {lease.payments && lease.payments.length > 0 ? lease.payments.map((pay) => (
+                                <div key={pay.id} className="flex justify-between items-center p-3 hover:bg-[#0B1120] rounded-lg transition group border-b border-slate-800 last:border-0">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                                             <CheckCircle className="w-4 h-4"/>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-sm text-white">Loyer reçu</p>
+                                            <p className="font-bold text-sm text-white">Loyer perçu</p>
                                             <p className="text-xs text-slate-500">{new Date(pay.date).toLocaleDateString()}</p>
                                         </div>
                                     </div>
-                                    <span className="font-mono font-bold text-white">{pay.amount.toLocaleString()} F</span>
+                                    <span className="font-mono font-bold text-emerald-400">+{pay.amount.toLocaleString()} F</span>
                                 </div>
                             )) : (
-                                <p className="text-slate-500 text-sm italic text-center py-4">Aucun paiement enregistré pour ce bail.</p>
+                                <div className="text-center py-8">
+                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-600">
+                                        <Wallet className="w-6 h-6"/>
+                                    </div>
+                                    <p className="text-slate-500 text-sm">Aucun paiement enregistré pour ce bail.</p>
+                                </div>
                             )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* COLONNE DROITE : LOCATAIRE */}
+            {/* DROITE : PROFIL LOCATAIRE */}
             <div>
-                <Card className="bg-slate-900 border-slate-800 sticky top-6">
-                    <CardHeader>
-                        <CardTitle className="text-white flex items-center gap-2">
-                            <User className="text-blue-500" /> Locataire
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center">
-                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-slate-700">
-                            <span className="text-2xl font-black text-slate-500">{lease.tenant?.name?.charAt(0)}</span>
+                <Card className="bg-slate-900 border-slate-800 sticky top-6 shadow-xl">
+                    <div className="h-24 bg-gradient-to-b from-blue-600/20 to-slate-900"></div>
+                    <div className="px-6 relative -mt-12 text-center">
+                        <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mx-auto border-4 border-slate-900 overflow-hidden shadow-2xl">
+                             {lease.tenant?.image ? (
+                                <img src={lease.tenant.image} alt="Avatar" className="w-full h-full object-cover" />
+                             ) : (
+                                <div className="w-full h-full bg-slate-800 flex items-center justify-center text-3xl font-black text-slate-600">
+                                    {lease.tenant?.name?.charAt(0)}
+                                </div>
+                             )}
                         </div>
-                        <h3 className="font-bold text-xl text-white mb-1">{lease.tenant?.name}</h3>
-                        <div className="flex justify-center gap-2 mb-6">
-                             <Badge variant="secondary" className="bg-blue-500/10 text-blue-400">LOCATAIRE VÉRIFIÉ</Badge>
+                        <h3 className="font-bold text-xl text-white mt-3">{lease.tenant?.name}</h3>
+                        <Badge variant="secondary" className="mt-2 bg-blue-500/10 text-blue-400 border-blue-500/20">LOCATAIRE EN TITRE</Badge>
+                    </div>
+
+                    <CardContent className="mt-6 space-y-4">
+                        <div className="space-y-1 bg-[#0B1120] p-3 rounded-xl border border-slate-800">
+                            <p className="text-[10px] uppercase text-slate-500 font-bold">Email</p>
+                            <p className="text-sm text-white truncate font-medium">{lease.tenant?.email}</p>
                         </div>
-                        
-                        <div className="space-y-3 text-left bg-slate-950 p-4 rounded-xl border border-slate-800">
-                            <div>
-                                <p className="text-[10px] uppercase text-slate-500 font-bold">Email</p>
-                                <p className="text-sm text-slate-300 truncate">{lease.tenant?.email}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] uppercase text-slate-500 font-bold">Téléphone</p>
-                                <p className="text-sm text-slate-300 font-mono">{lease.tenant?.phone}</p>
-                            </div>
+                        <div className="space-y-1 bg-[#0B1120] p-3 rounded-xl border border-slate-800">
+                            <p className="text-[10px] uppercase text-slate-500 font-bold">Téléphone</p>
+                            <p className="text-sm text-white font-mono font-medium">{lease.tenant?.phone || "Non renseigné"}</p>
                         </div>
 
-                        <button className="w-full mt-6 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition text-sm border border-slate-700">
-                            Envoyer un message
-                        </button>
+                        <Link href={`/dashboard/owner/tenants/${lease.tenant.id}`} className="block">
+                            <button className="w-full py-3 mt-2 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition border border-transparent hover:border-slate-700">
+                                Voir le profil complet
+                            </button>
+                        </Link>
                     </CardContent>
                 </Card>
             </div>
-
         </div>
     </div>
   );

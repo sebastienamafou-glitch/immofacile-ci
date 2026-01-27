@@ -23,20 +23,16 @@ export default async function GuestTripsPage() {
   const headersList = headers();
   const userEmail = headersList.get("x-user-email");
   
-  // ⚠️ TEMPORAIRE : Fallback pour tester si vous n'avez pas encore le middleware Auth
-  // Remplacez par votre propre email présent dans la DB pour voir vos données
-  const emailToUse = userEmail || "admin@immofacile.com"; 
+  // 🔒 SÉCURITÉ STRICTE : Si pas d'email (Middleware a bloqué ou pas passé), on éjecte vers le login
+  if (!userEmail) {
+    return redirect("/login?callbackUrl=/dashboard/guest/trips");
+  }
 
-  const user = await prisma.user.findUnique({ where: { email: emailToUse } });
+  const user = await prisma.user.findUnique({ where: { email: userEmail } });
 
+  // Cas rare : Email dans header mais utilisateur supprimé de la DB
   if (!user) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-            <h2 className="text-xl font-bold mb-2">Accès restreint</h2>
-            <p className="text-slate-500 mb-4">Veuillez vous connecter pour voir vos voyages.</p>
-            <Link href="/login"><Button>Se connecter</Button></Link>
-        </div>
-    );
+    return redirect("/login");
   }
 
   // 2. RÉCUPÉRATION DES VOYAGES (Triés par date récente)

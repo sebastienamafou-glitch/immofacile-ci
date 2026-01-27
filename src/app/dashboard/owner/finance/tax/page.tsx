@@ -4,39 +4,64 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, ArrowLeft, Loader2 } from "lucide-react";
+import { Printer, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
+// ✅ TYPAGE STRICT
+interface PropertyTaxSummary {
+    id: string;
+    title: string;
+    commune: string;
+    rev: number;
+    exp: number;
+    net: number;
+}
+
+interface TaxReportData {
+    year: number;
+    ownerName: string;
+    ownerEmail: string;
+    revenue: number;
+    expenses: number;
+    net: number;
+    properties: PropertyTaxSummary[];
+}
 
 export default function TaxSummaryPage() {
   const router = useRouter();
   const [year, setYear] = useState<string>(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<TaxReportData | null>(null);
 
-  // Charger les données fiscales réelles
   useEffect(() => {
     const fetchData = async () => {
         setLoading(true);
+        
         try {
-            // CORRECTION : Appel direct, l'intercepteur gère l'auth via le Token
+            // ✅ APPEL SÉCURISÉ : Cookie Only (Plus de localStorage)
             const res = await api.get(`/owner/finance/tax?year=${year}`);
             
             if (res.data.success) {
                 setData(res.data.data);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Erreur chargement fiscal", error);
-            toast.error("Impossible de générer le rapport.");
+            // Redirection si session expirée
+            if (error.response?.status === 401) {
+                router.push('/login');
+            } else {
+                toast.error("Impossible de générer le rapport fiscal.");
+            }
         } finally {
             setLoading(false);
         }
     };
 
     fetchData();
-  }, [year, router]); // Ajout de router aux dépendances
+  }, [year, router]);
 
-  if (loading && !data) return (
+  if (loading) return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
           <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
       </div>
@@ -47,12 +72,12 @@ export default function TaxSummaryPage() {
       
       {/* HEADER NO-PRINT */}
       <div className="max-w-4xl mx-auto mb-8 flex justify-between items-center no-print">
-        <Button variant="ghost" onClick={() => router.back()} className="text-slate-500">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Retour
+        <Button variant="ghost" onClick={() => router.back()} className="text-slate-500 hover:text-slate-900">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Retour Finances
         </Button>
         <div className="flex gap-4">
             <Select value={year} onValueChange={setYear}>
-                <SelectTrigger className="w-[100px] bg-white border-slate-300 shadow-sm">
+                <SelectTrigger className="w-[120px] bg-white border-slate-300 shadow-sm">
                     <SelectValue placeholder="Année" />
                 </SelectTrigger>
                 <SelectContent>
@@ -87,11 +112,11 @@ export default function TaxSummaryPage() {
         {/* CARTES RÉSUMÉ */}
         <div className="grid grid-cols-3 gap-6 mb-12">
             <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100 print:border-slate-300">
-                <p className="text-xs font-bold text-emerald-700 uppercase mb-2 tracking-wider">Total Revenus</p>
+                <p className="text-xs font-bold text-emerald-700 uppercase mb-2 tracking-wider">Total Revenus (Imposable)</p>
                 <p className="text-2xl font-black text-emerald-900">{data?.revenue?.toLocaleString()} F</p>
             </div>
             <div className="bg-rose-50 p-6 rounded-xl border border-rose-100 print:border-slate-300">
-                <p className="text-xs font-bold text-rose-700 uppercase mb-2 tracking-wider">Total Dépenses</p>
+                <p className="text-xs font-bold text-rose-700 uppercase mb-2 tracking-wider">Dépenses Déductibles</p>
                 <p className="text-2xl font-black text-rose-900">{data?.expenses?.toLocaleString()} F</p>
             </div>
             <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 print:border-slate-300">
@@ -110,18 +135,23 @@ export default function TaxSummaryPage() {
             <thead>
                 <tr className="border-b-2 border-slate-900 text-[10px] uppercase text-slate-500 tracking-wider">
                     <th className="py-3 pr-4">Bien Immobilier</th>
-                    <th className="py-3 px-4 text-right">Revenus (Loyer)</th>
-                    <th className="py-3 px-4 text-right">Charges / Travaux</th>
+                    <th className="py-3 px-4 text-right">Loyers Perçus</th>
+                    <th className="py-3 px-4 text-right">Travaux / Charges</th>
                     <th className="py-3 pl-4 text-right font-bold text-slate-900">Solde Net</th>
                 </tr>
             </thead>
             <tbody className="text-sm">
-                {data?.properties?.length === 0 ? (
+                {!data?.properties || data.properties.length === 0 ? (
                     <tr>
-                        <td colSpan={4} className="py-8 text-center text-slate-400 italic">Aucune activité enregistrée pour cette année.</td>
+                        <td colSpan={4} className="py-8 text-center text-slate-400 italic">
+                            <div className="flex flex-col items-center gap-2">
+                                <AlertCircle className="w-6 h-6" />
+                                Aucune activité fiscale enregistrée pour cette année.
+                            </div>
+                        </td>
                     </tr>
                 ) : (
-                    data?.properties.map((item: any, i: number) => (
+                    data.properties.map((item, i) => (
                         <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                             <td className="py-4 pr-4">
                                 <p className="font-bold text-slate-900">{item.title}</p>
@@ -145,7 +175,7 @@ export default function TaxSummaryPage() {
         {/* FOOTER DOCUMENT */}
         <div className="mt-auto pt-8 border-t border-slate-200 text-center text-[10px] text-slate-400 uppercase tracking-wider">
             <p>Document généré automatiquement par la plateforme ImmoFacile CI.</p>
-            <p>Ce rapport est fourni à titre informatif pour votre gestion comptable.</p>
+            <p>Ce rapport est fourni à titre indicatif pour votre déclaration fiscale. Vérifiez les montants avec vos relevés bancaires.</p>
         </div>
 
       </div>

@@ -2,21 +2,20 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
-// ✅ Typage strict des props reçues
 interface DashboardStats {
-  totalRent?: number;
-  totalExpensesMonth?: number;
-  netIncome?: number;
-  [key: string]: any; // Flexibilité pour d'autres stats futures
+  totalRent: number; // Modifié pour correspondre exactement à StatsOverview
+  totalExpenses: number; // Harmonisation des noms (totalExpenses vs totalExpensesMonth)
+  netIncomeYTD: number;  // Harmonisation
+  [key: string]: any;
 }
 
 export default function FinanceChart({ stats }: { stats: DashboardStats }) {
   
-  // ✅ Sécurisation des valeurs (0 par défaut)
+  // Mapping sécurisé des props reçues depuis StatsOverview
   const data = [
     { name: 'Revenus', amount: stats?.totalRent || 0, colorStart: '#4ade80', colorEnd: '#22c55e' },
-    { name: 'Dépenses', amount: stats?.totalExpensesMonth || 0, colorStart: '#f87171', colorEnd: '#ef4444' },
-    { name: 'Résultat', amount: stats?.netIncome || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' },
+    { name: 'Dépenses', amount: stats?.totalExpenses || 0, colorStart: '#f87171', colorEnd: '#ef4444' }, // Modifié pour matcher la prop
+    { name: 'Résultat', amount: stats?.netIncomeYTD || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' }, // Modifié pour matcher la prop
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -35,8 +34,6 @@ export default function FinanceChart({ stats }: { stats: DashboardStats }) {
 
   return (
     <div className="bg-[#131b2e] border border-slate-800/60 p-6 rounded-[2rem] h-full flex flex-col relative overflow-hidden group min-h-[350px]">
-        
-        {/* Petit effet de lueur en fond */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
 
         <div className="flex justify-between items-center mb-6 relative z-10">
@@ -63,9 +60,7 @@ export default function FinanceChart({ stats }: { stats: DashboardStats }) {
                             </linearGradient>
                         ))}
                     </defs>
-                    
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                    
                     <XAxis 
                         dataKey="name" 
                         axisLine={false} 
@@ -74,9 +69,7 @@ export default function FinanceChart({ stats }: { stats: DashboardStats }) {
                         dy={15}
                     />
                     <YAxis hide />
-                    
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)', radius: 8 }} />
-                    
                     <Bar dataKey="amount" radius={[12, 12, 12, 12]} animationDuration={1500}>
                         {data.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={`url(#gradient-${index})`} strokeWidth={0} />
