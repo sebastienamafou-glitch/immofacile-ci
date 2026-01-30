@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+// ❌ ON RETIRE 'Badge' d'ici s'il y était
 import { 
   Wrench, Clock, Plus, Hammer, Loader2,
-  ArrowLeft, ShieldCheck
-} from "lucide-react";
+  ArrowLeft, ShieldCheck, MessageCircle, ChevronRight 
+} from "lucide-react"; 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// ✅ ON IMPORTE LE VRAI BADGE UI ICI
+import { Badge } from "@/components/ui/badge"; 
 import Swal from "sweetalert2";
 import Link from "next/link";
 
-// 1. TYPAGE STRICT (Best Practice)
 interface Incident {
   id: string;
   type: string;
@@ -25,7 +27,7 @@ interface Incident {
 }
 
 export default function TenantIncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>([]); // Typage appliqué
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +37,6 @@ export default function TenantIncidentsPage() {
 
   const fetchIncidents = async () => {
     try {
-      // On appelle la route dédiée (plus propre que dashboard global)
       const res = await api.get('/tenant/incidents'); 
       if (res.data.success) {
         setIncidents(res.data.incidents || []);
@@ -66,18 +67,13 @@ export default function TenantIncidentsPage() {
             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
             <textarea id="swal-desc" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mt-1 outline-none focus:border-orange-500 h-24" placeholder="Décrivez le problème en détails..."></textarea>
           </div>
-          <div class="p-4 bg-orange-500/5 border border-orange-500/10 rounded-xl">
-            <p className="text-[9px] text-orange-500 font-bold uppercase italic">Note technique</p>
-            <p className="text-[10px] text-slate-500 leading-tight mt-1">Votre signalement sera transmis instantanément au bailleur pour assignation d'un artisan spécialisé.</p>
-          </div>
         </div>
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: 'Envoyer le signalement',
+      confirmButtonText: 'Envoyer',
       confirmButtonColor: '#F59E0B',
       background: '#0F172A', color: '#fff',
-      customClass: { popup: 'border border-white/10 rounded-[2.5rem] p-8' },
       preConfirm: () => {
         const typeEl = document.getElementById('swal-type') as HTMLSelectElement;
         const descEl = document.getElementById('swal-desc') as HTMLTextAreaElement;
@@ -94,7 +90,7 @@ export default function TenantIncidentsPage() {
       try {
         await api.post('/tenant/incidents', formValues); 
         Swal.fire({ icon: 'success', title: 'Signalé !', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, background: '#10B981', color: '#fff' });
-        fetchIncidents(); // Rafraîchir la liste
+        fetchIncidents();
       } catch (e) {
         Swal.fire({ icon: 'error', title: 'Erreur', text: 'Impossible d\'envoyer le signalement.', background: '#0F172A', color: '#fff' });
       } finally {
@@ -123,11 +119,11 @@ export default function TenantIncidentsPage() {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
             <div>
-                <Link href="/dashboard/tenant" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors mb-4 group">
+                <Link href="/dashboard" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors mb-4 group">
                     <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Retour Dashboard
                 </Link>
                 <h1 className="text-4xl font-black text-white tracking-tighter italic">Maintenance & <span className="text-orange-500">Support</span></h1>
-                <p className="text-slate-500 text-sm mt-1 font-medium">Gérez vos demandes d'intervention technique.</p>
+                <p className="text-slate-500 text-sm mt-1 font-medium">Gérez vos demandes et discutez avec les artisans.</p>
             </div>
             <Button 
                 onClick={handleReportIncident}
@@ -141,50 +137,51 @@ export default function TenantIncidentsPage() {
         {/* LISTE DES INCIDENTS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {incidents.length > 0 ? incidents.map((incident) => (
-                <Card key={incident.id} className="bg-[#0F172A]/50 border-white/5 rounded-[2.5rem] backdrop-blur-xl hover:border-white/10 transition-all group overflow-hidden">
-                    <CardHeader className="p-8 pb-4">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-2xl bg-white/5 border border-white/5 text-slate-400 group-hover:text-orange-500 transition-colors`}>
-                                <Wrench className="w-5 h-5" />
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusStyle(incident.status)}`}>
-                                {incident.status === 'OPEN' ? 'Signalé' : incident.status === 'IN_PROGRESS' ? 'En cours' : 'Résolu'}
-                            </span>
-                        </div>
-                        <CardTitle className="text-white text-lg font-black italic uppercase tracking-tight">{incident.type}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-8 pt-0">
-                        <p className="text-slate-400 text-sm leading-relaxed mb-6 line-clamp-3 font-medium italic">
-                            "{incident.description}"
-                        </p>
+                <Link href={`/dashboard/tenant/incidents/${incident.id}`} key={incident.id} className="group cursor-pointer">
+                    <Card className="h-full bg-[#0F172A]/50 border-white/5 rounded-[2.5rem] backdrop-blur-xl group-hover:border-orange-500/30 transition-all duration-300 overflow-hidden relative">
                         
-                        {/* Barre d'état visuelle */}
-                        <div className="flex items-center gap-4 pt-6 border-t border-white/5">
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Signalé le</span>
-                                <span className="text-xs font-bold text-slate-300">{new Date(incident.createdAt).toLocaleDateString()}</span>
+                        <CardHeader className="p-8 pb-4">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className={`p-3 rounded-2xl bg-white/5 border border-white/5 text-slate-400 group-hover:text-orange-500 group-hover:bg-orange-500/10 transition-colors`}>
+                                    <Wrench className="w-5 h-5" />
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusStyle(incident.status)}`}>
+                                    {incident.status === 'OPEN' ? 'Signalé' : incident.status === 'IN_PROGRESS' ? 'En cours' : 'Résolu'}
+                                </span>
                             </div>
+                            <CardTitle className="text-white text-lg font-black italic uppercase tracking-tight flex items-center justify-between">
+                                {incident.type}
+                                <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                            </CardTitle>
+                        </CardHeader>
+                        
+                        <CardContent className="p-8 pt-0">
+                            <p className="text-slate-400 text-sm leading-relaxed mb-6 line-clamp-3 font-medium italic">
+                                "{incident.description}"
+                            </p>
                             
-                            {/* Affichage de l'artisan si assigné */}
-                            {incident.assignedTo ? (
+                            <div className="flex items-center gap-4 pt-6 border-t border-white/5">
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">Date</span>
+                                    <span className="text-xs font-bold text-slate-300">{new Date(incident.createdAt).toLocaleDateString()}</span>
+                                </div>
+                                
                                 <div className="flex items-center gap-2 ml-auto">
-                                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-                                        <Hammer className="w-4 h-4" />
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[8px] font-bold text-blue-500 uppercase">Artisan en route</span>
-                                        <span className="text-[10px] font-bold text-white truncate max-w-[80px]">{incident.assignedTo.name}</span>
-                                    </div>
+                                    {incident.assignedTo ? (
+                                        <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-400 text-[10px] gap-1 px-3 py-1 h-8">
+                                            <MessageCircle className="w-3 h-3" /> Chat Actif
+                                        </Badge>
+                                    ) : (
+                                        <span className="text-[10px] text-slate-600 font-bold uppercase flex items-center gap-1">
+                                            <Clock className="w-3 h-3" /> En attente
+                                        </span>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="flex items-center gap-2 ml-auto text-slate-600">
-                                    <Clock className="w-4 h-4" />
-                                    <span className="text-[9px] font-bold uppercase">En attente artisan</span>
-                                </div>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                            </div>
+                        </CardContent>
+
+                    </Card>
+                </Link>
             )) : (
                 <div className="col-span-full py-24 text-center">
                     <div className="w-24 h-24 bg-slate-900 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border border-white/5 shadow-inner">

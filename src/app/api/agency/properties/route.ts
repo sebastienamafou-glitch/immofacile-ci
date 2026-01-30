@@ -2,40 +2,44 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PropertyType } from "@prisma/client";
 
+export const dynamic = 'force-dynamic';
+
 // ==========================================
 // 1. GET : Lister les biens de l'agence
 // ==========================================
 export async function GET(req: Request) {
   try {
-    const userEmail = req.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = req.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    // 2. VÉRIFICATION RÔLE & AGENCE
     const admin = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { agency: true }
+      where: { id: userId },
+      select: { id: true, role: true, agencyId: true }
     });
 
-    // SÉCURITÉ : Seul l'Admin d'Agence accède à cette liste
-    if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agencyId) {
-      return NextResponse.json({ error: "Accès Agence requis" }, { status: 403 });
+    if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
+      return NextResponse.json({ error: "Accès Agence requis." }, { status: 403 });
     }
 
+    // 3. RÉCUPÉRATION DES MANDATS
     const properties = await prisma.property.findMany({
       where: {
         agencyId: admin.agencyId // 🔒 FILTRE STRICT : Uniquement les biens de CETTE agence
       },
       include: {
-        owner: { select: { name: true, email: true } }, // On récupère les infos du bailleur
+        owner: { select: { name: true, email: true, phone: true } }, 
         leases: { 
             where: { isActive: true }, 
             select: { id: true } 
-        }, // Pour vérifier l'occupation
-        _count: { select: { incidents: true } } // Pour les alertes
+        },
+        _count: { select: { incidents: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Formatage pour le front (Calcul de disponibilité)
+    // Formatage (Disponibilité)
     const formatted = properties.map((p) => ({
       ...p,
       isAvailable: p.leases.length === 0, 
@@ -49,65 +53,58 @@ export async function GET(req: Request) {
   }
 }
 
-// ==========================================
-// 2. POST : Créer un nouveau mandat (Bien)
+// 2. POST : CRÉER UN NOUVEAU MANDAT
 // ==========================================
 export async function POST(req: Request) {
   try {
-    const userEmail = req.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = req.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    // 2. VÉRIFICATION ADMIN AGENCE
     const admin = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { agency: true }
+      where: { id: userId },
+      select: { id: true, role: true, agencyId: true }
     });
 
-    // SÉCURITÉ RÔLE
-    if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agencyId) {
-      return NextResponse.json({ error: "Accès Agence requis" }, { status: 403 });
+    if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
+      return NextResponse.json({ error: "Accès Agence requis." }, { status: 403 });
     }
 
+    // 3. VALIDATION DONNÉES
     const body = await req.json();
 
-    // VALIDATION : Le Propriétaire (Bailleur) est OBLIGATOIRE
-    if (!body.ownerId) {
-        return NextResponse.json({ error: "Veuillez sélectionner un propriétaire pour ce mandat." }, { status: 400 });
+    if (!body.ownerId || !body.title || !body.price) {
+        return NextResponse.json({ error: "Propriétaire, Titre et Prix requis." }, { status: 400 });
     }
 
-    // Vérification optionnelle : Est-ce que ce propriétaire existe ?
-    const ownerExists = await prisma.user.findUnique({ where: { id: body.ownerId } });
-    if (!ownerExists) {
-        return NextResponse.json({ error: "Le propriétaire sélectionné est introuvable." }, { status: 404 });
-    }
-
-    // CRÉATION DU MANDAT
+    // 4. CRÉATION SÉCURISÉE (Contexte Agence Forcé)
     const property = await prisma.property.create({
       data: {
         title: body.title,
+        description: body.description || "",
         address: body.address,
         commune: body.commune || "Abidjan",
-        description: body.description || "",
         
-        // Conversions numériques
         price: Number(body.price),
-        type: body.type as PropertyType,
+        surface: body.surface ? Number(body.surface) : null,
         bedrooms: Number(body.bedrooms) || 0,
         bathrooms: Number(body.bathrooms) || 0,
-        surface: body.surface ? Number(body.surface) : null,
+        type: body.type as PropertyType,
         
-        images: body.images || [], 
-        isPublished: true,
+        images: body.images || [],
+        isPublished: true, 
 
-        // 🟢 LIAISONS CRITIQUES AGENCE :
-        ownerId: body.ownerId,     // Le bien appartient au CLIENT (Bailleur)
-        agencyId: admin.agencyId   // Le bien est géré par VOTRE AGENCE
+        // 🟢 SÉCURITÉ CRITIQUE :
+        ownerId: body.ownerId,       // Le bien appartient au client sélectionné
+        agencyId: admin.agencyId     // Le bien est VERROUILLÉ sur votre agence
       }
     });
 
     return NextResponse.json({ success: true, property });
 
-  } catch (error) {
-    console.error("Erreur POST Agency Property:", error);
-    return NextResponse.json({ error: "Erreur serveur lors de la création du mandat" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Create Agency Property Error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

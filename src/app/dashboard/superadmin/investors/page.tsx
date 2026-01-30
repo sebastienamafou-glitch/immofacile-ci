@@ -1,10 +1,11 @@
+import { headers } from "next/headers"; // 1. IMPORT REQUIS
+import { redirect } from "next/navigation"; // 2. IMPORT REQUIS
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { 
   Users, TrendingUp, Download, Plus, 
   Search, Filter, CheckCircle, XCircle, Ban 
 } from "lucide-react";
-// ✅ IMPORT DES TYPES PRISMA POUR ÉVITER LES ERREURS DE TYPAGE
 import { User, InvestmentContract } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
@@ -13,14 +14,37 @@ const formatFCFA = (amount: number) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
 };
 
-// ✅ DÉFINITION DU TYPE POUR LE TABLEAU
 type InvestorWithContracts = User & {
   investmentContracts: InvestmentContract[];
 };
 
 export default async function InvestorsListPage() {
   
-  // ✅ CORRECTION : TYPAGE EXPLICITE DU TABLEAU (Plus d'erreur "implicit any")
+  // ---------------------------------------------------------
+  // 🛡️ PROTOCOLE ZERO TRUST (DÉBUT DU BLINDAGE)
+  // ---------------------------------------------------------
+  const headersList = headers();
+  const userId = headersList.get("x-user-id");
+
+  if (!userId) {
+      // Pas d'ID = Intrusion potentielle -> Ejection
+      redirect("/login");
+  }
+
+  // Double vérification du grade (Defense in Depth)
+  const admin = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+  });
+
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+      // Mauvais grade -> Ejection
+      redirect("/dashboard");
+  }
+  // ---------------------------------------------------------
+  // ✅ FIN DU BLINDAGE - ACCÈS AUTORISÉ
+  // ---------------------------------------------------------
+
   let investors: InvestorWithContracts[] = [];
   
   try {
@@ -73,6 +97,7 @@ export default async function InvestorsListPage() {
 
       {/* KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Capitaux Levés */}
         <div className="bg-[#0B1120] border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-[#F59E0B]/30 transition duration-500">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
                 <TrendingUp className="w-16 h-16 text-[#F59E0B]" />
@@ -84,6 +109,7 @@ export default async function InvestorsListPage() {
             </div>
         </div>
 
+        {/* Structure Capital */}
         <div className="bg-[#0B1120] border border-white/5 p-6 rounded-2xl hover:border-blue-500/30 transition duration-500">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Structure du Capital</p>
             <div className="flex items-baseline gap-2">
@@ -95,6 +121,7 @@ export default async function InvestorsListPage() {
             </p>
         </div>
 
+        {/* Conformité */}
         <div className="bg-[#0B1120] border border-white/5 p-6 rounded-2xl hover:border-emerald-500/30 transition duration-500">
             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Conformité (Signatures)</p>
             <div className="flex items-end gap-2">
@@ -110,9 +137,8 @@ export default async function InvestorsListPage() {
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* TABLEAU */}
       <div className="bg-[#0B1120] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-        
         <div className="p-4 border-b border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 bg-white/[0.02]">
             <div className="relative flex-1 max-w-sm w-full">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500"/>

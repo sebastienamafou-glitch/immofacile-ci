@@ -1,39 +1,58 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
+    // 2. VÉRIFICATION AGENT (Role + Agence)
+    const agent = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true, agencyId: true }
+    });
+
+    if (!agent || agent.role !== 'AGENT' || !agent.agencyId) {
+        return NextResponse.json({ error: "Accès refusé (Agent/Agence requis)." }, { status: 403 });
+    }
+
+    // 3. VALIDATION INPUT
     const body = await request.json();
     const { bookingId, action } = body; // action: 'CHECK_IN' ou 'CHECK_OUT'
 
     if (!bookingId || !action) return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
 
-    // 2. RECUPÉRER LA RÉSERVATION
+    // 4. RECUPÉRER LA RÉSERVATION (Avec vérification périmètre Agence)
     const booking = await prisma.booking.findUnique({
-        where: { id: bookingId }
+        where: { id: bookingId },
+        include: { listing: { select: { agencyId: true } } }
     });
 
     if (!booking) return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
 
-    // 3. LOGIQUE MÉTIER (Machine à états)
+    // 🔒 SÉCURITÉ : On vérifie que la réservation appartient à l'agence de l'agent
+    if (booking.listing.agencyId !== agent.agencyId) {
+        return NextResponse.json({ error: "Cette réservation ne dépend pas de votre agence." }, { status: 403 });
+    }
+
+    // 5. LOGIQUE MÉTIER (Machine à états)
     const today = new Date();
-    // On enlève les heures pour comparer les jours calendaires
-    today.setHours(0,0,0,0);
+    today.setHours(0,0,0,0); // On compare les jours calendaires
+    
     const startDate = new Date(booking.startDate);
     startDate.setHours(0,0,0,0);
 
     // SCÉNARIO A : CHECK-IN (Arrivée)
     if (action === 'CHECK_IN') {
-        if (booking.status !== 'CONFIRMED') {
-            return NextResponse.json({ error: "Check-in impossible : Le statut n'est pas 'CONFIRMED'." }, { status: 400 });
+        if (booking.status !== 'CONFIRMED' && booking.status !== 'PAID') {
+            return NextResponse.json({ error: "Check-in impossible : Le statut n'est pas CONFIRMED/PAID." }, { status: 400 });
         }
         // Sécurité temporelle : On ne peut pas check-in avant la date prévue
         if (today < startDate) {
-             return NextResponse.json({ error: "Trop tôt ! Le séjour commence plus tard." }, { status: 400 });
+             return NextResponse.json({ error: "Trop tôt ! Le séjour n'a pas commencé." }, { status: 400 });
         }
 
         await prisma.booking.update({
@@ -46,9 +65,9 @@ export async function POST(request: Request) {
 
     // SCÉNARIO B : CHECK-OUT (Départ)
     if (action === 'CHECK_OUT') {
-        // On peut faire un check-out si le client est "CHECKED_IN" ou même "CONFIRMED" (si oubli de check-in)
-        if (booking.status !== 'CHECKED_IN' && booking.status !== 'CONFIRMED') {
-             return NextResponse.json({ error: "Check-out impossible : Statut incohérent." }, { status: 400 });
+        // On peut faire un check-out si le client est "CHECKED_IN"
+        if (booking.status !== 'CHECKED_IN') {
+             return NextResponse.json({ error: "Check-out impossible : Le client n'a pas fait de Check-in." }, { status: 400 });
         }
 
         await prisma.booking.update({

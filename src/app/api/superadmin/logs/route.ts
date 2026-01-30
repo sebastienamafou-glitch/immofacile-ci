@@ -3,10 +3,9 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-// 1. MÉTHODE D'INFÉRENCE STRICTE (Méthode Mémorisée ✅)
-// On définit la requête exacte pour typer le retour automatiquement
+// 1. REQUÊTE TYPÉE
 const getAdminLogsQuery = () => prisma.transaction.findMany({
-  take: 100, // On limite aux 100 dernières actions pour la performance
+  take: 100,
   orderBy: { createdAt: 'desc' },
   include: { 
     user: { 
@@ -17,29 +16,42 @@ const getAdminLogsQuery = () => prisma.transaction.findMany({
 
 type TransactionLog = Awaited<ReturnType<typeof getAdminLogsQuery>>[number];
 
+// 2. UTILITAIRE CATÉGORIE
+function determineCategory(type: string) {
+    if (['CREDIT', 'DEBIT', 'PAYMENT', 'CASHOUT_WAVE', 'CASHOUT_ORANGE'].includes(type)) return 'FINANCE';
+    if (['LOGIN', 'AUTH', 'KYC_VERIFIED'].includes(type)) return 'AUTH';
+    if (['ADMIN_CREDIT', 'AGENCY_CREATE'].includes(type)) return 'SECURITY';
+    return 'SYSTEM';
+}
+
 export async function GET(request: Request) {
   try {
-    // SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 3. SÉCURITÉ ZERO TRUST (ID)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const admin = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!admin || admin.role !== "SUPER_ADMIN") return NextResponse.json({ error: "Interdit" }, { status: 403 });
+    const admin = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, role: true }
+    });
 
-    // REQUÊTE
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        return NextResponse.json({ error: "Accès Interdit" }, { status: 403 });
+    }
+
+    // 4. RÉCUPÉRATION
     const rawTransactions = await getAdminLogsQuery();
 
-    // MAPPING INTELLIGENT
-    // On transforme une Transaction financière en "Log d'Audit" générique
+    // 5. MAPPING
     const logs = rawTransactions.map((tx: TransactionLog) => ({
         id: tx.id,
         createdAt: tx.createdAt,
-        category: determineCategory(tx.type), // Fonction utilitaire locale
+        category: determineCategory(tx.type),
         user: tx.user,
-        action: tx.reason, // Ex: "Loyer Janvier"
+        action: tx.reason,
         details: { 
             amount: tx.amount, 
-            type: tx.type // CREDIT / DEBIT
+            type: tx.type 
         }
     }));
 
@@ -49,11 +61,4 @@ export async function GET(request: Request) {
     console.error("Erreur Admin Logs:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
-
-// Petit utilitaire pour colorer les catégories
-function determineCategory(type: string) {
-    if (['CREDIT', 'DEBIT', 'PAYMENT'].includes(type)) return 'FINANCE';
-    if (['LOGIN', 'AUTH'].includes(type)) return 'AUTH';
-    return 'SYSTEM';
 }

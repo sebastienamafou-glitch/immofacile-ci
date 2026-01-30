@@ -1,27 +1,20 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 // GET : Liste historique des incidents
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!tenant || tenant.role !== "TENANT") {
-        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    }
-
-    // 2. RÉCUPÉRATION
     const incidents = await prisma.incident.findMany({
-      where: { reporterId: tenant.id },
+      where: { reporterId: userId },
       orderBy: { createdAt: 'desc' },
       include: {
-        assignedTo: { select: { name: true, phone: true } }, // Infos artisan
-        property: { select: { title: true } } // Infos bien
+        assignedTo: { select: { name: true, phone: true } },
+        property: { select: { title: true } }
       }
     });
 
@@ -36,45 +29,49 @@ export async function GET(request: Request) {
 // POST : Créer un incident
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-
-    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!tenant || tenant.role !== "TENANT") {
-        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    }
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await request.json();
-    const { title, description, priority, propertyId, photos } = body;
+    
+    // ✅ CORRECTIF ICI : On récupère aussi 'type'
+    let { title, type, description, priority, propertyId, photos } = body;
 
-    // Validation
-    if (!title || !description || !propertyId) {
-        return NextResponse.json({ error: "Titre, description et bien concerné sont requis" }, { status: 400 });
+    // ✅ MAPPING INTELLIGENT : Si 'title' est vide mais que 'type' est là, on utilise 'type'
+    if (!title && type) {
+        title = type; // Ex: "PLOMBERIE" devient le titre
     }
 
-    // 2. VÉRIFICATION STRICTE (Le locataire loue-t-il CE bien ?)
-    const lease = await prisma.lease.findFirst({
-      where: { 
-        tenantId: tenant.id, 
-        propertyId: propertyId, // ✅ On vérifie le lien spécifique Bien <-> Locataire
-        status: { in: ['ACTIVE', 'PENDING'] } 
-      }
-    });
+    // Validation
+    if (!title || !description) {
+        return NextResponse.json({ error: "Le type et la description sont obligatoires" }, { status: 400 });
+    }
 
-    if (!lease) {
-      return NextResponse.json({ error: "Aucun bail valide trouvé pour ce bien" }, { status: 403 });
+    // 2. RÉSOLUTION DU BIEN (Auto-Detection)
+    if (!propertyId) {
+        const activeLeases = await prisma.lease.findMany({
+            where: { tenantId: userId, status: { in: ['ACTIVE', 'PENDING'] } },
+            select: { propertyId: true }
+        });
+
+        if (activeLeases.length === 1) {
+            propertyId = activeLeases[0].propertyId; // ✅ Auto-assignation
+        } else if (activeLeases.length === 0) {
+            return NextResponse.json({ error: "Aucun contrat actif." }, { status: 403 });
+        } else {
+            return NextResponse.json({ error: "Veuillez préciser le bien concerné." }, { status: 400 });
+        }
     }
 
     // 3. CRÉATION
     const newIncident = await prisma.incident.create({
       data: {
-        title,
+        title: title, // On utilise le titre consolidé
         description,
         priority: priority || 'NORMAL',
         status: 'OPEN',
-        photos: photos || [], // ✅ Support des photos
-        reporterId: tenant.id,
+        photos: photos || [],
+        reporterId: userId,
         propertyId: propertyId
       }
     });

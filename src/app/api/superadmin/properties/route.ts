@@ -1,51 +1,55 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ ---
+// --- HELPER DE SÉCURITÉ (ZERO TRUST) ---
 async function checkSuperAdminPermission(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
-  if (!userEmail) return { authorized: false, status: 401, error: "Non authentifié" };
-
-  const admin = await prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { role: true }
-  });
-
-  if (!admin || admin.role !== Role.SUPER_ADMIN) {
-    return { authorized: false, status: 403, error: "Accès refusé" };
+  // 1. Identification par ID (Session via Middleware)
+  const userId = request.headers.get("x-user-id");
+  if (!userId) {
+    return { authorized: false, status: 401, error: "Non authentifié" };
   }
 
-  return { authorized: true };
+  // 2. Vérification Rôle
+  const admin = await prisma.user.findUnique({ 
+    where: { id: userId },
+    select: { id: true, role: true }
+  });
+
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    return { authorized: false, status: 403, error: "Accès refusé. Réservé au Super Admin." };
+  }
+
+  return { authorized: true, admin };
 }
 
-// --- GET : LISTER TOUT LE PARC IMMOBILIER ---
+// ==========================================
+// 1. GET : LISTER TOUT LE PARC
+// ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. Sécurité
     const auth = await checkSuperAdminPermission(request);
     if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    // 2. Requête Complexe (Eager Loading)
+    // Requête Eager Loading (Proprio + Agence + Baux)
     const properties = await prisma.property.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         owner: {
             select: { name: true, email: true, phone: true }
         },
-        agency: { // Support du mode SaaS (Agences)
+        agency: { 
             select: { name: true, logoUrl: true }
         },
         leases: {
-            where: { isActive: true }, // Pour savoir si c'est loué actuellement
+            where: { isActive: true }, 
             select: { id: true }
         }
       }
     });
 
-    // 3. Transformation des données (DTO) pour le Frontend
+    // DTO Frontend
     const formatted = properties.map(p => ({
         id: p.id,
         title: p.title,
@@ -54,10 +58,11 @@ export async function GET(request: Request) {
         type: p.type,
         isPublished: p.isPublished,
         images: p.images,
-        // Logique : Si Agence, on affiche l'Agence. Sinon le Proprio.
+        // Logique d'affichage Gestionnaire
         manager: p.agency 
             ? { name: p.agency.name, type: "AGENCY", sub: "Agence Partenaire" }
             : { name: p.owner.name || "Inconnu", type: "OWNER", sub: p.owner.email },
+        // Statut calculé
         status: p.leases.length > 0 ? "OCCUPIED" : "AVAILABLE",
         createdAt: p.createdAt
     }));
@@ -65,15 +70,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, properties: formatted });
 
   } catch (error) {
-    console.error("[API_PROPERTIES] Error:", error);
-    return NextResponse.json({ error: "Erreur chargement parc immobilier" }, { status: 500 });
+    console.error("[API_PROPERTIES_GET] Error:", error);
+    return NextResponse.json({ error: "Erreur chargement parc" }, { status: 500 });
   }
 }
 
-// --- DELETE : SUPPRESSION SÉCURISÉE ---
+// ==========================================
+// 2. DELETE : SUPPRESSION SÉCURISÉE
+// ==========================================
 export async function DELETE(request: Request) {
     try {
-        // 1. Sécurité
         const auth = await checkSuperAdminPermission(request);
         if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
@@ -82,30 +88,39 @@ export async function DELETE(request: Request) {
 
         if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
 
-        // 2. Vérification d'Intégrité (Règle Métier)
+        // ✅ CORRECTION : On passe par 'listings' pour trouver les 'bookings'
         const property = await prisma.property.findUnique({
             where: { id },
-            include: { leases: true } // On vérifie TOUT l'historique
+            include: { 
+                leases: true,
+                listings: {
+                    include: { bookings: true } // On regarde dans les annonces liées
+                }
+            } 
         });
 
         if (!property) return NextResponse.json({ error: "Bien introuvable" }, { status: 404 });
 
-        // 🛑 BLOQUAGE : Si le bien a un historique, on interdit la suppression
-        if (property.leases.length > 0) {
+        // Calcul du nombre total de réservations sur toutes les annonces de ce bien
+        const totalBookings = property.listings.reduce((acc, listing) => acc + listing.bookings.length, 0);
+
+        // 🛑 BLOQUAGE SÉCURISÉ
+        if (property.leases.length > 0 || totalBookings > 0) {
             return NextResponse.json({ 
-                error: "IMPOSSIBLE DE SUPPRIMER : Ce bien est lié à des contrats de bail (actifs ou passés). Archivez-le plutôt en le dépubliant." 
+                error: "SUPPRESSION IMPOSSIBLE : Ce bien possède un historique (Baux ou Réservations via des annonces). Veuillez l'archiver." 
             }, { status: 409 });
         }
 
-        // 3. Nettoyage en cascade (Transaction)
+        // Nettoyage en cascade
         await prisma.$transaction([
-            prisma.mission.deleteMany({ where: { propertyId: id } }), // Missions techniques
-            prisma.incident.deleteMany({ where: { propertyId: id } }), // Signalements
-            prisma.listing.deleteMany({ where: { propertyId: id } }), // Annonces Airbnb liées
-            prisma.property.delete({ where: { id } }) // Le bien lui-même
+            prisma.mission.deleteMany({ where: { propertyId: id } }),
+            prisma.incident.deleteMany({ where: { propertyId: id } }),
+            // On supprime d'abord les annonces liées pour éviter les contraintes de clé étrangère
+            prisma.listing.deleteMany({ where: { propertyId: id } }), 
+            prisma.property.delete({ where: { id } })
         ]);
 
-        return NextResponse.json({ success: true, message: "Bien supprimé du parc." });
+        return NextResponse.json({ success: true, message: "Bien supprimé définitivement." });
 
     } catch (error: any) {
         console.error("[API_PROPERTIES_DELETE] Error:", error);

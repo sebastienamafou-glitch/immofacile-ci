@@ -20,7 +20,11 @@ const PROTECTED_PATHS = [
   '/api/profile',
   '/api/guest',
   '/api/akwaba',
-  '/api/auth/me'
+  '/api/auth/me',
+  '/api/documents',
+  '/api/user' ,
+  '/api/chat' ,
+  '/api/notifications' 
 ];
 
 // EXCEPTIONS PUBLIQUES (Webhooks + Auth)

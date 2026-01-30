@@ -1,40 +1,40 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 // =====================================================================
-// 1. GET : LISTER MES PROSPECTS (CRM PERSONNEL)
+// 1. GET : LISTER MES PROSPECTS
 // =====================================================================
 export async function GET(request: Request) {
   try {
-    // A. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const agent = await prisma.user.findUnique({ where: { email: userEmail } });
+    // 2. VÉRIFICATION RÔLE
+    const agent = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, role: true } 
+    });
     
-    // ✅ RÔLE STRICT AGENT
     if (!agent || agent.role !== "AGENT") {
         return NextResponse.json({ error: "Accès réservé aux agents." }, { status: 403 });
     }
 
-    // B. REQUÊTE SÉCURISÉE (Filtrage par agentId)
+    // 3. REQUÊTE SÉCURISÉE (Mes prospects uniquement)
     const leads = await prisma.lead.findMany({
       where: {
-        agentId: agent.id // 🔒 L'agent ne voit que SES prospects
+        agentId: agent.id 
       },
-      // ✅ CORRECTION : Tri par 'createdAt' car 'updatedAt' n'existe pas dans le schéma Lead
-      orderBy: { createdAt: 'desc' }, 
+      orderBy: { createdAt: 'desc' },
       select: {
           id: true,
           name: true,
           phone: true,
-          // email: true, // Retiré car n'existe pas dans votre schema Lead actuel
           budget: true,
-          // type: true,  // Retiré car n'existe pas dans votre schema Lead actuel
           status: true,
-          // notes: true, // Retiré car n'existe pas dans votre schema Lead actuel
+          needs: true, // ✅ Champ correct selon schema
           createdAt: true
       }
     });
@@ -48,44 +48,38 @@ export async function GET(request: Request) {
 }
 
 // =====================================================================
-// 2. POST : CRÉER UN NOUVEAU PROSPECT
+// 2. POST : CRÉER UN PROSPECT
 // =====================================================================
 export async function POST(request: Request) {
   try {
-    // A. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 1. AUTH ZERO TRUST
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const agent = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!agent || agent.role !== "AGENT") {
-        return NextResponse.json({ error: "Accès réservé aux agents." }, { status: 403 });
-    }
-
-    // B. VALIDATION
-    const body = await request.json();
+    const agent = await prisma.user.findUnique({ 
+        where: { id: userId }, 
+        select: { id: true, role: true } 
+    });
     
-    // Champs obligatoires minimaux
-    if (!body.name || !body.phone) {
-        return NextResponse.json({ error: "Nom et Téléphone sont obligatoires." }, { status: 400 });
+    if (!agent || agent.role !== "AGENT") {
+        return NextResponse.json({ error: "Interdit." }, { status: 403 });
     }
 
-    // Nettoyage du budget (String -> Int)
-    const budgetInt = body.budget ? parseInt(body.budget) : 0;
+    // 2. VALIDATION
+    const body = await request.json();
+    if (!body.name || !body.phone) {
+        return NextResponse.json({ error: "Nom et Téléphone requis." }, { status: 400 });
+    }
 
-    // C. CRÉATION
+    // 3. CRÉATION
     const newLead = await prisma.lead.create({
         data: {
             name: body.name,
             phone: body.phone,
-            // email: body.email || null, // Champ inexistant dans schema
-            budget: isNaN(budgetInt) ? 0 : budgetInt,
-            // type: body.type || "Non spécifié", // Champ inexistant dans schema
+            budget: body.budget ? Number(body.budget) : null,
+            needs: body.needs || "",
             status: "NEW", 
-            // notes: body.notes || "", // Champ inexistant dans schema
-            needs: body.needs || "", // Utilisez 'needs' qui existe dans votre schema
-            
-            // ✅ LIAISON AUTOMATIQUE À L'AGENT CONNECTÉ
-            agent: { connect: { id: agent.id } }
+            agentId: agent.id // ✅ Liaison sécurisée
         }
     });
 
@@ -93,42 +87,37 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error("Erreur POST Lead:", error);
-    return NextResponse.json({ error: "Impossible de créer le prospect." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur création prospect." }, { status: 500 });
   }
 }
 
 // =====================================================================
-// 3. PUT : METTRE À JOUR LE STATUT (Suivi)
+// 3. PUT : MISE À JOUR (Statut / Notes)
 // =====================================================================
 export async function PUT(request: Request) {
     try {
-      // A. SÉCURITÉ
-      const userEmail = request.headers.get("x-user-email");
-      if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  
-      const agent = await prisma.user.findUnique({ where: { email: userEmail } });
-      if (!agent || agent.role !== "AGENT") return NextResponse.json({ error: "Interdit" }, { status: 403 });
+      const userId = request.headers.get("x-user-id");
+      if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   
       const body = await request.json();
-      const { id, status, needs } = body; // Remplacé 'notes' par 'needs'
+      const { id, status, needs } = body;
   
       if (!id) return NextResponse.json({ error: "ID manquant" }, { status: 400 });
 
-      // B. VÉRIFICATION DE PROPRIÉTÉ (Anti-IDOR)
+      // SÉCURITÉ : Vérifier que le lead appartient à l'agent
       const existingLead = await prisma.lead.findFirst({
-          where: { id: id, agentId: agent.id }
+          where: { id: id, agentId: userId }
       });
 
       if (!existingLead) {
-          return NextResponse.json({ error: "Prospect introuvable ou ne vous appartient pas." }, { status: 404 });
+          return NextResponse.json({ error: "Prospect introuvable." }, { status: 404 });
       }
   
-      // C. MISE À JOUR
       const updatedLead = await prisma.lead.update({
           where: { id },
           data: {
               status: status || undefined,
-              needs: needs || undefined // Remplacé 'notes' par 'needs'
+              needs: needs || undefined
           }
       });
   
@@ -138,4 +127,4 @@ export async function PUT(request: Request) {
       console.error("Erreur PUT Lead:", error);
       return NextResponse.json({ error: "Erreur mise à jour" }, { status: 500 });
     }
-  }
+}

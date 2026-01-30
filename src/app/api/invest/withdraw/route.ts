@@ -1,60 +1,46 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import axios from "axios"; // 📦 Le client HTTP pro
-import { v4 as uuidv4 } from "uuid"; // 📦 Pour l'idempotence
+import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
 
 export const dynamic = 'force-dynamic';
 
-// --- CONFIGURATION DES ENDPOINTS (A mettre dans .env) ---
+// CONFIGURATION
 const WAVE_API_URL = process.env.WAVE_API_URL || "https://api.wave.com/v1/payouts";
 const ORANGE_API_URL = process.env.ORANGE_API_URL || "https://api.orange.com/payment/v1";
 
-/**
- * 🌍 GATEWAY RÉELLE (Wave / Orange)
- * Cette fonction effectue le véritable mouvement d'argent.
- */
+// --- GATEWAY ---
 async function processPaymentGateway(provider: string, phone: string, amount: number) {
-  const idempotencyKey = `wapp-wd-${uuidv4()}`; // Clé unique pour cette transaction
-
-  console.info(`[GATEWAY_START] Provider: ${provider} | Phone: ${phone} | Idempotency: ${idempotencyKey}`);
+  const idempotencyKey = `wapp-wd-${uuidv4()}`;
 
   try {
     let response;
 
-    // --- CAS 1 : WAVE (Implémentation Standard) ---
     if (provider === 'WAVE') {
-        // Wave demande souvent le montant, la devise et le mobile
         response = await axios.post(
             WAVE_API_URL,
             {
-                amount: amount,
+                amount,
                 currency: "XOF",
-                recipient: phone, // Le numéro de l'utilisateur (ex: +225...)
-                // On peut ajouter une description qui apparaîtra sur le SMS du client
-                description: "Retrait ImmoFacile" 
+                recipient: phone,
+                description: "Retrait ImmoFacile"
             },
             {
                 headers: {
-                    // La clé secrète ne doit JAMAIS être dans le code, toujours dans .env
                     'Authorization': `Bearer ${process.env.WAVE_API_SECRET_KEY}`,
                     'Content-Type': 'application/json',
-                    // Vital : Empêche les doubles paiements en cas de retry réseau
                     'Idempotency-Key': idempotencyKey 
                 },
-                timeout: 10000 // On abandonne après 10s si Wave ne répond pas
+                timeout: 15000 
             }
         );
-    } 
-    
-    // --- CAS 2 : ORANGE MONEY (Exemple simplifié) ---
-    else if (provider === 'ORANGE_MONEY') {
-        // Orange nécessite souvent un Token d'accès avant le paiement (OAuth)
-        // Ici on suppose qu'on a déjà le token ou une API Key directe
+    } else if (provider === 'ORANGE_MONEY') {
+        // ... (Logique OM simplifiée)
         response = await axios.post(
             ORANGE_API_URL,
             {
                 merchant_key: process.env.OM_MERCHANT_KEY,
-                amount: amount,
+                amount,
                 recipient: phone,
                 reference: idempotencyKey
             },
@@ -65,64 +51,22 @@ async function processPaymentGateway(provider: string, phone: string, amount: nu
                 }
             }
         );
-    } 
-    
-    else {
-        throw new Error(`Provider ${provider} non supporté en production.`);
+    } else {
+        throw new Error(`Provider ${provider} non supporté.`);
     }
 
-    // Si on arrive ici, l'API a répondu 200 OK ou 201 Created
-    console.info(`[GATEWAY_SUCCESS] TxID: ${response.data.id}`);
-    
     return { 
-        transactionId: response.data.id || idempotencyKey, // L'ID donné par Wave/Orange
-        status: 'SUCCESS',
-        rawResponse: response.data
+        transactionId: response.data.id || idempotencyKey, 
+        status: 'SUCCESS' 
     };
 
   } catch (error: any) {
-    // GESTION FINE DES ERREURS HTTP
-    // C'est ici qu'on sait si c'est un problème de solde marchand, de numéro invalide, etc.
-    
-    let errorMessage = "Erreur de connexion opérateur.";
-    
-    if (axios.isAxiosError(error)) {
-        // L'API a répondu avec une erreur (ex: 400 Bad Request, 402 Insufficient Funds)
-        const apiError = error.response?.data;
-        console.error(`[GATEWAY_FAIL] HTTP ${error.response?.status}`, apiError);
-
-        if (error.response?.status === 402) {
-             errorMessage = "Échec : Fonds insuffisants sur le compte marchand ImmoFacile.";
-        } else if (error.response?.status === 400) {
-             errorMessage = "Numéro de téléphone invalide ou compte non enregistré.";
-        } else {
-             errorMessage = `Refus opérateur : ${apiError?.message || error.message}`;
-        }
-    } else {
-        console.error(`[GATEWAY_CRASH]`, error);
-    }
-
-    // On relance l'erreur pour déclencher le ROLLBACK dans la fonction principale
-    throw new Error(errorMessage);
+    console.error(`[GATEWAY_FAIL] ${provider}`, error.response?.data || error.message);
+    throw new Error("Échec du transfert opérateur.");
   }
 }
 
-/**
- * RÉCUPÉRATION USER (Inchangé)
- */
-async function getAuthenticatedUser(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
-  if (!userEmail) return null;
-  
-  return prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { id: true, email: true, walletBalance: true }
-  });
-}
-
-/**
- * ROLLBACK (Inchangé - Toujours aussi vital)
- */
+// --- ROLLBACK ---
 async function performRollback(transactionId: string, userId: string) {
     try {
         const tx = await prisma.transaction.findUnique({ where: { id: transactionId } });
@@ -138,32 +82,36 @@ async function performRollback(transactionId: string, userId: string) {
                 data: { status: "FAILED" }
             })
         ]);
-        console.info(`[ROLLBACK_DONE] Transaction ${transactionId} annulée.`);
     } catch (e) {
-        console.error(`[ROLLBACK_FATAL] Impossible d'annuler ${transactionId}`, e);
+        console.error("Rollback failed", e);
     }
 }
 
-// =====================================================================
-// POST : ORCHESTRATION DU RETRAIT
-// =====================================================================
+// --- MAIN POST ---
 export async function POST(request: Request) {
   let transactionId: string | null = null;
   let userId: string | null = null;
 
   try {
-    const user = await getAuthenticatedUser(request);
-    if (!user) return NextResponse.json({ error: "Session invalide." }, { status: 401 });
-    userId = user.id;
+    // 1. AUTH ZERO TRUST
+    userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, walletBalance: true } 
+    });
+
+    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 403 });
 
     const body = await request.json();
     const { amount, provider, phone } = body;
 
-    // ... (Validations inchangées) ...
-    if (!amount || amount <= 0) return NextResponse.json({ error: "Montant invalide." }, { status: 400 });
-    if (user.walletBalance < amount) return NextResponse.json({ error: "Solde insuffisant." }, { status: 400 });
+    // 2. VALIDATION SOLDE
+    if (!amount || amount < 1000) return NextResponse.json({ error: "Minimum 1000 FCFA" }, { status: 400 });
+    if (user.walletBalance < amount) return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
 
-    // 1. VERROUILLAGE DB
+    // 3. VERROUILLAGE DB (DEBIT PENDING)
     const initialOp = await prisma.$transaction(async (tx) => {
         const updatedUser = await tx.user.update({
             where: { id: user.id },
@@ -172,12 +120,11 @@ export async function POST(request: Request) {
 
         const txRecord = await tx.transaction.create({
             data: {
-                amount: amount,
+                amount,
                 type: "DEBIT",
                 reason: `CASHOUT_${provider}`,
                 status: "PENDING",
-                userId: user.id,
-                createdAt: new Date()
+                userId: user.id
             }
         });
         return { user: updatedUser, tx: txRecord };
@@ -185,10 +132,10 @@ export async function POST(request: Request) {
 
     transactionId = initialOp.tx.id;
 
-    // 2. APPEL RÉEL À WAVE/ORANGE
+    // 4. APPEL GATEWAY (RISQUÉ)
     await processPaymentGateway(provider, phone, amount);
 
-    // 3. SUCCÈS CONFIRMÉ
+    // 5. CONFIRMATION
     await prisma.transaction.update({
         where: { id: transactionId },
         data: { status: "SUCCESS" }
@@ -196,15 +143,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
         success: true,
-        message: "Transfert envoyé avec succès.",
+        message: "Transfert effectué.",
         newBalance: initialOp.user.walletBalance
     });
 
   } catch (error: any) {
-    // 4. ECHEC & REMBOURSEMENT
+    // 6. ROLLBACK SI ÉCHEC
     if (transactionId && userId) {
         await performRollback(transactionId, userId);
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Erreur technique" }, { status: 500 });
   }
 }

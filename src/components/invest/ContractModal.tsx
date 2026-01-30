@@ -5,8 +5,8 @@ import Image from 'next/image';
 import SignatureCanvas from 'react-signature-canvas';
 import { Loader2, Download, Eraser, CheckCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+// On importe la server action sécurisée
 import { signInvestmentContract } from '@/lib/actions/contract';
-// ✅ IMPORT DU SERVICE PAIEMENT
 import { initiatePayment } from '@/lib/api';
 
 interface ContractModalProps {
@@ -14,7 +14,6 @@ interface ContractModalProps {
     id: string;
     name: string;
     email: string;
-    // ✅ Ajout du téléphone obligatoire pour le paiement
     phone?: string; 
     amount: number;
     packName: string;
@@ -41,12 +40,13 @@ export default function ContractModal({ user, onSuccess }: ContractModalProps) {
         // 1. Capture signature
         const signatureImage = sigPad.current?.toDataURL('image/png');
 
-        // 2. Enregistrement DB (Server Action)
-        const result = await signInvestmentContract(user.id, signatureImage);
+        // ✅ CORRECTION MAJEURE ICI : 
+        // On ne passe plus 'user.id'. La fonction le trouve via le cookie de session.
+        const result = await signInvestmentContract(signatureImage);
 
         // Vérification robuste du résultat
         if (!result.success || !result.contractId) {
-            throw new Error("Erreur lors de l'enregistrement du contrat.");
+            throw new Error(result.error || "Erreur lors de l'enregistrement du contrat.");
         }
 
         setIsSigned(true);
@@ -55,8 +55,8 @@ export default function ContractModal({ user, onSuccess }: ContractModalProps) {
         // 3. DÉCLENCHEMENT PAIEMENT (CinetPay)
         const paymentResult = await initiatePayment({
             type: 'INVESTMENT',
-            referenceId: result.contractId, // Utilisation de l'ID Contrat généré
-            phone: user.phone || "0700000000" // Fallback si non renseigné (à éviter en prod)
+            referenceId: result.contractId,
+            phone: user.phone || "0700000000"
         });
 
         if (paymentResult.success && paymentResult.paymentUrl) {
@@ -101,7 +101,6 @@ export default function ContractModal({ user, onSuccess }: ContractModalProps) {
                   <p className="italic text-slate-600">Sous seing privé électronique - Conforme Loi n° 2013-546 (Côte d'Ivoire)</p>
                 </div>
 
-                {/* --- CONTENU JURIDIQUE EXISTANT CONSERVÉ --- */}
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                   <p className="mb-4"><strong>ENTRE LES SOUSSIGNÉS :</strong></p>
                   <p className="mb-4 pl-4 border-l-4 border-[#0F172A]">
@@ -119,7 +118,6 @@ export default function ContractModal({ user, onSuccess }: ContractModalProps) {
                 <div className="space-y-6 text-justify">
                     <div>
                         <h3 className="font-bold uppercase text-xs tracking-widest text-slate-500 mb-1">Article 1 : Objet</h3>
-                        {/* ✅ AJOUT DE LA PHRASE MANQUANTE POUR CONFORMITÉ PDF */}
                         <p className="mb-2">
                             Le présent contrat a pour objet de formaliser l'apport financier de l'Investisseur au développement de la plateforme immobilière "ImmoFacile", propriété exclusive de WebAppCI.
                         </p>
@@ -192,7 +190,7 @@ export default function ContractModal({ user, onSuccess }: ContractModalProps) {
 
             <div className="flex gap-4 w-full md:w-auto">
                 <button 
-                    onClick={handleSignAndPay} // ✅ ACTION MISE À JOUR
+                    onClick={handleSignAndPay}
                     disabled={loading || isSigned}
                     className={`flex-1 md:flex-none px-8 py-3 rounded-xl font-bold text-white transition flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:-translate-y-0.5
                         ${isSigned ? 'bg-emerald-600' : 'bg-[#020617] hover:bg-[#0F172A]'}

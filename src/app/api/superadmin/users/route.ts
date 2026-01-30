@@ -3,21 +3,30 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-// MIDDLEWARE DE SÉCURITÉ INTERNE
+// --- HELPER SÉCURITÉ (ZERO TRUST) ---
 async function checkSuperAdmin(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
-  if (!userEmail) return null;
+  // 1. Identification par ID (Session via Middleware)
+  const userId = request.headers.get("x-user-id");
+  if (!userId) return null;
   
-  const admin = await prisma.user.findUnique({ where: { email: userEmail } });
+  // 2. Vérification Rôle
+  const admin = await prisma.user.findUnique({ 
+    where: { id: userId },
+    select: { id: true, role: true } 
+  });
+
   if (!admin || admin.role !== "SUPER_ADMIN") return null;
   
   return admin;
 }
 
+// ==========================================
 // 1. GET : LISTER TOUS LES UTILISATEURS
+// ==========================================
 export async function GET(request: Request) {
   try {
-    if (!await checkSuperAdmin(request)) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+    const admin = await checkSuperAdmin(request);
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
@@ -29,11 +38,12 @@ export async function GET(request: Request) {
         role: true, 
         kycStatus: true,
         walletBalance: true,
-        isActive: true, // ✅ INDISPENSABLE pour le bouton Bloquer
+        isActive: true, 
         backerTier: true,
         createdAt: true,
+        // On compte les liens pour éviter les suppressions dangereuses
         _count: {
-            select: { leases: true, propertiesOwned: true }
+            select: { leases: true, propertiesOwned: true, listings: true }
         }
       }
     });
@@ -46,23 +56,25 @@ export async function GET(request: Request) {
   }
 }
 
-// 2. PATCH : BLOQUER / DÉBLOQUER (Toggle Status)
+// ==========================================
+// 2. PATCH : BLOQUER / DÉBLOQUER
+// ==========================================
 export async function PATCH(request: Request) {
     try {
       const admin = await checkSuperAdmin(request);
       if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   
       const body = await request.json();
-      const { userId, isActive } = body; // On attend un booléen
+      const { userId, isActive } = body; 
   
-      // Sécurité : Un Admin ne peut pas se bloquer lui-même
+      // SÉCURITÉ : Anti-Suicide (On ne peut pas se bloquer soi-même)
       if (userId === admin.id) {
-          return NextResponse.json({ error: "Vous ne pouvez pas désactiver votre propre compte." }, { status: 400 });
+          return NextResponse.json({ error: "Action impossible sur votre propre compte." }, { status: 400 });
       }
   
       const updatedUser = await prisma.user.update({
           where: { id: userId },
-          data: { isActive: isActive } // true ou false
+          data: { isActive: isActive }
       });
   
       return NextResponse.json({ success: true, user: updatedUser });
@@ -72,7 +84,9 @@ export async function PATCH(request: Request) {
     }
 }
 
-// 3. PUT : MODIFIER UN RÔLE
+// ==========================================
+// 3. PUT : MODIFIER RÔLE
+// ==========================================
 export async function PUT(request: Request) {
   try {
     const admin = await checkSuperAdmin(request);
@@ -81,12 +95,12 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { userId, newRole } = body;
 
-    // Sécurité : Un Admin ne peut pas se rétrograder lui-même via cette route (risque de lock-out)
-    if (userId === admin.id && newRole !== 'SUPER_ADMIN') {
-        return NextResponse.json({ error: "Impossible de modifier son propre rôle ici." }, { status: 400 });
+    // SÉCURITÉ : On ne touche pas à son propre rôle de Super Admin
+    if (userId === admin.id) {
+        return NextResponse.json({ error: "Modification de votre propre rôle interdite ici." }, { status: 400 });
     }
 
-    const validRoles = ["TENANT", "OWNER", "AGENT", "ARTISAN", "SUPER_ADMIN", "INVESTOR"]; // Ajout INVESTOR
+    const validRoles = ["TENANT", "OWNER", "AGENT", "ARTISAN", "SUPER_ADMIN", "INVESTOR", "AGENCY_ADMIN"];
     if (!userId || !validRoles.includes(newRole)) {
         return NextResponse.json({ error: "Rôle invalide" }, { status: 400 });
     }
@@ -103,7 +117,9 @@ export async function PUT(request: Request) {
   }
 }
 
-// 4. DELETE : SUPPRIMER UN UTILISATEUR
+// ==========================================
+// 4. DELETE : SUPPRIMER UTILISATEUR
+// ==========================================
 export async function DELETE(request: Request) {
     try {
       const admin = await checkSuperAdmin(request);
@@ -114,21 +130,27 @@ export async function DELETE(request: Request) {
 
       if (!userId) return NextResponse.json({ error: "ID requis" }, { status: 400 });
 
-      // 🛑 SÉCURITÉ CRITIQUE : ANTI-SUICIDE
+      // SÉCURITÉ : Anti-Suicide
       if (userId === admin.id) {
-        return NextResponse.json({ error: "ACTION INTERDITE : Vous ne pouvez pas supprimer votre propre compte administrateur." }, { status: 409 });
+        return NextResponse.json({ error: "IMPOSSIBLE DE SUPPRIMER VOTRE COMPTE." }, { status: 409 });
       }
 
+      // VÉRIFICATION D'INTÉGRITÉ
       const userToDelete = await prisma.user.findUnique({
           where: { id: userId },
-          include: { _count: { select: { leases: true, propertiesOwned: true } } }
+          include: { 
+              _count: { 
+                  select: { leases: true, propertiesOwned: true, listings: true, bookings: true } 
+              } 
+          }
       });
 
       if (!userToDelete) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
 
-      if (userToDelete._count.leases > 0 || userToDelete._count.propertiesOwned > 0) {
+      // Blocage si l'utilisateur a des données liées critiques
+      if (userToDelete._count.leases > 0 || userToDelete._count.propertiesOwned > 0 || userToDelete._count.listings > 0) {
           return NextResponse.json({ 
-              error: "Impossible de supprimer : cet utilisateur a des dossiers actifs (Baux/Propriétés)." 
+              error: "Suppression refusée : Cet utilisateur possède des Baux, Propriétés ou Annonces actifs." 
           }, { status: 409 });
       }
   

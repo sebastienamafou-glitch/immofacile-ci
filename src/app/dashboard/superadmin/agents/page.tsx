@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { 
-  UserPlus, Mail, Phone, Lock, ShieldCheck, RefreshCw, Briefcase, Loader2, Copy 
+  UserPlus, Mail, Phone, Lock, ShieldCheck, RefreshCw, Briefcase, Loader2 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ interface Agent {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   createdAt: string;
   _count: {
     missionsAccepted: number;
@@ -42,7 +42,7 @@ export default function AgentsPage() {
   // 1. Charger la liste (SÉCURISÉ)
   const fetchAgents = async () => {
     try {
-      // 🔒 Pas de headers manuels. Le cookie HttpOnly fait le travail.
+      // ✅ APPEL SÉCURISÉ
       const res = await api.get('/superadmin/agents');
       
       if (res.data.success) {
@@ -50,9 +50,8 @@ export default function AgentsPage() {
       }
     } catch (error: any) {
       console.error("Erreur Agents:", error);
-      // Gestion de session expirée
       if (error.response?.status === 401 || error.response?.status === 403) {
-          toast.error("Session expirée. Veuillez vous reconnecter.");
+          toast.error("Session expirée.");
           router.push('/login');
       } else {
           toast.error("Impossible de charger la liste des agents.");
@@ -73,19 +72,21 @@ export default function AgentsPage() {
     setCreating(true);
 
     try {
-      // 🔒 Appel API sécurisé
+      // ✅ APPEL SÉCURISÉ
       const res = await api.post('/superadmin/agents', formData);
       
-      toast.success("Compte Agent créé avec succès !");
-      
-      // Mise à jour Optimiste
-      const newAgentUI = {
-          ...res.data.agent,
-          _count: { missionsAccepted: 0, leads: 0 }
-      };
-      setAgents(prev => [newAgentUI, ...prev]);
-      
-      setFormData({ name: "", email: "", phone: "", password: "" }); // Reset
+      if (res.data.success) {
+        toast.success("Compte Agent créé avec succès !");
+        
+        // Mise à jour Optimiste
+        const newAgentUI: Agent = {
+            ...res.data.agent,
+            _count: { missionsAccepted: 0, leads: 0 }
+        };
+        setAgents(prev => [newAgentUI, ...prev]);
+        
+        setFormData({ name: "", email: "", phone: "", password: "" }); // Reset
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Erreur lors de la création.");
     } finally {
@@ -120,7 +121,7 @@ export default function AgentsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         
-        {/* COLONNE GAUCHE : LISTE DES AGENTS */}
+        {/* COLONNE GAUCHE : LISTE */}
         <div className="xl:col-span-2 space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="font-bold text-xl text-white flex items-center gap-2">
@@ -168,7 +169,7 @@ export default function AgentsPage() {
             )}
         </div>
 
-        {/* COLONNE DROITE : FORMULAIRE CRÉATION */}
+        {/* COLONNE DROITE : FORMULAIRE */}
         <div>
             <Card className="bg-[#0B1120] border-white/5 shadow-2xl sticky top-8">
                 <CardHeader className="bg-white/[0.02] border-b border-white/5 pb-4">
@@ -178,7 +179,6 @@ export default function AgentsPage() {
                 </CardHeader>
                 <CardContent className="pt-6">
                     <form onSubmit={handleCreate} className="space-y-5">
-                        
                         <div className="space-y-1.5">
                             <Label className="text-slate-400 text-xs uppercase font-bold">Nom complet</Label>
                             <Input 
@@ -189,7 +189,6 @@ export default function AgentsPage() {
                                 onChange={e => setFormData({...formData, name: e.target.value})}
                             />
                         </div>
-
                         <div className="space-y-1.5">
                             <Label className="text-slate-400 text-xs uppercase font-bold">Email professionnel</Label>
                             <div className="relative group">
@@ -203,13 +202,11 @@ export default function AgentsPage() {
                                 />
                             </div>
                         </div>
-
                         <div className="space-y-1.5">
                             <Label className="text-slate-400 text-xs uppercase font-bold">Téléphone</Label>
                             <div className="relative group">
                                 <Phone className="absolute left-3 top-2.5 w-4 h-4 text-slate-500 group-focus-within:text-blue-500 transition-colors"/>
                                 <Input 
-                                    required 
                                     className="pl-9 bg-[#020617] border-white/10 text-white focus:border-blue-500"
                                     placeholder="07 00 00 00 00"
                                     value={formData.phone}
@@ -217,7 +214,6 @@ export default function AgentsPage() {
                                 />
                             </div>
                         </div>
-
                         <div className="space-y-1.5">
                             <div className="flex justify-between items-center">
                                 <Label className="text-slate-400 text-xs uppercase font-bold">Mot de passe</Label>
@@ -235,7 +231,6 @@ export default function AgentsPage() {
                                 />
                             </div>
                         </div>
-
                         <Button type="submit" disabled={creating} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-11">
                             {creating ? <Loader2 className="animate-spin w-5 h-5" /> : "Créer le compte Agent"}
                         </Button>
@@ -243,7 +238,6 @@ export default function AgentsPage() {
                 </CardContent>
             </Card>
         </div>
-
       </div>
     </div>
   );

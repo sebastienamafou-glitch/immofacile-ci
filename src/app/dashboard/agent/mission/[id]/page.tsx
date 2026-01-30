@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { MapPin, Calendar, User, Phone, Navigation, Clock } from "lucide-react";
+import { MapPin, Calendar, User, Phone, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MissionActionPanel from "@/components/agent/MissionActionPanel";
 import Link from "next/link";
@@ -15,19 +15,26 @@ interface PageProps {
 }
 
 export default async function MissionDetailPage({ params }: PageProps) {
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST
+  const userId = headers().get("x-user-id");
+  if (!userId) redirect("/login");
 
-  const agent = await prisma.user.findUnique({ where: { email: userEmail } });
+  // 2. VÉRIFICATION RÔLE
+  const agent = await prisma.user.findUnique({ 
+      where: { id: userId },
+      select: { id: true, role: true }
+  });
+  
   if (!agent || agent.role !== "AGENT") redirect("/dashboard");
 
-  // Récupération de la mission avec les infos Propriétaire (Owner)
+  // 3. RÉCUPÉRATION MISSION
   const mission = await prisma.mission.findUnique({
     where: { id: params.id },
     include: {
         property: {
             include: {
-                owner: { select: { name: true, phone: true, email: true } } // On récupère le contact du proprio
+                // On récupère le contact du proprio
+                owner: { select: { name: true, phone: true, email: true } } 
             }
         }
     }
@@ -37,13 +44,14 @@ export default async function MissionDetailPage({ params }: PageProps) {
     return <div className="p-10 text-white">Mission introuvable.</div>;
   }
 
-  // SÉCURITÉ : Est-ce bien MA mission ?
+  // 4. SÉCURITÉ : VÉRIFICATION D'APPARTENANCE
+  // Un agent ne peut voir le détail QUE s'il est assigné à la mission
   if (mission.agentId !== agent.id) {
      return (
         <div className="p-10 flex flex-col items-center justify-center h-[50vh] text-center">
             <h1 className="text-2xl font-bold text-white mb-2">Accès Refusé</h1>
             <p className="text-slate-400">Vous n'êtes pas assigné à cette mission.</p>
-            <Link href="/dashboard/agent/mission">
+            <Link href="/dashboard/agent/missions">
                 <Button variant="link" className="text-orange-500 mt-4">Retour aux missions</Button>
             </Link>
         </div>
@@ -51,7 +59,7 @@ export default async function MissionDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6 pb-24">
+    <div className="p-6 max-w-4xl mx-auto space-y-6 pb-24 bg-[#0B1120] min-h-screen">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -73,7 +81,7 @@ export default async function MissionDetailPage({ params }: PageProps) {
                     <>Prévu le {format(new Date(mission.dateScheduled), "dd MMMM yyyy à HH:mm", { locale: fr })}</>
                 ) : (
                      <span>Date à définir</span>
-          )}
+                )}
             </p>
         </div>
         
@@ -85,14 +93,13 @@ export default async function MissionDetailPage({ params }: PageProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* COLONNE GAUCHE : INFOS BIEN & PROPRIO */}
+        {/* COLONNE GAUCHE */}
         <div className="md:col-span-2 space-y-6">
             
-            {/* CARTE LOCALISATION */}
+            {/* LOCALISATION */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                <div className="h-40 bg-slate-800 relative flex items-center justify-center">
-                    {/* Placeholder Map - À remplacer par Google Maps/Leaflet plus tard */}
-                    <div className="absolute inset-0 opacity-20 bg-[url('https://upload.wikimedia.org/wikipedia/commons/e/ec/Abidjan_Map.png')] bg-cover bg-center"></div>
+                <div className="h-40 bg-slate-800 relative flex items-center justify-center bg-[url('https://upload.wikimedia.org/wikipedia/commons/e/ec/Abidjan_Map.png')] bg-cover bg-center">
+                    <div className="absolute inset-0 bg-black/40"></div>
                     <MapPin className="text-orange-500 w-10 h-10 relative z-10 drop-shadow-lg" />
                 </div>
                 <div className="p-6">
@@ -104,7 +111,7 @@ export default async function MissionDetailPage({ params }: PageProps) {
                     
                     <div className="mt-6 flex gap-3">
                         <Button className="flex-1 bg-slate-800 hover:bg-slate-700 text-white gap-2">
-                            <Navigation size={16} /> Waze / GPS
+                            <Navigation size={16} /> GPS
                         </Button>
                     </div>
                 </div>
@@ -120,21 +127,22 @@ export default async function MissionDetailPage({ params }: PageProps) {
                         <p className="text-white font-bold text-lg">{mission.property.owner.name}</p>
                         <p className="text-slate-500 text-sm">Propriétaire</p>
                     </div>
-                    <a href={`tel:${mission.property.owner.phone}`}>
-                        <Button className="bg-green-600 hover:bg-green-500 text-white rounded-full w-12 h-12 p-0 shadow-lg shadow-green-900/20">
-                            <Phone size={20} />
-                        </Button>
-                    </a>
+                    {mission.property.owner.phone && (
+                        <a href={`tel:${mission.property.owner.phone}`}>
+                            <Button className="bg-green-600 hover:bg-green-500 text-white rounded-full w-12 h-12 p-0 shadow-lg shadow-green-900/20">
+                                <Phone size={20} />
+                            </Button>
+                        </a>
+                    )}
                 </div>
             </div>
-
         </div>
 
-        {/* COLONNE DROITE : ACTION */}
+        {/* COLONNE DROITE : ACTIONS */}
         <div className="space-y-6">
+            {/* Injection du panel d'action (à venir) */}
             <MissionActionPanel missionId={mission.id} status={mission.status} />
             
-            {/* RAPPEL HONORAIRES MOBILE */}
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 md:hidden">
                 <p className="text-sm text-slate-500 uppercase font-bold tracking-wider mb-1">Honoraires prévus</p>
                 <p className="text-3xl font-black text-emerald-500">{mission.fee.toLocaleString()} F</p>

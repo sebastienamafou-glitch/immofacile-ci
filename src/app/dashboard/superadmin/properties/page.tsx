@@ -6,11 +6,10 @@ import { api } from "@/lib/api";
 import Swal from "sweetalert2";
 import { toast } from "sonner";
 import { 
-  Building, MapPin, Search, Trash2, ExternalLink, Loader2, Home, Briefcase, User 
+  Building, MapPin, Search, Trash2, ExternalLink, Loader2, Home, Briefcase, User, EyeOff 
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// Interface alignée avec le DTO du Backend
 interface AdminProperty {
   id: string;
   title: string;
@@ -22,7 +21,7 @@ interface AdminProperty {
   manager: {
     name: string;
     type: "AGENCY" | "OWNER";
-    sub: string; // Email ou Description
+    sub: string;
   };
   status: "OCCUPIED" | "AVAILABLE";
   createdAt: string;
@@ -34,22 +33,20 @@ export default function AdminPropertiesPage() {
   const [properties, setProperties] = useState<AdminProperty[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // --- CHARGEMENT ---
   const fetchProperties = async () => {
     try {
-        // 🔒 SÉCURITÉ : Aucun header manuel. Le cookie HttpOnly fait le travail.
+        setLoading(true);
+        // ✅ APPEL SÉCURISÉ
         const res = await api.get('/superadmin/properties');
-        
         if (res.data.success) {
             setProperties(res.data.properties);
         }
     } catch (error: any) {
         console.error("Erreur Properties", error);
         if (error.response?.status === 401 || error.response?.status === 403) {
-            toast.error("Session expirée.");
             router.push('/login');
         } else {
-            toast.error("Impossible de charger le parc immobilier.");
+            toast.error("Erreur chargement parc immobilier.");
         }
     } finally {
         setLoading(false);
@@ -61,11 +58,10 @@ export default function AdminPropertiesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- SUPPRESSION ---
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
         title: 'Supprimer ce bien ?',
-        text: "Attention : Impossible si le bien a un historique de location.",
+        text: "Cette action est irréversible. Si le bien a un historique, la suppression sera bloquée.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -75,7 +71,7 @@ export default function AdminPropertiesPage() {
     });
 
     if (result.isConfirmed) {
-        const toastId = toast.loading("Suppression en cours...");
+        const toastId = toast.loading("Vérification et suppression...");
         try {
             await api.delete(`/superadmin/properties?id=${id}`);
             
@@ -83,14 +79,12 @@ export default function AdminPropertiesPage() {
             toast.success("Bien supprimé avec succès.", { id: toastId });
             
         } catch (error: any) {
-            // Gestion spécifique de l'erreur 409 (Conflit / Historique existant)
             const errorMsg = error.response?.data?.error || "Erreur lors de la suppression.";
             toast.error(errorMsg, { id: toastId, duration: 5000 });
         }
     }
   };
 
-  // Filtrage
   const filteredProps = properties.filter(p => 
     p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.manager.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -100,12 +94,12 @@ export default function AdminPropertiesPage() {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-[#0B1120] text-white gap-3">
         <Loader2 className="w-10 h-10 animate-spin text-orange-500"/>
-        <p className="text-sm font-mono text-slate-500">Audit du Parc Immobilier...</p>
+        <p className="text-sm font-mono text-slate-500">Scan du Parc Immobilier...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#020617] p-6 md:p-10 text-slate-200 font-sans">
+    <div className="min-h-screen bg-[#020617] p-6 md:p-10 text-slate-200 font-sans pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -113,14 +107,14 @@ export default function AdminPropertiesPage() {
             <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-tight">
                 <Building className="text-orange-500" /> PARC IMMOBILIER
             </h1>
-            <p className="text-slate-400 mt-1 text-sm">Vue globale des {properties.length} actifs (Agences & Particuliers).</p>
+            <p className="text-slate-400 mt-1 text-sm">Supervision des {properties.length} actifs (Agences & Particuliers).</p>
         </div>
         
         <div className="relative w-full md:w-96 group">
             <Search className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition" />
             <input 
                 type="text" 
-                placeholder="Rechercher (Titre, Gestionnaire, Ville)..." 
+                placeholder="Rechercher (Titre, Propriétaire, Ville)..." 
                 className="w-full bg-[#0B1120] border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:border-orange-500 outline-none text-white transition-all placeholder:text-slate-600"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -128,7 +122,7 @@ export default function AdminPropertiesPage() {
         </div>
       </div>
 
-      {/* LISTE DES BIENS */}
+      {/* LISTE */}
       <div className="bg-[#0B1120] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -136,7 +130,7 @@ export default function AdminPropertiesPage() {
                     <tr>
                         <th className="px-6 py-4">Bien</th>
                         <th className="px-6 py-4">Localisation</th>
-                        <th className="px-6 py-4">Loyer Mensuel</th>
+                        <th className="px-6 py-4">Valeur Locative</th>
                         <th className="px-6 py-4">Gestionnaire</th>
                         <th className="px-6 py-4 text-center">État</th>
                         <th className="px-6 py-4 text-right">Actions</th>
@@ -187,24 +181,19 @@ export default function AdminPropertiesPage() {
                                     {property.isPublished ? (
                                         <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] hover:bg-emerald-500/20">Publié</Badge>
                                     ) : (
-                                        <Badge className="bg-slate-700/50 text-slate-400 border-slate-600/50 text-[9px] hover:bg-slate-700/60">Masqué</Badge>
+                                        <Badge className="bg-slate-700/50 text-slate-400 border-slate-600/50 text-[9px] gap-1"><EyeOff size={8}/> Masqué</Badge>
                                     )}
                                 </div>
-                                <div>
-                                    {property.status === 'OCCUPIED' && (
-                                        <span className="text-[9px] font-bold text-blue-400 block mt-1">Loué (Bail Actif)</span>
-                                    )}
-                                </div>
+                                {property.status === 'OCCUPIED' && (
+                                    <span className="text-[9px] font-bold text-blue-400 block">Loué (Actif)</span>
+                                )}
                             </td>
                             <td className="px-6 py-4 text-right">
                                 <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition border border-transparent hover:border-white/10" title="Voir fiche">
-                                        <ExternalLink className="w-4 h-4" />
-                                    </button>
                                     <button 
                                         onClick={() => handleDelete(property.id)}
                                         className="p-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-lg transition" 
-                                        title="Supprimer"
+                                        title="Supprimer définitivement"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -212,18 +201,12 @@ export default function AdminPropertiesPage() {
                             </td>
                         </tr>
                     ))}
+                    {filteredProps.length === 0 && (
+                        <tr><td colSpan={6} className="p-12 text-center text-slate-500 italic">Aucun bien trouvé.</td></tr>
+                    )}
                 </tbody>
             </table>
         </div>
-        {filteredProps.length === 0 && (
-            <div className="p-16 text-center text-slate-500 flex flex-col items-center">
-                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                    <Building className="w-8 h-8 opacity-20" />
-                </div>
-                <p className="font-medium">Aucun bien trouvé.</p>
-                <p className="text-xs mt-1 opacity-50">Essayez de modifier vos termes de recherche.</p>
-            </div>
-        )}
       </div>
     </div>
   );

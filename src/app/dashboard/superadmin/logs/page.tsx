@@ -10,12 +10,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-// ✅ 1. TYPAGE STRICT
 interface AuditLog {
   id: string;
   action: string;
-  category: string; // 'FINANCE' | 'SECURITY' | 'AUTH' | 'SYSTEM'
-  details: any;     // JSON flexible
+  category: string;
+  details: any;
   createdAt: string;
   user: {
     name: string | null;
@@ -37,7 +36,7 @@ export default function AdminLogsPage() {
   useEffect(() => {
     const fetchLogs = async () => {
         try {
-            // ✅ 2. APPEL SÉCURISÉ (Le cookie fait tout le travail)
+            // ✅ APPEL SÉCURISÉ
             const res = await api.get('/superadmin/logs');
             
             if (res.data.success) {
@@ -45,7 +44,6 @@ export default function AdminLogsPage() {
             }
         } catch (error: any) {
             console.error("Erreur Audit:", error);
-            // Si l'API renvoie 401/403, c'est que le cookie n'est pas bon ou pas Admin
             if (error.response?.status === 401 || error.response?.status === 403) {
                  toast.error("Accès refusé. Admin uniquement.");
                  router.push('/login');
@@ -59,7 +57,7 @@ export default function AdminLogsPage() {
     fetchLogs();
   }, [router]);
 
-  // 🔎 FILTRAGE AVANCÉ
+  // FILTRAGE
   const filteredLogs = logs.filter(log => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
@@ -77,7 +75,7 @@ export default function AdminLogsPage() {
     return matchesSearch && matchesDate;
   });
 
-  // 📥 EXPORT CSV
+  // EXPORT CSV
   const handleExportCSV = () => {
     if (filteredLogs.length === 0) return toast.error("Aucune donnée à exporter.");
 

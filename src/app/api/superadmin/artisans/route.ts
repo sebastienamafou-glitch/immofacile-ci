@@ -1,37 +1,38 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ STANDARDISÉ ---
+// --- HELPER DE SÉCURITÉ (ZERO TRUST - ID ONLY) ---
 async function checkSuperAdminPermission(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
-  if (!userEmail) return { authorized: false, status: 401, error: "Non authentifié" };
-
-  const admin = await prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { role: true }
-  });
-
-  if (!admin || admin.role !== Role.SUPER_ADMIN) {
-    return { authorized: false, status: 403, error: "Accès réservé aux Super Admins" };
+  // 1. Identification par ID (Session via Middleware)
+  const userId = request.headers.get("x-user-id");
+  if (!userId) {
+    return { authorized: false, status: 401, error: "Non authentifié" };
   }
 
-  return { authorized: true };
+  // 2. Vérification Rôle
+  const admin = await prisma.user.findUnique({ 
+    where: { id: userId },
+    select: { id: true, role: true }
+  });
+
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    return { authorized: false, status: 403, error: "Accès refusé. Réservé au Super Admin." };
+  }
+
+  return { authorized: true, admin };
 }
 
 // =====================================================================
-// GET : LISTER LES ARTISANS (Annuaire)
+// GET : LISTER LES ARTISANS
 // =====================================================================
 export async function GET(request: Request) {
   try {
-    // 1. Sécurité
     const auth = await checkSuperAdminPermission(request);
     if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    // 2. Récupération Optimisée
     const artisans = await prisma.user.findMany({
       where: { role: "ARTISAN" },
       orderBy: { createdAt: 'desc' },
@@ -40,12 +41,12 @@ export async function GET(request: Request) {
         name: true,
         phone: true,
         email: true,
-        jobTitle: true, // ✅ Métier (Plombier, etc.)
+        jobTitle: true,
         createdAt: true,
         kycStatus: true,
         isActive: true,
         _count: {
-            select: { incidentsAssigned: true } // Charge de travail
+            select: { incidentsAssigned: true }
         }
       }
     });
@@ -63,27 +64,23 @@ export async function GET(request: Request) {
 // =====================================================================
 export async function POST(request: Request) {
   try {
-    // 1. Sécurité
     const auth = await checkSuperAdminPermission(request);
     if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    // 2. Validation
-    const body = await request.json(); // { name, phone, job, email? }
+    const body = await request.json();
     if (!body.name || !body.phone) {
         return NextResponse.json({ error: "Nom et téléphone requis" }, { status: 400 });
     }
 
-    // 3. Sécurité : Génération Mot de Passe Fort
+    // Génération Mot de Passe Fort
     const rawPassword = Math.random().toString(36).slice(-8) + "Pro!";
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    // 4. Logique Email (Si pas d'email, on en crée un technique)
-    // Cela évite l'erreur "Unique constraint" sur le champ email
+    // Email Technique (si absent)
     const emailToUse = body.email && body.email.trim() !== "" 
         ? body.email 
         : `artisan-${body.phone.replace(/\s/g, '')}@immofacile.pro`;
 
-    // 5. Création en Base
     const newArtisan = await prisma.user.create({
         data: {
             name: body.name,
@@ -92,13 +89,12 @@ export async function POST(request: Request) {
             jobTitle: body.job || "Technicien Polyvalent",
             password: hashedPassword,
             role: "ARTISAN",
-            kycStatus: "VERIFIED", // Un pro validé par l'admin est vérifié
+            kycStatus: "VERIFIED",
             walletBalance: 0,
             isActive: true
         }
     });
 
-    // 6. Réponse (Avec les identifiants en clair UNE SEULE FOIS)
     return NextResponse.json({ 
         success: true, 
         credentials: {
@@ -112,11 +108,10 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("[API_ARTISANS_POST]", error);
     
-    // Gestion propre des doublons
     if (error.code === 'P2002') {
-        return NextResponse.json({ error: "Ce numéro de téléphone ou cet email est déjà utilisé." }, { status: 409 });
+        return NextResponse.json({ error: "Ce numéro ou cet email existe déjà." }, { status: 409 });
     }
 
-    return NextResponse.json({ error: "Erreur technique lors de la création." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
   }
 }

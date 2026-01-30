@@ -4,15 +4,15 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { 
-  TrendingUp, Users, AlertTriangle, CheckCircle, Loader2, Info 
+  TrendingUp, Users, CheckCircle, Loader2, Info 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import Swal from "sweetalert2";
 
-// Fonction locale de formatage (Currency)
 const formatFCFA = (amount: number) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
 };
@@ -24,20 +24,28 @@ export default function DividendDistributor() {
   const [report, setReport] = useState<any | null>(null);
 
   const handleDistribute = async () => {
-    // Validation basique
     const value = Number(amount);
     if (!value || value <= 0) {
       toast.error("Veuillez saisir un montant valide.");
       return;
     }
 
-    // Confirmation visuelle (en plus du toast)
-    if (!confirm(`Confirmez-vous la distribution de ${formatFCFA(value)} à tous les investisseurs éligibles ?\n\nCette action est irréversible.`)) {
-      return;
-    }
+    // Confirmation Sécurisée
+    const confirm = await Swal.fire({
+        title: 'Confirmer la distribution ?',
+        text: `Vous allez verser ${formatFCFA(value)} aux investisseurs pour la période ${period}.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#F59E0B',
+        cancelButtonColor: '#334155',
+        confirmButtonText: 'Oui, Distribuer',
+        background: '#020617', color: '#fff'
+    });
+
+    if (!confirm.isConfirmed) return;
 
     setLoading(true);
-    setReport(null); // Reset report
+    setReport(null); 
 
     try {
       const res = await api.post('/superadmin/finance/distribute', {
@@ -48,7 +56,7 @@ export default function DividendDistributor() {
       if (res.data.success) {
         setReport(res.data.report);
         toast.success("Distribution effectuée avec succès !");
-        setAmount(""); // Reset input
+        setAmount(""); 
       }
     } catch (error: any) {
       console.error("Erreur distribution:", error);
@@ -79,8 +87,6 @@ export default function DividendDistributor() {
       </CardHeader>
       
       <CardContent className="space-y-6">
-        
-        {/* FORMULAIRE */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
                 <Label className="text-slate-300 text-xs uppercase font-bold">Période (Référence)</Label>
@@ -106,39 +112,27 @@ export default function DividendDistributor() {
             </div>
         </div>
 
-        {/* INFO BOX */}
         <div className="bg-blue-500/5 border border-blue-500/20 p-4 rounded-xl flex gap-3 text-sm text-blue-300">
             <Info className="w-5 h-5 shrink-0" />
-            <p>Le système calculera automatiquement la part de chaque investisseur au prorata de son capital engagé (contrats signés). Les fonds seront crédités instantanément.</p>
+            <p>Le système calculera automatiquement la part de chaque investisseur au prorata de son capital engagé.</p>
         </div>
 
-        {/* ACTIONS */}
         <Button 
             onClick={handleDistribute}
             disabled={loading || !amount}
             className="w-full bg-[#F59E0B] hover:bg-orange-600 text-black font-bold h-12 text-base transition-all"
         >
-            {loading ? (
-                <><Loader2 className="w-5 h-5 animate-spin mr-2"/> Calcul & Distribution en cours...</>
-            ) : (
-                "Lancer la Distribution"
-            )}
+            {loading ? <><Loader2 className="w-5 h-5 animate-spin mr-2"/> Distribution en cours...</> : "Lancer la Distribution"}
         </Button>
 
-        {/* RAPPORT DE SUCCÈS (Affiché après exécution) */}
         {report && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="flex items-center gap-2 mb-4 text-emerald-500 font-bold uppercase tracking-wide text-sm">
                     <CheckCircle className="w-5 h-5"/> Rapport d'Exécution
                 </div>
-                
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                     <div className="bg-[#020617] p-3 rounded-lg border border-white/5">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Enveloppe Totale</p>
-                        <p className="text-white font-mono font-bold">{formatFCFA(report.poolAmount)}</p>
-                    </div>
-                    <div className="bg-[#020617] p-3 rounded-lg border border-white/5">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Distribué Réel</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Distribué</p>
                         <p className="text-emerald-400 font-mono font-bold">{formatFCFA(report.realDistributed)}</p>
                     </div>
                      <div className="bg-[#020617] p-3 rounded-lg border border-white/5">
@@ -147,14 +141,9 @@ export default function DividendDistributor() {
                             <Users className="w-3 h-3 text-blue-400"/> {report.beneficiaries}
                         </div>
                     </div>
-                     <div className="bg-[#020617] p-3 rounded-lg border border-white/5">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Reliquat (Arrondis)</p>
-                        <p className="text-orange-400 font-mono font-bold">{formatFCFA(report.remainder)}</p>
-                    </div>
                 </div>
             </div>
         )}
-
       </CardContent>
     </Card>
   );

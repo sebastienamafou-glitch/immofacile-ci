@@ -1,31 +1,41 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Settings, ShieldCheck } from "lucide-react";
+import { Settings, ShieldCheck, AlertTriangle } from "lucide-react";
 import AgencySettingsForm from "@/components/agency/AgencySettingsForm";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgencySettingsPage() {
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST
+  const headersList = headers();
+  const userId = headersList.get("x-user-id");
+  
+  if (!userId) redirect("/login");
 
+  // 2. RÉCUPÉRATION DONNÉES
   const admin = await prisma.user.findUnique({
-    where: { email: userEmail },
+    where: { id: userId },
     include: { agency: true }
   });
 
-  if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agency) {
-    redirect("/dashboard");
+  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN") || !admin.agency) {
+    return (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center text-slate-400">
+            <AlertTriangle className="w-10 h-10 mb-4 text-orange-500" />
+            <h2 className="text-xl text-white font-bold">Accès Restreint</h2>
+            <p>Seuls les administrateurs peuvent modifier les paramètres de l'agence.</p>
+        </div>
+    );
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8">
+    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-8 min-h-screen bg-[#020617] text-slate-200">
       
       {/* HEADER */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-white flex items-center gap-3">
-             <Settings className="text-orange-500" /> Paramètres Agence
+      <div className="flex flex-col gap-2 border-b border-slate-800 pb-6">
+        <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-tight">
+             <Settings className="text-orange-500 w-8 h-8" /> Paramètres Agence
         </h1>
         <p className="text-slate-400">
             Configurez votre identité visuelle, vos coordonnées et vos informations légales.
@@ -33,16 +43,20 @@ export default async function AgencySettingsPage() {
       </div>
 
       {/* ALERT STATUS */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4 flex items-center gap-4">
-        <div className={`p-2 rounded-full ${admin.agency.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500"}`}>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-start gap-4 shadow-lg">
+        <div className={`p-2 rounded-full mt-1 ${admin.agency.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500"}`}>
             <ShieldCheck size={24} />
         </div>
         <div>
-            <p className="text-sm font-bold text-white">Statut du compte : {admin.agency.isActive ? "VÉRIFIÉ" : "EN ATTENTE"}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-sm font-bold text-white uppercase tracking-wide">
+                Statut du compte : <span className={admin.agency.isActive ? "text-emerald-400" : "text-yellow-400"}>
+                    {admin.agency.isActive ? "VÉRIFIÉ" : "EN ATTENTE"}
+                </span>
+            </p>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 {admin.agency.isActive 
-                    ? "Votre agence est pleinement opérationnelle et visible." 
-                    : "Votre dossier est en cours de validation par l'équipe ImmoFacile."}
+                    ? "Votre agence est pleinement opérationnelle. Vos annonces sont visibles sur la marketplace." 
+                    : "Votre dossier est en cours de validation par l'équipe ImmoFacile. Certaines fonctionnalités sont restreintes."}
             </p>
         </div>
       </div>

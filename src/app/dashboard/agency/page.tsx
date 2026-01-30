@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
   Building, Users, Wallet, TrendingUp, BarChart3, 
-  UserPlus, AlertTriangle, MapPin 
+  UserPlus, AlertTriangle, MapPin, LayoutDashboard 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,26 +12,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyDashboardPage() {
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST
+  const headersList = headers();
+  const userId = headersList.get("x-user-id");
+  
+  if (!userId) redirect("/login");
 
+  // 2. VÉRIFICATION RÔLE (Optimisée : ID only)
   const admin = await prisma.user.findUnique({
-    where: { email: userEmail },
+    where: { id: userId },
     include: { agency: true }
   });
 
-  if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agency) {
+  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-[#020617] text-white gap-4">
         <AlertTriangle className="w-12 h-12 text-orange-500" />
-        <h1 className="text-xl font-bold">Configuration incomplète</h1>
-        <p className="text-slate-400">Votre compte n'est lié à aucune agence active.</p>
-        <Button variant="outline" className="mt-4">Contacter le Support</Button>
+        <h1 className="text-xl font-bold">Accès Refusé</h1>
+        <p className="text-slate-400">Ce tableau de bord est réservé aux administrateurs d'agence.</p>
+        <Button variant="outline" className="mt-4">Retour</Button>
       </div>
     );
   }
 
-  const agencyId = admin.agency.id;
+  const agencyId = admin.agency!.id; // On est sûr qu'elle existe ici
 
   // ✅ REQUÊTES OPTIMISÉES (Agrégations incluses)
   const [
@@ -39,9 +43,7 @@ export default async function AgencyDashboardPage() {
     listingsCount,
     agents,
     revenueData,
-    // E. Répartition par Commune (Biens Physiques)
     propertiesByCommune,
-    // F. Répartition par Ville (Listings Courte Durée)
     listingsByCity
   ] = await Promise.all([
     prisma.property.count({ where: { agencyId } }),
@@ -50,7 +52,7 @@ export default async function AgencyDashboardPage() {
       where: { agencyId, role: "AGENT" },
       select: {
         id: true, name: true, image: true, 
-        _count: { select: { missionsAccepted: true } }
+        _count: { select: { missionsAccepted: { where: { status: 'COMPLETED' } } } }
       },
       orderBy: { missionsAccepted: { _count: 'desc' } },
       take: 5
@@ -73,30 +75,28 @@ export default async function AgencyDashboardPage() {
     })
   ]);
 
-  // ✅ LOGIQUE MÉTIER : Fusion des zones géographique
+  // ✅ LOGIQUE MÉTIER
   const totalAssets = propertiesCount + listingsCount;
   const totalRevenue = revenueData._sum.agencyCommission || 0;
   
-  // Calculs fictifs pour l'UI (à dynamiser avec l'historique plus tard)
+  // Calculs (À dynamiser avec API Stats plus tard pour l'historique)
   const growthRate = 12.5; 
   const occupancyRate = totalAssets > 0 ? Math.round((listingsCount / totalAssets) * 85) : 0; 
 
-  // 1. Fusionner les données (Commune = City)
+  // 1. Fusion des zones géographiques
   const zoneMap = new Map<string, number>();
 
-  // Ajouter les propriétés
   propertiesByCommune.forEach((item) => {
-    const zone = item.commune.trim(); // Normalisation basique
+    const zone = item.commune.trim();
     zoneMap.set(zone, (zoneMap.get(zone) || 0) + item._count.id);
   });
 
-  // Ajouter les listings
   listingsByCity.forEach((item) => {
     const zone = item.city.trim(); 
     zoneMap.set(zone, (zoneMap.get(zone) || 0) + item._count.id);
   });
 
-  // 2. Trier et prendre le Top 3
+  // 2. Top 3 Zones
   const topZones = Array.from(zoneMap.entries())
     .map(([name, count]) => ({
       name,
@@ -104,7 +104,7 @@ export default async function AgencyDashboardPage() {
       percentage: totalAssets > 0 ? Math.round((count / totalAssets) * 100) : 0
     }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3); // Top 3 seulement
+    .slice(0, 3);
 
   return (
     <div className="p-8 bg-[#020617] min-h-screen text-slate-200 pb-24">
@@ -113,33 +113,36 @@ export default async function AgencyDashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-             <h1 className="text-3xl font-black text-white">Command Center</h1>
-             <span className="px-3 py-1 rounded-full bg-orange-500/10 text-orange-500 text-xs font-bold border border-orange-500/20 uppercase tracking-wider">
-                {admin.agency.name}
+             <LayoutDashboard className="w-8 h-8 text-orange-500" />
+             <h1 className="text-3xl font-black text-white uppercase tracking-tight">QG Agence</h1>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+             <span className="text-slate-400">Pilotage :</span>
+             <span className="px-3 py-1 rounded-full bg-slate-800 text-white text-xs font-bold border border-slate-700 uppercase tracking-wider">
+                {admin.agency!.name}
              </span>
           </div>
-          <p className="text-slate-400">Pilotage de votre activité en temps réel.</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" className="border-slate-700 text-white bg-slate-900 hover:bg-slate-800">
-            <UserPlus className="mr-2 h-4 w-4" /> Inviter un Agent
+            <UserPlus className="mr-2 h-4 w-4" /> Nouvel Agent
           </Button>
-          <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold">
-            <BarChart3 className="mr-2 h-4 w-4" /> Rapport PDF
+          <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-lg shadow-orange-900/20">
+            <BarChart3 className="mr-2 h-4 w-4" /> Rapport Mensuel
           </Button>
         </div>
       </div>
 
       {/* KPI FINANCIERS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         
         {/* CA MENSUEL */}
-        <Card className="bg-slate-900 border-slate-800 shadow-xl">
+        <Card className="bg-slate-900 border-slate-800 shadow-xl group hover:border-emerald-500/30 transition">
            <CardContent className="p-6">
               <div className="flex justify-between items-start">
                  <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Commissions (Mois)</p>
-                    <h3 className="text-2xl lg:text-3xl font-black text-white mt-2">
+                    <h3 className="text-2xl lg:text-3xl font-black text-white mt-2 group-hover:text-emerald-400 transition">
                         {new Intl.NumberFormat('fr-FR').format(totalRevenue)} <span className="text-lg text-slate-500">F</span>
                     </h3>
                  </div>
@@ -155,12 +158,12 @@ export default async function AgencyDashboardPage() {
         </Card>
 
         {/* PARC ACTIF */}
-        <Card className="bg-slate-900 border-slate-800 shadow-xl">
+        <Card className="bg-slate-900 border-slate-800 shadow-xl group hover:border-blue-500/30 transition">
            <CardContent className="p-6">
               <div className="flex justify-between items-start">
                  <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mandats Actifs</p>
-                    <h3 className="text-3xl font-black text-white mt-2">{totalAssets}</h3>
+                    <h3 className="text-3xl font-black text-white mt-2 group-hover:text-blue-400 transition">{totalAssets}</h3>
                  </div>
                  <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
                     <Building size={20} />
@@ -175,30 +178,30 @@ export default async function AgencyDashboardPage() {
         </Card>
 
         {/* TAUX OCCUPATION */}
-        <Card className="bg-slate-900 border-slate-800 shadow-xl">
+        <Card className="bg-slate-900 border-slate-800 shadow-xl group hover:border-orange-500/30 transition">
            <CardContent className="p-6">
               <div className="flex justify-between items-start">
                  <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Taux Occupation</p>
-                    <h3 className="text-3xl font-black text-white mt-2">{occupancyRate}%</h3>
+                    <h3 className="text-3xl font-black text-white mt-2 group-hover:text-orange-400 transition">{occupancyRate}%</h3>
                  </div>
                  <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500 border border-orange-500/20">
                     <Users size={20} />
                  </div>
               </div>
               <div className="mt-4 w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                 <div className="bg-orange-500 h-full rounded-full" style={{ width: `${occupancyRate}%` }}></div>
+                 <div className="bg-orange-500 h-full rounded-full transition-all duration-1000" style={{ width: `${occupancyRate}%` }}></div>
               </div>
            </CardContent>
         </Card>
 
         {/* ÉQUIPE */}
-        <Card className="bg-slate-900 border-slate-800 shadow-xl">
+        <Card className="bg-slate-900 border-slate-800 shadow-xl group hover:border-purple-500/30 transition">
            <CardContent className="p-6">
               <div className="flex justify-between items-start">
                  <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Agents Terrain</p>
-                    <h3 className="text-3xl font-black text-white mt-2">{agents.length}</h3>
+                    <h3 className="text-3xl font-black text-white mt-2 group-hover:text-purple-400 transition">{agents.length}</h3>
                  </div>
                  <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 border border-purple-500/20">
                     <Users size={20} />
@@ -224,10 +227,10 @@ export default async function AgencyDashboardPage() {
       </div>
 
       {/* SECTION GESTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
          
          {/* Top Agents */}
-         <Card className="col-span-1 bg-slate-900 border-slate-800 overflow-hidden">
+         <Card className="col-span-1 bg-slate-900 border-slate-800 overflow-hidden shadow-xl">
             <CardHeader className="bg-slate-950/50 border-b border-slate-800/50 py-4">
                <CardTitle className="text-white text-base font-bold flex items-center gap-2">
                    🏆 Top Performance
@@ -273,8 +276,8 @@ export default async function AgencyDashboardPage() {
             </CardContent>
          </Card>
 
-         {/* ✅ VRAIE Carte Géographique (Données réelles) */}
-         <Card className="col-span-1 lg:col-span-2 bg-slate-900 border-slate-800 flex flex-col">
+         {/* Carte Géographique */}
+         <Card className="col-span-1 lg:col-span-2 bg-slate-900 border-slate-800 flex flex-col shadow-xl">
             <CardHeader className="bg-slate-950/50 border-b border-slate-800/50 py-4 flex flex-row items-center justify-between">
                <CardTitle className="text-white text-base font-bold flex items-center gap-2">
                    <MapPin className="text-orange-500 w-4 h-4" /> Couverture Agence
@@ -297,17 +300,13 @@ export default async function AgencyDashboardPage() {
                     </div>
                 ) : (
                     topZones.map((zone, idx) => {
-                        // Couleur dynamique selon le classement
-                        let colorClass = "bg-blue-500";
                         let gradientClass = "from-blue-600 to-blue-400";
                         let textClass = "text-blue-400";
 
                         if (idx === 0) {
-                            colorClass = "bg-emerald-500";
                             gradientClass = "from-emerald-600 to-emerald-400";
                             textClass = "text-emerald-400";
                         } else if (idx === 1) {
-                            colorClass = "bg-orange-500";
                             gradientClass = "from-orange-600 to-orange-400";
                             textClass = "text-orange-400";
                         }

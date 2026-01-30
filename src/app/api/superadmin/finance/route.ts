@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Role, PaymentStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ ---
+// --- HELPER DE SÉCURITÉ (ZERO TRUST - ID ONLY) ---
 async function checkSuperAdminPermission(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
+  // 1. Identification par ID (Session via Middleware)
+  const userId = request.headers.get("x-user-id");
   
-  if (!userEmail) {
+  if (!userId) {
     return { authorized: false, status: 401, error: "Non authentifié" };
   }
 
+  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { role: true }
+    where: { id: userId },
+    select: { id: true, role: true }
   });
 
-  if (!admin || admin.role !== Role.SUPER_ADMIN) {
+  if (!admin || admin.role !== "SUPER_ADMIN") {
     return { authorized: false, status: 403, error: "Accès refusé : Rôle Super Admin requis" };
   }
 
@@ -31,23 +32,21 @@ export async function GET(request: Request) {
     if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     // 2. STATS "AGENCY" (KPIs Business)
-    // On garde ces stats pures : uniquement basées sur l'activité immobilière (Payment)
-    // On ne mélange pas avec la trésorerie Corporate (Transaction) pour ne pas fausser le CA.
     const stats = await prisma.payment.aggregate({
-        where: { status: PaymentStatus.SUCCESS },
+        where: { status: "SUCCESS" },
         _sum: {
             amount: true,          // Volume d'affaires (GMV)
-            amountPlatform: true,  // Notre Revenue (CA Net)
+            amountPlatform: true,  // Revenue Net
             amountOwner: true,     // Reversé aux clients
         },
         _count: { id: true }
     });
 
-    // 3. RÉCUPERATION DES DEUX FLUX (Parallélisation)
+    // 3. RÉCUPERATION DES DEUX FLUX
     const [rawPayments, rawTransactions] = await Promise.all([
-        // Flux A : Gestion Locative (Payment)
+        // Flux A : Gestion Locative
         prisma.payment.findMany({
-            where: { status: PaymentStatus.SUCCESS },
+            where: { status: "SUCCESS" },
             orderBy: { date: 'desc' }, 
             take: 50, 
             include: {
@@ -59,9 +58,8 @@ export async function GET(request: Request) {
                 }
             }
         }),
-        // Flux B : Trésorerie Corporate / Investisseurs (Transaction)
+        // Flux B : Trésorerie Corporate
         prisma.transaction.findMany({
-            // On prend tout (PENDING, SUCCESS...) pour voir les demandes de retrait en cours
             orderBy: { createdAt: 'desc' },
             take: 50,
             include: {
@@ -70,40 +68,38 @@ export async function GET(request: Request) {
         })
     ]);
 
-    // 4. MAPPING & FUSION (Unification du DTO)
-    
-    // Mapping des Paiements (Loyer, etc.)
+    // 4. MAPPING & FUSION
     const historyFromPayments = rawPayments.map(p => ({
         id: p.id,
         amount: p.amount,
         commission: p.amountPlatform,
-        status: p.status, // "SUCCESS"
+        status: p.status, 
         date: p.date,
-        type: p.type, // "LOYER", "DEPOSIT"...
+        type: p.type,
         details: p.lease 
             ? `${p.lease.tenant.name} - ${p.lease.property.title}`
             : "Paiement direct",
-        category: "AGENCY" // Marqueur interne
+        category: "AGENCY"
     }));
 
-    // Mapping des Transactions (Dividendes, Retraits...)
     const historyFromTransactions = rawTransactions.map(t => ({
         id: t.id,
         amount: t.amount,
-        commission: 0, // Pas de commission visible sur ces mvts internes
-        status: t.status, // "SUCCESS", "PENDING"
+        commission: 0,
+        status: t.status,
         date: t.createdAt,
-        type: t.reason || "WALLET", // ex: "DIVIDENDE_T1", "CASHOUT_WAVE"
+        type: t.reason || "WALLET",
         details: t.user 
             ? `${t.user.name} (${t.type === 'CREDIT' ? 'Entrée' : 'Sortie'})`
             : "Opération Système",
         category: "CORPORATE"
     }));
 
-    // 5. FUSION & TRI FINAL
+    // Fusion et Tri
     const mergedHistory = [...historyFromPayments, ...historyFromTransactions]
+        // @ts-ignore
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 100); // On garde les 100 derniers mouvements consolidés
+        .slice(0, 100); 
     
     return NextResponse.json({
       success: true,

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ChatWindow from "@/components/guest/ChatWindow";
-import { MapPin, Calendar, ArrowLeft } from "lucide-react";
+import { MapPin, Calendar, ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -36,6 +36,17 @@ export default async function ConversationPage({ params }: PageProps) {
   // 3. Sécurité (Est-ce que je suis autorisé ?)
   if (!conversation) {
     return <div className="p-10 text-white">Conversation introuvable.</div>;
+  }
+
+  // ✅ CORRECTIF DE SÉCURITÉ : VÉRIFICATION DES PARTICIPANTS
+  // TypeScript est content car on gère le cas où c'est null
+  if (!conversation.guest || !conversation.host) {
+      return (
+        <div className="p-10 flex flex-col items-center justify-center text-slate-400 h-[50vh]">
+            <AlertCircle className="w-10 h-10 mb-4 text-orange-500"/>
+            <p>Impossible de charger les participants de cette conversation.</p>
+        </div>
+      );
   }
   
   const isGuest = conversation.guest.id === currentUser.id;
@@ -92,6 +103,7 @@ export default async function ConversationPage({ params }: PageProps) {
                     <img 
                         src={otherUser.image || "https://ui-avatars.com/api/?background=random"} 
                         className="w-20 h-20 rounded-full mb-3 border-4 border-slate-800"
+                        alt="Avatar"
                     />
                     <p className="text-white font-bold text-lg">{otherUser.name}</p>
                     <p className="text-slate-500 text-sm">Membre ImmoFacile</p>

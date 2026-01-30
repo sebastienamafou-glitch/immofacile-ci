@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { createInvestor } from '@/lib/actions/admin';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api'; // ✅ On utilise notre wrapper sécurisé
 import { toast } from 'sonner';
 import { Loader2, Save, ArrowLeft, UserPlus, Copy, CheckCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -20,23 +20,30 @@ export default function NewInvestorPage() {
 
     const formData = new FormData(e.currentTarget);
     
-    const data = {
+    // Préparation des données pour l'API Route
+    const payload = {
         name: formData.get('name') as string,
         email: formData.get('email') as string,
         phone: formData.get('phone') as string,
-        amount: Number(formData.get('amount')),
-        packName: formData.get('packName') as string,
+        initialAmount: Number(formData.get('amount')), // 'initialAmount' correspond à l'API
+        backerTier: formData.get('packName') as string, // 'backerTier' correspond à l'API
     };
 
-    const result = await createInvestor(data);
+    try {
+        // ✅ APPEL SÉCURISÉ VERS NOTRE API ROUTE
+        const res = await api.post('/superadmin/investors', payload);
 
-    if (result.success && result.credentials) {
-        toast.success(result.message);
-        setCreatedCredentials(result.credentials); // On affiche le résultat
-    } else {
-        toast.error(result.error || "Une erreur est survenue");
+        if (res.data.success) {
+            toast.success("Investisseur créé avec succès !");
+            setCreatedCredentials(res.data.credentials); // On affiche le résultat
+        }
+    } catch (error: any) {
+        console.error("Erreur création:", error);
+        const msg = error.response?.data?.error || "Erreur lors de la création.";
+        toast.error(msg);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const copyToClipboard = () => {
@@ -47,7 +54,7 @@ export default function NewInvestorPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-8">
+    <div className="max-w-2xl mx-auto p-8 font-sans">
       
       {/* HEADER */}
       <div className="flex items-center gap-4 mb-8">
@@ -55,22 +62,22 @@ export default function NewInvestorPage() {
             <ArrowLeft className="w-5 h-5"/>
         </Link>
         <div>
-            <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            <h1 className="text-2xl font-black text-white flex items-center gap-2 tracking-tight">
                 <UserPlus className="w-6 h-6 text-[#F59E0B]"/> Nouvel Actionnaire
             </h1>
-            <p className="text-slate-500 text-sm">Ajout manuel d'un investisseur Private Equity</p>
+            <p className="text-slate-500 text-sm mt-1">Ajout manuel d'un investisseur Private Equity</p>
         </div>
       </div>
 
       {/* VIEW 1: SUCCÈS - AFFICHAGE DES IDENTIFIANTS */}
       {createdCredentials ? (
-        <div className="bg-[#0B1120] border border-emerald-500/30 p-8 rounded-3xl animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-[#0B1120] border border-emerald-500/30 p-8 rounded-3xl animate-in fade-in zoom-in-95 duration-500 shadow-2xl">
             <div className="flex flex-col items-center text-center mb-8">
-                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mb-4 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                     <CheckCircle className="w-8 h-8 text-emerald-500" />
                 </div>
-                <h2 className="text-2xl font-bold text-white">Compte Créé avec Succès !</h2>
-                <p className="text-slate-400 mt-2 text-sm max-w-md">
+                <h2 className="text-2xl font-black text-white tracking-tight">Compte Créé avec Succès !</h2>
+                <p className="text-slate-400 mt-2 text-sm max-w-md leading-relaxed">
                     Les fonds ont été ajoutés au registre. Veuillez transmettre ces identifiants sécurisés à l'investisseur <strong>immédiatement</strong>.
                 </p>
             </div>
@@ -86,7 +93,7 @@ export default function NewInvestorPage() {
                         <p className="text-xs uppercase text-slate-500 font-bold tracking-wider mb-1">Mot de passe généré</p>
                         <div className="flex items-center gap-3">
                             <p className="text-[#F59E0B] font-mono text-xl font-bold select-all tracking-wide">{createdCredentials.password}</p>
-                            <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded border border-red-500/20">Unique</span>
+                            <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded border border-red-500/20 font-bold uppercase">Unique</span>
                         </div>
                     </div>
                 </div>
@@ -109,7 +116,7 @@ export default function NewInvestorPage() {
                 </button>
                  <button 
                     onClick={() => setCreatedCredentials(null)} // Reset pour en créer un autre
-                    className="flex-1 py-4 rounded-xl bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-bold transition flex items-center justify-center gap-2"
+                    className="flex-1 py-4 rounded-xl bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-orange-900/20"
                 >
                     <UserPlus className="w-4 h-4"/> Ajouter un autre
                 </button>
@@ -121,17 +128,17 @@ export default function NewInvestorPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nom Complet</label>
-                    <input required name="name" type="text" placeholder="Ex: Jean Kouassi" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium" />
+                    <input required name="name" type="text" placeholder="Ex: Jean Kouassi" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium placeholder:text-slate-600" />
                 </div>
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Téléphone</label>
-                    <input required name="phone" type="tel" placeholder="Ex: 0707..." className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium" />
+                    <input required name="phone" type="tel" placeholder="Ex: 0707..." className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium placeholder:text-slate-600" />
                 </div>
             </div>
 
             <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email (Identifiant)</label>
-                <input required name="email" type="email" placeholder="investisseur@email.com" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium" />
+                <input required name="email" type="email" placeholder="investisseur@email.com" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition font-medium placeholder:text-slate-600" />
             </div>
 
             <div className="h-px bg-white/5 my-2"></div>
@@ -140,7 +147,7 @@ export default function NewInvestorPage() {
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pack Choisi</label>
                     <div className="relative">
-                        <select name="packName" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition appearance-none font-medium">
+                        <select name="packName" className="w-full bg-[#020617] border border-white/10 rounded-xl p-3 text-white focus:border-[#F59E0B] outline-none transition appearance-none font-medium cursor-pointer">
                             <option value="VISIONNAIRE">Pack Visionnaire (Gold)</option>
                             <option value="AMBASSADEUR">Pack Ambassadeur (Blue)</option>
                             <option value="SUPPORTER">Pack Supporter (Red)</option>
@@ -153,17 +160,17 @@ export default function NewInvestorPage() {
                 </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex gap-3">
-                <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0"/>
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex gap-3">
+                <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5"/>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                    Sécurité : Un mot de passe fort sera généré automatiquement. Il ne sera affiché qu'une seule fois à l'étape suivante. Aucune notification email ne sera envoyée (remise en main propre).
+                    <strong>Sécurité Maximale :</strong> Un mot de passe fort sera généré automatiquement. Il ne sera affiché qu'une seule fois à l'étape suivante. Aucune notification email ne sera envoyée (remise en main propre).
                 </p>
             </div>
 
             <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-[#F59E0B] hover:bg-orange-500 text-black font-black py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)]"
+                className="w-full bg-[#F59E0B] hover:bg-orange-500 text-black font-black py-4 rounded-xl transition flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] active:scale-95"
             >
                 {loading ? <Loader2 className="animate-spin w-5 h-5"/> : <><Save className="w-5 h-5"/> ENREGISTRER L'INVESTISSEMENT</>}
             </button>

@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
+import { headers } from "next/headers"; // ✅ IMPORT REQUIS
 
-// Validation stricte des types d'entrée
 interface CreateInvestorData {
   name: string;
   email: string;
@@ -16,7 +16,23 @@ interface CreateInvestorData {
 
 export async function createInvestor(data: CreateInvestorData) {
   try {
-    // 1. Validation : Unicité Email & Téléphone
+    // 🛡️ 1. SÉCURITÉ ZERO TRUST (AJOUT CRITIQUE)
+    const headersList = headers();
+    const adminId = headersList.get("x-user-id");
+
+    if (!adminId) return { success: false, error: "Non autorisé." };
+
+    const adminUser = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { role: true }
+    });
+
+    if (!adminUser || adminUser.role !== "SUPER_ADMIN") {
+        return { success: false, error: "Intrusion détectée : Droits insuffisants." };
+    }
+    // 🛡️ FIN DE LA SÉCURISATION
+
+    // 2. Validation : Unicité Email & Téléphone
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -27,10 +43,12 @@ export async function createInvestor(data: CreateInvestorData) {
     });
 
     if (existingUser) {
-      return { success: false, error: "Cet email ou ce numéro de téléphone existe déjà." };
+      return { success: false, error: "Cet email ou ce numéro existe déjà." };
     }
+
     const generatedPassword = crypto.randomBytes(10).toString('hex');
-    const hashedPassword = await hash(generatedPassword, 12); // Cost factor 12 pour Prod
+    const hashedPassword = await hash(generatedPassword, 12);
+
     const newUser = await prisma.$transaction(async (tx) => {
       // A. Création User
       const user = await tx.user.create({
@@ -40,31 +58,32 @@ export async function createInvestor(data: CreateInvestorData) {
           phone: data.phone,
           password: hashedPassword,
           role: "INVESTOR",
-          isBacker: true,
+          // ... reste inchangé
           backerTier: data.packName,
-          walletBalance: data.amount, // On crédite le wallet virtuel
-          isVerified: true, // L'admin l'a vérifié manuellement (KYC manuel)
+          walletBalance: data.amount,
+          isVerified: true,
           kycStatus: "VERIFIED"
         }
       });
 
-      // B. Enregistrement de l'apport financier
-      await tx.transaction.create({
-        data: {
-          amount: data.amount,
-          type: "CREDIT",
-          reason: `INITIAL_INVESTMENT_${data.packName}`,
-          userId: user.id
-        }
-      });
+      // B. Transaction
+      if (data.amount > 0) {
+          await tx.transaction.create({
+            data: {
+              amount: data.amount,
+              type: "CREDIT",
+              reason: `INITIAL_INVESTMENT_${data.packName}`,
+              userId: user.id,
+              status: "SUCCESS" // ✅ Toujours préciser le statut
+            }
+          });
+      }
 
       return user;
     });
 
     revalidatePath('/dashboard/superadmin/investors');
 
-    // 4. RETOUR SÉCURISÉ
-    // On renvoie le mot de passe en clair UNIQUEMENT ICI pour affichage unique
     return { 
       success: true, 
       message: "Investisseur créé avec succès.",
@@ -76,6 +95,6 @@ export async function createInvestor(data: CreateInvestorData) {
 
   } catch (error) {
     console.error("[CRITICAL] Create Investor Error:", error);
-    return { success: false, error: "Erreur critique base de données." };
+    return { success: false, error: "Erreur technique." };
   }
 }

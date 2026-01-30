@@ -1,4 +1,4 @@
-import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType } from '@prisma/client';
+import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, QuoteStatus, IncidentStatus } from '@prisma/client';
 import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -6,18 +6,57 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Démarrage du "Full Ecosystem Seed"...');
 
+  // ==========================================
+  // 1. GRAND NETTOYAGE (Ordre Hiérarchique Strict)
+  // ==========================================
+  console.log('🧹 Nettoyage de la base de données...');
+  
+  // Niveau 4 : Les "Petits-enfants" (Dépendent de tout)
+  await prisma.quoteItem.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.signatureProof.deleteMany(); // ✅ Débloque les Baux
+  await prisma.inventoryItem.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.bookingPayment.deleteMany();
+  
+  // Niveau 3 : Les "Enfants"
+  await prisma.quote.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.inventory.deleteMany();
+  await prisma.incident.deleteMany();
+  await prisma.mission.deleteMany();
+  await prisma.booking.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.wishlist.deleteMany();
+  await prisma.investmentContract.deleteMany();
+  
+  // Niveau 2 : Les "Parents"
+  await prisma.lease.deleteMany(); 
+  await prisma.listing.deleteMany();
+  await prisma.transaction.deleteMany();
+  await prisma.agencyTransaction.deleteMany();
+  
+  // Niveau 1 : Les "Racines"
+  await prisma.property.deleteMany();
+  
+  // Niveau 0 : Les Acteurs
+  // On ne supprime les users/agences que si on veut repartir de zéro absolu
+  // Ici on delete tout pour être propre
+  await prisma.user.deleteMany(); 
+  await prisma.agency.deleteMany();
+  
+  console.log('✨ Base de données immaculée.');
+
   const password = await hash('password123', 10);
 
   // ==========================================
-  // 1. CRÉATION DE L'AGENCE (Avec le code OBLIGATOIRE)
+  // 2. CRÉATION DE L'AGENCE
   // ==========================================
-  const agency = await prisma.agency.upsert({
-    where: { slug: 'immo-prestige' },
-    update: {},
-    create: {
+  const agency = await prisma.agency.create({
+    data: {
       name: 'Immo Prestige International',
       slug: 'immo-prestige',
-      code: 'IMMO-PRESTIGE', // <--- ✅ AJOUTÉ ICI (Obligatoire désormais)
+      code: 'IMMO-PRESTIGE',
       email: 'contact@immoprestige.ci',
       phone: '+225 0707070707',
       primaryColor: '#F59E0B',
@@ -26,12 +65,12 @@ async function main() {
       logoUrl: 'https://placehold.co/400x400/0f172a/white?text=IP',
     },
   });
-  console.log(`🏢 Agence créée : ${agency.name} (Code: ${agency.code})`);
+  console.log(`🏢 Agence créée : ${agency.name}`);
 
   // ==========================================
-  // 2. CRÉATION DES UTILISATEURS
+  // 3. CRÉATION DES UTILISATEURS
   // ==========================================
-  const users = [
+  const usersData = [
     { email: 'superadmin@immofacile.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null },
     { email: 'directeur@immoprestige.ci', name: 'M. le Directeur', role: Role.AGENCY_ADMIN, agencyId: agency.id },
     { email: 'agent@immoprestige.ci', name: 'Alexandre Agent', role: Role.AGENT, jobTitle: 'Négociateur Immobilier', agencyId: agency.id },
@@ -43,12 +82,12 @@ async function main() {
     { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null },
   ];
 
-  for (const u of users) {
-    // @ts-ignore
-    await prisma.user.upsert({
-      where: { email: u.email },
-      update: { agencyId: u.agencyId, role: u.role },
-      create: {
+  // On stocke les users créés dans une map pour y accéder facilement
+  const usersMap: Record<string, any> = {};
+
+  for (const u of usersData) {
+    const user = await prisma.user.create({
+      data: {
         email: u.email,
         name: u.name,
         password: password,
@@ -57,31 +96,30 @@ async function main() {
         isVerified: true,
         kycStatus: VerificationStatus.VERIFIED,
         jobTitle: u.jobTitle,
-        income: u.income, // @ts-ignore
-        phone: u.role === Role.ARTISAN ? u.phone : undefined, // @ts-ignore
-        isBacker: u.isBacker || false, // @ts-ignore
+        income: u.income, 
+        // @ts-ignore
+        phone: u.phone, 
+        // @ts-ignore
+        isBacker: u.isBacker || false,
+        // @ts-ignore
         backerTier: u.backerTier || null,
       },
     });
+    usersMap[u.email] = user;
   }
-  console.log(`👥 ${users.length} Utilisateurs traités.`);
-
-  // Récupération ID
-  const ownerManaged = await prisma.user.findUnique({ where: { email: 'proprio.agence@gmail.com' } });
-  const tenant = await prisma.user.findUnique({ where: { email: 'locataire@gmail.com' } });
-  const agent = await prisma.user.findUnique({ where: { email: 'agent@immoprestige.ci' } });
-  const investor = await prisma.user.findUnique({ where: { email: 'investisseur@gmail.com' } });
+  console.log(`👥 ${usersData.length} Utilisateurs créés.`);
 
   // ==========================================
-  // 3. PROPRIÉTÉ
+  // 4. PROPRIÉTÉ & GESTION
   // ==========================================
-  let propertyId = 'prop-demo-01';
-  if (ownerManaged) {
-    const property = await prisma.property.upsert({
-      where: { id: 'prop-demo-01' },
-      update: {},
-      create: {
-        id: 'prop-demo-01',
+  const owner = usersMap['proprio.agence@gmail.com'];
+  const tenant = usersMap['locataire@gmail.com'];
+  const agent = usersMap['agent@immoprestige.ci'];
+  const artisan = usersMap['plombier@pro.ci'];
+
+  if (owner) {
+    const property = await prisma.property.create({
+      data: {
         title: 'Villa Duplex Cocody Ambassades',
         description: 'Magnifique villa 4 pièces avec piscine et jardin.',
         address: 'Rue des Jardins',
@@ -92,20 +130,16 @@ async function main() {
         bathrooms: 3,
         surface: 250,
         isPublished: true,
-        ownerId: ownerManaged.id,
+        ownerId: owner.id,
         agencyId: agency.id,
         images: ['https://placehold.co/800x600/1e293b/white?text=Villa+Cocody'],
       },
     });
-    console.log(`🏠 Bien créé/vérifié : ${property.title}`);
+    console.log(`🏠 Bien créé : ${property.title}`);
 
-    // NETTOYAGE PRÉVENTIF (Anti-doublons)
-    await prisma.lease.deleteMany({ where: { propertyId: property.id } });
-    await prisma.mission.deleteMany({ where: { propertyId: property.id } });
-
-    // 4. BAIL
+    // --- BAIL ---
     if (tenant) {
-      await prisma.lease.create({
+      const lease = await prisma.lease.create({
         data: {
           startDate: new Date('2024-01-01'),
           endDate: new Date('2025-01-01'),
@@ -119,10 +153,28 @@ async function main() {
           agentId: agent ? agent.id : null,
         },
       });
-      console.log(`📜 Bail actif réinitialisé pour ${tenant.name}`);
+      console.log(`📜 Bail créé pour ${tenant.name}`);
+      
+      // --- INCIDENT & DEVIS (Pour tester le module Artisan) ---
+      if (artisan) {
+          const incident = await prisma.incident.create({
+              data: {
+                  title: 'Fuite Salle de Bain',
+                  description: 'Grosse fuite sous le lavabo, urgent.',
+                  priority: 'HIGH',
+                  status: IncidentStatus.IN_PROGRESS, // Déjà en cours
+                  propertyId: property.id,
+                  reporterId: tenant.id,
+                  assignedToId: artisan.id,
+                  photos: ['https://placehold.co/300?text=Fuite'],
+                  createdAt: new Date()
+              }
+          });
+          console.log(`🔧 Incident créé pour ${artisan.name}`);
+      }
     }
 
-    // 5. MISSION
+    // --- MISSION ---
     if (agent) {
         await prisma.mission.create({
             data: {
@@ -134,14 +186,14 @@ async function main() {
                 agentId: agent.id
             }
         });
-        console.log(`🕵️ Mission réinitialisée pour ${agent.name}`);
     }
   }
 
-  // 6. INVESTISSEMENT
+  // ==========================================
+  // 5. INVESTISSEMENT
+  // ==========================================
+  const investor = usersMap['investisseur@gmail.com'];
   if (investor) {
-      await prisma.investmentContract.deleteMany({ where: { userId: investor.id } });
-
       await prisma.investmentContract.create({
           data: {
               userId: investor.id,
@@ -154,7 +206,7 @@ async function main() {
               signedAt: new Date(),
           }
       });
-      console.log(`🚀 Contrat Investisseur réinitialisé pour ${investor.name}`);
+      console.log(`🚀 Contrat Investisseur créé.`);
   }
 
   console.log('✅ Seeding terminé avec succès ! 🚀');

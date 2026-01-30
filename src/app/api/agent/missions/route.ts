@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    const agent = await prisma.user.findUnique({ where: { email: userEmail } });
+    // 2. VÉRIFICATION RÔLE (Via ID)
+    const agent = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true } // On ne récupère que le nécessaire
+    });
 
-    // ✅ CHECK RÔLE STRICT (Manquait dans votre version)
     if (!agent || agent.role !== "AGENT") {
         return NextResponse.json({ error: "Accès réservé aux agents." }, { status: 403 });
     }
 
-    // 2. LOGIQUE MÉTIER
+    // 3. LOGIQUE MÉTIER
 
     // A. Marketplace : Missions en attente (disponibles pour tous)
     const available = await prisma.mission.findMany({
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
             select: { address: true, commune: true, type: true } 
         } 
       },
-      orderBy: { dateScheduled: 'asc' }
+      orderBy: { createdAt: 'desc' } // Plus récentes en premier
     });
 
     // B. Mes missions : Celles assignées à CET agent

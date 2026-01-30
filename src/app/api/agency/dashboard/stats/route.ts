@@ -6,13 +6,14 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    // 2. VÉRIFICATION RÔLE & AGENCE (Via ID)
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { agency: true }
+      where: { id: userId },
+      select: { id: true, role: true, agencyId: true } // Optimisation select
     });
 
     if (!user || !user.agencyId || (user.role !== 'AGENCY_ADMIN' && user.role !== 'SUPER_ADMIN')) {
@@ -27,48 +28,70 @@ export async function GET(request: Request) {
     const lastMonthStart = startOfMonth(subMonths(now, 1));
     const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-    // 2. FINANCE (CA GLOBAL)
-    // A. Akwaba
-    const akwabaRevenue = await prisma.bookingPayment.aggregate({
-        _sum: { agencyCommission: true },
-        where: {
-            booking: { listing: { agencyId } },
-            status: 'SUCCESS',
-            createdAt: { gte: currentMonthStart, lte: currentMonthEnd }
-        }
-    });
+    // 3. CALCULS FINANCIERS PARALLÉLISÉS
+    const [
+        akwabaRevenue,
+        akwabaRevenueLast,
+        longTermRevenue,
+        longTermRevenueLast,
+        totalProperties,
+        totalListings,
+        occupiedProperties,
+        agents
+    ] = await Promise.all([
+        // A. Akwaba (Court séjour)
+        prisma.bookingPayment.aggregate({
+            _sum: { agencyCommission: true },
+            where: {
+                booking: { listing: { agencyId } },
+                status: 'SUCCESS',
+                createdAt: { gte: currentMonthStart, lte: currentMonthEnd }
+            }
+        }),
+        prisma.bookingPayment.aggregate({
+            _sum: { agencyCommission: true },
+            where: {
+                booking: { listing: { agencyId } },
+                status: 'SUCCESS',
+                createdAt: { gte: lastMonthStart, lte: lastMonthEnd }
+            }
+        }),
+        // B. Longue Durée
+        prisma.payment.aggregate({
+            _sum: { amountAgency: true }, // ✅ CORRECTION: On prend la part AGENCE, pas Agent
+            where: {
+                lease: { property: { agencyId } },
+                status: 'SUCCESS',
+                date: { gte: currentMonthStart, lte: currentMonthEnd }
+            }
+        }),
+        prisma.payment.aggregate({
+            _sum: { amountAgency: true },
+            where: {
+                lease: { property: { agencyId } },
+                status: 'SUCCESS',
+                date: { gte: lastMonthStart, lte: lastMonthEnd }
+            }
+        }),
+        // C. KPI Assets
+        prisma.property.count({ where: { agencyId } }),
+        prisma.listing.count({ where: { agencyId } }),
+        prisma.property.count({ where: { agencyId, leases: { some: { isActive: true } } } }),
+        // D. Top Agents
+        prisma.user.findMany({
+            where: { agencyId, role: 'AGENT' },
+            select: {
+                id: true, name: true, image: true,
+                _count: { select: { missionsAccepted: { where: { status: 'COMPLETED' } } } }
+            },
+            orderBy: { missionsAccepted: { _count: 'desc' } },
+            take: 5
+        })
+    ]);
 
-    const akwabaRevenueLastMonth = await prisma.bookingPayment.aggregate({
-        _sum: { agencyCommission: true },
-        where: {
-            booking: { listing: { agencyId } },
-            status: 'SUCCESS',
-            createdAt: { gte: lastMonthStart, lte: lastMonthEnd }
-        }
-    });
-
-    // B. Longue Durée
-    const longTermRevenue = await prisma.payment.aggregate({
-        _sum: { amountAgent: true },
-        where: {
-            lease: { property: { agencyId } },
-            status: 'SUCCESS',
-            date: { gte: currentMonthStart, lte: currentMonthEnd }
-        }
-    });
-
-    const longTermRevenueLastMonth = await prisma.payment.aggregate({
-        _sum: { amountAgent: true },
-        where: {
-            lease: { property: { agencyId } },
-            status: 'SUCCESS',
-            date: { gte: lastMonthStart, lte: lastMonthEnd }
-        }
-    });
-
-    // Totaux & Croissance
-    const currentTotal = (akwabaRevenue._sum.agencyCommission || 0) + (longTermRevenue._sum.amountAgent || 0);
-    const lastTotal = (akwabaRevenueLastMonth._sum.agencyCommission || 0) + (longTermRevenueLastMonth._sum.amountAgent || 0);
+    // 4. AGRÉGATION & FORMATAGE
+    const currentTotal = (akwabaRevenue._sum.agencyCommission || 0) + (longTermRevenue._sum.amountAgency || 0);
+    const lastTotal = (akwabaRevenueLast._sum.agencyCommission || 0) + (longTermRevenueLast._sum.amountAgency || 0);
     
     let growthPercent = 0;
     if (lastTotal > 0) {
@@ -77,48 +100,16 @@ export async function GET(request: Request) {
         growthPercent = 100;
     }
 
-    // 3. KPI OPÉRATIONNELS
-    const totalProperties = await prisma.property.count({ where: { agencyId } });
-    const totalListings = await prisma.listing.count({ where: { agencyId } });
     const totalAssets = totalProperties + totalListings;
+    const occupancyRate = totalProperties > 0 ? Math.round((occupiedProperties / totalProperties) * 100) : 0;
 
-    const occupiedProperties = await prisma.property.count({
-        where: { 
-            agencyId, 
-            leases: { some: { isActive: true } } 
-        }
-    });
-    
-    const occupancyRate = totalProperties > 0 
-        ? Math.round((occupiedProperties / totalProperties) * 100) 
-        : 0;
-
-    // 4. ÉQUIPE & PERFORMANCE
-    const agents = await prisma.user.findMany({
-        where: { agencyId, role: 'AGENT' },
-        select: {
-            id: true,
-            name: true,
-            image: true,
-            _count: {
-                select: { 
-                    missionsAccepted: { where: { status: 'COMPLETED' } } 
-                }
-            }
-        },
-        orderBy: {
-            missionsAccepted: { _count: 'desc' }
-        },
-        take: 5
-    });
-
-    // Mapping propre pour le frontend
     const formattedAgents = agents.map(a => ({
         id: a.id,
         name: a.name,
         image: a.image,
-        sales: a._count.missionsAccepted, // CORRECTION ICI (On utilise le nb de missions comme proxy des ventes)
+        sales: a._count.missionsAccepted,
         completedMissions: a._count.missionsAccepted,
+        // Estimation revenue agent (Ex: 15k par mission)
         revenueDisplay: `${(a._count.missionsAccepted * 15000).toLocaleString()} F`
     }));
 

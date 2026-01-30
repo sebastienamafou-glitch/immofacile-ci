@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 // CONFIGURATION & RÈGLES
 // =============================================================================
 const FINANCE_RULES = {
-  TENANT_FIXED_FEE: 20000, // Frais de dossier Agence
+  TENANT_FIXED_FEE: 20000, // Frais de dossier Agence (Entrée)
   CURRENCY: 'XOF'
 };
 
@@ -15,14 +15,13 @@ const CINETPAY_CONFIG = {
   API_KEY: process.env.CINETPAY_API_KEY,
   SITE_ID: process.env.CINETPAY_SITE_ID,
   BASE_URL: "https://api-checkout.cinetpay.com/v2/payment",
-  // URL du webhook blindé que nous avons créé
   NOTIFY_URL: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/cinetpay` 
 };
 
-// DTO : Ce que le Frontend doit envoyer
+// DTO
 interface PaymentInitRequest {
   type: 'RENT' | 'INVESTMENT';
-  referenceId: string; // ID du Bail (leaseId) OU ID du Contrat (contractId)
+  referenceId: string; // ID Bail ou ID Contrat
   phone: string;
   paymentMethod?: string;
 }
@@ -31,12 +30,16 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ & AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Session expirée" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Session expirée" }, { status: 401 });
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 403 });
+    const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, name: true, email: true } // Optimisation
+    });
+
+    if (!user || !user.email) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 403 });
 
     const body: PaymentInitRequest = await request.json();
     const { type, referenceId, phone } = body;
@@ -45,59 +48,62 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Référence et téléphone requis" }, { status: 400 });
     }
 
-    // Identifiant Unique de la Transaction (Généré ici pour lier les deux bouts)
+    // ID Transaction Unique
     const transactionId = uuidv4();
     
     let amountToPay = 0;
     let description = "";
-    let metadata: any = {};
 
     // =========================================================================
-    // ROUTE A : PAIEMENT DE LOYER (Gestion Locative)
+    // ROUTE A : PAIEMENT DE LOYER
     // =========================================================================
     if (type === 'RENT') {
         const lease = await prisma.lease.findUnique({
             where: { id: referenceId },
             include: { property: true }
         });
+        
         if (!lease) return NextResponse.json({ error: "Bail introuvable" }, { status: 404 });
 
-        // Vérification : Est-ce le premier paiement ?
+        // 🔒 SÉCURITÉ : Seul le locataire du bail peut payer
+        if (lease.tenantId !== user.id) {
+            return NextResponse.json({ error: "Ce bail ne vous appartient pas." }, { status: 403 });
+        }
+
+        // Vérif premier paiement
         const previousPayment = await prisma.payment.findFirst({
             where: { leaseId: lease.id, status: "SUCCESS" }
         });
         const isFirstPayment = !previousPayment;
 
         if (isFirstPayment) {
-            // Premier mois : Loyer + Caution + Frais 20k
             amountToPay = lease.monthlyRent + (lease.depositAmount || 0) + FINANCE_RULES.TENANT_FIXED_FEE;
-            description = `Entrée Lieux (Loyer+Caution+Frais) - ${lease.property.title}`;
+            description = `Entrée Lieux - ${lease.property.title}`;
         } else {
-            // Mois suivants : Loyer simple
             amountToPay = lease.monthlyRent;
             description = `Loyer - ${lease.property.title}`;
         }
 
-        // Création de la ligne de paiement (PENDING) avec les champs du nouveau SCHEMA
+        // Création PENDING
         await prisma.payment.create({
             data: {
                 leaseId: lease.id,
                 amount: amountToPay,
                 type: isFirstPayment ? "DEPOSIT" : "LOYER",
                 status: "PENDING",
-                reference: transactionId,
+                reference: transactionId, // Lien avec CinetPay
                 date: new Date(),
-                // Initialisation explicite à 0 (Sera rempli par le Webhook)
+                // Initialisation à zéro (Ventilation faite par le Webhook)
                 amountOwner: 0, 
                 amountPlatform: 0,
                 amountAgent: 0,
-                amountAgency: 0 // ✅ Nouveau champ Agence
+                amountAgency: 0 
             }
         });
     }
 
     // =========================================================================
-    // ROUTE B : INVESTISSEMENT (Crowdfunding)
+    // ROUTE B : INVESTISSEMENT
     // =========================================================================
     else if (type === 'INVESTMENT') {
         const contract = await prisma.investmentContract.findUnique({
@@ -105,28 +111,33 @@ export async function POST(request: Request) {
         });
         
         if (!contract) return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
+        
+        // 🔒 SÉCURITÉ : Seul l'investisseur peut payer
+        if (contract.userId !== user.id) {
+            return NextResponse.json({ error: "Ce contrat ne vous appartient pas." }, { status: 403 });
+        }
+
         if (contract.status === 'ACTIVE') return NextResponse.json({ error: "Déjà payé." }, { status: 400 });
 
         amountToPay = contract.amount;
-        description = `Investissement Pack ${contract.packName || 'STANDARD'}`;
+        description = `Investissement Pack ${contract.packName || 'ImmoFacile'}`;
         
-        // ⚠️ CRITIQUE : On lie l'ID CinetPay au contrat MAINTENANT.
-        // C'est grâce à ça que le Webhook retrouvera le contrat plus tard.
+        // Liaison ID Transaction
         await prisma.investmentContract.update({
             where: { id: contract.id },
             data: { 
-                paymentReference: transactionId, // <-- Le lien vital
+                paymentReference: transactionId,
                 status: 'PENDING'
             }
         });
     } 
     
     else {
-        return NextResponse.json({ error: "Type de paiement invalide" }, { status: 400 });
+        return NextResponse.json({ error: "Type de paiement inconnu" }, { status: 400 });
     }
 
     // =========================================================================
-    // 2. APPEL API CINETPAY (Commun)
+    // 3. ENVOI CINETPAY
     // =========================================================================
     const payload = {
       apikey: CINETPAY_CONFIG.API_KEY,
@@ -138,14 +149,14 @@ export async function POST(request: Request) {
       // Infos Client
       customer_email: user.email,
       customer_phone_number: phone,
-      customer_name: user.name || "Client",
+      customer_name: user.name || "Client ImmoFacile",
       customer_city: "Abidjan",
       customer_country: "CI",
-      // Configuration technique
+      // URLs
       notify_url: CINETPAY_CONFIG.NOTIFY_URL,
       return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=processing`,
       channels: "ALL",
-      metadata: JSON.stringify({ type, referenceId }) // Utile pour le debug
+      metadata: JSON.stringify({ type, referenceId, userId: user.id })
     };
 
     const response = await axios.post(CINETPAY_CONFIG.BASE_URL, payload);

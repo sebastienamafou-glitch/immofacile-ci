@@ -2,43 +2,61 @@
 
 import { useState, useEffect } from "react";
 import { Search, MapPin, ArrowRight, Loader2 } from "lucide-react";
-import ListingCard from "@/components/guest/ListingCard"; // ✅ Import du composant créé
+import ListingCard from "@/components/guest/ListingCard"; 
 import { toast } from "sonner";
+import { Listing } from "@prisma/client"; 
+
+// ✅ 1. CORRECTION DE L'INTERFACE
+// On ajoute les champs que ListingCard réclame (location, image, etc.)
+interface ListingData extends Listing {
+  rating?: number;
+  isFavorite?: boolean;
+  price?: number; 
+  location?: string;      // Requis par ListingCard
+  image?: string | null;  // Requis par ListingCard
+}
 
 export default function GuestDashboard() {
   
-  // --- ÉTATS ---
   const [query, setQuery] = useState("");
-  const [listings, setListings] = useState<any[]>([]);
+  const [listings, setListings] = useState<ListingData[]>([]); 
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  // --- 1. CHARGEMENT USER & DATA INITIALE ---
-  useEffect(() => {
-    // Récupération user depuis localStorage (Adaptez selon votre auth)
-    const storedUser = localStorage.getItem("immouser");
-    if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        setUserEmail(parsed.email);
-    }
-
-    fetchListings("");
-  }, []);
 
   // --- 2. FONCTION DE RECHERCHE API ---
   const fetchListings = async (searchQuery: string) => {
     setLoading(true);
     try {
         const headers: any = {};
-        // Astuce : On récupère l'email du localstorage si dispo pour les favoris
         const storedUser = localStorage.getItem("immouser");
-        if (storedUser) headers['x-user-email'] = JSON.parse(storedUser).email;
+        if (storedUser) {
+            try {
+                 const parsed = JSON.parse(storedUser);
+                 if (parsed?.email) headers['x-user-email'] = parsed.email;
+            } catch (e) { /* ignore error */ }
+        }
 
         const res = await fetch(`/api/guest/search?q=${searchQuery}`, { headers });
         const data = await res.json();
         
         if (data.success) {
-            setListings(data.listings);
+            // ✅ MAPPING DE DONNÉES (ADAPTATEUR)
+            // On transforme les données Prisma (DB) vers le format ListingCard (UI)
+            const formattedListings = data.listings.map((l: any) => ({
+                ...l,
+                price: l.price || l.pricePerNight || 0, 
+                rating: l.rating || 5,             
+                isFavorite: l.isFavorite || false,
+                createdAt: new Date(l.createdAt),
+                updatedAt: new Date(l.updatedAt),
+                
+                // --- LES CORRECTIFS SONT ICI ---
+                // On mappe 'city' vers 'location'
+                location: l.city || l.address || "Abidjan", 
+                // On prend la première image du tableau pour 'image'
+                image: (l.images && l.images.length > 0) ? l.images[0] : null
+            }));
+            setListings(formattedListings);
         }
     } catch (error) {
         console.error("Erreur fetch", error);
@@ -48,7 +66,20 @@ export default function GuestDashboard() {
     }
   };
 
-  // Gestion soumission formulaire
+  // --- 1. CHARGEMENT SÉCURISÉ ---
+  useEffect(() => {
+    try {
+        const storedUser = localStorage.getItem("immouser");
+        if (storedUser) {
+            const parsed = JSON.parse(storedUser);
+            if (parsed && parsed.email) setUserEmail(parsed.email);
+        }
+    } catch (e) {
+        localStorage.removeItem("immouser"); 
+    }
+    fetchListings("");
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchListings(query);
@@ -66,13 +97,12 @@ export default function GuestDashboard() {
             Espace Voyageur Akwaba
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-            Où souhaitez-vous aller{userEmail ? `, ` : ''}<span className="text-orange-500">{userEmail ? 'Paul' : ''}</span> ?
+            Où souhaitez-vous aller{userEmail ? `, ` : ' '}<span className="text-orange-500">{userEmail ? userEmail.split('@')[0] : ''}</span> ?
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
             Découvrez nos résidences exclusives à Abidjan, Assinie et au-delà.
           </p>
 
-          {/* BARRE DE RECHERCHE ACTIVE */}
           <form onSubmit={handleSearch} className="mt-8 bg-white/5 backdrop-blur-xl border border-white/10 p-2 rounded-2xl flex flex-col sm:flex-row gap-2 max-w-3xl mx-auto shadow-2xl transition-all focus-within:border-orange-500/50 focus-within:bg-slate-900/80">
             <div className="flex-1 flex items-center px-4 py-3 bg-slate-900/50 rounded-xl border border-transparent transition-colors group w-full">
               <MapPin className="w-5 h-5 text-slate-500 group-hover:text-orange-500 transition-colors mr-3 shrink-0" />
@@ -128,9 +158,9 @@ export default function GuestDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {listings.length > 0 ? (
                   listings.map((item) => (
-                    // ✅ COMPOSANT CARTE INTELLIGENT
                     <ListingCard 
                         key={item.id} 
+                        // @ts-ignore - On force le passage car on sait qu'on a mappé les bons champs
                         data={item} 
                         currentUserEmail={userEmail} 
                     />

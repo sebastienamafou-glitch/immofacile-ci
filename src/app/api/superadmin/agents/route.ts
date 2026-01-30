@@ -1,37 +1,34 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ (Standardisé) ---
-async function checkSuperAdminPermission(request: Request) {
-  const userEmail = request.headers.get("x-user-email");
-  if (!userEmail) return { authorized: false, status: 401, error: "Non authentifié" };
+// --- HELPER SÉCURITÉ (ZERO TRUST) ---
+async function checkSuperAdmin(request: Request) {
+  // 1. Identification par ID (Session via Middleware)
+  const userId = request.headers.get("x-user-id");
+  if (!userId) return null;
 
+  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { role: true }
+    where: { id: userId },
+    select: { id: true, role: true } 
   });
 
-  if (!admin || admin.role !== Role.SUPER_ADMIN) {
-    return { authorized: false, status: 403, error: "Accès réservé aux Super Admins" };
-  }
+  if (!admin || admin.role !== "SUPER_ADMIN") return null;
 
-  return { authorized: true };
+  return admin;
 }
 
-// =====================================================================
-// GET : LISTER TOUS LES AGENTS (Avec KPI)
-// =====================================================================
+// ==========================================
+// 1. GET : LISTER LES AGENTS
+// ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. Sécurité
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const admin = await checkSuperAdmin(request);
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
-    // 2. Récupération Optimisée
     const agents = await prisma.user.findMany({
       where: { role: "AGENT" },
       orderBy: { createdAt: 'desc' },
@@ -42,6 +39,7 @@ export async function GET(request: Request) {
         phone: true,
         kycStatus: true,
         createdAt: true,
+        // KPI Agents
         _count: {
           select: { 
               missionsAccepted: true, 
@@ -59,25 +57,23 @@ export async function GET(request: Request) {
   }
 }
 
-// =====================================================================
-// POST : CRÉER UN AGENT (Recrutement)
-// =====================================================================
+// ==========================================
+// 2. POST : RECRUTER UN AGENT
+// ==========================================
 export async function POST(request: Request) {
   try {
-    // 1. Sécurité
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const admin = await checkSuperAdmin(request);
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
-    // 2. Validation Input
     const body = await request.json();
     if (!body.email || !body.password || !body.name) {
         return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
     }
 
-    // 3. Hashage Password
+    // Hashage
     const hashedPassword = await bcrypt.hash(body.password, 10);
 
-    // 4. Création (Gestion téléphone vide)
+    // Nettoyage Téléphone (si vide, on met null/undefined pour éviter conflit unique)
     const phoneToSave = body.phone && body.phone.trim() !== "" ? body.phone : undefined;
 
     const newAgent = await prisma.user.create({
@@ -87,13 +83,15 @@ export async function POST(request: Request) {
             name: body.name,
             password: hashedPassword,
             role: "AGENT",
-            kycStatus: "VERIFIED", // Un agent créé par l'admin est "Vérifié" d'office
+            // Un agent créé par le Super Admin est considéré comme vérifié
+            kycStatus: "VERIFIED", 
+            isVerified: true,
             walletBalance: 0,
             isActive: true
         }
     });
 
-    // 5. Sécurité : On retire le hash avant de répondre
+    // On retire le hash de la réponse
     // @ts-ignore
     const { password, ...agentSafe } = newAgent;
 

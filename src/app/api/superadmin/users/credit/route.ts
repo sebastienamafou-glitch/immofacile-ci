@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ ADMIN
-    const adminEmail = request.headers.get("x-user-email");
-    if (!adminEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID Obligatoire)
+    const adminId = request.headers.get("x-user-id");
+    if (!adminId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const admin = await prisma.user.findUnique({ where: { email: adminEmail } });
+    const admin = await prisma.user.findUnique({
+        where: { id: adminId },
+        select: { id: true, role: true, name: true }
+    });
+
     if (!admin || admin.role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "Action réservée aux administrateurs." }, { status: 403 });
     }
@@ -28,8 +31,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Montant invalide." }, { status: 400 });
     }
 
-    // 3. TRANSACTION BANCAIRE
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // 3. TRANSACTION BANCAIRE ATOMIQUE
+    const result = await prisma.$transaction(async (tx) => {
         
         const targetUser = await tx.user.findUnique({ where: { id: userId } });
         if (!targetUser) throw new Error("USER_NOT_FOUND");
@@ -40,15 +43,16 @@ export async function POST(request: Request) {
             data: { walletBalance: { increment: amountInt } }
         });
 
-        // Création de la trace
+        // Création de la trace (Audit)
         await tx.transaction.create({
             data: {
                 amount: amountInt,
                 type: "CREDIT",
-                // ✅ CONSEIL : Si votre Schema le permet, forcez le statut ici
-                status: "COMPLETED", 
-                reason: "Rechargement manuel (Admin)",
-                user: { connect: { id: userId } }
+                // ✅ CORRECTION : Status standardisé
+                status: "SUCCESS", 
+                // ✅ TRACE : On marque qui a fait l'action
+                reason: `ADMIN_CREDIT_MANUAL_BY_${admin.name?.toUpperCase().replace(/\s+/g, '_') || 'ADMIN'}`,
+                userId: userId
             }
         });
 

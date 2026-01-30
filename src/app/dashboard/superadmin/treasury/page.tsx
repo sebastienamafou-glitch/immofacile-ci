@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
   Building, TrendingUp, TrendingDown, Wallet, 
@@ -11,7 +13,22 @@ const formatFCFA = (amount: number) => {
 
 export default async function TreasuryPage() {
   
-  // 1. RÉCUPÉRATION DES DONNÉES RÉELLES
+  // 1. SÉCURITÉ ZERO TRUST (Server Component)
+  const headersList = headers();
+  const userId = headersList.get("x-user-id");
+  
+  if (!userId) redirect("/login");
+
+  const admin = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+
+  if (!admin || admin.role !== "SUPER_ADMIN") {
+    redirect("/dashboard");
+  }
+
+  // 2. RÉCUPÉRATION DES DONNÉES RÉELLES
   const transactions = await prisma.transaction.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
@@ -22,7 +39,7 @@ export default async function TreasuryPage() {
     take: 100 // On limite aux 100 dernières pour la performance
   });
 
-  // 2. CALCULS DES TOTAUX (Algorithme Financier)
+  // 3. CALCULS DES TOTAUX (Algorithme Financier)
   const stats = transactions.reduce((acc, tx) => {
     if (tx.type === 'CREDIT') {
         acc.income += tx.amount;
@@ -35,7 +52,7 @@ export default async function TreasuryPage() {
   const netBalance = stats.income - stats.expense;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-300 p-8 font-sans">
+    <div className="min-h-screen bg-[#020617] text-slate-300 p-8 font-sans pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
@@ -95,7 +112,7 @@ export default async function TreasuryPage() {
       </div>
 
       {/* TABLEAU DES TRANSACTIONS */}
-      <div className="bg-[#0B1120] border border-white/5 rounded-3xl overflow-hidden">
+      <div className="bg-[#0B1120] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
         
         {/* BARRE D'OUTILS */}
         <div className="p-4 border-b border-white/5 flex items-center justify-between gap-4">
@@ -111,7 +128,7 @@ export default async function TreasuryPage() {
 
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-                <thead className="bg-white/[0.02] text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                <thead className="bg-white/[0.02] text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-white/5">
                     <tr>
                         <th className="p-4">Date</th>
                         <th className="p-4">Acteur</th>
@@ -151,7 +168,7 @@ export default async function TreasuryPage() {
                             </td>
                             <td className="p-4 text-center">
                                 {tx.status === 'COMPLETED' || tx.status === 'SUCCESS' ? (
-                                     <div className="w-2 h-2 rounded-full bg-emerald-500 mx-auto" title="Succès"></div>
+                                     <div className="w-2 h-2 rounded-full bg-emerald-500 mx-auto shadow-[0_0_10px_rgba(16,185,129,0.5)]" title="Succès"></div>
                                 ) : (
                                      <div className="w-2 h-2 rounded-full bg-orange-500 mx-auto animate-pulse" title="En attente"></div>
                                 )}

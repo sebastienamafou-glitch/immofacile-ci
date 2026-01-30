@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Listing } from "@prisma/client"; // Utilisation du type généré par Prisma
+import { Listing } from "@prisma/client";
 import { Palmtree, MapPin, DollarSign, Users, Save, Loader2, Trash2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import ImageUpload from "@/components/shared/ImageUpload";
+import { api } from "@/lib/api"; // ✅ Wrapper Sécurisé
+import ImageUpload from "@/components/dashboard/shared/ImageUpload";
 import Link from "next/link";
 
 interface EditListingFormProps {
-  initialData: Listing; // Conformité stricte au schéma
+  initialData: Listing;
 }
 
 export default function EditListingForm({ initialData }: EditListingFormProps) {
@@ -21,7 +22,6 @@ export default function EditListingForm({ initialData }: EditListingFormProps) {
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
-  // États
   const [images, setImages] = useState<string[]>(initialData.images);
   const [isPublished, setIsPublished] = useState(initialData.isPublished);
   
@@ -46,46 +46,46 @@ export default function EditListingForm({ initialData }: EditListingFormProps) {
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/agency/listings/${initialData.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // ✅ PATCH SÉCURISÉ
+      const res = await api.patch(`/agency/listings/${initialData.id}`, {
             ...formData,
             images,
             isPublished
-        }),
       });
 
-      if (!res.ok) throw new Error("Erreur lors de la mise à jour");
+      if (res.data.success) {
+          toast.success("Annonce mise à jour ! 🚀");
+          router.refresh();
+      }
 
-      toast.success("Annonce mise à jour !");
-      router.refresh(); // Rafraîchir les données serveur
-      
     } catch (error: any) {
-      toast.error(error.message);
+      console.error(error);
+      const msg = error.response?.data?.error || "Erreur lors de la mise à jour";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette annonce ? Cette action est irréversible.")) return;
+    if (!confirm("Êtes-vous sûr ? Cette action est irréversible.")) return;
     
     setDeleting(true);
     try {
-        const res = await fetch(`/api/agency/listings/${initialData.id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("Impossible de supprimer");
+        // ✅ DELETE SÉCURISÉ
+        await api.delete(`/agency/listings/${initialData.id}`);
         
         toast.success("Annonce supprimée");
         router.push("/dashboard/agency/listings");
-    } catch (error) {
-        toast.error("Erreur suppression (Vérifiez les réservations en cours)");
+    } catch (error: any) {
+        const msg = error.response?.data?.error || "Erreur suppression";
+        toast.error(msg);
         setDeleting(false);
     }
   };
 
   return (
-    <form onSubmit={handleUpdate} className="space-y-8 max-w-5xl mx-auto pb-20">
+    <form onSubmit={handleUpdate} className="space-y-8 max-w-5xl mx-auto pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* HEADER ACTIONS */}
       <div className="flex items-center justify-between">
@@ -113,7 +113,7 @@ export default function EditListingForm({ initialData }: EditListingFormProps) {
       </div>
 
       {/* 1. PHOTOS */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <h3 className="text-white font-bold text-lg mb-6 flex items-center gap-2">
             <Palmtree className="text-orange-500" /> Gestion des Photos
         </h3>
@@ -125,76 +125,65 @@ export default function EditListingForm({ initialData }: EditListingFormProps) {
       </div>
 
       {/* 2. DÉTAILS */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <h3 className="text-white font-bold text-lg mb-6">Informations</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="col-span-2">
-                <label className="label-text">Titre</label>
-                <Input name="title" required className="bg-slate-950 border-slate-800" value={formData.title} onChange={handleChange} />
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Titre</label>
+                <Input name="title" required className="bg-slate-950 border-slate-800 text-white" value={formData.title} onChange={handleChange} />
             </div>
 
             <div>
-                <label className="label-text">Prix / Nuit (FCFA)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Prix / Nuit (FCFA)</label>
                 <div className="relative">
                     <DollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                    <Input name="pricePerNight" type="number" required className="pl-9 bg-slate-950 border-slate-800" value={formData.pricePerNight} onChange={handleChange} />
+                    <Input name="pricePerNight" type="number" required className="pl-9 bg-slate-950 border-slate-800 text-white" value={formData.pricePerNight} onChange={handleChange} />
                 </div>
             </div>
 
             <div className="col-span-2">
-                <label className="label-text">Description</label>
-                <Textarea name="description" className="bg-slate-950 border-slate-800 min-h-[100px]" value={formData.description} onChange={handleChange} />
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Description</label>
+                <Textarea name="description" className="bg-slate-950 border-slate-800 min-h-[100px] text-white" value={formData.description} onChange={handleChange} />
             </div>
         </div>
       </div>
 
       {/* 3. CAPACITÉ & ADRESSE */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <h3 className="text-white font-bold text-lg mb-6 flex gap-2"><Users size={20} className="text-blue-500" /> Configuration</h3>
             <div className="grid grid-cols-3 gap-4">
                 <div>
-                    <label className="label-text">Max Invités</label>
-                    <Input name="maxGuests" type="number" className="bg-slate-950 border-slate-800" value={formData.maxGuests} onChange={handleChange} />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Max Invités</label>
+                    <Input name="maxGuests" type="number" className="bg-slate-950 border-slate-800 text-white" value={formData.maxGuests} onChange={handleChange} />
                 </div>
                 <div>
-                    <label className="label-text">Chambres</label>
-                    <Input name="bedrooms" type="number" className="bg-slate-950 border-slate-800" value={formData.bedrooms} onChange={handleChange} />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Chambres</label>
+                    <Input name="bedrooms" type="number" className="bg-slate-950 border-slate-800 text-white" value={formData.bedrooms} onChange={handleChange} />
                 </div>
                 <div>
-                    <label className="label-text">SDB</label>
-                    <Input name="bathrooms" type="number" className="bg-slate-950 border-slate-800" value={formData.bathrooms} onChange={handleChange} />
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">SDB</label>
+                    <Input name="bathrooms" type="number" className="bg-slate-950 border-slate-800 text-white" value={formData.bathrooms} onChange={handleChange} />
                 </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
             <h3 className="text-white font-bold text-lg mb-6 flex gap-2"><MapPin size={20} className="text-emerald-500" /> Localisation</h3>
             <div className="space-y-4">
-                <Input name="city" placeholder="Ville" className="bg-slate-950 border-slate-800" value={formData.city} onChange={handleChange} />
-                <Input name="neighborhood" placeholder="Quartier" className="bg-slate-950 border-slate-800" value={formData.neighborhood} onChange={handleChange} />
-                <Input name="address" placeholder="Adresse" className="bg-slate-950 border-slate-800" value={formData.address} onChange={handleChange} />
+                <Input name="city" placeholder="Ville" className="bg-slate-950 border-slate-800 text-white" value={formData.city} onChange={handleChange} />
+                <Input name="neighborhood" placeholder="Quartier" className="bg-slate-950 border-slate-800 text-white" value={formData.neighborhood} onChange={handleChange} />
+                <Input name="address" placeholder="Adresse" className="bg-slate-950 border-slate-800 text-white" value={formData.address} onChange={handleChange} />
             </div>
           </div>
       </div>
 
       {/* FOOTER FIXED */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/80 backdrop-blur-md border-t border-slate-800 p-4 z-50 flex justify-center md:pl-64">
-         <Button type="submit" disabled={loading} size="lg" className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-12 shadow-xl shadow-orange-900/20">
+         <Button type="submit" disabled={loading} size="lg" className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-12 shadow-xl shadow-orange-900/20 active:scale-95 transition-transform">
             {loading ? <Loader2 className="animate-spin mr-2" /> : <><Save className="mr-2 w-5 h-5" /> Enregistrer les modifications</>}
         </Button>
       </div>
-
-      <style jsx global>{`
-        .label-text {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: #64748b;
-            margin-bottom: 0.5rem;
-        }
-      `}</style>
     </form>
   );
 }

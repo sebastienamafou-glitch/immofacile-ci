@@ -54,6 +54,7 @@
     "react-day-picker": "^9.13.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.71.0",
+    "react-qr-code": "^2.0.18",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^2.12.2",
     "sonner": "^1.4.3",

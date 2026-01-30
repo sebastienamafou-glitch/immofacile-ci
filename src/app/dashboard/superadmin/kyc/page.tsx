@@ -4,20 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import Swal from "sweetalert2";
-import { toast } from "sonner"; // ✅ Standard du projet
+import { toast } from "sonner"; 
 import { 
   ShieldCheck, CheckCircle, XCircle, FileText, AlertTriangle, Loader2, ExternalLink
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// ✅ Typage Strict
+// ✅ CORRECTION DU TYPAGE (Aligné avec Prisma)
 interface KycUser {
   id: string;
   name: string;
   email: string;
   role: string;
   kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  documents: string[];
+  kycDocuments: string[]; // ⚠️ C'était 'documents', corrigé en 'kycDocuments'
   createdAt: string;
 }
 
@@ -31,7 +31,7 @@ export default function AdminKycPage() {
   const fetchKycUsers = async () => {
     try {
         setLoading(true);
-        // ❌ Pas de headers manuels ! Le cookie fait le travail via le Middleware.
+        // ✅ APPEL SÉCURISÉ (Zero Trust)
         const res = await api.get('/superadmin/kyc'); 
         
         if (res.data.success) {
@@ -39,9 +39,8 @@ export default function AdminKycPage() {
         }
     } catch (error: any) {
         console.error("Erreur Fetch KYC", error);
-        // Gestion intelligente de la redirection
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-             toast.error("Session expirée, veuillez vous reconnecter.");
+             toast.error("Session expirée.");
              router.push('/login');
         } else {
              toast.error("Impossible de charger les dossiers.");
@@ -60,31 +59,27 @@ export default function AdminKycPage() {
   const handleDecision = async (userId: string, name: string, decision: 'VERIFIED' | 'REJECTED') => {
     const isApprove = decision === 'VERIFIED';
 
-    // 1. Confirmation visuelle (Swal pour l'impact)
     const result = await Swal.fire({
         title: isApprove ? 'Valider ce dossier ?' : 'Rejeter ce dossier ?',
         text: isApprove 
             ? `Cela donnera le badge "Vérifié" à ${name}.` 
-            : `L'utilisateur ${name} recevra une notification pour resoumettre.`,
+            : `L'utilisateur ${name} devra resoumettre ses documents.`,
         icon: isApprove ? 'question' : 'warning',
         showCancelButton: true,
         confirmButtonColor: isApprove ? '#10b981' : '#ef4444',
         cancelButtonColor: '#1e293b',
         confirmButtonText: isApprove ? 'Oui, Valider' : 'Rejeter',
         cancelButtonText: 'Annuler',
-        background: '#0f172a', color: '#fff',
-        iconColor: isApprove ? '#10b981' : '#ef4444'
+        background: '#0f172a', color: '#fff'
     });
 
     if (result.isConfirmed) {
-        // 2. Feedback immédiat
         const toastId = toast.loading("Traitement en cours...");
 
         try {
-            // 3. Appel API
             await api.put('/superadmin/kyc', { userId, status: decision });
             
-            // 4. Mise à jour Optimiste (UI)
+            // Mise à jour Optimiste
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, kycStatus: decision } : u));
             
             toast.success(isApprove ? "Dossier validé !" : "Dossier rejeté.", { id: toastId });
@@ -95,7 +90,6 @@ export default function AdminKycPage() {
     }
   };
 
-  // Filtrage
   const filteredUsers = users.filter(u => filter === 'ALL' ? true : u.kycStatus === 'PENDING');
 
   if (loading) return (
@@ -106,7 +100,7 @@ export default function AdminKycPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#020617] p-6 md:p-8 text-slate-200 font-sans">
+    <div className="min-h-screen bg-[#020617] p-6 md:p-8 text-slate-200 font-sans pb-20">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
@@ -115,7 +109,7 @@ export default function AdminKycPage() {
                 <ShieldCheck className="w-8 h-8 text-emerald-500" /> Conformité KYC
             </h1>
             <p className="text-slate-400 mt-1 text-sm">
-                Vérification des pièces d'identité (CNI, Passeport) des utilisateurs.
+                Vérification des identités (CNI, Passeport).
             </p>
         </div>
         
@@ -130,34 +124,33 @@ export default function AdminKycPage() {
                 onClick={() => setFilter('ALL')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${filter === 'ALL' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
             >
-                Historique Complet
+                Historique
             </button>
         </div>
       </div>
 
-      {/* LISTE DES DOSSIERS */}
+      {/* LISTE */}
       <div className="space-y-4">
         {filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 border border-dashed border-white/10 rounded-3xl bg-white/[0.02]">
                 <CheckCircle className="w-16 h-16 mb-4 text-emerald-500/20" />
-                <p className="text-lg font-bold text-white">Tout est à jour !</p>
-                <p className="text-sm text-slate-500">Aucun dossier en attente de validation.</p>
+                <p className="text-lg font-bold text-white">Aucun dossier en attente</p>
             </div>
         ) : (
             filteredUsers.map((user) => (
                 <div key={user.id} className="bg-[#0B1120] border border-white/10 rounded-2xl p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:border-white/20 transition-all shadow-lg shadow-black/20">
                     
-                    {/* INFO UTILISATEUR */}
+                    {/* INFO */}
                     <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center font-black text-xl text-slate-300 border border-white/10 shadow-inner">
+                        <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center font-black text-xl text-slate-300 border border-white/10">
                             {(user.name || "?").charAt(0).toUpperCase()}
                         </div>
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <h3 className="font-bold text-white text-lg tracking-tight">{user.name}</h3>
-                                {user.kycStatus === 'PENDING' && <Badge className="bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20 hover:bg-[#F59E0B]/20">En Attente</Badge>}
-                                {user.kycStatus === 'VERIFIED' && <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20">Vérifié</Badge>}
-                                {user.kycStatus === 'REJECTED' && <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Rejeté</Badge>}
+                                {user.kycStatus === 'PENDING' && <Badge className="bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20">En Attente</Badge>}
+                                {user.kycStatus === 'VERIFIED' && <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Vérifié</Badge>}
+                                {user.kycStatus === 'REJECTED' && <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Rejeté</Badge>}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-slate-500 font-mono">
                                 <span>{user.email}</span>
@@ -167,19 +160,19 @@ export default function AdminKycPage() {
                         </div>
                     </div>
 
-                    {/* ACTIONS & DOCUMENTS */}
+                    {/* ACTIONS */}
                     <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
                         
-                        {/* Bouton Document */}
-                        {user.documents && user.documents.length > 0 ? (
+                        {/* ✅ CORRECTION ICI : user.kycDocuments au lieu de user.documents */}
+                        {user.kycDocuments && user.kycDocuments.length > 0 ? (
                             <a 
-                                href={user.documents[0]} 
+                                href={user.kycDocuments[0]} 
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="group flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-blue-500/10 hover:text-blue-400 text-slate-300 border border-white/10 hover:border-blue-500/30 rounded-xl text-xs font-bold transition"
                             >
                                 <FileText className="w-4 h-4" /> 
-                                <span>Voir Pièce</span>
+                                <span>Pièce d'identité</span>
                                 <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"/>
                             </a>
                         ) : (
@@ -188,7 +181,6 @@ export default function AdminKycPage() {
                             </div>
                         )}
 
-                        {/* Boutons de Décision */}
                         {user.kycStatus === 'PENDING' && (
                             <div className="flex items-center gap-2 pl-2 border-l border-white/10 ml-2">
                                 <button 

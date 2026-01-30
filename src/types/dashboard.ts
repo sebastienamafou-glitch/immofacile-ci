@@ -1,4 +1,5 @@
-import { User } from "@prisma/client"; // <--- La magie est ici
+// ✅ On importe les bons modèles
+import { User, Property } from "@prisma/client"; 
 
 export interface DashboardStats {
   activeIncidentsCount: number;
@@ -6,11 +7,14 @@ export interface DashboardStats {
 }
 
 export interface DashboardData {
-  user: User; // Fini le 'any', maintenant TypeScript connaît votre DB par cœur !
+  user: User; 
   stats: DashboardStats;
-  properties: User[]; // Vous pouvez aussi importer { Property } from "@prisma/client"
-  artisans: User[];   // Idem pour { Artisan }...
-  tenants?: User[];
+  
+  // ✅ CORRECTION : Ce sont des Propriétés, pas des Users
+  properties: Property[]; 
+  
+  artisans: User[];   // Correct (Ce sont des humains)
+  tenants?: User[];   // Correct
 }
 
 export interface ApiResponse {

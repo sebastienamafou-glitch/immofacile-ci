@@ -3,64 +3,59 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { MapPin, Calendar, Coins, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { MapPin, Calendar, Coins, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { api } from "@/lib/api"; // ✅ WRAPPER SÉCURISÉ
 
-// ✅ Définition stricte basée sur votre Schema Prisma
 interface MissionProps {
   mission: {
     id: string;
-    type: string; // Enum MissionType
-    status: string; // Enum MissionStatus
+    type: string;
+    status: string;
     fee: number;
-    dateScheduled: Date | string | null; //  Peut être null
+    dateScheduled: Date | string | null;
     property: {
       address: string;
-      commune: string; //  Property utilise 'commune', pas 'city'
+      commune: string;
     };
   };
-  userEmail: string;
+  // userEmail retiré car inutile (Zero Trust)
   isMarketplace?: boolean;
 }
 
-export default function MissionCard({ mission, userEmail, isMarketplace = false }: MissionProps) {
+export default function MissionCard({ mission, isMarketplace = false }: MissionProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // 🛡️ SÉCURITÉ : Empêche le crash "mission is undefined"
   if (!mission || !mission.property) return null;
 
-  // Gestion sécurisée de la date (qui peut être null)
   const scheduledDate = mission.dateScheduled ? new Date(mission.dateScheduled) : null;
   const isValidDate = scheduledDate && !isNaN(scheduledDate.getTime());
 
   const handleAccept = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/agent/missions/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ missionId: mission.id, userEmail }),
+      // ✅ APPEL SÉCURISÉ (Cookie auto-inclus)
+      await api.post("/agent/missions/accept", { 
+          missionId: mission.id 
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
       toast.success("Mission acceptée ! 🚀");
-      router.refresh();
+      router.refresh(); // Rafraîchit les données serveur
     } catch (error: any) {
-      toast.error(error.message || "Erreur");
+      const msg = error.response?.data?.error || "Erreur technique";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition group h-full">
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition group h-full shadow-lg">
       <div>
         <div className="flex justify-between items-start mb-4">
           <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 uppercase tracking-wider text-[10px]">
@@ -73,7 +68,6 @@ export default function MissionCard({ mission, userEmail, isMarketplace = false 
         </div>
 
         <h3 className="text-white font-bold text-lg mb-1 flex items-center gap-2 truncate">
-            {/* ✅ Correction: commune au lieu de city */}
             <MapPin className="text-orange-500 w-4 h-4 flex-shrink-0" /> {mission.property.commune}
         </h3>
         <p className="text-slate-500 text-sm mb-4 truncate">{mission.property.address}</p>
@@ -92,9 +86,9 @@ export default function MissionCard({ mission, userEmail, isMarketplace = false 
             <Button 
                 onClick={handleAccept} 
                 disabled={loading}
-                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold"
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold h-10 shadow-lg shadow-orange-600/20"
             >
-                {loading ? <Loader2 className="animate-spin w-4 h-4" /> : "Accepter la mission"}
+                {loading ? <Loader2 className="animate-spin w-4 h-4" /> : "ACCEPTER"}
             </Button>
         ) : (
             <Link href={`/dashboard/agent/mission/${mission.id}`} className="w-full block">

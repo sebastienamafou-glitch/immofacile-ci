@@ -1,23 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Helper de sécurité
+// Helper de sécurité Zero Trust (Basé sur ID)
 async function checkAgencyAccess(req: Request, listingId: string) {
-  const userEmail = req.headers.get("x-user-email");
-  if (!userEmail) return null;
+  const userId = req.headers.get("x-user-id");
+  if (!userId) return null;
 
   const admin = await prisma.user.findUnique({
-    where: { email: userEmail },
-    include: { agency: true }
+    where: { id: userId },
+    select: { id: true, role: true, agencyId: true }
   });
 
-  if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agencyId) return null;
+  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
+      return null;
+  }
 
-  // On vérifie que le listing est bien à EUX
+  // Vérification stricte : Le listing doit appartenir à l'agence de l'admin
   const listing = await prisma.listing.findUnique({
     where: {
       id: listingId,
-      agencyId: admin.agencyId // 🔒 Check propriété
+      agencyId: admin.agencyId // 🔒 Verrou Agence
     }
   });
 
@@ -26,6 +28,9 @@ async function checkAgencyAccess(req: Request, listingId: string) {
   return { admin, listing };
 }
 
+// ==========================================
+// 1. PATCH : Modifier l'annonce
+// ==========================================
 export async function PATCH(req: Request, { params }: { params: { listingId: string } }) {
   try {
     const access = await checkAgencyAccess(req, params.listingId);
@@ -39,6 +44,7 @@ export async function PATCH(req: Request, { params }: { params: { listingId: str
         title: body.title,
         description: body.description,
         pricePerNight: body.pricePerNight ? parseInt(body.pricePerNight) : undefined,
+        
         city: body.city,
         neighborhood: body.neighborhood,
         address: body.address,
@@ -48,7 +54,7 @@ export async function PATCH(req: Request, { params }: { params: { listingId: str
         bathrooms: body.bathrooms ? parseInt(body.bathrooms) : undefined,
         maxGuests: body.maxGuests ? parseInt(body.maxGuests) : undefined,
         
-        isPublished: body.isPublished,
+        isPublished: typeof body.isPublished === 'boolean' ? body.isPublished : undefined,
         images: body.images,
       }
     });
@@ -61,13 +67,29 @@ export async function PATCH(req: Request, { params }: { params: { listingId: str
   }
 }
 
+// ==========================================
+// 2. DELETE : Supprimer l'annonce
+// ==========================================
 export async function DELETE(req: Request, { params }: { params: { listingId: string } }) {
   try {
     const access = await checkAgencyAccess(req, params.listingId);
     if (!access) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-    // TODO: Vérifier s'il y a des réservations futures avant de supprimer ?
-    // Pour l'instant on supprime, Prisma bloquera s'il y a des contraintes FK strictes sur Bookings sans cascade.
+    // Sécurité : Empêcher la suppression si des réservations futures existent
+    // (Optionnel mais recommandé)
+    const activeBookings = await prisma.booking.count({
+        where: {
+            listingId: params.listingId,
+            status: { in: ['CONFIRMED', 'PAID'] },
+            endDate: { gte: new Date() }
+        }
+    });
+
+    if (activeBookings > 0) {
+        return NextResponse.json({ 
+            error: "Impossible de supprimer : Des réservations sont en cours ou à venir." 
+        }, { status: 409 });
+    }
     
     await prisma.listing.delete({
       where: { id: params.listingId }
@@ -77,6 +99,6 @@ export async function DELETE(req: Request, { params }: { params: { listingId: st
 
   } catch (error) {
     console.error("Delete Listing Error:", error);
-    return NextResponse.json({ error: "Impossible de supprimer (Réservations actives ?)" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la suppression" }, { status: 500 });
   }
 }

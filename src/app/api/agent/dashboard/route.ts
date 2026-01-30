@@ -5,13 +5,13 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION AGENT
+    // 2. VÉRIFICATION IDENTITÉ & RÔLE
     const agent = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: { id: userId }, // 🔒 Recherche par ID sécurisé
       select: {
         id: true,
         name: true,
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
         role: true,
         walletBalance: true,
         
-        // Leads pour stats
+        // Leads récents (Top 5)
         leads: {
             take: 5,
             orderBy: { createdAt: 'desc' },
@@ -35,21 +35,22 @@ export async function GET(request: Request) {
     });
 
     if (!agent || agent.role !== 'AGENT') {
-       return NextResponse.json({ error: "Accès refusé. Profil Agent requis." }, { status: 403 });
+       return NextResponse.json({ error: "Espace réservé aux agents immobiliers." }, { status: 403 });
     }
 
-    // 3. CALCULS FINANCIERS AVANCÉS
-    // On calcule la somme des "fees" des missions acceptées par l'agent mais pas encore payées (si applicable)
-    // Ici on simplifie : Commission Estimée = Solde Wallet + Fees des missions en cours
-    const pendingMissions = await prisma.mission.findMany({
-        where: { agentId: agent.id, status: { in: ['ACCEPTED', 'PENDING'] } },
+    // 3. CALCULS FINANCIERS (Commissions en attente)
+    // On cherche les missions acceptées par l'agent dont le statut n'est pas encore 'COMPLETED' (payé)
+    const activeMissions = await prisma.mission.findMany({
+        where: { 
+            agentId: agent.id, 
+            status: { in: ['ACCEPTED'] } 
+        },
         select: { fee: true }
     });
     
-    const pendingCommissions = pendingMissions.reduce((acc, m) => acc + (m.fee || 0), 0);
+    const pendingCommissions = activeMissions.reduce((acc, m) => acc + (m.fee || 0), 0);
     const totalCommissionsEstimate = (agent.walletBalance || 0) + pendingCommissions;
 
-    // 4. RÉPONSE FORMATÉE POUR LE FRONT
     return NextResponse.json({
       success: true,
       stats: {
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error: any) {
-    console.error("Erreur Agent Dashboard:", error);
+    console.error("Agent Dashboard API Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

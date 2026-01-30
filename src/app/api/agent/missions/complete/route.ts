@@ -5,55 +5,51 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    // 1. AUTHENTIFICATION & SÉCURITÉ
-    const userEmail = req.headers.get("x-user-email");
-    if (!userEmail) {
+    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
+    const userId = req.headers.get("x-user-id");
+    if (!userId) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const agent = await prisma.user.findUnique({ where: { email: userEmail } });
+    // 2. VÉRIFICATION RÔLE (Via ID)
+    const agent = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, role: true }
+    });
 
-    // Vérification Rôle
     if (!agent || agent.role !== "AGENT") {
-      return NextResponse.json({ error: "Accès refusé. Réservé aux agents." }, { status: 403 });
+      return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
     }
 
-    // 2. VALIDATION DES DONNÉES ENTRANTES
+    // 3. VALIDATION
     const body = await req.json();
-    // On récupère 'reportNote' car c'est ce que le frontend envoie (MissionActionPanel.tsx)
     const { missionId, reportNote } = body; 
 
     if (!missionId) {
       return NextResponse.json({ error: "ID Mission manquant" }, { status: 400 });
     }
 
-    // 3. VÉRIFICATION DE LA MISSION
     const mission = await prisma.mission.findUnique({
       where: { id: missionId },
       include: { 
-        property: { 
-          select: { address: true } 
-        } 
+        property: { select: { address: true } } 
       }
     });
 
-    if (!mission) {
-      return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
-    }
+    if (!mission) return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
 
-    // Sécurité : Vérifier que c'est bien SA mission
+    // Sécurité : Vérifier l'assignation
     if (mission.agentId !== agent.id) {
       return NextResponse.json({ error: "Cette mission ne vous est pas attribuée." }, { status: 403 });
     }
 
-    // Logique métier : Impossible de finir une mission annulée ou déjà finie
     if (mission.status !== "ACCEPTED") {
-      return NextResponse.json({ error: "La mission n'est pas active (Déjà terminée ?)" }, { status: 400 });
+      return NextResponse.json({ error: "Statut invalide pour clôture (Déjà finie ?)." }, { status: 400 });
     }
 
-    // 4. TRANSACTION ATOMIQUE (Tout ou rien)
+    // 4. TRANSACTION FINANCIÈRE ATOMIQUE
     await prisma.$transaction([
-      // A. Mise à jour du statut de la mission
+      // A. Clôture Mission
       prisma.mission.update({
         where: { id: missionId },
         data: {
@@ -62,7 +58,7 @@ export async function POST(req: Request) {
         }
       }),
 
-      // B. Paiement de l'Agent (Incrémentation Wallet)
+      // B. Paiement Agent (Wallet)
       prisma.user.update({
         where: { id: agent.id },
         data: {
@@ -70,12 +66,13 @@ export async function POST(req: Request) {
         }
       }),
 
-      // C. Création de la trace comptable
+      // C. Trace Comptable
       prisma.transaction.create({
         data: {
           amount: mission.fee,
           type: "CREDIT",
           reason: `Mission terminée : ${mission.property.address}`,
+          status: "SUCCESS",
           userId: agent.id
         }
       })
@@ -88,9 +85,6 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("Erreur Complete Mission:", error);
-    return NextResponse.json(
-      { error: "Erreur serveur", details: error.message }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

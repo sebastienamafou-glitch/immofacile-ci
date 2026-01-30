@@ -6,6 +6,7 @@ import { UserPlus, Loader2, Mail, Phone, User, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { api } from "@/lib/api"; // ✅ Wrapper Sécurisé
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -31,23 +32,20 @@ export default function CreateAgentModal() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/agency/team/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // ✅ APPEL SÉCURISÉ
+      const res = await api.post("/agency/team/create", formData);
 
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
-
-      toast.success("Agent ajouté avec succès !");
-      setFormData({ name: "", email: "", phone: "", jobTitle: "" }); // Reset
-      setOpen(false);
-      router.refresh(); // Rafraîchit la liste derrière la modal
+      if (res.data.success) {
+          toast.success("Agent ajouté avec succès !");
+          setFormData({ name: "", email: "", phone: "", jobTitle: "" }); 
+          setOpen(false);
+          router.refresh();
+      }
 
     } catch (error: any) {
-      toast.error(error.message);
+      console.error(error);
+      const msg = error.response?.data?.error || "Erreur lors de la création";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -56,7 +54,7 @@ export default function CreateAgentModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-orange-600 hover:bg-orange-500 text-white gap-2 font-bold">
+        <Button className="bg-orange-600 hover:bg-orange-500 text-white gap-2 font-bold shadow-lg shadow-orange-900/10">
             <UserPlus size={18} /> Ajouter un membre
         </Button>
       </DialogTrigger>
@@ -102,11 +100,11 @@ export default function CreateAgentModal() {
             </div>
 
             <div className="pt-2">
-                <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold">
+                <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 font-bold h-10">
                     {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer le compte"}
                 </Button>
                 <p className="text-[10px] text-slate-500 text-center mt-3">
-                    Un mot de passe par défaut sera généré.
+                    Un mot de passe par défaut sera généré et envoyé (simulé).
                 </p>
             </div>
         </form>

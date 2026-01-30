@@ -1,64 +1,72 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Building2, Plus, Search } from "lucide-react";
+import { Building2, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import Link from "next/link";
-// 👇 IMPORT CORRECT
 import AgencyPropertyCard from "@/components/agency/AgencyPropertyCard";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyPropertiesPage() {
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST (Server Side)
+  const headersList = headers();
+  const userId = headersList.get("x-user-id");
+  
+  if (!userId) redirect("/login");
 
+  // 2. VÉRIFICATION ADMIN AGENCE
   const admin = await prisma.user.findUnique({
-    where: { email: userEmail },
+    where: { id: userId },
     include: { agency: true }
   });
 
-  if (!admin || admin.role !== "AGENCY_ADMIN" || !admin.agency) {
-    redirect("/dashboard");
+  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
+    return (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center text-slate-400">
+            <AlertCircle className="w-10 h-10 mb-4 text-orange-500" />
+            <h2 className="text-xl text-white font-bold">Accès Restreint</h2>
+            <p>Espace réservé aux administrateurs d'agence.</p>
+        </div>
+    );
   }
 
-  // Requête optimisée conforme au Schema Property [cite: 24]
+  // 3. REQUÊTE SÉCURISÉE (Scope Agence)
   const properties = await prisma.property.findMany({
     where: {
-      agencyId: admin.agency.id // 🔒 SÉCURITÉ : Uniquement les biens de l'agence
+      agencyId: admin.agencyId // 🔒 SÉCURITÉ : Uniquement les biens de l'agence
     },
     include: {
         owner: {
             select: { name: true }
         },
         leases: {
-            where: { isActive: true } // Pour déterminer le statut occupé/vacant
+            where: { isActive: true } // Pour déterminer le statut
         },
         _count: {
-            select: { incidents: true } // Pour les alertes
+            select: { incidents: true }
         }
     },
     orderBy: { createdAt: 'desc' }
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 min-h-screen bg-[#020617] text-slate-200">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
         <div>
-          <h1 className="text-3xl font-black text-white flex items-center gap-3">
-             <Building2 className="text-orange-500" /> Biens Sous Gestion
+          <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-tight">
+             <Building2 className="text-orange-500 w-8 h-8" /> Biens Sous Gestion
           </h1>
-          <p className="text-slate-400 mt-1">
-            Parc Immobilier Longue Durée ({properties.length} mandats)
+          <p className="text-slate-400 mt-1 font-medium">
+            Parc Immobilier de <span className="text-orange-400">{admin.agency?.name}</span> ({properties.length} mandats)
           </p>
         </div>
         
         <div className="flex gap-3 w-full md:w-auto">
             <Link href="/dashboard/agency/properties/create">
-                <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold gap-2">
+                <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold gap-2 shadow-lg shadow-orange-900/20 transition-transform active:scale-95">
                     <Plus size={18} /> Nouveau Mandat
                 </Button>
             </Link>
@@ -66,14 +74,16 @@ export default async function AgencyPropertiesPage() {
       </div>
 
       {/* LISTE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {properties.length === 0 ? (
-            <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/50">
-                <Building2 className="mx-auto h-12 w-12 text-slate-600 mb-4" />
-                <h3 className="text-white font-bold text-lg">Aucun mandat actif</h3>
-                <p className="text-slate-500 mb-6">Ajoutez un bien pour commencer la gestion locative.</p>
+            <div className="col-span-full py-24 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
+                <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Building2 className="h-8 w-8 text-slate-500" />
+                </div>
+                <h3 className="text-white font-bold text-xl mb-2">Aucun mandat actif</h3>
+                <p className="text-slate-500 mb-6 max-w-md mx-auto">Votre agence ne gère aucun bien pour le moment. Ajoutez votre premier mandat pour activer le tableau de bord.</p>
                 <Link href="/dashboard/agency/properties/create">
-                    <Button variant="outline">Créer un mandat</Button>
+                    <Button variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white">Créer un mandat</Button>
                 </Link>
             </div>
         ) : (

@@ -11,7 +11,7 @@ import {
   ScrollText, Hammer, LifeBuoy,
   ClipboardCheck, MapPin, ClipboardList, UserCheck,
   ShieldCheck, Receipt, Briefcase, Landmark, Server, CalendarCheck, CalendarDays, Building2,
-  MessageCircle, Heart, Compass, Map as MapIcon, LucideIcon, Palmtree, TrendingUp
+  MessageCircle, Heart, Compass, Map as MapIcon, LucideIcon, Palmtree, TrendingUp,
 } from "lucide-react";
 
 // 1. DÉFINITION DU TYPE
@@ -31,16 +31,19 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Users, label: "Mes Locataires", href: "/dashboard/owner/tenants" },
     { icon: UserCheck, label: "Candidatures", href: "/dashboard/owner/candidates" },
     { icon: FileText, label: "Baux & Contrats", href: "/dashboard/owner/leases" },
+    { icon: ShieldCheck, label: "Conformité & Juridique", href: "/dashboard/owner/compliance" },
     { icon: ClipboardList, label: "États des lieux", href: "/dashboard/owner/inventory" },
     { icon: Hammer, label: "Maintenance", href: "/dashboard/owner/maintenance" },
     { icon: Wallet, label: "Mes Finances", href: "/dashboard/owner/finance" },
-    { icon: FileText, label: "Mon bilan", href: "/dashboard/owner/finance/tax" }
+    { icon: FileText, label: "Mon bilan", href: "/dashboard/owner/finance/tax" },
+  
   ],
   TENANT: [
     { icon: LayoutDashboard, label: "Mon Espace", href: "/dashboard/tenant" },
     { icon: Receipt, label: "Mes Paiements", href: "/dashboard/tenant/payments" },
     { icon: FileText, label: "Mon Contrat", href: "/dashboard/tenant/contract" },
     { icon: Shield, label: "Signaler Incident", href: "/dashboard/tenant/incidents" },
+ 
   ],
   AGENT: [
     { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/agent" }, 
@@ -48,12 +51,14 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: ClipboardCheck, label: "Dossiers Locataires", href: "/dashboard/agent/files" }, 
     { icon: Key, label: "Biens sous Gestion", href: "/dashboard/agent/properties" },
     { icon: Key, label: "Conciergerie", href: "/dashboard/agent/akwaba" },
+ 
   ],
   ARTISAN: [
     { icon: LayoutDashboard, label: "Mes Missions", href: "/dashboard/artisan" },
     { icon: CalendarCheck, label: "Planning", href: "/dashboard/artisan/schedule" },
     { icon: Wallet, label: "Facturation", href: "/dashboard/artisan/finance" },
-    { icon: Settings, label: "Disponibilité", href: "/dashboard/artisan/profile" }
+    { icon: Settings, label: "Disponibilité", href: "/dashboard/artisan/profile" },
+  
   ],
   SUPER_ADMIN: [
     { icon: Server, label: "Command Center", href: "/dashboard/superadmin" }, 
@@ -66,6 +71,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: ShieldCheck, label: "KYC & Sécurité", href: "/dashboard/superadmin/kyc" },
     { icon: ScrollText, label: "Journal d'Audit", href: "/dashboard/superadmin/logs" },
     { icon: Landmark, label: "Trésorerie", href: "/dashboard/superadmin/treasury" },
+     { icon: ShieldCheck, label: "Conformité & Juridique", href: "/dashboard/owner/compliance" },
   ],
   AGENCY_ADMIN: [
     { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },
@@ -74,6 +80,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Palmtree, label: "Locations Saisonnières", href: "/dashboard/agency/listings" },
     { icon: Wallet, label: "Portefeuille", href: "/dashboard/agency/wallet" },
     { icon: Settings, label: "Paramètres Agence", href: "/dashboard/agency/settings" },
+   
   ],
   GUEST: [
     { icon: Compass, label: "Explorer", href: "/dashboard/guest" },
@@ -81,12 +88,14 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Heart, label: "Favoris", href: "/dashboard/guest/favorites" },
     { icon: MessageCircle, label: "Messages", href: "/dashboard/guest/inbox" },
     { icon: FileText, label: "Historique", href: "/dashboard/guest/history" },
+    
   ],
 };
 
 const COMMON_ITEMS: MenuItem[] = [
-  { icon: Settings, label: "Paramètres", href: "/dashboard/settings" },
   { icon: LifeBuoy, label: "Centre d'aide", href: "/dashboard/help" },
+  { icon: Settings, label: "Paramètres", href: "/dashboard/settings" },
+  
 ];
 
 export function AppSidebar({ className }: { className?: string }) {

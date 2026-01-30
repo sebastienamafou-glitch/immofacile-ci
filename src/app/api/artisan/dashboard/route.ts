@@ -1,29 +1,27 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    const userId = request.headers.get("x-user-id");
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION OPTIMISÉE (Tout en une seule requête)
     const artisan = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: { id: userId },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
         walletBalance: true,
-        // isAvailable: true, // ⚠️ DÉCOMMENTEZ SI VOUS AVEZ AJOUTÉ LE CHAMP DANS LE SCHEMA
+        isAvailable: true, 
         
-        // On récupère directement les missions assignées ici
-        incidentsAssigned: {
+        // ✅ CORRECTION ICI : "incidentsAssigned" (Comme dans le schema.prisma)
+        incidentsAssigned: { 
           where: {
-            status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] } // On cache les CLOSED
+            status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] }
           },
           orderBy: { createdAt: 'desc' },
           select: {
@@ -34,7 +32,6 @@ export async function GET(request: Request) {
             priority: true,
             createdAt: true,
             quoteAmount: true,
-            // Relations imbriquées
             property: { 
                 select: { address: true, commune: true } 
             },
@@ -46,21 +43,22 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. VÉRIFICATION RÔLE
     if (!artisan || artisan.role !== "ARTISAN") {
         return NextResponse.json({ error: "Accès réservé aux artisans." }, { status: 403 });
     }
 
-    // 4. FORMATAGE DES DONNÉES
-    const formattedJobs = artisan.incidentsAssigned.map(j => ({
+    // ✅ MAPPING CORRIGÉ
+    const incidents = artisan.incidentsAssigned || [];
+
+    const formattedJobs = incidents.map((j: any) => ({
         id: j.id,
         title: j.title,
         description: j.description,
         status: j.status,
         priority: j.priority,
-        address: `${j.property.address}, ${j.property.commune}`,
-        reporterName: j.reporter.name,
-        reporterPhone: j.reporter.phone, // Utile pour l'artisan pour appeler avant de venir
+        address: j.property ? `${j.property.address}, ${j.property.commune}` : "Adresse inconnue",
+        reporterName: j.reporter?.name || "Locataire",
+        reporterPhone: j.reporter?.phone || "",
         quoteAmount: j.quoteAmount || 0,
         createdAt: j.createdAt
     }));
@@ -71,12 +69,11 @@ export async function GET(request: Request) {
         name: artisan.name,
         email: artisan.email,
         walletBalance: artisan.walletBalance,
-        // isAvailable: artisan.isAvailable // ⚠️ DÉCOMMENTEZ APRÈS MAJ SCHEMA
-        isAvailable: true // Valeur par défaut temporaire pour ne pas faire planter
+        isAvailable: artisan.isAvailable ?? true 
       },
       stats: {
         jobsCount: formattedJobs.length,
-        rating: 4.8, // À implémenter plus tard
+        rating: 4.8, 
         earnings: artisan.walletBalance
       },
       jobs: formattedJobs

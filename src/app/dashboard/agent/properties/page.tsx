@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/lib/api"; // ✅ Wrapper Sécurisé
 import { Loader2, Home, MapPin, User, MessageCircle, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
-// Typage strict pour éviter les erreurs TypeScript
 interface ManagedProperty {
   id: string;
   title: string;
@@ -25,36 +25,41 @@ interface ManagedProperty {
 }
 
 export default function AgentPropertiesPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<ManagedProperty[]>([]);
 
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        // ✅ On appelle notre nouvelle route dédiée
+        // ✅ Appel sécurisé (Cookie auto)
         const res = await api.get('/agent/properties');
         if (res.data.success) {
             setProperties(res.data.properties);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erreur chargement biens", error);
-        toast.error("Impossible de charger vos biens.");
+        if (error.response?.status === 401) {
+             router.push('/login');
+        } else {
+             toast.error("Impossible de charger vos biens.");
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchProperties();
-  }, []);
+  }, [router]);
 
   if (loading) return (
-    <div className="h-[80vh] w-full flex flex-col items-center justify-center bg-[#060B18]">
+    <div className="h-[80vh] w-full flex flex-col items-center justify-center bg-[#0B1120]">
         <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
         <p className="text-slate-500 text-sm mt-4">Récupération de votre portefeuille...</p>
     </div>
   );
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto min-h-screen bg-[#060B18] pb-20">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto min-h-screen bg-[#0B1120] pb-24 text-slate-200">
       
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -63,7 +68,7 @@ export default function AgentPropertiesPage() {
                 Vous gérez actuellement <span className="text-emerald-400 font-bold">{properties.length}</span> propriétés.
             </p>
         </div>
-        <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 flex items-center gap-3">
+        <div className="bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 flex items-center gap-3 shadow-lg shadow-emerald-900/10">
              <Building2 className="w-5 h-5 text-emerald-500" />
              <span className="text-emerald-400 font-bold text-sm">Portefeuille Actif</span>
         </div>
@@ -98,14 +103,12 @@ export default function AgentPropertiesPage() {
                              </div>
                          )}
                          
-                         {/* Badge Statut */}
                          <div className="absolute top-3 right-3">
                             <Badge className={`${property.isAvailable ? "bg-emerald-500 text-black hover:bg-emerald-400" : "bg-red-500 text-white hover:bg-red-600"} font-bold border-0 shadow-lg`}>
                                 {property.isAvailable ? "Disponible" : "Loué"}
                             </Badge>
                          </div>
                          
-                         {/* Badge Type */}
                          <div className="absolute bottom-3 left-3">
                             <Badge variant="outline" className="bg-black/60 backdrop-blur border-white/20 text-white text-xs">
                                 {property.type}
@@ -123,7 +126,6 @@ export default function AgentPropertiesPage() {
                             <MapPin className="w-3 h-3 text-slate-500 shrink-0"/> {property.address}
                         </p>
 
-                        {/* Bloc Propriétaire */}
                         <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 flex items-center justify-between group-hover:border-emerald-500/20 transition-colors">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">

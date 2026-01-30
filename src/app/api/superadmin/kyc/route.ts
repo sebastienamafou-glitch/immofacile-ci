@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ ---
+// --- HELPER DE SÉCURITÉ (ZERO TRUST) ---
 async function checkSuperAdminPermission(request: Request) {
-  // 1. On récupère l'email injecté par le Middleware (Preuve que le token est valide)
-  const userEmail = request.headers.get("x-user-email");
+  // 1. Identification par ID (Session sécurisée)
+  const userId = request.headers.get("x-user-id");
   
-  if (!userEmail) {
+  if (!userId) {
     return { authorized: false, status: 401, error: "Non authentifié" };
   }
 
-  // 2. Double vérification en base de données (Le rôle a-t-il changé depuis la connexion ?)
+  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
-    where: { email: userEmail },
-    select: { role: true } // On ne select que ce qui est nécessaire (Perf)
+    where: { id: userId },
+    select: { id: true, role: true } 
   });
 
-  if (!admin || admin.role !== Role.SUPER_ADMIN) {
+  if (!admin || admin.role !== "SUPER_ADMIN") {
     return { authorized: false, status: 403, error: "Accès refusé : Rôle Super Admin requis" };
   }
 
@@ -31,11 +30,9 @@ async function checkSuperAdminPermission(request: Request) {
 // =====================================================================
 export async function GET(request: Request) {
   try {
-    // 1. Sécurité
     const auth = await checkSuperAdminPermission(request);
     if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    // 2. Requête Optimisée
     const users = await prisma.user.findMany({
       where: { 
         OR: [
@@ -44,7 +41,7 @@ export async function GET(request: Request) {
             { kycStatus: "REJECTED" }
         ]
       },
-      orderBy: { updatedAt: 'desc' }, // Les dossiers modifiés récemment en premier
+      orderBy: { updatedAt: 'desc' },
       select: { 
         id: true, 
         name: true, 
@@ -69,32 +66,26 @@ export async function GET(request: Request) {
 // =====================================================================
 export async function PUT(request: Request) {
     try {
-        // 1. Sécurité
         const auth = await checkSuperAdminPermission(request);
         if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-        // 2. Validation des données entrantes
         const body = await request.json();
         const { userId, status } = body;
 
-        // Validation stricte des inputs
         if (!userId || !["VERIFIED", "REJECTED"].includes(status)) {
-            return NextResponse.json({ error: "Données invalides ou statut inconnu" }, { status: 400 });
+            return NextResponse.json({ error: "Données invalides" }, { status: 400 });
         }
 
-        // 3. Mise à jour Atomique
+        // Mise à jour + Validation du compte
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: { 
                 kycStatus: status,
-                isVerified: status === 'VERIFIED', // Le flag boolean suit le statut KYC
-                updatedAt: new Date() // Force le refresh du timestamp
+                isVerified: status === 'VERIFIED', // Le badge suit le statut
+                updatedAt: new Date()
             },
             select: { id: true, kycStatus: true, email: true }
         });
-
-        // (Optionnel) Ici, on pourrait envoyer un email de notification à l'utilisateur
-        console.log(`[KYC] Dossier ${updatedUser.email} mis à jour : ${status}`);
 
         return NextResponse.json({ success: true, user: updatedUser });
 

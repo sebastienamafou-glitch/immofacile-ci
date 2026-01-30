@@ -52,18 +52,25 @@ export default async function GuestInboxPage() {
                      className="block bg-slate-900 border border-slate-800 p-4 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition group"
                    >
                        <div className="flex items-center gap-4">
-                           {/* Avatar Host */}
-                           <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center shrink-0 border border-slate-600">
-                               <span className="font-bold text-white text-lg">
-                                   {conv.host.name ? conv.host.name[0] : <User/>}
-                               </span>
+                           {/* Avatar Host - ✅ CORRECTIF DE SÉCURITÉ ICI */}
+                           <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center shrink-0 border border-slate-600 overflow-hidden">
+                               {conv.host?.image ? (
+                                   <img src={conv.host.image} alt="Avatar" className="w-full h-full object-cover"/>
+                               ) : (
+                                   <span className="font-bold text-white text-lg">
+                                       {/* On vérifie si conv.host existe avant d'accéder au nom */}
+                                       {conv.host?.name ? conv.host.name[0] : <User className="w-6 h-6 text-slate-400"/>}
+                                   </span>
+                               )}
                            </div>
 
                            {/* Contenu */}
                            <div className="flex-1 min-w-0">
                                <div className="flex justify-between items-baseline mb-1">
+                                   {/* ✅ CORRECTIF DE SÉCURITÉ ICI AUSSI */}
                                    <h4 className="text-white font-bold truncate">
-                                       {conv.host.name} • <span className="text-slate-500 font-normal text-sm">{conv.listing?.title}</span>
+                                       {conv.host?.name || "Utilisateur inconnu"} 
+                                       <span className="text-slate-500 font-normal text-sm ml-2">• {conv.listing?.title || "Annonce"}</span>
                                    </h4>
                                    <span className="text-xs text-slate-500 whitespace-nowrap">
                                        {conv.messages[0] && formatDistanceToNow(new Date(conv.messages[0].createdAt), { addSuffix: true, locale: fr })}

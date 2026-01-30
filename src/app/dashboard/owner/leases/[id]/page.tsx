@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation"; // ✅ useParams préféré
 import { api } from "@/lib/api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   ArrowLeft, Download, Ban, User, MapPin, Calendar, 
   Wallet, CheckCircle, FileText, Loader2, 
-  AlertTriangle 
+  AlertTriangle, QrCode
 } from "lucide-react";
+import QRCode from "react-qr-code";
 import Link from "next/link";
 import Swal from "sweetalert2";
 import { toast } from "sonner";
@@ -133,6 +135,29 @@ export default function LeaseDetailPage() {
                     {isSigned ? <CheckCircle className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                     {isSigned ? "Contrat Signé (PDF)" : "Télécharger PDF"}
                 </a>
+
+                {/* Bouton QR Code de Conformité */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                   <button className="flex items-center gap-2 px-4 py-2 bg-[#F59E0B]/10 text-[#F59E0B] hover:bg-[#F59E0B] hover:text-black border border-[#F59E0B]/20 rounded-xl transition text-sm font-bold">
+                     <QrCode className="w-4 h-4" />
+                     Certificat
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="bg-white p-4 w-auto flex flex-col items-center gap-2 shadow-xl border-slate-200">
+                  <p className="text-xs font-bold text-slate-900 uppercase mb-2">Scanner pour vérifier</p>
+                  <div className="bg-white p-2 rounded border border-slate-100">
+                      {/* Génère le QR vers la page publique que je viens de coder */}
+                      <QRCode 
+                          value={`https://immofacile.ci/compliance/${lease.id}`} 
+                          size={120} 
+                     />
+                 </div>
+                 <p className="text-[10px] text-slate-400 text-center max-w-[150px]">
+                   Preuve de conformité Loi 2019 et audit de signature.
+                 </p>
+               </PopoverContent>
+             </Popover>
 
                 {/* Bouton Résilier */}
                 {lease.isActive && (

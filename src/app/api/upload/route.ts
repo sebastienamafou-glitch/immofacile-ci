@@ -1,50 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 
-// Configuration globale sécurisée
+// Configuration Cloudinary (Variables Serveur)
 cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY || process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ : Vérification de l'Authentification
-    // On empêche les uploads anonymes pour protéger votre quota Cloudinary
-    const userEmail = req.headers.get("x-user-email");
+    // 1. SÉCURITÉ : AUTHENTIFICATION VIA ID (DOCTRINE N°3)
+    const userId = request.headers.get("x-user-id");
     
-    if (!userEmail) {
-        return NextResponse.json({ error: "Upload non autorisé. Veuillez vous connecter." }, { status: 401 });
+    if (!userId) {
+        return NextResponse.json({ error: "Upload non autorisé (Non identifié)." }, { status: 401 });
     }
 
-    // 2. Vérification Configuration Serveur
-    if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_SECRET) {
-        return NextResponse.json({ error: "Erreur configuration serveur (Cloudinary)" }, { status: 500 });
+    // 2. RÉCUPÉRATION DU FICHIER
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+
+    if (!file) {
+      return NextResponse.json({ error: "Aucun fichier reçu." }, { status: 400 });
     }
 
-    // 3. Récupération du fichier
-    const data = await req.formData();
-    const file = data.get("file");
-
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "Aucun fichier valide reçu." }, { status: 400 });
-    }
-
-    // Validation de base (Taille max 5MB pour éviter les abus)
+    // Validation Taille (Max 5MB)
     if (file.size > 5 * 1024 * 1024) {
         return NextResponse.json({ error: "Fichier trop volumineux (Max 5MB)." }, { status: 400 });
     }
 
-    // 4. Conversion et Upload
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // 3. TRAITEMENT DU BUFFER
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
+    // 4. UPLOAD VERS CLOUDINARY (STREAM)
     const result = await new Promise<any>((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
+      const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: "immofacile/uploads", // Dossier organisé
-          resource_type: "auto",        // Détection auto (Image ou PDF)
+          folder: "immofacile/intervention_proofs", // Dossier spécifique propre
+          resource_type: "auto",
         },
         (error, result) => {
           if (error) {
@@ -54,13 +49,16 @@ export async function POST(req: NextRequest) {
               resolve(result);
           }
         }
-      ).end(buffer);
+      );
+      
+      // Écriture sécurisée du buffer dans le stream
+      uploadStream.end(buffer);
     });
 
-    // 5. Réponse succès
+    // 5. SUCCÈS
     return NextResponse.json({ 
         success: true, 
-        url: result.secure_url,       // L'URL HTTPS à enregistrer en BDD
+        url: result.secure_url,
         format: result.format,
         original_name: result.original_filename
     });
