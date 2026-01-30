@@ -24,7 +24,7 @@ const PROTECTED_PATHS = [
   '/api/documents',
   '/api/user' ,
   '/api/chat' ,
-  '/api/notifications' 
+  '/api/notifications'
 ];
 
 // EXCEPTIONS PUBLIQUES (Webhooks + Auth)
