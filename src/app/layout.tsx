@@ -3,8 +3,8 @@ import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner"; 
 import { Providers } from "@/components/Providers";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
-// 1. Configuration des polices
 const fontSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -15,7 +15,6 @@ const fontMono = Roboto_Mono({
   subsets: ["latin"],
 });
 
-// 2. Configuration PWA
 export const viewport: Viewport = {
   themeColor: '#0B1120',
   width: 'device-width',
@@ -26,8 +25,13 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "ImmoFacile C.I",
-  description: "Gestion immobilière intelligente",
+  description: "Gestion immobilière intelligente en Côte d'Ivoire",
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: "ImmoFacile",
+  },
 };
 
 export default function RootLayout({
@@ -36,10 +40,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
-      <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-[#0B1120]`}>
-        {/* ✅ CORRECTION : Providers englobe TOUT (Application + Toaster) */}
-        <Providers> 
+    <html lang="fr" className="dark">
+      <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-[#0B1120] text-slate-200`}>
+        <Providers>
+          <ServiceWorkerRegister />
           {children}
           <Toaster position="top-right" richColors theme="dark" closeButton />
         </Providers>
