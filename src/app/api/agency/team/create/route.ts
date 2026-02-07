@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
-import { hash } from "bcryptjs"; // Préférez bcryptjs pour éviter les soucis de compilation native
+import { hash } from "bcryptjs";
+
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = req.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ : Session Serveur (Plus de headers)
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    // 2. VÉRIFICATION ADMIN AGENCE
+    if (!userId) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    // 2. VÉRIFICATION DROITS (Admin Agence)
     const admin = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, role: true, agencyId: true }
@@ -33,8 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cet email est déjà utilisé." }, { status: 409 });
     }
 
-    // 4. CRÉATION SÉCURISÉE (Multi-Tenant)
-    // Mot de passe par défaut
+    // 4. CRÉATION SÉCURISÉE (Multi-Tenant & Relationnelle)
     const hashedPassword = await hash("ImmoFacile2025!", 10); 
 
     const newAgent = await prisma.user.create({
@@ -49,12 +55,27 @@ export async function POST(req: Request) {
         // 🔒 VERROUILLAGE SUR L'AGENCE DE L'ADMIN
         agencyId: admin.agencyId, 
         
-        isVerified: true, // Pré-vérifié par le directeur
-        kycStatus: "VERIFIED"
+        isVerified: true, 
+        
+        // ✅ CORRECTION 1 : KYC dans sa table dédiée
+        kyc: {
+            create: {
+                status: "VERIFIED", // Pré-vérifié par le directeur
+                idType: "PROFESSIONAL_ID",
+                documents: []
+            }
+        },
+
+        // ✅ CORRECTION 2 : Initialisation Finance obligatoire
+        finance: {
+            create: {
+                walletBalance: 0,
+                kycTier: 2, // Agent = Tier 2 par défaut
+                version: 1
+            }
+        }
       }
     });
-
-    // TODO: Envoyer email d'invitation ici (SendGrid/Resend)
 
     return NextResponse.json({ success: true, agent: { id: newAgent.id, name: newAgent.name } });
 

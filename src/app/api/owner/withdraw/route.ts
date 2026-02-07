@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    // 1. AUTHENTIFICATION ZERO TRUST (Via Middleware)
-    const userId = req.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Session invalide ou expirée" }, { status: 401 });
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. VALIDATION DES ENTRÉES
     const body = await req.json();
     const { amount, paymentDetails } = body;
 
-    // On force un entier positif (les centimes sont gérés en entiers ou ignorés selon votre règle, ici FCFA = entier)
     const amountInt = Math.floor(Number(amount));
 
     if (!amountInt || amountInt <= 0) {
@@ -23,44 +25,52 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Détails de paiement requis" }, { status: 400 });
     }
 
-    // 3. VÉRIFICATION DU SOLDE (Database Fetch)
-    const user = await prisma.user.findUnique({ 
-        where: { id: userId },
-        select: { walletBalance: true, id: true } 
-    });
+    // 3. TRANSACTION FINANCIÈRE ATOMIQUE
+    await prisma.$transaction(async (tx) => {
+        
+        // A. Vérification du Solde (Dans UserFinance)
+        const finance = await tx.userFinance.findUnique({ 
+            where: { userId: userId } 
+        });
 
-    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+        if (!finance || finance.walletBalance < amountInt) {
+            throw new Error("Solde insuffisant pour ce retrait.");
+        }
 
-    if (user.walletBalance < amountInt) {
-        return NextResponse.json({ error: "Solde insuffisant pour ce retrait." }, { status: 400 });
-    }
-
-    // 4. TRANSACTION ATOMIQUE (Bank Grade)
-    // Empêche les "Race Conditions" (double retrait simultané)
-    await prisma.$transaction([
-        // A. Débit du compte (La condition gte assure une sécurité DB supplémentaire)
-        prisma.user.update({
-            where: { id: userId },
+        // B. Débit du compte (Optimistic Locking via version)
+        await tx.userFinance.update({
+            where: { 
+                userId: userId,
+                version: finance.version 
+            },
             data: { 
-                walletBalance: { decrement: amountInt } 
+                walletBalance: { decrement: amountInt },
+                version: { increment: 1 }
             }
-        }),
-        // B. Création de la trace de transaction
-        prisma.transaction.create({
+        });
+
+        // C. Création de la trace de transaction
+        await tx.transaction.create({
             data: {
                 amount: amountInt,
                 type: "DEBIT",
-                reason: `Retrait vers ${paymentDetails}`, // Ex: "WAVE - 0707..."
-                status: "PENDING", // En attente de validation manuelle par l'Admin
-                userId: userId
+                balanceType: "WALLET", // ✅ Champ obligatoire ajouté
+                reason: `Retrait vers ${paymentDetails}`,
+                status: "PENDING",
+                userId: userId,
+                reference: `WITHDRAW-${Date.now()}` // Référence unique
             }
-        })
-    ]);
+        });
+    });
 
     return NextResponse.json({ success: true });
 
-  } catch (error) {
-    console.error("🚨 Critical Withdraw Error:", error);
-    return NextResponse.json({ error: "Erreur lors du traitement de la transaction." }, { status: 500 });
+  } catch (error: any) {
+    console.error("Erreur Retrait:", error);
+    // Gestion propre des erreurs transactionnelles
+    if (error.message.includes("Solde insuffisant")) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Erreur lors du traitement." }, { status: 500 });
   }
 }

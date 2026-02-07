@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
+import { prisma } from "@/lib/prisma";
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RECUPERER LES RÉSERVATIONS (Côté Host)
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
     const bookings = await prisma.booking.findMany({
       where: {
         listing: {
-          hostId: userId // 🔒 Verrouillage par ID
+          hostId: userId // 🔒 Verrouillage par ID session
         }
       },
       orderBy: {
@@ -27,7 +30,10 @@ export async function GET(request: Request) {
             email: true,
             image: true,
             phone: true,
-            kycStatus: true
+            // ✅ CORRECTION SCHEMA : On passe par la relation kyc
+            kyc: {
+                select: { status: true }
+            }
           }
         },
         listing: {
@@ -48,7 +54,17 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. STATS
+    // 3. REMAPPING & STATS
+    // On doit aplatir l'objet pour le frontend qui attend kycStatus à plat
+    const formattedBookings = bookings.map(b => ({
+        ...b,
+        guest: {
+            ...b.guest,
+            kycStatus: b.guest.kyc?.status || "PENDING", // Mapping intelligent
+            kyc: undefined // On nettoie
+        }
+    }));
+
     const stats = {
         upcoming: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) > new Date()).length,
         active: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) <= new Date() && new Date(b.endDate) >= new Date()).length,
@@ -56,7 +72,7 @@ export async function GET(request: Request) {
         revenue: bookings.reduce((acc, b) => acc + (b.payment?.hostPayout || 0), 0)
     };
 
-    return NextResponse.json({ success: true, bookings, stats });
+    return NextResponse.json({ success: true, bookings: formattedBookings, stats });
 
   } catch (error) {
     console.error("API Bookings Error:", error);

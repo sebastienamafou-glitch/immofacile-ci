@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns"; // Assurez-vous d'avoir date-fns
 

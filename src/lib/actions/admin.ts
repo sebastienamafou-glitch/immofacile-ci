@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import crypto from "crypto";
-import { headers } from "next/headers"; // ✅ IMPORT REQUIS
+import { auth } from "@/auth"; 
 
 interface CreateInvestorData {
   name: string;
@@ -16,41 +16,30 @@ interface CreateInvestorData {
 
 export async function createInvestor(data: CreateInvestorData) {
   try {
-    // 🛡️ 1. SÉCURITÉ ZERO TRUST (AJOUT CRITIQUE)
-    const headersList = headers();
-    const adminId = headersList.get("x-user-id");
+    // 🛡️ 1. SÉCURITÉ RÉELLE (Session NextAuth)
+    const session = await auth();
 
-    if (!adminId) return { success: false, error: "Non autorisé." };
-
-    const adminUser = await prisma.user.findUnique({
-        where: { id: adminId },
-        select: { role: true }
-    });
-
-    if (!adminUser || adminUser.role !== "SUPER_ADMIN") {
-        return { success: false, error: "Intrusion détectée : Droits insuffisants." };
+    // Vérifie si connecté ET si c'est un SUPER_ADMIN
+    // @ts-ignore (Assure-toi que ton type Session inclut le role)
+    if (!session || session.user.role !== "SUPER_ADMIN") {
+        return { success: false, error: "Accès refusé. Intrusion détectée." };
     }
-    // 🛡️ FIN DE LA SÉCURISATION
+    // 🛡️ FIN SÉCURITÉ
 
-    // 2. Validation : Unicité Email & Téléphone
+    // 2. Validation Unicité
     const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: data.email },
-          { phone: data.phone }
-        ]
-      }
+      where: { OR: [{ email: data.email }, { phone: data.phone }] }
     });
 
-    if (existingUser) {
-      return { success: false, error: "Cet email ou ce numéro existe déjà." };
-    }
+    if (existingUser) return { success: false, error: "Utilisateur déjà existant." };
 
     const generatedPassword = crypto.randomBytes(10).toString('hex');
     const hashedPassword = await hash(generatedPassword, 12);
 
+    // 3. TRANSACTION ATOMIQUE (Correction Schéma)
     const newUser = await prisma.$transaction(async (tx) => {
-      // A. Création User
+      
+      // A. Création User (Identité seule)
       const user = await tx.user.create({
         data: {
           name: data.name,
@@ -58,23 +47,41 @@ export async function createInvestor(data: CreateInvestorData) {
           phone: data.phone,
           password: hashedPassword,
           role: "INVESTOR",
-          // ... reste inchangé
+          isBacker: true,
           backerTier: data.packName,
-          walletBalance: data.amount,
-          isVerified: true,
-          kycStatus: "VERIFIED"
+          isVerified: true, // Champ booléen simple sur User [cite: 6]
         }
       });
 
-      // B. Transaction
+      // B. Création Finance (Le wallet est ici !) 
+      await tx.userFinance.create({
+        data: {
+            userId: user.id,
+            walletBalance: data.amount, // Crédit initial
+            kycTier: 3, // On suppose que l'admin a vérifié le client
+            version: 1
+        }
+      });
+
+      // C. Création KYC (Le statut est ici !) 
+      await tx.userKYC.create({
+          data: {
+              userId: user.id,
+              status: "VERIFIED",
+              idType: "ADMIN_IMPORT"
+          }
+      });
+
+      // D. Trace de la Transaction
       if (data.amount > 0) {
           await tx.transaction.create({
             data: {
               amount: data.amount,
               type: "CREDIT",
-              reason: `INITIAL_INVESTMENT_${data.packName}`,
+              balanceType: "WALLET", // [cite: 93]
+              reason: `INVESTISSEMENT INITIAL - ${data.packName}`,
               userId: user.id,
-              status: "SUCCESS" // ✅ Toujours préciser le statut
+              status: "SUCCESS"
             }
           });
       }
@@ -87,14 +94,11 @@ export async function createInvestor(data: CreateInvestorData) {
     return { 
       success: true, 
       message: "Investisseur créé avec succès.",
-      credentials: {
-        email: newUser.email,
-        password: generatedPassword 
-      }
+      credentials: { email: newUser.email, password: generatedPassword }
     };
 
   } catch (error) {
-    console.error("[CRITICAL] Create Investor Error:", error);
-    return { success: false, error: "Erreur technique." };
+    console.error("[CreateInvestor]", error);
+    return { success: false, error: "Erreur technique serveur." };
   }
 }

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+
 
 export async function POST(request: Request) {
   try {
@@ -29,27 +32,40 @@ export async function POST(request: Request) {
     // 3. Hashage Mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ SÉCURITÉ RÔLES (Correction Critique)
-    // On retire "ADMIN" de la liste. Seuls les admins peuvent créer d'autres admins via le dashboard.
-    const allowedPublicRoles = ["OWNER", "AGENT", "ARTISAN"]; 
+    // Sécurité Rôles
+    const allowedPublicRoles = ["OWNER", "TENANT", "AGENT", "ARTISAN", "GUEST", "INVESTOR"]; 
+    let userRole = "GUEST"; // Rôle par défaut prudent
     
-    // Rôle par défaut = OWNER (Propriétaire)
-    // Si l'utilisateur demande un rôle autorisé, on lui donne. Sinon, on force OWNER.
-    let userRole = "OWNER"; 
     if (role && allowedPublicRoles.includes(role)) {
         userRole = role;
     }
 
-    // 4. Création
+    // 4. CRÉATION ATOMIQUE (USER + FINANCE + KYC)
+    // C'est ici que la magie opère pour respecter le schéma v5
     const newUser = await prisma.user.create({
       data: {
         email,
         phone,
         password: hashedPassword,
         name: name || "Utilisateur",
-        role: userRole as any, // Cast sécurisé maintenant que la liste est filtrée
-        walletBalance: 0,
-        kycStatus: "PENDING"
+        role: userRole as any,
+        
+        // ✅ INIT FINANCE (Obligatoire maintenant)
+        finance: {
+            create: {
+                walletBalance: 0,
+                version: 1,
+                kycTier: 1 // Tier 1 par défaut (Non vérifié)
+            }
+        },
+
+        // ✅ INIT KYC (Obligatoire maintenant)
+        kyc: {
+            create: {
+                status: "PENDING",
+                documents: []
+            }
+        }
       }
     });
 

@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+
 export const dynamic = 'force-dynamic';
 
-// --- HELPER SÉCURITÉ (ZERO TRUST) ---
-async function checkSuperAdmin(request: Request) {
-  // 1. Identification par ID (Session via Middleware)
-  const userId = request.headers.get("x-user-id");
+// --- HELPER SÉCURITÉ (MIGRATION v5) ---
+async function checkSuperAdmin() {
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) return null;
 
-  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
     where: { id: userId },
     select: { id: true, role: true } 
   });
 
   if (!admin || admin.role !== "SUPER_ADMIN") return null;
-
   return admin;
 }
 
@@ -26,7 +27,7 @@ async function checkSuperAdmin(request: Request) {
 // ==========================================
 export async function GET(request: Request) {
   try {
-    const admin = await checkSuperAdmin(request);
+    const admin = await checkSuperAdmin();
     if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const agents = await prisma.user.findMany({
@@ -37,8 +38,13 @@ export async function GET(request: Request) {
         name: true,
         email: true,
         phone: true,
-        kycStatus: true,
         createdAt: true,
+        
+        // ✅ CORRECTION SCHEMA : On passe par la relation KYC
+        kyc: {
+            select: { status: true }
+        },
+        
         // KPI Agents
         _count: {
           select: { 
@@ -49,7 +55,14 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, agents });
+    // Remapping pour le frontend
+    const formattedAgents = agents.map(a => ({
+        ...a,
+        kycStatus: a.kyc?.status || "PENDING", // Valeur par défaut
+        kyc: undefined
+    }));
+
+    return NextResponse.json({ success: true, agents: formattedAgents });
 
   } catch (error) {
     console.error("[API_AGENTS_GET]", error);
@@ -62,7 +75,7 @@ export async function GET(request: Request) {
 // ==========================================
 export async function POST(request: Request) {
   try {
-    const admin = await checkSuperAdmin(request);
+    const admin = await checkSuperAdmin();
     if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const body = await request.json();
@@ -70,12 +83,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Champs obligatoires manquants." }, { status: 400 });
     }
 
-    // Hashage
     const hashedPassword = await bcrypt.hash(body.password, 10);
-
-    // Nettoyage Téléphone (si vide, on met null/undefined pour éviter conflit unique)
     const phoneToSave = body.phone && body.phone.trim() !== "" ? body.phone : undefined;
 
+    // CRÉATION ATOMIQUE (USER + FINANCE + KYC)
     const newAgent = await prisma.user.create({
         data: {
             email: body.email,
@@ -83,15 +94,28 @@ export async function POST(request: Request) {
             name: body.name,
             password: hashedPassword,
             role: "AGENT",
-            // Un agent créé par le Super Admin est considéré comme vérifié
-            kycStatus: "VERIFIED", 
-            isVerified: true,
-            walletBalance: 0,
-            isActive: true
+            isActive: true, // Si ce champ existe toujours sur User
+            
+            // ✅ INIT KYC (Directement validé car créé par l'Admin)
+            kyc: {
+                create: {
+                    status: "VERIFIED", // L'admin valide d'office
+                    documents: [] 
+                }
+            },
+
+            // ✅ INIT FINANCE (Obligatoire)
+            finance: {
+                create: {
+                    walletBalance: 0,
+                    version: 1,
+                    kycTier: 3 // Tier max pour les agents internes
+                }
+            }
         }
     });
 
-    // On retire le hash de la réponse
+    // Nettoyage réponse
     // @ts-ignore
     const { password, ...agentSafe } = newAgent;
 
@@ -100,13 +124,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("[API_AGENTS_POST]", error);
 
-    // Gestion Erreur Doublon (Prisma P2002)
     if (error.code === 'P2002') {
-        const target = error.meta?.target;
-        if (Array.isArray(target)) {
-            if (target.includes('email')) return NextResponse.json({ error: "Cet email est déjà utilisé." }, { status: 409 });
-            if (target.includes('phone')) return NextResponse.json({ error: "Ce numéro est déjà utilisé." }, { status: 409 });
-        }
         return NextResponse.json({ error: "Email ou Téléphone déjà existant." }, { status: 409 });
     }
     

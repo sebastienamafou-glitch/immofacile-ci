@@ -57,17 +57,37 @@ export default function TenantDashboard() {
     fetchData();
   }, [router]);
 
-  // 3. GESTION DU DOCUMENT UPLOAD (Placeholder sécurisé)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || e.target.files.length === 0) return;
-      
-      setIsUploading(true);
-      // Simulation d'upload (À connecter à votre API d'upload S3/Cloudinary plus tard)
-      setTimeout(() => {
-          toast.success("Document transmis au propriétaire ! 📨");
-          setIsUploading(false);
-      }, 1500);
-  };
+  // Remplacer la fonction handleFileUpload existante par celle-ci :
+const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Sécurité : Vérification basique côté client
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation taille (5MB) pour éviter d'envoyer une requête inutile
+    if (file.size > 5 * 1024 * 1024) {
+        toast.error("Fichier trop volumineux (Max 5MB)");
+        return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", "kyc"); // On marque le type pour le dossier sécurisé
+
+    try {
+        // L'instance 'api' gère déjà les cookies de session (withCredentials)
+        await api.post('/upload', formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        
+        toast.success("Document chiffré et transmis ! 🔒");
+    } catch (err) {
+        console.error("Upload error", err);
+        toast.error("Erreur lors de l'envoi du document.");
+    } finally {
+        setIsUploading(false);
+    }
+};
 
   // --- ÉTAT : CHARGEMENT ---
   if (loading) return (

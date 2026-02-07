@@ -1,6 +1,6 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth"; // ✅ Import de la session sécurisée
 import { 
   Building, TrendingUp, TrendingDown, Wallet, 
   ArrowUpRight, ArrowDownLeft, Download, Filter, Search
@@ -13,18 +13,17 @@ const formatFCFA = (amount: number) => {
 
 export default async function TreasuryPage() {
   
-  // 1. SÉCURITÉ ZERO TRUST (Server Component)
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
+  // On récupère la session directement côté serveur
+  const session = await auth();
   
-  if (!userId) redirect("/login");
+  // Si pas de session ou pas l'ID, éjection immédiate vers le login
+  if (!session || !session.user?.id) {
+    redirect("/login");
+  }
 
-  const admin = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true }
-  });
-
-  if (!admin || admin.role !== "SUPER_ADMIN") {
+  // Vérification stricte du rôle Super Admin pour cette page sensible
+  if (session.user.role !== "SUPER_ADMIN") {
     redirect("/dashboard");
   }
 
@@ -36,10 +35,10 @@ export default async function TreasuryPage() {
             select: { name: true, email: true, role: true }
         }
     },
-    take: 100 // On limite aux 100 dernières pour la performance
+    take: 100 // Limite de performance
   });
 
-  // 3. CALCULS DES TOTAUX (Algorithme Financier)
+  // 3. CALCULS DES TOTAUX
   const stats = transactions.reduce((acc, tx) => {
     if (tx.type === 'CREDIT') {
         acc.income += tx.amount;
@@ -76,7 +75,6 @@ export default async function TreasuryPage() {
       {/* KPI CARDS (TOTAUX) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           
-          {/* CARTE 1 : ENCAISSEMENTS (Entrées) */}
           <div className="bg-[#0B1120] p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
               <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition">
                   <ArrowUpRight className="w-20 h-20 text-emerald-500"/>
@@ -88,7 +86,6 @@ export default async function TreasuryPage() {
               </div>
           </div>
 
-          {/* CARTE 2 : DÉCAISSEMENTS (Sorties) */}
           <div className="bg-[#0B1120] p-6 rounded-3xl border border-white/5 relative overflow-hidden group">
               <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition">
                   <ArrowDownLeft className="w-20 h-20 text-red-500"/>
@@ -100,7 +97,6 @@ export default async function TreasuryPage() {
               </div>
           </div>
 
-          {/* CARTE 3 : VOLUME NET */}
           <div className="bg-[#0B1120] p-6 rounded-3xl border border-white/5 relative overflow-hidden group hover:border-[#F59E0B]/30 transition">
               <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition">
                   <Wallet className="w-20 h-20 text-[#F59E0B]"/>
@@ -114,7 +110,6 @@ export default async function TreasuryPage() {
       {/* TABLEAU DES TRANSACTIONS */}
       <div className="bg-[#0B1120] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
         
-        {/* BARRE D'OUTILS */}
         <div className="p-4 border-b border-white/5 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-white font-bold text-sm">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>

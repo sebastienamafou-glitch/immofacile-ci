@@ -1,23 +1,32 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. VÉRIFICATION IDENTITÉ & RÔLE
     const agent = await prisma.user.findUnique({
-      where: { id: userId }, // 🔒 Recherche par ID sécurisé
+      where: { id: userId },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        walletBalance: true,
+        
+        // ✅ CORRECTION SCHEMA : On passe par la relation Finance
+        finance: {
+            select: { walletBalance: true }
+        },
         
         // Leads récents (Top 5)
         leads: {
@@ -38,8 +47,11 @@ export async function GET(request: Request) {
        return NextResponse.json({ error: "Espace réservé aux agents immobiliers." }, { status: 403 });
     }
 
-    // 3. CALCULS FINANCIERS (Commissions en attente)
-    // On cherche les missions acceptées par l'agent dont le statut n'est pas encore 'COMPLETED' (payé)
+    // 3. CALCULS FINANCIERS
+    // ✅ Récupération sécurisée du solde via la relation
+    const currentBalance = agent.finance?.walletBalance || 0;
+
+    // On cherche les missions acceptées par l'agent dont le statut n'est pas encore 'COMPLETED'
     const activeMissions = await prisma.mission.findMany({
         where: { 
             agentId: agent.id, 
@@ -49,7 +61,7 @@ export async function GET(request: Request) {
     });
     
     const pendingCommissions = activeMissions.reduce((acc, m) => acc + (m.fee || 0), 0);
-    const totalCommissionsEstimate = (agent.walletBalance || 0) + pendingCommissions;
+    const totalCommissionsEstimate = currentBalance + pendingCommissions;
 
     return NextResponse.json({
       success: true,
@@ -57,7 +69,7 @@ export async function GET(request: Request) {
         commissionEstimate: totalCommissionsEstimate,
         totalLeads: agent._count.leads,
         managedCount: agent._count.missionsAccepted,
-        walletBalance: agent.walletBalance || 0
+        walletBalance: currentBalance // ✅ Valeur corrigée
       },
       recentLeads: agent.leads
     });

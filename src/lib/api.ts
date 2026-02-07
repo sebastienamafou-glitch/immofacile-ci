@@ -1,53 +1,43 @@
+// Fichier : src/lib/api.ts
 import axios from 'axios';
+import { signOut } from 'next-auth/react';
 
-// 1. CRÉATION DE L'INSTANCE API (Export indispensable)
+// 1. Instance API Standardisée
 export const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 40000,
+  withCredentials: true, 
 });
 
-// 2. INTERCEPTEURS (Sécurité & Nettoyage)
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      let token = localStorage.getItem('token');
-      
-      // NETTOYAGE : On enlève les guillemets parasites s'ils existent
-      if (token && token.startsWith('"') && token.endsWith('"')) {
-        token = token.slice(1, -1);
-      }
-
-      // SÉCURITÉ : On s'assure qu'on n'envoie pas le mot "undefined" ou "null"
-      if (token && token !== 'undefined' && token !== 'null' && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
+// 2. Intercepteur de Réponse
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Gestion intelligente de la déconnexion
-    const isLogin = error.config?.url?.includes('/auth/login');
-    if (error.response?.status === 401 && !isLogin) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    // 🛑 STOP BOUCLE INFINIE
+    // Si l'erreur vient des notifications ou de l'auth elle-même, on ne fait rien.
+    // On laisse le composant gérer l'erreur (ex: afficher 0 notifs) sans déconnecter.
+    if (originalRequest.url?.includes('/notifications') || originalRequest.url?.includes('/auth')) {
+        return Promise.reject(error);
+    }
+
+    // Gestion standard des 401 pour les autres routes (ex: accès page admin)
+    if (error.response?.status === 401 && !originalRequest._retry) {
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        // Nettoyage et redirection
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
+        originalRequest._retry = true;
+        // On garde la déconnexion pour les vraies erreurs de session sur les pages principales
+        await signOut({ callbackUrl: '/login' });
       }
     }
     return Promise.reject(error);
   }
 );
 
-// 3. EXPORTS DES FONCTIONS MÉTIERS (CONSERVÉS INTÉGRALEMENT)
+// ... (Le reste des exports initiatePayment, etc. reste inchangé)
 export const getContractData = async (leaseId: string) => api.get(`/owner/contract/${leaseId}`);
 export const getReceiptData = async (paymentId: string) => api.get(`/owner/receipt/${paymentId}`);
 export const getFormalNoticeData = async (leaseId: string) => api.get(`/owner/formal-notice/${leaseId}`);
@@ -61,16 +51,13 @@ export const endLeaseWithProposals = async (data: { leaseId: string; deduction: 
   return api.post('/owner/leases/end', data);
 };
 
-// =============================================================================
-// ✅ 4. NOUVEAU : UNIVERSAL PAYMENT GATEWAY (Frontend Service)
-// =============================================================================
-// Cette fonction gère à la fois les Loyers (RENT) et les Investissements (INVESTMENT)
 export const initiatePayment = async (data: {
-  type: 'RENT' | 'INVESTMENT'; 
-  referenceId: string;         // leaseId OU investmentContractId
-  phone: string;               // Numéro Mobile Money
+  type: 'RENT' | 'INVESTMENT' | 'QUOTE' | 'DEPOSIT' | 'TOPUP'; 
+  referenceId: string;
+  phone: string;
+  idempotencyKey: string; 
+  manualAmount?: number; 
 }) => {
-  // Appelle notre route Next.js blindée (src/app/api/payment/initiate/route.ts)
   const response = await api.post('/payment/initiate', data);
-  return response.data; // Retourne { success: true, paymentUrl: "..." }
+  return response.data; 
 };

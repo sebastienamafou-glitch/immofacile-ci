@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     // 2. VÉRIFICATION RÔLE
@@ -53,7 +57,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // 1. AUTH ZERO TRUST
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const agent = await prisma.user.findUnique({ 
@@ -96,7 +102,9 @@ export async function POST(request: Request) {
 // =====================================================================
 export async function PUT(request: Request) {
     try {
-      const userId = request.headers.get("x-user-id");
+      const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
       if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   
       const body = await request.json();

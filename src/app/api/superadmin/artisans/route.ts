@@ -1,28 +1,25 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ (ZERO TRUST - ID ONLY) ---
-async function checkSuperAdminPermission(request: Request) {
-  // 1. Identification par ID (Session via Middleware)
-  const userId = request.headers.get("x-user-id");
-  if (!userId) {
-    return { authorized: false, status: 401, error: "Non authentifié" };
-  }
+// --- HELPER SÉCURITÉ (MIGRATION v5) ---
+async function checkSuperAdmin() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
 
-  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
     where: { id: userId },
-    select: { id: true, role: true }
+    select: { id: true, role: true } 
   });
 
-  if (!admin || admin.role !== "SUPER_ADMIN") {
-    return { authorized: false, status: 403, error: "Accès refusé. Réservé au Super Admin." };
-  }
-
-  return { authorized: true, admin };
+  if (!admin || admin.role !== "SUPER_ADMIN") return null;
+  return admin;
 }
 
 // =====================================================================
@@ -30,8 +27,8 @@ async function checkSuperAdminPermission(request: Request) {
 // =====================================================================
 export async function GET(request: Request) {
   try {
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const admin = await checkSuperAdmin();
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const artisans = await prisma.user.findMany({
       where: { role: "ARTISAN" },
@@ -43,15 +40,27 @@ export async function GET(request: Request) {
         email: true,
         jobTitle: true,
         createdAt: true,
-        kycStatus: true,
         isActive: true,
+        
+        // ✅ CORRECTION SCHEMA : On passe par la relation KYC
+        kyc: {
+            select: { status: true }
+        },
+        
         _count: {
             select: { incidentsAssigned: true }
         }
       }
     });
 
-    return NextResponse.json({ success: true, artisans });
+    // Remapping pour le frontend
+    const formattedArtisans = artisans.map(a => ({
+        ...a,
+        kycStatus: a.kyc?.status || "PENDING", // Valeur par défaut
+        kyc: undefined
+    }));
+
+    return NextResponse.json({ success: true, artisans: formattedArtisans });
 
   } catch (error) {
     console.error("[API_ARTISANS_GET]", error);
@@ -64,8 +73,8 @@ export async function GET(request: Request) {
 // =====================================================================
 export async function POST(request: Request) {
   try {
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const admin = await checkSuperAdmin();
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const body = await request.json();
     if (!body.name || !body.phone) {
@@ -81,6 +90,7 @@ export async function POST(request: Request) {
         ? body.email 
         : `artisan-${body.phone.replace(/\s/g, '')}@immofacile.pro`;
 
+    // CRÉATION ATOMIQUE (USER + FINANCE + KYC)
     const newArtisan = await prisma.user.create({
         data: {
             name: body.name,
@@ -89,9 +99,24 @@ export async function POST(request: Request) {
             jobTitle: body.job || "Technicien Polyvalent",
             password: hashedPassword,
             role: "ARTISAN",
-            kycStatus: "VERIFIED",
-            walletBalance: 0,
-            isActive: true
+            isActive: true,
+            
+            // ✅ INIT KYC (Validé d'office par l'admin)
+            kyc: {
+                create: {
+                    status: "VERIFIED",
+                    documents: []
+                }
+            },
+            
+            // ✅ INIT FINANCE (Obligatoire)
+            finance: {
+                create: {
+                    walletBalance: 0,
+                    version: 1,
+                    kycTier: 2
+                }
+            }
         }
     });
 

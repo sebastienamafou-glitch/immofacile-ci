@@ -12,89 +12,130 @@ datasource db {
 }
 
 // ==========================================
-// 1. GESTION UTILISATEURS UNIFIÉE (IAM)
+// 1. GESTION UTILISATEURS (IAM - Identité Pure)
 // ==========================================
 
 model User {
   id            String    @id @default(cuid())
   
-  // --- Identité de base ---
+  // --- Identité Publique/Semi-Publique ---
   email         String?   @unique
   phone         String?   @unique
   name          String?
   password      String?   // Haché
-  image         String?   // Avatar
+  image         String?   // Photo de profil
   
-  // --- Sécurité & Verification ---
+  // --- Méta-données ---
   emailVerified DateTime?
   phoneVerified DateTime?
   isVerified    Boolean   @default(false)
-  kycStatus     VerificationStatus @default(PENDING)
-  kycDocuments  String[]  
-  
-  // --- Rôles & Métier ---
   role          Role      @default(GUEST)
   
-  // Infos Profil (ImmoFacile)
+  // --- Profil Public ---
   jobTitle      String?
   address       String?
-  income        Int?      // Revenus mensuels
-  paymentMethod String?   // WAVE, OM...
-  paymentNumber String?   // 07xx...
+  bio           String?   @db.Text
   isAvailable   Boolean   @default(false) 
 
   // --- Préférences ---
-  bio           String?   @db.Text
   notifEmail    Boolean   @default(true)
   notifSms      Boolean   @default(true)
 
-  // --- Fintech / Wallet (ImmoFacile) ---
-  walletBalance   Int     @default(0)
-  escrowBalance   Int     @default(0) 
-  referralBalance Int     @default(0)
-
-  // --- Module Investisseur (CROWDFUNDING) ---
+  // --- Relations Sécurisées (One-to-One) ---
+  finance       UserFinance?
+  kyc           UserKYC?
+  
+  // --- Module Investisseur ---
   isBacker        Boolean @default(false)
   backerTier      String? // "SUPPORTER", "AMBASSADEUR", "VISIONNAIRE"
   
-  // --- Relations (NextAuth) ---
+  // --- Relations NextAuth ---
   accounts      Account[]
   sessions      Session[]
 
-  // --- Relations Métier (Longue Durée) ---
+  // --- Relations Métier ---
   propertiesOwned    Property[]      @relation("PropertyOwner")
-  leases             Lease[]         @relation("LeaseTenant") // Le locataire
-  leasesManaged      Lease[]         @relation("LeaseAgent")  // L'agent qui gère le bail
+  leases             Lease[]         @relation("LeaseTenant")
+  leasesManaged      Lease[]         @relation("LeaseAgent")
   missionsAccepted   Mission[]       @relation("AgentMissions")
+  
   leads              Lead[]
   incidentsReported  Incident[]      @relation("IncidentReporter")
   incidentsAssigned  Incident[]      @relation("ArtisanIncidents")
-  quotesIssued       Quote[]         // Liste des devis émis
+  quotesIssued       Quote[]
   transactions       Transaction[]
-  
-  // --- Relations Signature ---
   signatureProofs    SignatureProof[] 
   investmentContracts InvestmentContract[]
-
-  // --- Relations Métier (Courte Durée) ---
   listings           Listing[]       
-  bookings           Booking[]       
+  bookings           Booking[]
+  
   reviews            Review[]        
   wishlists          Wishlist[]
   sentMessages       Message[]
   conversationsAsGuest Conversation[] @relation("GuestConversations")
   conversationsAsHost  Conversation[] @relation("HostConversations")
   
-  // --- Multi-Tenant SaaS (Agence) ---
+  // --- Multi-Tenant SaaS ---
   agencyId           String?
   agency             Agency?        @relation(fields: [agencyId], references: [id])
+  
   isActive           Boolean        @default(true)
-
-  lastMessageAt      DateTime        @default(now())
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  lastMessageAt      DateTime       @default(now())
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   notifications Notification[]
+}
+
+// ==========================================
+// 1.1 SEGMENT FINANCIER (Conformité BCEAO)
+// ==========================================
+model UserFinance {
+  id              String   @id @default(cuid())
+  
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  walletBalance   Int      @default(0)
+  escrowBalance   Int      @default(0) 
+  referralBalance Int      @default(0)
+  
+  // CONFORMITÉ : Gestion des plafonds UEMOA
+  kycTier         Int      @default(1)    // Tier 1 (Basique), Tier 2 (ID Vérifié), Tier 3 (Full)
+  monthlyVolume   Int      @default(0)    // Cumul des transactions du mois
+  lastResetDate   DateTime @default(now()) // Pour réinitialiser le volume mensuel
+
+  income          Int?     // Revenus mensuels déclarés
+  paymentMethod   String?  // WAVE, OM...
+  paymentNumber   String?  // 07xx... (À masquer dans l'UI)
+
+  // SÉCURITÉ : Verrouillage optimiste (Race Conditions)
+  version         Int      @default(0) 
+
+  updatedAt       DateTime @updatedAt
+}
+
+// ==========================================
+// 1.2 SEGMENT KYC (Lutte Anti-Blanchiment)
+// ==========================================
+model UserKYC {
+  id              String             @id @default(cuid())
+  
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status          VerificationStatus @default(PENDING)
+  documents       String[]           // URLs signées uniquement
+  
+  // CONFORMITÉ : Détails de la pièce d'identité
+  idType          String?            // CNI, PASSPORT, VOTE_CARD
+  idNumber        String?            // Numéro de pièce (Hashé/Chiffré)
+  expiryDate      DateTime?          // Date d'expiration de la pièce
+
+  reviewedBy      String?            // Admin ID
+  reviewedAt      DateTime?
+  rejectionReason String?
+  updatedAt       DateTime           @updatedAt
 }
 
 // ==========================================
@@ -107,13 +148,12 @@ model Agency {
   code         String   @unique  
   slug         String   @unique 
   logoUrl      String?
-  email        String?  
+  email        String?
   phone        String?
-  primaryColor String?  @default("#FF7900") 
-  taxId        String?
+  primaryColor String?  @default("#FF7900")
+  taxId        String?  // Numéro IFU / NINEA
   isActive     Boolean  @default(false) 
 
-  // Fintech Agence
   walletBalance Int      @default(0) 
 
   users        User[]   
@@ -166,7 +206,7 @@ model VerificationToken {
 }
 
 // ==========================================
-// 4. PATRIMOINE PHYSIQUE (Long Terme)
+// 4. PATRIMOINE PHYSIQUE
 // ==========================================
 
 model Property {
@@ -196,6 +236,7 @@ model Property {
   agency      Agency?  @relation(fields: [agencyId], references: [id])
 
   listings    Listing[] 
+  transactions Transaction[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -215,7 +256,7 @@ model Lease {
   isActive        Boolean         @default(false)
   
   contractUrl     String?
-  documentHash    String?
+  documentHash    String?         // Empreinte pour preuve légale
   signatureStatus SignatureStatus @default(PENDING)
   
   tenantId        String
@@ -272,7 +313,6 @@ model SignatureProof {
   userAgent String?
   signatureData String?  @db.Text
   otpToken  String?
-  
   leaseId   String
   lease     Lease    @relation(fields: [leaseId], references: [id])
 
@@ -290,7 +330,7 @@ model InvestmentContract {
   userAgent     String?
   signatureData String   @db.Text 
 
-  paymentReference String? @unique 
+  paymentReference String?  @unique 
   status           String   @default("PENDING") 
   
   userId        String
@@ -332,7 +372,7 @@ model Listing {
   agency         Agency?  @relation(fields: [agencyId], references: [id])
 
   propertyId     String?
-  property       Property? @relation(fields: [propertyId], references: [id])
+  property       Property?      @relation(fields: [propertyId], references: [id])
   
   bookings       Booking[]
   reviews        Review[]
@@ -372,7 +412,7 @@ model Review {
 }
 
 // ==========================================
-// 7. FINANCE & PAIEMENTS
+// 7. FINANCE & PAIEMENTS (Audit Trail)
 // ==========================================
 
 model Payment {
@@ -382,15 +422,26 @@ model Payment {
   type           PaymentType
   status         PaymentStatus @default(PENDING)
   method         String?
-  reference      String?
+  reference      String?       @unique 
+  idempotencyKey String?       @unique 
 
+  // Ventilation
   amountOwner    Int           @default(0) 
   amountPlatform Int           @default(0) 
   amountAgent    Int           @default(0) 
   amountAgency   Int           @default(0) 
+  
+  platformTaxRate   Float      @default(0.18) 
+  platformTaxAmount Int        @default(0)    
 
-  leaseId        String
-  lease          Lease         @relation(fields: [leaseId], references: [id])
+  providerResponse  Json?      
+
+  // 👇 MODIFICATIONS APPORTÉES 👇
+  leaseId        String?       // Devenu Optionnel (?)
+  lease          Lease?        @relation(fields: [leaseId], references: [id])
+
+  quoteId        String?       // Ajouté
+  quote          Quote?        @relation(fields: [quoteId], references: [id])
 }
 
 model BookingPayment {
@@ -401,7 +452,7 @@ model BookingPayment {
   status           String
   
   agencyCommission Int
-  hostPayout       Int
+  hostPayout       Int 
   platformCommission Int           @default(0)
 
   bookingId        String          @unique
@@ -411,15 +462,30 @@ model BookingPayment {
 }
 
 model Transaction {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   amount      Int
-  type        String   
+  type        TransactionType // Enum CREDIT/DEBIT
+  balanceType BalanceType     // Quel solde est touché (WALLET/ESCROW)
   reason      String   
-  status      String   @default("SUCCESS") 
+  status      String          @default("SUCCESS") 
+  reference   String?         @unique // Liaison vers Payment.reference
   
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User            @relation(fields: [userId], references: [id])
   
+  // SÉCURITÉ : Audit Trail
+  previousHash String?        // Pour détecter les altérations de DB
+  
+  // ✅ AJOUTS STRATÉGIQUES POUR LA MAINTENANCE
+  quoteId     String?
+  quote       Quote?          @relation(fields: [quoteId], references: [id])
+  
+  incidentId  String?
+  incident    Incident?       @relation(fields: [incidentId], references: [id])
+
+  propertyId  String?
+  property    Property?       @relation(fields: [propertyId], references: [id])
+
   createdAt   DateTime @default(now())
 }
 
@@ -462,15 +528,13 @@ model Incident {
   description String
   priority    String         @default("NORMAL")
   
-  // Photos
   photos      String[]
   photosBefore String[]      
   photosAfter  String[]      
 
   status      IncidentStatus @default(OPEN)
   
-  // Devis & Coût
-  quote       Quote?         
+  quote       Quote?
   quoteAmount Int?
   finalCost   Int?
 
@@ -480,13 +544,12 @@ model Incident {
   assignedToId String?
   assignedTo   User?         @relation("ArtisanIncidents", fields: [assignedToId], references: [id])
 
-
   propertyId  String
   property    Property       @relation(fields: [propertyId], references: [id])
 
-  // Chat
-  conversation Conversation? 
-
+  conversation Conversation?
+  transactions Transaction[] // ✅ Relation pour suivre les coûts
+  
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -520,11 +583,9 @@ model Wishlist {
   @@unique([userId, listingId]) 
 }
 
-// ✅ MODÈLE CONVERSATION UNIFIÉ (AIRBNB + MAINTENANCE)
 model Conversation {
   id        String    @id @default(cuid())
 
-  // --- Contexte 1 : Court Séjour ---
   guestId   String?
   guest     User?     @relation("GuestConversations", fields: [guestId], references: [id])
   
@@ -534,7 +595,6 @@ model Conversation {
   listingId String?
   listing   Listing?  @relation(fields: [listingId], references: [id])
 
-  // --- Contexte 2 : Maintenance ---
   incidentId String?  @unique
   incident   Incident? @relation(fields: [incidentId], references: [id])
 
@@ -583,6 +643,9 @@ model Quote {
 
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  
+  transactions Transaction[] // ✅ Relation pour savoir si le devis a été payé
+  payments     Payment[]
 }
 
 model QuoteItem {
@@ -599,21 +662,35 @@ model QuoteItem {
 model Notification {
   id        String   @id @default(cuid())
   
-  userId    String   // Le destinataire
+  userId    String  
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   title     String
   message   String
   isRead    Boolean  @default(false)
-  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
-  link      String?  // Lien de redirection (ex: vers le dossier)
+  type      String   @default("INFO") 
+  link      String?  // Lien de redirection
   
   createdAt DateTime @default(now())
 }
 
 // ==========================================
-// 11. ENUMS (RÉFÉRENTIEL)
+// 11. ENUMS (RÉFÉRENTIEL FINANCIER)
 // ==========================================
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  PAYMENT    
+  INVESTMENT
+}
+
+enum BalanceType {
+  WALLET
+  ESCROW
+  REFERRAL
+}
 
 enum QuoteStatus {
   PENDING
@@ -678,6 +755,7 @@ enum PaymentType {
   DEPOSIT
   CHARGES
   FEE
+  TOPUP
 }
 
 enum PaymentProvider {

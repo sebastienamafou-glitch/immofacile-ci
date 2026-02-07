@@ -1,41 +1,53 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
-// ============================================================================
-// GET : Lister les candidatures (Baux en attente) + Scoring IA
-// ============================================================================
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ (Migration Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+    
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION (Baux PENDING sur mes propriétés)
+    // 2. RÉCUPÉRATION (Avec les nouvelles relations)
     const pendingLeases = await prisma.lease.findMany({
       where: {
         status: "PENDING",
         property: { ownerId: userId } // 🔒 Verrou Propriétaire
       },
       include: {
-        tenant: true,
+        tenant: {
+            // ✅ On inclut les tables satellites
+            include: {
+                finance: true,
+                kyc: true
+            }
+        },
         property: { select: { id: true, title: true, price: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // 3. TRUST SCORE ALGORITHM
+    // 3. TRUST SCORE ALGORITHM (Adapté au nouveau schéma)
     const candidates = pendingLeases.map((lease) => {
         let score = 50; // Base
         const details: string[] = [];
         const tenant = lease.tenant;
 
+        // ✅ Extraction sécurisée des nouvelles sources de données
+        const walletBalance = tenant.finance?.walletBalance || 0;
+        const kycStatus = tenant.kyc?.status || "PENDING";
+
         // A. Solvabilité (Basée sur le Wallet)
-        if (tenant.walletBalance >= lease.monthlyRent * 3) {
+        if (walletBalance >= lease.monthlyRent * 3) {
             score += 30;
             details.push("💰 Solvabilité Excellente (> 3 mois)");
-        } else if (tenant.walletBalance >= lease.monthlyRent) {
+        } else if (walletBalance >= lease.monthlyRent) {
             score += 10;
             details.push("✅ Solde suffisant");
         } else {
@@ -44,7 +56,7 @@ export async function GET(request: Request) {
         }
 
         // B. Identité (KYC)
-        if (tenant.kycStatus === "VERIFIED") {
+        if (kycStatus === "VERIFIED") {
             score += 20;
             details.push("✅ Identité Vérifiée");
         } else {
@@ -53,7 +65,7 @@ export async function GET(request: Request) {
 
         // C. Profil
         if (tenant.jobTitle) score += 5;
-        if (tenant.isAvailable) score += 5;
+        // Note: 'isAvailable' retiré par sécurité si absent du schéma User standard
 
         // Bornage
         score = Math.min(Math.max(score, 0), 100);
@@ -73,8 +85,9 @@ export async function GET(request: Request) {
                 name: tenant.name || "Candidat",
                 phone: tenant.phone || "",
                 email: tenant.email || "",
-                walletBalance: tenant.walletBalance,
-                kycStatus: tenant.kycStatus,
+                // ✅ On renvoie les valeurs extraites pour le front
+                walletBalance: walletBalance,
+                kycStatus: kycStatus,
                 image: tenant.image
             },
             property: lease.property,

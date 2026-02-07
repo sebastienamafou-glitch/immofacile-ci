@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { api } from "@/lib/api"; // ✅ Wrapper Sécurisé
+import { auth } from "@/auth";
 
 interface Movement {
     id: string;

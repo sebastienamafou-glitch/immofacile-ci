@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 // Import compatible Next.js pour le moteur PDF serveur
@@ -14,7 +16,9 @@ export async function GET(
     const { leaseId } = await params;
 
     // 1. SÉCURITÉ : Qui demande le fichier ?
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const user = await prisma.user.findUnique({ 

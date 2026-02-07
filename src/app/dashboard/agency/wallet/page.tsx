@@ -1,19 +1,24 @@
-import { headers } from "next/headers";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, History, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// ✅ CORRECTIF IMPORTS : On pointe vers le bon dossier (pas de sous-dossier 'wallet')
 import WithdrawForm from "@/components/agency/WithdrawForm"; 
 import TransactionList from "@/components/agency/TransactionList";
+import { auth } from "@/auth";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyWalletPage() {
-  // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
-  if (!userId) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
+const session = await auth();
+
+// Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
+if (!session || !session.user?.id) {
+  redirect("/login");
+}
+
+const userId = session.user.id;
 
   // 2. VÉRIFICATION ADMIN & AGENCE
   const admin = await prisma.user.findUnique({

@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID Obligatoire)
-    const adminId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const adminId = session?.user?.id;
+
     if (!adminId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const admin = await prisma.user.findUnique({
@@ -34,29 +39,39 @@ export async function POST(request: Request) {
     // 3. TRANSACTION BANCAIRE ATOMIQUE
     const result = await prisma.$transaction(async (tx) => {
         
+        // Vérif existence user
         const targetUser = await tx.user.findUnique({ where: { id: userId } });
         if (!targetUser) throw new Error("USER_NOT_FOUND");
 
-        // Crédit du Wallet
-        const updatedUser = await tx.user.update({
-            where: { id: userId },
-            data: { walletBalance: { increment: amountInt } }
+        // A. Crédit du Wallet (Correction Schema : UserFinance)
+        // On utilise upsert pour l'auto-réparation (crée le coffre s'il n'existe pas)
+        const updatedFinance = await tx.userFinance.upsert({
+            where: { userId: userId },
+            create: {
+                userId: userId,
+                walletBalance: amountInt,
+                version: 1,
+                kycTier: 1
+            },
+            update: { 
+                walletBalance: { increment: amountInt },
+                version: { increment: 1 } 
+            }
         });
 
-        // Création de la trace (Audit)
+        // B. Création de la trace (Audit)
         await tx.transaction.create({
             data: {
                 amount: amountInt,
                 type: "CREDIT",
-                // ✅ CORRECTION : Status standardisé
+                balanceType: "WALLET", // ✅ Champ obligatoire
                 status: "SUCCESS", 
-                // ✅ TRACE : On marque qui a fait l'action
-                reason: `ADMIN_CREDIT_MANUAL_BY_${admin.name?.toUpperCase().replace(/\s+/g, '_') || 'ADMIN'}`,
+                reason: `CREDIT_ADMIN_PAR_${admin.name?.toUpperCase().replace(/\s+/g, '_') || 'ADMIN'}`,
                 userId: userId
             }
         });
 
-        return updatedUser;
+        return updatedFinance;
     });
 
     return NextResponse.json({ 

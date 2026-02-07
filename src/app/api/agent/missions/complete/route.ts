@@ -1,90 +1,97 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = req.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) {
-      return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // 2. VÉRIFICATION RÔLE (Via ID)
-    const agent = await prisma.user.findUnique({ 
-        where: { id: userId },
-        select: { id: true, role: true }
-    });
-
-    if (!agent || agent.role !== "AGENT") {
-      return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-    }
-
-    // 3. VALIDATION
     const body = await req.json();
-    const { missionId, reportNote } = body; 
+    const { missionId, reportData } = body;
 
     if (!missionId) {
-      return NextResponse.json({ error: "ID Mission manquant" }, { status: 400 });
+        return NextResponse.json({ error: "ID mission manquant" }, { status: 400 });
     }
 
-    const mission = await prisma.mission.findUnique({
-      where: { id: missionId },
-      include: { 
-        property: { select: { address: true } } 
-      }
+    // 2. TRANSACTION FINANCIÈRE ATOMIQUE
+    const result = await prisma.$transaction(async (tx) => {
+        
+        // A. Vérification de la Mission (Lock)
+        const mission = await tx.mission.findUnique({
+            where: { id: missionId },
+            include: { agent: { include: { finance: true } } }
+        });
+
+        // Contrôles de sécurité
+        if (!mission) throw new Error("Mission introuvable");
+        if (mission.agentId !== userId) throw new Error("Cette mission ne vous est pas assignée");
+        if (mission.status !== "ACCEPTED") throw new Error("Mission déjà terminée ou non active");
+
+        const fee = mission.fee || 0;
+
+        // B. Mise à jour statut Mission
+        const updatedMission = await tx.mission.update({
+            where: { id: missionId },
+            data: {
+                status: "COMPLETED",
+                reportData: reportData || "Mission validée.",
+                // On peut ajouter ici la date de fin réelle si prévue dans le schéma
+            }
+        });
+
+        // C. Rémunération de l'Agent (CORRECTION SCHEMA)
+        if (fee > 0) {
+            // On cible UserFinance, pas User
+            const finance = await tx.userFinance.findUnique({ where: { userId } });
+            
+            if (finance) {
+                await tx.userFinance.update({
+                    where: { userId },
+                    data: {
+                        walletBalance: { increment: fee },
+                        version: { increment: 1 } // Optimistic Lock
+                    }
+                });
+            } else {
+                // Self-healing : On crée le wallet s'il manque
+                await tx.userFinance.create({
+                    data: {
+                        userId,
+                        walletBalance: fee,
+                        version: 1
+                    }
+                });
+            }
+
+            // D. Audit Trail (Obligatoire)
+            await tx.transaction.create({
+                data: {
+                    amount: fee,
+                    type: "CREDIT",
+                    balanceType: "WALLET",
+                    reason: `Rémunération Mission #${mission.id.substring(0, 8)}`,
+                    status: "SUCCESS",
+                    userId: userId,
+                    reference: `MISSION-${mission.id}`
+                }
+            });
+        }
+
+        return updatedMission;
     });
 
-    if (!mission) return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
-
-    // Sécurité : Vérifier l'assignation
-    if (mission.agentId !== agent.id) {
-      return NextResponse.json({ error: "Cette mission ne vous est pas attribuée." }, { status: 403 });
-    }
-
-    if (mission.status !== "ACCEPTED") {
-      return NextResponse.json({ error: "Statut invalide pour clôture (Déjà finie ?)." }, { status: 400 });
-    }
-
-    // 4. TRANSACTION FINANCIÈRE ATOMIQUE
-    await prisma.$transaction([
-      // A. Clôture Mission
-      prisma.mission.update({
-        where: { id: missionId },
-        data: {
-          status: "COMPLETED",
-          reportData: reportNote || "Mission validée sans note."
-        }
-      }),
-
-      // B. Paiement Agent (Wallet)
-      prisma.user.update({
-        where: { id: agent.id },
-        data: {
-          walletBalance: { increment: mission.fee }
-        }
-      }),
-
-      // C. Trace Comptable
-      prisma.transaction.create({
-        data: {
-          amount: mission.fee,
-          type: "CREDIT",
-          reason: `Mission terminée : ${mission.property.address}`,
-          status: "SUCCESS",
-          userId: agent.id
-        }
-      })
-    ]);
-
-    return NextResponse.json({ 
-      success: true, 
-      message: "Mission terminée. Portefeuille crédité." 
-    });
+    return NextResponse.json({ success: true, mission: result });
 
   } catch (error: any) {
-    console.error("Erreur Complete Mission:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("Erreur Completion Mission:", error.message);
+    return NextResponse.json({ error: error.message || "Erreur serveur" }, { status: 500 });
   }
 }

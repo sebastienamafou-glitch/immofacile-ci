@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // Singleton
+import { auth } from "@/auth";
+
+import { prisma } from "@/lib/prisma";
+
 
 // Import compatible Next.js pour le moteur PDF serveur
 const PDFDocument = require("pdfkit/js/pdfkit.standalone");
@@ -8,24 +11,36 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ leaseId: string }> } // ✅ Next.js 15 Promise
+  { params }: { params: { leaseId: string } } // ✅ CORRECTION : Format Next.js 14
 ) {
   try {
-    const { leaseId } = await params;
+    const { leaseId } = params; // Pas de await en Next.js 14
 
-    // 1. SÉCURITÉ : Identification
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!userId) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { id: true, role: true, email: true } // Optimisation select
+    });
+
     if (!user) return NextResponse.json({ error: "Compte introuvable" }, { status: 403 });
 
     // 2. RÉCUPÉRATION DU BAIL
     const lease = await prisma.lease.findUnique({
       where: { id: leaseId },
       include: {
-        property: { include: { owner: true } },
-        tenant: true,
+        property: { 
+            include: { 
+                owner: { select: { id: true, name: true, email: true } } 
+            } 
+        },
+        tenant: { select: { id: true, name: true, email: true } },
         signatures: true
       },
     });
@@ -34,13 +49,16 @@ export async function GET(
       return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
     }
 
-    // 3. VÉRIFICATION DES DROITS D'ACCÈS (CRITIQUE)
-    // Seul le locataire du bail ou le propriétaire du bien peut télécharger
+    // 3. VÉRIFICATION DES DROITS (ACL)
+    // - Le locataire du bail
+    // - Le propriétaire du bien
+    // - Un Super Admin
     const isTenant = lease.tenantId === user.id;
     const isOwner = lease.property.ownerId === user.id;
     const isAdmin = user.role === 'SUPER_ADMIN';
 
     if (!isTenant && !isOwner && !isAdmin) {
+        console.error(`[PDF SECURITY] Tentative accès non autorisé User ${user.id} sur Bail ${leaseId}`);
         return NextResponse.json({ error: "Accès interdit à ce document." }, { status: 403 });
     }
 
@@ -79,11 +97,11 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(2);
 
-    // 1. Les Parties
+    // 1. Les Parties (Avec Null Safety)
     doc.fontSize(12).font('Helvetica-Bold').text("1. LES PARTIES");
     doc.fontSize(10).font('Helvetica')
-       .text(`BAILLEUR : ${lease.property.owner?.name} (${lease.property.owner?.email})`)
-       .text(`LOCATAIRE : ${lease.tenant?.name} (${lease.tenant?.email})`);
+       .text(`BAILLEUR : ${lease.property.owner?.name || 'Non défini'} (${lease.property.owner?.email || 'N/A'})`)
+       .text(`LOCATAIRE : ${lease.tenant?.name || 'Non défini'} (${lease.tenant?.email || 'N/A'})`);
     doc.moveDown(1);
 
     // 2. Le Bien
@@ -105,11 +123,11 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.fontSize(12).font('Helvetica-Bold').text("4. SIGNATURES & VALIDATION");
     doc.moveDown(1);
 
-    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "COMPLETED";
+    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "TERMINATED"; // Adapté au nouveau statut
     
     if (isSigned) {
         doc.fillColor('green').text("[ DOCUMENT SIGNÉ ÉLECTRONIQUEMENT ]", { align: 'center' });
-        doc.fillColor('black').fontSize(8).text(`Date de signature : ${new Date(lease.updatedAt).toLocaleString()}`, { align: 'center' });
+        doc.fillColor('black').fontSize(8).text(`Dernière mise à jour : ${new Date(lease.updatedAt).toLocaleString()}`, { align: 'center' });
         if(lease.documentHash) {
             doc.text(`Empreinte numérique (Hash) : ${lease.documentHash}`, { align: 'center' });
         }

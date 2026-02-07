@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Users, Phone, Mail, ShieldCheck, MoreVertical, AlertTriangle } from "lucide-react";
@@ -9,10 +9,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function AgencyTeamPage() {
   // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  const session = await auth();
+  if (!session || !session.user?.id) {redirect("/login");
+}
   
-  if (!userId) redirect("/login");
+  const userId = session.user.id;
 
   // 2. VÉRIFICATION RÔLE
   const admin = await prisma.user.findUnique({

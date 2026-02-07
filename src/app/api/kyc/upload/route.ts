@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma"; // ✅ Singleton
+import { auth } from "@/auth";
+
+import { prisma } from "@/lib/prisma";
 import { put } from "@vercel/blob";
 import { v4 as uuidv4 } from "uuid";
 
-export const dynamic = 'force-dynamic'; // Sécurité Next.js
 
-// CONFIGURATION
+export const dynamic = 'force-dynamic';
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Mo
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
@@ -16,14 +18,13 @@ const ALLOWED_MIME_TYPES = [
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ AUTH
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. PARSING & VALIDATION
+    // 2. PARSING & VALIDATION FICHIER
     const formData = await request.formData();
     const file = formData.get("document") as File | null;
 
@@ -36,39 +37,43 @@ export async function POST(request: Request) {
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: "Format non supporté (PDF, JPG, PNG uniquement)." }, { status: 415 });
+      return NextResponse.json({ error: "Format non supporté (PDF, JPG, PNG)." }, { status: 415 });
     }
 
     // 3. UPLOAD CLOUD (Vercel Blob)
     const fileExtension = file.name.split('.').pop() || "bin";
-    // On range par ID utilisateur pour éviter le désordre
-    const uniqueFileName = `kyc/${user.id}/${uuidv4()}.${fileExtension}`; 
+    const uniqueFileName = `kyc/${userId}/${uuidv4()}.${fileExtension}`; 
 
     const blob = await put(uniqueFileName, file, {
-      access: 'public', // Attention: URL accessible si connue. Pour du KYC strict, envisagez 'private' + tokens temporaires plus tard.
+      access: 'public', 
     });
 
-    // 4. MISE À JOUR BASE DE DONNÉES
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        kycStatus: "PENDING", // On repasse en attente de validation
-        // ❌ J'ai supprimé 'kycDocumentUrl' qui n'existe pas dans votre schema
-        // ✅ On utilise 'push' pour ajouter au tableau existant
-        kycDocuments: {
-          push: blob.url 
+    // 4. MISE À JOUR BASE DE DONNÉES (CORRECTION SCHEMA)
+    // On cible la table UserKYC, pas User
+    await prisma.userKYC.upsert({
+      where: { userId: userId },
+      create: {
+        userId: userId,
+        status: "PENDING",
+        documents: [blob.url], // On initialise le tableau
+        idType: "CNI" // Valeur par défaut
+      },
+      update: {
+        status: "PENDING", // On repasse en attente à chaque nouvel envoi
+        documents: {
+          push: blob.url // On ajoute au tableau existant
         }
       }
     });
 
     return NextResponse.json({ 
       success: true, 
-      message: "Document envoyé. En attente de validation.",
+      message: "Document envoyé. Dossier en cours d'analyse.",
       url: blob.url
     });
 
   } catch (error) {
     console.error("Erreur Upload KYC:", error);
-    return NextResponse.json({ error: "Erreur serveur lors de l'envoi." }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

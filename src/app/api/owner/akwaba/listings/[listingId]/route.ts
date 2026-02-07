@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +12,9 @@ export async function GET(
 ) {
   try {
     // 1. SÉCURITÉ ZERO TRUST
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION SÉCURISÉE
@@ -44,7 +48,9 @@ export async function PUT(
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // Vérification Existence + Propriété
@@ -91,7 +97,9 @@ export async function DELETE(
   { params }: { params: { listingId: string } }
 ) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 1. Vérif Owner

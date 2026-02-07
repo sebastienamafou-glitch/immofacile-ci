@@ -1,4 +1,3 @@
-// Fichier: prisma/create-admin.ts
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -6,12 +5,11 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = "superadmin@immofacile.ci";
-  const password = "admin123"; // Changez-le après !
+  const password = "admin123"; 
 
-  // 1. Hachage du mot de passe
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // 2. Création ou Mise à jour
+  // Correction : On utilise la relation imbriquée 'kyc'
   const user = await prisma.user.upsert({
     where: { email },
     update: { 
@@ -22,14 +20,26 @@ async function main() {
       email,
       name: "Direction ImmoFacile",
       password: hashedPassword,
-      role: "SUPER_ADMIN", // Le rôle clé
+      role: "SUPER_ADMIN", 
       isVerified: true,
-      kycStatus: "VERIFIED",
-      image: "https://ui-avatars.com/api/?name=Super+Admin&background=0D8ABC&color=fff"
+      image: "https://ui-avatars.com/api/?name=Super+Admin&background=0D8ABC&color=fff",
+      // 👇 C'est ici que ça change : Création imbriquée
+      kyc: {
+        create: {
+            status: "VERIFIED",
+            idType: "CNI"
+        }
+      },
+      finance: {
+        create: {
+            walletBalance: 0,
+            kycTier: 3
+        }
+      }
     },
   });
 
-  console.log(`✅ Super Admin créé : ${user.email} (Mot de passe: ${password})`);
+  console.log(`✅ Super Admin créé : ${user.email}`);
 }
 
 main()

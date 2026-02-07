@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, ShieldCheck, User, Mail, Phone, Lock, Eye, EyeOff, Building2, Home } from "lucide-react";
-import { cn } from "@/lib/utils"; // Assurez-vous d'avoir clsx/tailwind-merge ou enlevez cn()
+import { cn } from "@/lib/utils"; 
 
 function SignupForm() {
   const router = useRouter();

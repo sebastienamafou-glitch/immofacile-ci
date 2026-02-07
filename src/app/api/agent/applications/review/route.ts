@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     // 1. AUTH ZERO TRUST
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const agent = await prisma.user.findUnique({ where: { id: userId }, select: { role: true }});

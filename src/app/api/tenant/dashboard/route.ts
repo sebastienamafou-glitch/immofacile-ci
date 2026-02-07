@@ -1,48 +1,51 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
-// ✅ IMPORT DU TYPE SSOT (Source of Truth)
+// ✅ IMPORT DU TYPE SSOT
 import { TenantDashboardResponse } from "@/lib/types/tenant";
 
-// Force le mode dynamique pour ne pas cacher les données utilisateur
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
     // -------------------------------------------------------------------------
-    // 1. SÉCURITÉ & AUTHENTIFICATION (Niveau Bancaire)
+    // 1. SÉCURITÉ & AUTHENTIFICATION (Migration v5)
     // -------------------------------------------------------------------------
-    const userEmail = request.headers.get("x-user-email");
+    const session = await auth();
+    const userEmail = session?.user?.email;
     
     if (!userEmail) {
         return NextResponse.json(
-            { error: "Accès refusé. Token manquant." }, 
+            { error: "Accès refusé. Non authentifié." }, 
             { status: 401 }
         );
     }
 
+    // 2. RÉCUPÉRATION USER + FINANCE + KYC
     const user = await prisma.user.findUnique({ 
-        where: { email: userEmail } 
+        where: { email: userEmail },
+        include: {
+            finance: { select: { walletBalance: true } }, // ✅ Relation Finance
+            kyc: { select: { status: true } }             // ✅ Relation KYC
+        }
     });
 
     if (!user) {
-        return NextResponse.json(
-            { error: "Utilisateur introuvable." }, 
-            { status: 404 }
-        );
+        return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
     }
 
     // -------------------------------------------------------------------------
-    // 2. RÉCUPÉRATION DES DONNÉES (Conforme au Type SSOT)
+    // 3. RÉCUPÉRATION DES DONNÉES MÉTIER
     // -------------------------------------------------------------------------
     
-    // A. Récupération du Bail (Priorité : ACTIF, sinon PENDING)
-    // On utilise exactement les mêmes 'select/include' que dans tenant.ts
+    // A. Récupération du Bail
     const lease = await prisma.lease.findFirst({
         where: {
             tenantId: user.id, // 🔒 SÉCURITÉ : Cloisonnement strict
             status: { in: ['ACTIVE', 'PENDING'] }
         },
-        orderBy: { createdAt: 'desc' }, // Le plus récent en premier
+        orderBy: { createdAt: 'desc' },
         include: {
             property: {
                 select: {
@@ -62,9 +65,9 @@ export async function GET(request: Request) {
         }
     });
 
-    // B. Récupération des Incidents (Seulement ceux créés par le locataire)
+    // B. Récupération des Incidents
     const incidents = await prisma.incident.findMany({
-        where: { reporterId: user.id }, // 🔒 SÉCURITÉ
+        where: { reporterId: user.id },
         orderBy: { createdAt: 'desc' },
         take: 3,
         select: {
@@ -76,9 +79,13 @@ export async function GET(request: Request) {
     });
 
     // -------------------------------------------------------------------------
-    // 3. CONSTRUCTION DE LA RÉPONSE
+    // 4. CONSTRUCTION DE LA RÉPONSE
     // -------------------------------------------------------------------------
     
+    // Extraction sécurisée des données relationnelles
+    const kycStatus = user.kyc?.status || "PENDING";
+    const walletBalance = user.finance?.walletBalance || 0;
+
     const responseData: TenantDashboardResponse = {
         success: true,
         user: {
@@ -86,11 +93,12 @@ export async function GET(request: Request) {
             name: user.name,
             email: user.email,
             phone: user.phone,
-            walletBalance: user.walletBalance,
-            isVerified: user.kycStatus === 'VERIFIED',
-            kycStatus: user.kycStatus
+            
+            // ✅ CORRECTION SCHEMA : On mappe les nouvelles sources
+            walletBalance: walletBalance,
+            isVerified: kycStatus === 'VERIFIED',
+            kycStatus: kycStatus
         },
-        // Grâce au typage SSOT, TypeScript vérifie que 'lease' correspond exactement
         lease: lease, 
         incidents: incidents
     };

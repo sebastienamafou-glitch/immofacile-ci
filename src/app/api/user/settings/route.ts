@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
-import { hash, compare } from "bcryptjs"; // N'oubliez pas: npm install bcryptjs
+import { hash, compare } from "bcryptjs"; 
+
 
 export const dynamic = 'force-dynamic';
 
 // =============================================================================
-// 1. GET : CHARGER LES INFOS (Votre code validé)
+// 1. GET : CHARGER LES INFOS
 // =============================================================================
 export async function GET(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const user = await prisma.user.findUnique({
@@ -20,15 +26,16 @@ export async function GET(request: Request) {
         email: true,
         phone: true,
         address: true,
-        jobTitle: true,      // Ajouté pour les pros
-        paymentMethod: true, // Ajouté pour les paiements
-        paymentNumber: true, // Ajouté pour les paiements
-        role: true,          // Utile pour l'affichage conditionnel
+        jobTitle: true,      
+        // ❌ SUPPRIMÉS : Ces champs n'existent plus sur User (Architecture v5)
+        // paymentMethod: true, 
+        // paymentNumber: true, 
+        role: true,          
         image: true,
       }
     });
 
-    return NextResponse.json(user); // Renvoie directement l'objet user
+    return NextResponse.json(user);
 
   } catch (error) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -36,37 +43,37 @@ export async function GET(request: Request) {
 }
 
 // =============================================================================
-// 2. PATCH : MISE À JOUR (Le moteur du formulaire)
+// 2. PATCH : MISE À JOUR
 // =============================================================================
 export async function PATCH(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await request.json();
     const { 
         name, phone, address, jobTitle, 
-        paymentMethod, paymentNumber, 
+        // paymentMethod, paymentNumber, // On ignore ces champs obsolètes
         currentPassword, newPassword 
     } = body;
 
     // --- GESTION SÉCURISÉE DU MOT DE PASSE ---
     let passwordUpdate = {};
     if (newPassword && currentPassword) {
-        // 1. On récupère le hash actuel
         const user = await prisma.user.findUnique({ where: { id: userId } });
         
         if (!user || !user.password) {
              return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
         }
 
-        // 2. On vérifie l'ancien mot de passe
         const isValid = await compare(currentPassword, user.password);
         if (!isValid) {
             return NextResponse.json({ error: "Mot de passe actuel incorrect" }, { status: 403 });
         }
 
-        // 3. On hash le nouveau
         const hashedPassword = await hash(newPassword, 12);
         passwordUpdate = { password: hashedPassword };
     }
@@ -79,12 +86,11 @@ export async function PATCH(request: Request) {
             phone,
             address,
             jobTitle,
-            paymentMethod,
-            paymentNumber,
-            ...passwordUpdate // N'est appliqué que si le mot de passe change
+            // On ne met plus à jour les méthodes de paiement ici
+            ...passwordUpdate 
         },
         select: {
-            id: true, name: true, email: true // On renvoie le strict minimum pour confirmer
+            id: true, name: true, email: true
         }
     });
 

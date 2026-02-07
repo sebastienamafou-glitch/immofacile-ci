@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
@@ -6,7 +8,9 @@ export const dynamic = 'force-dynamic';
 // 1. GET : LIRE LE PROFIL
 export async function GET(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const artisan = await prisma.user.findUnique({
@@ -36,7 +40,9 @@ export async function GET(request: Request) {
 // 2. PUT : METTRE À JOUR LE PROFIL (Infos + Disponibilité)
 export async function PUT(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const body = await request.json();

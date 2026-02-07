@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
+import { prisma } from "@/lib/prisma";
 export const dynamic = 'force-dynamic';
 
 export async function GET(
@@ -11,7 +12,8 @@ export async function GET(
     const { id } = await params;
 
     // 1. SÉCURITÉ ZERO TRUST (Middleware ID)
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+    const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION SÉCURISÉE (Bail + Paiements)

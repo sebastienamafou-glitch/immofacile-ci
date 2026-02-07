@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import PDFDocument from "pdfkit";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +15,8 @@ export async function GET(
     const { id } = await params;
 
     // 1. SÉCURITÉ ZERO TRUST : Qui demande le fichier ?
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+    const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION SÉCURISÉE

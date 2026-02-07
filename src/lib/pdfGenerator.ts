@@ -1,29 +1,48 @@
 import { jsPDF } from "jspdf";
-// ✅ IMPORT DE L'ADN (Propriété Intellectuelle)
 import { PLATFORM_OWNER } from "@/lib/constants/owner";
 
-// ✅ FIX : Formatage manuel pour éviter les slashes "/" dans le PDF
-const formatMoney = (amount: number) => {
-  const value = new Intl.NumberFormat('fr-FR').format(amount);
-  const cleanValue = value.replace(/\s/g, ' ');
-  return `${cleanValue} FCFA`;
+// 🔧 SÉCURITÉ : Valeurs par défaut si les constantes manquent
+const OWNER_FALLBACK = {
+  COMPANY_NAME: PLATFORM_OWNER?.COMPANY_NAME || "WebAppCI",
+  INTERNAL_SIGNATURE: PLATFORM_OWNER?.INTERNAL_SIGNATURE || "WAPP-SECURE",
+  ENGINE_VERSION: PLATFORM_OWNER?.ENGINE_VERSION || "1.0",
+  COPYRIGHT_YEAR: PLATFORM_OWNER?.COPYRIGHT_YEAR || new Date().getFullYear(),
+};
+
+// 🔧 UTILITAIRE : Formatage monétaire robuste pour PDF
+// Remplace les espaces insécables (\u00A0) par des espaces simples pour éviter les caractères bizarres
+const formatMoney = (amount: any): string => {
+  const num = Number(amount);
+  if (isNaN(num)) return "0 FCFA";
+  
+  try {
+    const value = new Intl.NumberFormat('fr-FR').format(num);
+    return `${value.replace(/\s/g, ' ')} FCFA`;
+  } catch (e) {
+    return `${num} FCFA`;
+  }
 };
 
 export const generateInvestmentContract = (user: any, contractData: any) => {
-  // Sécurité anti-crash
-  const safeUser = user || { name: "INCONNU", email: "N/A", phone: "N/A" };
-  const packName = contractData.packName || safeUser.backerTier || 'STANDARD';
-  const amount = contractData.amount || 0;
+  // 1. 🛡️ DATA SANITIZATION (Prévention des crashs frontend)
+  const safeUser = user || { name: "CLIENT NON IDENTIFIÉ", email: "N/A" };
+  const safeContract = contractData || {};
+  
+  // Données critiques
+  const packName = safeContract.packName || safeUser.backerTier || 'STANDARD';
+  const amount = safeContract.amount || 0;
+  const contractId = safeContract.id || `DRAFT-${Date.now().toString().slice(-6)}`; // ID Unique visible
+  const dateSigned = safeContract.signedAt ? new Date(safeContract.signedAt) : new Date();
 
   const doc = new jsPDF();
   
-  // 🔒 SÉCURITÉ IP : INJECTION DES MÉTADONNÉES (Invisible mais juridique)
+  // 2. 🔒 MÉTADONNÉES PDF (Preuve numérique invisible)
   doc.setProperties({
-    title: `Contrat Partenariat - ${safeUser.name}`,
-    subject: "Investissement Immobilier ImmoFacile",
-    author: PLATFORM_OWNER.COMPANY_NAME, // Auteur = WebAppCI
-    keywords: `contrat, investissement, ${PLATFORM_OWNER.INTERNAL_SIGNATURE}, legal`,
-    creator: `WebAppCI Engine v${PLATFORM_OWNER.ENGINE_VERSION}`
+    title: `Contrat Partenariat - ${safeUser.name || 'Investisseur'}`,
+    subject: `Investissement Immobilier - Réf: ${contractId}`,
+    author: OWNER_FALLBACK.COMPANY_NAME,
+    keywords: `contrat, ${contractId}, legal, ohada`,
+    creator: `ImmoFacile Engine v${OWNER_FALLBACK.ENGINE_VERSION}`
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -32,140 +51,169 @@ export const generateInvestmentContract = (user: any, contractData: any) => {
   const contentWidth = pageWidth - (margin * 2);
   
   // --- HEADER ---
-  doc.setFillColor(248, 250, 252); 
+  doc.setFillColor(248, 250, 252); // Gris très clair (Slate-50)
   doc.rect(0, 0, pageWidth, 40, 'F');
   
-  doc.setFontSize(18);
-  doc.setTextColor(15, 23, 42); 
+  doc.setFontSize(16);
+  doc.setTextColor(15, 23, 42); // Slate-900
   doc.setFont("helvetica", "bold");
   doc.text("CONTRAT DE PARTENARIAT FINANCIER", pageWidth / 2, 20, { align: "center" });
   
-  doc.setFontSize(10);
-  doc.setTextColor(71, 85, 105); 
-  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.setFont("helvetica", "normal");
   doc.text("Sous seing privé électronique - Conforme Loi n° 2013-546 (Côte d'Ivoire)", pageWidth / 2, 28, { align: "center" });
 
+  // ✅ AJOUT CRUCIAL : RÉFÉRENCE UNIQUE (Lien DB <-> Papier)
+  doc.setFontSize(8);
+  doc.setTextColor(220, 38, 38); // Rouge discret pour l'ID
+  doc.text(`Réf. Unique : ${contractId}`, margin, 35);
+
   // --- LES PARTIES ---
-  let yPos = 50;
+  let yPos = 55;
   
   doc.setDrawColor(203, 213, 225); 
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(margin, yPos, contentWidth, 55, 3, 3, 'FD');
+  doc.roundedRect(margin, yPos, contentWidth, 55, 2, 2, 'S'); // 'S' pour Stroke uniquement (plus propre à l'impression)
   
   yPos += 10;
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
   doc.text("ENTRE LES SOUSSIGNÉS :", margin + 5, yPos);
   
   yPos += 10;
+  // Partie 1 : L'Entreprise
   doc.setFont("helvetica", "bold");
-  doc.text("1. La société WebAppCI", margin + 5, yPos);
+  doc.text(`1. La société ${OWNER_FALLBACK.COMPANY_NAME}`, margin + 5, yPos);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.text("Société éditrice de solutions numériques. Siège social : Abidjan, Côte d'Ivoire.", margin + 5, yPos + 5);
-  doc.text("Représentée par son Gérant. Ci-après dénommée \"L'Entreprise\" ou \"L'Éditeur\".", margin + 5, yPos + 10);
+  doc.text("Représentée par son Gérant. Ci-après dénommée \"L'Entreprise\".", margin + 5, yPos + 10);
   
   yPos += 20;
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.text(`2. M./Mme ${safeUser.name?.toUpperCase()}`, margin + 5, yPos);
-  doc.setFont("helvetica", "normal");
+  // Partie 2 : L'Investisseur
   doc.setFontSize(10);
-  doc.text(`Identifiant : ${safeUser.email}`, margin + 5, yPos + 5);
+  doc.setFont("helvetica", "bold");
+  const userName = safeUser.name ? safeUser.name.toUpperCase() : "................................................";
+  doc.text(`2. M./Mme ${userName}`, margin + 5, yPos);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Email / Identifiant : ${safeUser.email || 'Non renseigné'}`, margin + 5, yPos + 5);
   doc.text("Ci-après dénommé(e) \"L'Investisseur\".", margin + 5, yPos + 10);
 
   // --- ARTICLES ---
   yPos += 30;
-  doc.setFontSize(10);
   
   const articles = [
       {
           title: "ARTICLE 1 : OBJET DU CONTRAT",
-          content: `Le présent contrat a pour objet de formaliser l'apport financier de l'Investisseur au développement de la plateforme immobilière "ImmoFacile", propriété exclusive de WebAppCI. L'Investisseur souscrit par la présente au "${packName}" pour un montant de ${formatMoney(amount)}.`
+          content: `Le présent contrat a pour objet de formaliser l'apport financier de l'Investisseur au développement de la plateforme immobilière "ImmoFacile". L'Investisseur souscrit au pack "${packName}" pour un montant ferme et définitif de ${formatMoney(amount)}.`
       },
       {
           title: "ARTICLE 2 : DESTINATION DES FONDS",
-          content: "Les fonds versés seront affectés exclusivement aux postes suivants : infrastructure technique (serveurs), développement logiciel (IA), marketing digital et expansion régionale de la solution ImmoFacile."
+          content: "Les fonds versés seront affectés exclusivement aux postes suivants : infrastructure technique (serveurs), développement logiciel (IA), marketing digital et expansion régionale."
       },
       {
           title: "ARTICLE 3 : PREUVE ET SIGNATURE ÉLECTRONIQUE",
-          content: "Les parties conviennent expressément que le présent contrat est signé par voie électronique. Conformément à la Loi n° 2013-546 du 30 juillet 2013 relative aux transactions électroniques en Côte d'Ivoire, l'usage de la signature électronique via la plateforme ImmoFacile vaut identification du signataire et manifeste son consentement irrévocable au contenu de l'acte. Les logs de connexion (Adresse IP, Horodatage) conservés par WebAppCI feront foi en cas de litige."
+          content: `Conformément à la Loi n° 2013-546 relative aux transactions électroniques, l'usage de la signature électronique via la plateforme vaut identification du signataire et manifeste son consentement irrévocable. Les logs de connexion (IP, Horodatage) associés à la transaction "${contractId}" feront foi.`
       },
       {
-          title: "ARTICLE 4 : JURIDICTION COMPÉTENTE",
-          content: "Le présent contrat est régi par le droit ivoirien et les Actes Uniformes de l'OHADA. Tout litige relatif à son interprétation ou son exécution sera soumis à la compétence exclusive du Tribunal de Commerce d'Abidjan."
+          title: "ARTICLE 4 : DROIT APPLICABLE",
+          content: "Le présent contrat est régi par le droit ivoirien et les Actes Uniformes de l'OHADA. Compétence exclusive est attribuée au Tribunal de Commerce d'Abidjan."
       }
   ];
 
   articles.forEach(article => {
+      // Gestion du saut de page
       if (yPos > 250) { 
           doc.addPage(); 
-          yPos = 20; 
+          yPos = 30; // Marge haute sur nouvelle page
       }
+      
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(71, 85, 105);
       doc.setFontSize(9);
-      doc.text(article.title.toUpperCase(), margin, yPos);
+      doc.text(article.title, margin, yPos);
       yPos += 5;
 
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 0, 0); 
+      doc.setTextColor(15, 23, 42); 
       doc.setFontSize(10);
+      
+      // Découpage du texte pour qu'il tienne dans la largeur
       const splitText = doc.splitTextToSize(article.content, contentWidth);
       doc.text(splitText, margin, yPos);
       
-      yPos += (splitText.length * 5) + 8; 
+      yPos += (splitText.length * 5) + 10; 
   });
 
   // --- ZONE DE SIGNATURE ---
-  if (yPos > 210) { doc.addPage(); yPos = 20; }
+  // On force une nouvelle page si on est trop bas, pour ne pas couper le bloc signature
+  if (yPos > 210) { doc.addPage(); yPos = 30; }
   
   yPos += 10;
   doc.setDrawColor(15, 23, 42); 
   doc.setLineWidth(0.5);
-  doc.rect(margin, yPos, contentWidth, 55); 
+  doc.rect(margin, yPos, contentWidth, 60); // Cadre signature
   
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(245, 158, 11); 
-  doc.text("ZONE DE CONSENTEMENT LÉGAL", margin + 5, yPos + 10);
+  doc.setTextColor(245, 158, 11); // Orange ImmoFacile
+  doc.text("CLÔTURE ET SIGNATURES", margin + 5, yPos + 10);
 
+  // Bloc Entreprise
   doc.setFontSize(8);
   doc.setTextColor(0);
-  doc.text(`Pour ${PLATFORM_OWNER.COMPANY_NAME} (L'Éditeur)`, margin + 5, yPos + 25);
+  doc.text(`Pour ${OWNER_FALLBACK.COMPANY_NAME}`, margin + 5, yPos + 25);
   doc.setFont("helvetica", "italic");
   doc.setTextColor(100);
-  doc.text("Signé électroniquement - Certificat WAPP-AUTH", margin + 5, yPos + 35);
+  doc.text("Signé électroniquement par l'Administrateur", margin + 5, yPos + 35);
+  doc.text(`Certificat Serveur: ${OWNER_FALLBACK.INTERNAL_SIGNATURE}`, margin + 5, yPos + 40);
 
+  // Bloc Investisseur
   doc.setFont("helvetica", "bold");
   doc.setTextColor(245, 158, 11); 
-  doc.text("Pour L'Investisseur (Vous)", pageWidth / 2 + 10, yPos + 25);
+  doc.text("Pour L'Investisseur (Lu et approuvé)", pageWidth / 2 + 10, yPos + 25);
   
-  if (contractData.signatureData) {
+  // Affichage Signature Image
+  if (safeContract.signatureData) {
       try {
-        doc.addImage(contractData.signatureData, 'PNG', pageWidth / 2 + 10, yPos + 28, 40, 20);
+        const sigData = safeContract.signatureData;
+        // Vérif basique format image
+        if (typeof sigData === 'string' && sigData.startsWith('data:image')) {
+            doc.addImage(sigData, 'PNG', pageWidth / 2 + 10, yPos + 30, 40, 20);
+        }
         
+        // Métadonnées techniques sous la signature
         doc.setFontSize(6);
         doc.setTextColor(150);
-        doc.setFont("courier", "normal");
-        doc.text(`IP: ${contractData.ipAddress || 'N/A'}`, pageWidth / 2 + 10, yPos + 52);
-        doc.text(`TS: ${new Date(contractData.signedAt).toISOString()}`, pageWidth - margin - 50, yPos + 52);
+        doc.setFont("courier", "normal"); // Police monospace pour l'aspect technique
+        doc.text(`IP Signataire: ${safeContract.ipAddress || 'Non enregistrée'}`, pageWidth / 2 + 10, yPos + 55);
+        doc.text(`TS: ${dateSigned.toISOString()}`, pageWidth - margin - 50, yPos + 55);
       } catch (e) {
-          console.error("Erreur image", e);
+          console.error("Erreur rendu signature PDF", e);
+          doc.setTextColor(255, 0, 0);
+          doc.text("[Erreur affichage signature]", pageWidth / 2 + 10, yPos + 40);
       }
+  } else {
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("[En attente de signature]", pageWidth / 2 + 10, yPos + 40);
   }
 
-  // --- FOOTER "COPYRIGHT" (Marquage Visuel) ---
+  // --- FOOTER "COPYRIGHT" & HASH ---
   const footerY = pageHeight - 10;
   doc.setFontSize(6);
-  doc.setTextColor(180); // Gris clair pour être discret mais lisible
+  doc.setTextColor(150); 
   doc.setFont("helvetica", "normal");
   
-  // Texte de propriété intellectuelle en bas de page
-  const copyrightText = `Propriété exclusive de ${PLATFORM_OWNER.COMPANY_NAME} © ${PLATFORM_OWNER.COPYRIGHT_YEAR} • ID: ${PLATFORM_OWNER.INTERNAL_SIGNATURE} • Ce document est une preuve juridique générée électroniquement.`;
-  doc.text(copyrightText, margin, footerY);
+  const copyrightText = `Document généré par ${OWNER_FALLBACK.COMPANY_NAME} © ${OWNER_FALLBACK.COPYRIGHT_YEAR} • ID Transaction: ${contractId} • Ce document vaut preuve juridique.`;
+  doc.text(copyrightText, pageWidth / 2, footerY, { align: "center" });
   
-  const fileName = `Contrat_Investissement_${(safeUser.name || 'User').replace(/\s+/g, '_')}.pdf`;
+  // Nom de fichier propre
+  const safeFileName = (safeUser.name || 'Contrat').replace(/[^a-z0-9]/gi, '_').toUpperCase();
+  const fileName = `CONTRAT_${safeFileName}_${contractId}.pdf`;
+  
   doc.save(fileName);
 };

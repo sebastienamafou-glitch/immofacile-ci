@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma"; // ✅ Singleton Obligatoire
 
 export const dynamic = 'force-dynamic';

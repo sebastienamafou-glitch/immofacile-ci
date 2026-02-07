@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+ // ✅ On utilise la session sécurisée
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
 import { MissionType } from "@prisma/client";
@@ -12,10 +14,9 @@ cloudinary.config({
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER : UPLOAD CLOUDINARY (Optimisé Web Standard) ---
+// --- HELPER : UPLOAD CLOUDINARY ---
 async function uploadToCloudinary(file: File | null, folder: string = "immofacile/inventory") {
-  if (!file) return null;
-  if (file.size === 0) return null; // Fichier vide ignoré
+  if (!file || file.size === 0) return null;
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -25,20 +26,19 @@ async function uploadToCloudinary(file: File | null, folder: string = "immofacil
       { 
         folder: folder,
         resource_type: "image",
-        quality: "auto:good", // Compression intelligente
-        fetch_format: "auto"  // Format optimal (WebP/AVIF)
+        quality: "auto:good", 
+        fetch_format: "auto"
       },
       (error, result) => {
         if (error) {
           console.error("Cloudinary Error:", error);
-          resolve(""); // On ne plante pas tout pour une image ratée, on renvoie vide
+          resolve(""); 
         } else {
           resolve(result?.secure_url || "");
         }
       }
     );
     
-    // Écriture du buffer
     const Readable = require("stream").Readable;
     const stream = new Readable();
     stream.push(buffer);
@@ -48,16 +48,21 @@ async function uploadToCloudinary(file: File | null, folder: string = "immofacil
 }
 
 // ==========================================
-// 1. GET : Lister les états des lieux (Sécurisé par ID)
+// 1. GET : Lister les états des lieux
 // ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (Middleware ID)
-    const userId = request.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 🔒 SÉCURITÉ BLINDÉE (Auth v5)
+    // On remplace req.headers.get("x-user-id") par la session réelle
+    const session = await auth();
+    
+    if (!session || !session.user || !session.user.id) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
 
     // 2. RÉCUPÉRATION SÉCURISÉE
-    // On ne cherche que les inventories liés aux propriétés de ce Owner
     const inventories = await prisma.inventory.findMany({
       where: {
         lease: { property: { ownerId: userId } } // 🔒 Cadenas Propriétaire
@@ -83,12 +88,16 @@ export async function GET(request: Request) {
 }
 
 // ==========================================
-// 2. POST : Créer un EDL (Zero Trust)
+// 2. POST : Créer un EDL
 // ==========================================
 export async function POST(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 🔒 SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    if (!session || !session.user?.id) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     const formData = await request.formData();
     
@@ -127,9 +136,8 @@ export async function POST(request: Request) {
             type: typeInput as MissionType,
             notes: comment,
             leaseId: leaseId,
-            propertyId: lease.propertyId, // Donnée redondante mais utile pour les requêtes rapides
+            propertyId: lease.propertyId, 
             
-            // Création des items détaillés
             items: {
                 create: [
                     {

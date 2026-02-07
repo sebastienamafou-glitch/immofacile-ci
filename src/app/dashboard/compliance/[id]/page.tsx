@@ -1,12 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { headers } from "next/headers";
+
 import { 
   ShieldCheck, FileText, CheckCircle2, 
   Scale, Server, Fingerprint, AlertTriangle, XCircle, MapPin, Download 
 } from 'lucide-react';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { auth } from "@/auth";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,20 +18,28 @@ interface PageProps {
 export default async function CompliancePage({ params }: PageProps) {
   const { id } = await params;
 
-  // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
+  const session = await auth();
+  const userId = session?.user?.id;
   
   if (!userId) return redirect("/login");
 
-  // 2. RÉCUPÉRATION DES DONNÉES
+  // 2. RÉCUPÉRATION DES DONNÉES (Avec Relations KYC)
   const lease = await prisma.lease.findUnique({
     where: { id: id },
     include: {
       property: {
-        include: { owner: true }
+        include: { 
+            owner: {
+                // ✅ ON INCLUT LE KYC DU PROPRIO
+                include: { kyc: true }
+            } 
+        }
       },
-      tenant: true,
+      tenant: {
+        // ✅ ON INCLUT LE KYC DU LOCATAIRE
+        include: { kyc: true }
+      },
       signatures: true
     }
   });
@@ -38,14 +47,13 @@ export default async function CompliancePage({ params }: PageProps) {
   if (!lease) return notFound();
 
   // 3. VÉRIFICATION DES DROITS (RBAC AVANCÉ)
-  // ✅ CORRECTION TS : On sélectionne agencyId explicitement
   const user = await prisma.user.findUnique({ 
       where: { id: userId }, 
       select: { id: true, role: true, agencyId: true } 
   });
 
   const isOwner = lease.property.ownerId === userId;
-  const isTenant = lease.tenantId === userId; // ✅ Le locataire a bien l'accès
+  const isTenant = lease.tenantId === userId;
   const isStaff = ["SUPER_ADMIN", "ADMIN"].includes(user?.role || "");
   
   // Droit pour l'agence qui gère le bien
@@ -69,10 +77,14 @@ export default async function CompliancePage({ params }: PageProps) {
   const legalDepositLimit = lease.monthlyRent * 2;
   const isDepositCompliant = lease.depositAmount <= legalDepositLimit;
 
-  const isOwnerVerified = lease.property.owner.kycStatus === 'VERIFIED' || lease.property.owner.isVerified;
-  const isTenantVerified = lease.tenant.kycStatus === 'VERIFIED' || lease.tenant.isVerified;
+  // ✅ CORRECTION : Lecture via la relation kyc (UserKYC)
+  const isOwnerVerified = lease.property.owner.kyc?.status === 'VERIFIED';
+  const isTenantVerified = lease.tenant.kyc?.status === 'VERIFIED';
   
-  const isSigned = lease.signatureStatus === 'COMPLETED' || lease.signatureStatus === 'SIGNED_TENANT';
+  // ✅ CORRECTION : Gestion des statuts (COMPLETED n'existe plus, remplacé par TERMINATED ou check signature)
+  // On considère signé si le statut signature est validé ou si le bail est actif/terminé
+  const isSigned = ['SIGNED_TENANT', 'ACTIVE', 'TERMINATED'].includes(lease.signatureStatus || '') || lease.isActive;
+  
   const proof = lease.signatures.length > 0 ? lease.signatures[0] : null;
 
   const isGlobalCompliant = isDepositCompliant && isOwnerVerified && isTenantVerified;
@@ -92,7 +104,7 @@ export default async function CompliancePage({ params }: PageProps) {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-wide">CERTIFICAT DE CONFORMITÉ</h1>
-              <p className="text-xs text-slate-400 uppercase tracking-widest">Infrastucture ImmoFacile • RCI</p>
+              <p className="text-xs text-slate-400 uppercase tracking-widest">Infrastructure ImmoFacile • RCI</p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -107,7 +119,7 @@ export default async function CompliancePage({ params }: PageProps) {
             )}
             {/* BOUTON TÉLÉCHARGEMENT PDF */}
             <a 
-                href={`/api/documents/compliance/${lease.id}`} 
+                href={`/api/documents/lease/${lease.id}`} 
                 target="_blank"
                 className="flex items-center gap-2 text-[10px] font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded transition"
             >
@@ -235,7 +247,7 @@ function ComplianceRow({ isValid, label, detail }: { isValid: boolean, label: st
             {isValid ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             ) : (
-                <XCircle className="w-5 h-5 text-red-500" /> // Ou AlertTriangle selon la sévérité
+                <XCircle className="w-5 h-5 text-red-500" />
             )}
             <div>
                 <span className="text-sm font-bold text-slate-700 block">{label}</span>

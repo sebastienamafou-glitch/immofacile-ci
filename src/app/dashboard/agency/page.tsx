@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
@@ -13,10 +13,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function AgencyDashboardPage() {
   // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
-  
-  if (!userId) redirect("/login");
+const session = await auth();
+
+if (!session || !session.user?.id) {
+  redirect("/login");
+}
+
+const userId = session.user.id;
 
   // 2. VÉRIFICATION RÔLE (Optimisée : ID only)
   const admin = await prisma.user.findUnique({

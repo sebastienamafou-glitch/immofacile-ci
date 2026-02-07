@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client"; // ✅ Import de l'Enum généré
 

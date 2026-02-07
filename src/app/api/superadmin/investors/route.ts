@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sendCredentialsEmail } from "@/lib/mail";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const admin = await prisma.user.findUnique({
@@ -19,6 +25,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
+    // 2. VALIDATION DONNÉES
     const body = await request.json();
     const { name, email, phone, backerTier, initialAmount } = body;
 
@@ -30,38 +37,60 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const amount = initialAmount ? parseInt(initialAmount) : 0;
 
-    const investor = await prisma.user.create({
-        data: {
-            name,
-            email,
-            phone: phone || null,
-            password: hashedPassword,
-            role: "INVESTOR",
-            kycStatus: "VERIFIED",
-            isVerified: true,
-            isActive: true,
-            backerTier: backerTier,
-            walletBalance: amount
-        }
-    });
-
-    if (amount > 0) {
-        await prisma.transaction.create({
+    // 3. CRÉATION ATOMIQUE (USER + FINANCE + KYC + TRANSACTION)
+    const investor = await prisma.$transaction(async (tx) => {
+        // A. Création de l'utilisateur avec ses coffres-forts
+        const newUser = await tx.user.create({
             data: {
-                userId: investor.id,
-                amount: amount,
-                type: "CREDIT",
-                reason: "CAPITAL_INITIAL_ADMIN",
-                status: "SUCCESS"
+                name,
+                email,
+                phone: phone || null,
+                password: hashedPassword,
+                role: "INVESTOR",
+                isActive: true,
+                backerTier: backerTier,
+                
+                // ✅ INIT KYC (Validé par l'admin)
+                kyc: {
+                    create: {
+                        status: "VERIFIED",
+                        documents: [] // Pas de docs requis si créé par Admin
+                    }
+                },
+
+                // ✅ INIT FINANCE (Capital de départ)
+                finance: {
+                    create: {
+                        walletBalance: amount,
+                        version: 1,
+                        kycTier: 3 // VIP
+                    }
+                }
             }
         });
-    }
 
-    // ✅ CORRECTION DU CRASH DE BUILD ICI
+        // B. Enregistrement de la transaction initiale (si montant > 0)
+        if (amount > 0) {
+            await tx.transaction.create({
+                data: {
+                    userId: newUser.id,
+                    amount: amount,
+                    type: "CREDIT",
+                    balanceType: "WALLET", // ✅ Champ obligatoire
+                    reason: "CAPITAL_INITIAL_ADMIN",
+                    status: "SUCCESS"
+                }
+            });
+        }
+
+        return newUser;
+    });
+
+    // 4. ENVOI EMAIL (Hors transaction pour ne pas bloquer)
     try {
-        if (investor.email) { // On vérifie que l'email existe pour rassurer TypeScript
+        if (investor.email) {
             await sendCredentialsEmail(
-                investor.email, // TypeScript est maintenant content
+                investor.email,
                 investor.name || "Partenaire", 
                 rawPassword, 
                 "INVESTOR"
@@ -82,7 +111,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error("API ERROR:", error);
+    console.error("API INVESTOR ERROR:", error);
     if (error.code === 'P2002') return NextResponse.json({ error: "Cet email existe déjà." }, { status: 409 });
     return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
   }

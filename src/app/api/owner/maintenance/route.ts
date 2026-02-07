@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
 
@@ -33,11 +35,14 @@ async function uploadToCloudinary(file: File | null) {
   });
 }
 
-// 1. GET : Lister les incidents (AVEC ARTISAN)
+// 1. GET : Lister les incidents
 export async function GET(req: Request) {
     try {
-        const userId = req.headers.get("x-user-id");
-        if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+        // 🔒 SÉCURITÉ : Session Cookie au lieu de Header
+        const session = await auth();
+        if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+        
+        const userId = session.user.id;
         
         const incidents = await prisma.incident.findMany({
             where: { property: { ownerId: userId } },
@@ -45,7 +50,6 @@ export async function GET(req: Request) {
             include: { 
                 property: { select: { id: true, title: true } }, 
                 reporter: { select: { name: true, phone: true, role: true } },
-                // ✅ AJOUT : On récupère l'artisan assigné
                 assignedTo: { select: { id: true, name: true, jobTitle: true, phone: true } }
             }
         });
@@ -59,8 +63,10 @@ export async function GET(req: Request) {
 // 2. POST : CRÉER UN INCIDENT
 export async function POST(req: Request) {
   try {
-    const userId = req.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 🔒 SÉCURITÉ
+    const session = await auth();
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = session.user.id;
 
     const formData = await req.formData();
     const title = formData.get('title') as string;
@@ -71,7 +77,7 @@ export async function POST(req: Request) {
     if (!title || !propertyId) return NextResponse.json({ error: "Requis" }, { status: 400 });
 
     const property = await prisma.property.findFirst({ where: { id: propertyId, ownerId: userId } });
-    if (!property) return NextResponse.json({ error: "Interdit" }, { status: 403 });
+    if (!property) return NextResponse.json({ error: "Interdit ou bien introuvable" }, { status: 403 });
 
     let photoUrl = photoFile ? await uploadToCloudinary(photoFile) : null;
 
@@ -94,11 +100,12 @@ export async function POST(req: Request) {
 // 3. PUT : ASSIGNER & RÉSOUDRE
 export async function PUT(req: Request) {
   try {
-    const userId = req.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 🔒 SÉCURITÉ
+    const session = await auth();
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = session.user.id;
 
     const body = await req.json();
-    // ✅ AJOUT : assignedToId
     const { id, status, finalCost, assignedToId } = body; 
 
     if (!id) return NextResponse.json({ error: "ID manquant" }, { status: 400 });
@@ -110,15 +117,12 @@ export async function PUT(req: Request) {
 
     if (!incident || incident.property.ownerId !== userId) return NextResponse.json({ error: "Interdit" }, { status: 403 });
 
-    // Préparation de l'update
     const updateData: any = {};
     if (status) updateData.status = status;
     if (finalCost !== undefined) updateData.finalCost = parseInt(finalCost);
     
-    // ✅ LOGIQUE ASSIGNATION
     if (assignedToId) {
         updateData.assignedToId = assignedToId;
-        // Si on assigne quelqu'un, l'incident passe automatiquement "En cours"
         if (incident.status === 'OPEN') {
             updateData.status = 'IN_PROGRESS';
         }

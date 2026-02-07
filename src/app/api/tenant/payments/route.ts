@@ -1,21 +1,31 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userEmail = session?.user?.email;
 
-    const tenant = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!userEmail) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const tenant = await prisma.user.findUnique({ 
+        where: { email: userEmail },
+        select: { id: true, role: true } 
+    });
+
     if (!tenant || tenant.role !== "TENANT") {
         return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 });
     }
 
     // 2. RÉCUPÉRATION DES PAIEMENTS
-    // On récupère les paiements liés à TOUS les baux du locataire (passés et présents)
     const payments = await prisma.payment.findMany({
       where: {
         lease: {
@@ -32,7 +42,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. FORMATAGE
+    // 3. FORMATAGE SÉCURISÉ
     const formatted = payments.map(p => ({
         id: p.id,
         amount: p.amount,
@@ -40,7 +50,8 @@ export async function GET(request: Request) {
         type: p.type,
         status: p.status,
         method: p.method,
-        propertyTitle: p.lease.property.title
+        // ✅ PROTECTION NULL CHECK (?. et ||)
+        propertyTitle: p.lease?.property?.title || "Bail archivé/Inconnu"
     }));
 
     return NextResponse.json({ success: true, payments: formatted });

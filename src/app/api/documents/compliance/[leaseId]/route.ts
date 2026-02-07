@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 const PDFDocument = require("pdfkit/js/pdfkit.standalone");
 
@@ -13,7 +15,9 @@ export async function GET(
 
     // 1. SÉCURITÉ : VIA MIDDLEWARE (Standard du projet)
     // Grâce au correctif middleware.ts, ce header est maintenant présent !
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     
     if (!userId) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });

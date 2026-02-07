@@ -1,35 +1,29 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ (ZERO TRUST - ID ONLY) ---
-async function checkSuperAdminPermission(request: Request) {
-  // 1. Identification par ID (Session via Middleware)
-  const userId = request.headers.get("x-user-id");
-  
-  if (!userId) {
-    return { authorized: false, status: 401, error: "Non authentifié" };
-  }
-
-  // 2. Vérification Rôle
-  const admin = await prisma.user.findUnique({ 
-    where: { id: userId },
-    select: { id: true, role: true }
-  });
-
-  if (!admin || admin.role !== "SUPER_ADMIN") {
-    return { authorized: false, status: 403, error: "Accès refusé : Rôle Super Admin requis" };
-  }
-
-  return { authorized: true };
-}
-
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
+
+    const admin = await prisma.user.findUnique({ 
+        where: { id: userId },
+        select: { role: true }
+    });
+
+    if (!admin || admin.role !== "SUPER_ADMIN") {
+        return NextResponse.json({ error: "Accès refusé : Rôle Super Admin requis" }, { status: 403 });
+    }
 
     // 2. STATS "AGENCY" (KPIs Business)
     const stats = await prisma.payment.aggregate({
@@ -76,8 +70,9 @@ export async function GET(request: Request) {
         status: p.status, 
         date: p.date,
         type: p.type,
+        // ✅ SÉCURITÉ NULL CHECK (?. pour éviter le crash)
         details: p.lease 
-            ? `${p.lease.tenant.name} - ${p.lease.property.title}`
+            ? `${p.lease.tenant?.name || 'Locataire'} - ${p.lease.property?.title || 'Bien'}`
             : "Paiement direct",
         category: "AGENCY"
     }));
@@ -95,9 +90,8 @@ export async function GET(request: Request) {
         category: "CORPORATE"
     }));
 
-    // Fusion et Tri
+    // Fusion et Tri propre (Typage Date)
     const mergedHistory = [...historyFromPayments, ...historyFromTransactions]
-        // @ts-ignore
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 100); 
     

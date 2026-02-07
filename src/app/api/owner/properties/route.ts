@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import { PropertyType } from "@prisma/client";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +13,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
     // ✅ ZERO TRUST : Auth via ID
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const properties = await prisma.property.findMany({
@@ -43,7 +48,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     // A. Authentification Zero Trust
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // B. Récupération User (pour vérifier Role & AgencyId)

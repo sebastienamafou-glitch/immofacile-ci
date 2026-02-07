@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
+
 import Link from "next/link";
 import { 
   ShieldCheck, AlertTriangle, ChevronRight, 
@@ -9,24 +12,35 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function OwnerCompliancePage() {
-  // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
+  const session = await auth();
+  const userId = session?.user?.id;
   
   if (!userId) {
-      return <div className="p-8 text-red-500 font-bold">Session expirée. Veuillez vous reconnecter.</div>;
+      return (
+        <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="text-slate-500 font-medium">Session expirée. Veuillez vous reconnecter.</div>
+        </div>
+      );
   }
 
   // 2. RÉCUPÉRATION DES DOSSIERS (Baux)
   const leases = await prisma.lease.findMany({
     where: { 
         property: { ownerId: userId },
-        // On affiche tout sauf les baux annulés/terminés depuis longtemps
         status: { in: ['ACTIVE', 'PENDING'] }
     },
     include: { 
         property: { select: { title: true, address: true, commune: true } }, 
-        tenant: { select: { name: true, email: true, kycStatus: true } },
+        
+        // ✅ CORRECTION SCHEMA : On passe par la relation kyc
+        tenant: { 
+            select: { 
+                name: true, 
+                email: true, 
+                kyc: { select: { status: true } } // Récupération du statut ici
+            } 
+        },
         signatures: true
     },
     orderBy: { updatedAt: 'desc' }
@@ -50,9 +64,13 @@ export default async function OwnerCompliancePage() {
       <div className="grid grid-cols-1 gap-4">
         {leases.length > 0 ? (
             leases.map((lease) => {
-                // Calcul rapide du statut pour l'affichage liste
-                const isSigned = lease.signatureStatus === 'COMPLETED' || lease.signatureStatus === 'SIGNED_TENANT';
-                const isTenantVerified = lease.tenant.kycStatus === 'VERIFIED';
+                // ✅ LOGIQUE MISE À JOUR
+                // On vérifie si la signature est présente ou le statut validé
+                const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'ACTIVE', 'TERMINATED'].includes(lease.signatureStatus || '') || lease.isActive;
+                
+                // ✅ ACCÈS SÉCURISÉ AU STATUT KYC (User -> KYC -> Status)
+                const isTenantVerified = lease.tenant?.kyc?.status === 'VERIFIED';
+                
                 const isFullyCompliant = isSigned && isTenantVerified;
 
                 return (
@@ -74,7 +92,7 @@ export default async function OwnerCompliancePage() {
                                     </h3>
                                     <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <span className="font-medium text-slate-700">Locataire:</span> 
-                                        {lease.tenant.name || lease.tenant.email}
+                                        {lease.tenant?.name || lease.tenant?.email || "Non assigné"}
                                     </div>
                                 </div>
                             </div>
@@ -84,12 +102,12 @@ export default async function OwnerCompliancePage() {
                                 {/* Badge Signature */}
                                 <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${isSigned ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-orange-50 text-orange-700 border border-orange-100'}`}>
                                     {isSigned ? <CheckCircle2 className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
-                                    {isSigned ? "Signature : OK" : "Signature : En attente"}
+                                    {isSigned ? "Signé" : "En attente"}
                                 </div>
 
                                 {/* Badge KYC */}
                                 <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${isTenantVerified ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-                                    {isTenantVerified ? "KYC : Vérifié" : "KYC : Manquant"}
+                                    {isTenantVerified ? "KYC : OK" : "KYC : PENDING"}
                                 </div>
                             </div>
 

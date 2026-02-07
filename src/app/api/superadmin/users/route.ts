@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER SÉCURITÉ (ZERO TRUST) ---
-async function checkSuperAdmin(request: Request) {
-  // 1. Identification par ID (Session via Middleware)
-  const userId = request.headers.get("x-user-id");
+// --- HELPER SÉCURITÉ (MIGRATION v5) ---
+async function checkSuperAdmin() {
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) return null;
   
-  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
     where: { id: userId },
     select: { id: true, role: true } 
   });
 
   if (!admin || admin.role !== "SUPER_ADMIN") return null;
-  
   return admin;
 }
 
@@ -25,7 +26,7 @@ async function checkSuperAdmin(request: Request) {
 // ==========================================
 export async function GET(request: Request) {
   try {
-    const admin = await checkSuperAdmin(request);
+    const admin = await checkSuperAdmin();
     if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const users = await prisma.user.findMany({
@@ -36,11 +37,18 @@ export async function GET(request: Request) {
         email: true, 
         phone: true, 
         role: true, 
-        kycStatus: true,
-        walletBalance: true,
         isActive: true, 
         backerTier: true,
         createdAt: true,
+        
+        // ✅ CORRECTION SCHEMA : Relations
+        kyc: {
+            select: { status: true }
+        },
+        finance: {
+            select: { walletBalance: true }
+        },
+
         // On compte les liens pour éviter les suppressions dangereuses
         _count: {
             select: { leases: true, propertiesOwned: true, listings: true }
@@ -48,7 +56,16 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, users });
+    // Remapping pour le frontend (Aplatissage)
+    const formattedUsers = users.map(u => ({
+        ...u,
+        kycStatus: u.kyc?.status || "PENDING",
+        walletBalance: u.finance?.walletBalance || 0,
+        kyc: undefined, // Nettoyage
+        finance: undefined // Nettoyage
+    }));
+
+    return NextResponse.json({ success: true, users: formattedUsers });
 
   } catch (error) {
     console.error("API GET Users Error:", error);
@@ -61,7 +78,7 @@ export async function GET(request: Request) {
 // ==========================================
 export async function PATCH(request: Request) {
     try {
-      const admin = await checkSuperAdmin(request);
+      const admin = await checkSuperAdmin();
       if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   
       const body = await request.json();
@@ -89,7 +106,7 @@ export async function PATCH(request: Request) {
 // ==========================================
 export async function PUT(request: Request) {
   try {
-    const admin = await checkSuperAdmin(request);
+    const admin = await checkSuperAdmin();
     if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const body = await request.json();
@@ -122,7 +139,7 @@ export async function PUT(request: Request) {
 // ==========================================
 export async function DELETE(request: Request) {
     try {
-      const admin = await checkSuperAdmin(request);
+      const admin = await checkSuperAdmin();
       if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   
       const { searchParams } = new URL(request.url);

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -20,15 +23,19 @@ type TransactionLog = Awaited<ReturnType<typeof getAdminLogsQuery>>[number];
 function determineCategory(type: string) {
     if (['CREDIT', 'DEBIT', 'PAYMENT', 'CASHOUT_WAVE', 'CASHOUT_ORANGE'].includes(type)) return 'FINANCE';
     if (['LOGIN', 'AUTH', 'KYC_VERIFIED'].includes(type)) return 'AUTH';
-    if (['ADMIN_CREDIT', 'AGENCY_CREATE'].includes(type)) return 'SECURITY';
+    if (['ADMIN_CREDIT', 'AGENCY_CREATE', 'SECURITY_ALERT'].includes(type)) return 'SECURITY';
     return 'SYSTEM';
 }
 
 export async function GET(request: Request) {
   try {
-    // 3. SÉCURITÉ ZERO TRUST (ID)
-    const userId = request.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    // 3. SÉCURITÉ ZERO TRUST (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
     const admin = await prisma.user.findUnique({ 
         where: { id: userId },
@@ -47,11 +54,17 @@ export async function GET(request: Request) {
         id: tx.id,
         createdAt: tx.createdAt,
         category: determineCategory(tx.type),
-        user: tx.user,
-        action: tx.reason,
+        user: tx.user ? {
+            name: tx.user.name,
+            role: tx.user.role,
+            email: tx.user.email
+        } : null,
+        action: tx.reason || "Action système",
         details: { 
             amount: tx.amount, 
-            type: tx.type 
+            type: tx.type,
+            // ✅ On ajoute l'info critique WALLET vs ESCROW
+            balanceType: tx.balanceType || "WALLET" 
         }
     }));
 

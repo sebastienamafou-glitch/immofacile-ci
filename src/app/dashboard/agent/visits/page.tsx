@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -12,8 +12,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AgentVisitsPage() {
   // 1. SÉCURITÉ
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) redirect("/login");
 
   // 2. DATA FETCHING (Visites assignées)

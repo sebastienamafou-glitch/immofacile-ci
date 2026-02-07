@@ -1,4 +1,4 @@
-import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, QuoteStatus, IncidentStatus } from '@prisma/client';
+import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, IncidentStatus } from '@prisma/client';
 import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -7,19 +7,18 @@ async function main() {
   console.log('🌱 Démarrage du "Full Ecosystem Seed"...');
 
   // ==========================================
-  // 1. GRAND NETTOYAGE (Ordre Hiérarchique Strict)
+  // 1. GRAND NETTOYAGE
   // ==========================================
   console.log('🧹 Nettoyage de la base de données...');
   
-  // Niveau 4 : Les "Petits-enfants" (Dépendent de tout)
+  // Suppression en cascade (l'ordre compte pour éviter les erreurs de foreign key)
   await prisma.quoteItem.deleteMany();
   await prisma.message.deleteMany();
-  await prisma.signatureProof.deleteMany(); // ✅ Débloque les Baux
+  await prisma.signatureProof.deleteMany();
   await prisma.inventoryItem.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.bookingPayment.deleteMany();
   
-  // Niveau 3 : Les "Enfants"
   await prisma.quote.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.inventory.deleteMany();
@@ -30,18 +29,16 @@ async function main() {
   await prisma.wishlist.deleteMany();
   await prisma.investmentContract.deleteMany();
   
-  // Niveau 2 : Les "Parents"
   await prisma.lease.deleteMany(); 
   await prisma.listing.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.agencyTransaction.deleteMany();
   
-  // Niveau 1 : Les "Racines"
   await prisma.property.deleteMany();
   
-  // Niveau 0 : Les Acteurs
-  // On ne supprime les users/agences que si on veut repartir de zéro absolu
-  // Ici on delete tout pour être propre
+  // Tables dépendantes de User (Finance/KYC sont on-delete cascade normalement, mais on nettoie au cas où)
+  await prisma.userFinance.deleteMany();
+  await prisma.userKYC.deleteMany();
   await prisma.user.deleteMany(); 
   await prisma.agency.deleteMany();
   
@@ -63,6 +60,7 @@ async function main() {
       isActive: true,
       taxId: 'CC-1234567-X',
       logoUrl: 'https://placehold.co/400x400/0f172a/white?text=IP',
+      walletBalance: 0
     },
   });
   console.log(`🏢 Agence créée : ${agency.name}`);
@@ -71,18 +69,17 @@ async function main() {
   // 3. CRÉATION DES UTILISATEURS
   // ==========================================
   const usersData = [
-    { email: 'superadmin@immofacile.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null },
-    { email: 'directeur@immoprestige.ci', name: 'M. le Directeur', role: Role.AGENCY_ADMIN, agencyId: agency.id },
-    { email: 'agent@immoprestige.ci', name: 'Alexandre Agent', role: Role.AGENT, jobTitle: 'Négociateur Immobilier', agencyId: agency.id },
-    { email: 'proprio.agence@gmail.com', name: 'Pierre Propriétaire (Géré)', role: Role.OWNER, agencyId: agency.id },
-    { email: 'proprio.solo@gmail.com', name: 'Sophie Indépendante', role: Role.OWNER, agencyId: null },
-    { email: 'locataire@gmail.com', name: 'Luc Locataire', role: Role.TENANT, jobTitle: 'Informaticien', income: 800000, agencyId: null },
-    { email: 'plombier@pro.ci', name: 'Mario Plombier', role: Role.ARTISAN, jobTitle: 'Plombier Certifié', phone: '+225 05050505', agencyId: null },
-    { email: 'investisseur@gmail.com', name: 'Ivan Investisseur', role: Role.INVESTOR, jobTitle: 'Business Angel', isBacker: true, backerTier: 'VISIONNAIRE', agencyId: null },
-    { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null },
+    { email: 'superadmin@immofacile.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null, tier: 3 },
+    { email: 'directeur@immoprestige.ci', name: 'M. le Directeur', role: Role.AGENCY_ADMIN, agencyId: agency.id, tier: 2 },
+    { email: 'agent@immoprestige.ci', name: 'Alexandre Agent', role: Role.AGENT, jobTitle: 'Négociateur Immobilier', agencyId: agency.id, tier: 2 },
+    { email: 'proprio.agence@gmail.com', name: 'Pierre Propriétaire (Géré)', role: Role.OWNER, agencyId: agency.id, tier: 2 },
+    { email: 'proprio.solo@gmail.com', name: 'Sophie Indépendante', role: Role.OWNER, agencyId: null, tier: 2 },
+    { email: 'locataire@gmail.com', name: 'Luc Locataire', role: Role.TENANT, jobTitle: 'Informaticien', income: 800000, agencyId: null, tier: 1 },
+    { email: 'plombier@pro.ci', name: 'Mario Plombier', role: Role.ARTISAN, jobTitle: 'Plombier Certifié', phone: '+225 05050505', agencyId: null, tier: 2 },
+    { email: 'investisseur@gmail.com', name: 'Ivan Investisseur', role: Role.INVESTOR, jobTitle: 'Business Angel', isBacker: true, backerTier: 'VISIONNAIRE', agencyId: null, tier: 3 },
+    { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null, tier: 1 },
   ];
 
-  // On stocke les users créés dans une map pour y accéder facilement
   const usersMap: Record<string, any> = {};
 
   for (const u of usersData) {
@@ -94,15 +91,30 @@ async function main() {
         role: u.role,
         agencyId: u.agencyId,
         isVerified: true,
-        kycStatus: VerificationStatus.VERIFIED,
+        phone: u.phone || undefined,
         jobTitle: u.jobTitle,
-        income: u.income, 
-        // @ts-ignore
-        phone: u.phone, 
-        // @ts-ignore
         isBacker: u.isBacker || false,
-        // @ts-ignore
         backerTier: u.backerTier || null,
+
+        // ✅ CORRECTION STRUCTURELLE KYC
+        kyc: {
+            create: {
+                status: VerificationStatus.VERIFIED,
+                idType: 'CNI',
+                idNumber: 'CI-SEED-123456',
+                documents: []
+            }
+        },
+
+        // ✅ CORRECTION STRUCTURELLE FINANCE
+        finance: {
+            create: {
+                walletBalance: 1000000, // On donne 1M à tout le monde pour tester
+                kycTier: u.tier,
+                income: u.income || 0,
+                version: 1
+            }
+        }
       },
     });
     usersMap[u.email] = user;
@@ -151,18 +163,19 @@ async function main() {
           tenantId: tenant.id,
           contractUrl: 'https://example.com/contract.pdf',
           agentId: agent ? agent.id : null,
+          agencyCommissionRate: 0.10
         },
       });
       console.log(`📜 Bail créé pour ${tenant.name}`);
       
-      // --- INCIDENT & DEVIS (Pour tester le module Artisan) ---
+      // --- INCIDENT ---
       if (artisan) {
-          const incident = await prisma.incident.create({
+          await prisma.incident.create({
               data: {
                   title: 'Fuite Salle de Bain',
                   description: 'Grosse fuite sous le lavabo, urgent.',
                   priority: 'HIGH',
-                  status: IncidentStatus.IN_PROGRESS, // Déjà en cours
+                  status: IncidentStatus.IN_PROGRESS,
                   propertyId: property.id,
                   reporterId: tenant.id,
                   assignedToId: artisan.id,

@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ (Gatekeeper via ID)
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
     const admin = await prisma.user.findUnique({ 
@@ -18,7 +23,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    // 2. Validation de l'input
+    // 2. VALIDATION INPUT
     const body = await request.json();
     const { amount, periodName } = body; 
 
@@ -27,7 +32,7 @@ export async function POST(request: Request) {
     }
     const globalDividendPool = parseInt(amount);
 
-    // 3. Récupération des Investisseurs
+    // 3. RECUPERATION INVESTISSEURS
     const investors = await prisma.user.findMany({
         where: { 
             role: "INVESTOR", 
@@ -43,7 +48,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Aucun investisseur éligible." }, { status: 400 });
     }
 
-    // 4. Calcul de la Masse Monétaire
+    // 4. CALCUL MASSE MONÉTAIRE
     let totalInvestedCapital = 0;
     const shareholderMap = investors.map(investor => {
         const userCapital = investor.investmentContracts.reduce((sum, contract) => sum + contract.amount, 0);
@@ -55,14 +60,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Capital total nul." }, { status: 400 });
     }
 
-    // 5. Transaction Atomique (ACID)
+    // 5. PRÉPARATION TRANSACTION (ACID)
     const prismaOperations = [];
     let distributedCheck = 0;
     let beneficiariesCount = 0;
 
     for (const shareholder of shareholderMap) {
         if (shareholder.userCapital > 0) {
-            // Part = (Capital User / Capital Total) * Enveloppe
+            // Règle de trois : Part = (Capital User / Capital Total) * Enveloppe
             const rawShare = (shareholder.userCapital / totalInvestedCapital) * globalDividendPool;
             const shareAmount = Math.floor(rawShare);
 
@@ -70,20 +75,31 @@ export async function POST(request: Request) {
                 beneficiariesCount++;
                 distributedCheck += shareAmount;
 
-                // Crédit Wallet
+                // A. Crédit Wallet (Correction Schema : UserFinance)
+                // On utilise upsert pour créer le wallet s'il n'existe pas
                 prismaOperations.push(
-                    prisma.user.update({
-                        where: { id: shareholder.userId },
-                        data: { walletBalance: { increment: shareAmount } }
+                    prisma.userFinance.upsert({
+                        where: { userId: shareholder.userId },
+                        create: {
+                            userId: shareholder.userId,
+                            walletBalance: shareAmount,
+                            version: 1,
+                            kycTier: 1
+                        },
+                        update: { 
+                            walletBalance: { increment: shareAmount },
+                            version: { increment: 1 } // Optimistic Lock simple
+                        }
                     })
                 );
 
-                // Trace Transaction
+                // B. Trace Transaction (Correction Schema : balanceType)
                 prismaOperations.push(
                     prisma.transaction.create({
                         data: {
                             amount: shareAmount,
                             type: "CREDIT",
+                            balanceType: "WALLET", // ✅ OBLIGATOIRE MAINTENANT
                             reason: `DIVIDENDE_${periodName || 'GENERIC'}`,
                             status: "SUCCESS",
                             userId: shareholder.userId
@@ -94,7 +110,7 @@ export async function POST(request: Request) {
         }
     }
 
-    // 6. Exécution
+    // 6. EXÉCUTION ATOMIQUE
     if (prismaOperations.length > 0) {
         await prisma.$transaction(prismaOperations);
     }

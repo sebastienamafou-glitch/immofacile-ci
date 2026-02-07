@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma"; // ✅ Singleton Obligatoire
 import { Prisma } from "@prisma/client";
 import crypto from "crypto";

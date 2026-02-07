@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Loader2, ClipboardList, Plus, MapPin, Calendar, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Inventory, Lease, Property, User } from '@prisma/client';
+import { auth } from "@/auth";
 
 // Type composite pour l'UI
 type InventoryWithDetails = Inventory & {

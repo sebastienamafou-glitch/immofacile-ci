@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
-  ShieldCheck, FileText, CheckCircle2, 
-  Scale, Server, Fingerprint, AlertTriangle, XCircle, MapPin 
+  ShieldCheck, CheckCircle2, 
+  Scale, Server, AlertTriangle, XCircle, MapPin 
 } from 'lucide-react';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
-import Image from "next/image"; // Assurez-vous d'avoir le logo
 
 export const dynamic = 'force-dynamic';
 
@@ -18,31 +17,41 @@ interface PageProps {
 export default async function PublicCompliancePage({ params }: PageProps) {
   const { id } = await params;
 
-  // 1. RÉCUPÉRATION PUISSANTE (Sans Auth User)
+  // 1. RÉCUPÉRATION PUISSANTE (Avec Relations KYC)
   const lease = await prisma.lease.findUnique({
     where: { id: id },
     include: {
       property: {
-        include: { owner: true }
+        include: { 
+            owner: {
+                // ✅ ON INCLUT LE KYC DU PROPRIO
+                include: { kyc: true }
+            } 
+        }
       },
-      tenant: true,
+      tenant: {
+        // ✅ ON INCLUT LE KYC DU LOCATAIRE
+        include: { kyc: true }
+      },
       signatures: true
     }
   });
 
   if (!lease) return notFound();
 
-  // 2. ALGORITHME DE CONFORMITÉ (Identique au Dashboard)
+  // 2. ALGORITHME DE CONFORMITÉ (Mis à jour v5)
   const legalDepositLimit = lease.monthlyRent * 2;
   const isDepositCompliant = lease.depositAmount <= legalDepositLimit;
-  const isOwnerVerified = lease.property.owner.kycStatus === 'VERIFIED' || lease.property.owner.isVerified;
-  const isTenantVerified = lease.tenant.kycStatus === 'VERIFIED' || lease.tenant.isVerified;
-  const isSigned = lease.signatureStatus === 'COMPLETED' || lease.signatureStatus === 'SIGNED_TENANT';
+
+  // ✅ CORRECTION : On vérifie via la relation kyc (avec null check)
+  const isOwnerVerified = lease.property.owner.kyc?.status === 'VERIFIED';
+  const isTenantVerified = lease.tenant.kyc?.status === 'VERIFIED';
+  
+  // ✅ CORRECTION : On gère les nouveaux statuts de bail (TERMINATED inclus pour l'historique)
+  const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'TERMINATED', 'ACTIVE'].includes(lease.signatureStatus || '');
+  
   const proof = lease.signatures.length > 0 ? lease.signatures[0] : null;
   const isGlobalCompliant = isDepositCompliant && isOwnerVerified && isTenantVerified;
-
-  const formatMoney = (amount: number) => 
-    new Intl.NumberFormat('fr-CI', { style: 'currency', currency: 'XOF' }).format(amount);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">

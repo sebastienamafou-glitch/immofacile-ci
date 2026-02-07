@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
     // 1. Récupération de l'utilisateur (via les Headers du Middleware)
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
 
     const body = await request.json();

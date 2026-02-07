@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
@@ -6,7 +8,9 @@ export const dynamic = 'force-dynamic';
 // --- HELPER DE SÉCURITÉ (ZERO TRUST) ---
 async function checkSuperAdminPermission(request: Request) {
   // 1. Identification par ID (Session via Middleware)
-  const userId = request.headers.get("x-user-id");
+  const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
   if (!userId) {
     return { authorized: false, status: 401, error: "Non authentifié" };
   }

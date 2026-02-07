@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +17,9 @@ export async function GET(
     const { propertyId } = await params;
 
     // ✅ SÉCURITÉ ZERO TRUST : Identification par ID (Middleware)
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const property = await prisma.property.findUnique({
@@ -59,7 +64,9 @@ export async function PUT(
 ) {
   try {
     const { propertyId } = await params;
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await req.json();
@@ -101,7 +108,9 @@ export async function DELETE(
 ) {
   try {
     const { propertyId } = await params;
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 1. Vérification Métier : Baux actifs

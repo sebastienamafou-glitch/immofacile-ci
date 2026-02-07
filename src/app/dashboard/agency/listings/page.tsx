@@ -1,4 +1,4 @@
-import { headers } from "next/headers";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Palmtree, Plus, Search } from "lucide-react";
@@ -6,15 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AgencyListingCard from "@/components/agency/AgencyListingCard";
 import Link from "next/link";
+import { auth } from "@/auth";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyListingsPage() {
-  // 1. SÉCURITÉ ZERO TRUST
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
-  
-  if (!userId) redirect("/login");
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
+const session = await auth();
+
+// Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
+if (!session || !session.user?.id) {
+  redirect("/login");
+}
+
+const userId = session.user.id;
 
   // 2. VÉRIFICATION RÔLE
   const admin = await prisma.user.findUnique({

@@ -6,13 +6,13 @@ import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { 
   ArrowLeft, FileText, CheckCircle, XCircle, Loader2, Hammer, 
-  MessageCircle, ShieldCheck, AlertCircle 
+  MessageCircle, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-// ✅ On réutilise le composant Chat pour que le proprio discute avec l'artisan
-import IncidentChat from "@/components/shared/IncidentChat"; 
+import IncidentChat from "@/components/shared/IncidentChat";
+import Swal from "sweetalert2"; // ✅ AJOUT : Module d'alerte tactique
 
 export default function OwnerIncidentDetail() {
   const { id } = useParams();
@@ -25,19 +25,17 @@ export default function OwnerIncidentDetail() {
   // 1. CHARGEMENT DES DONNÉES
   const fetchData = async () => {
     try {
-      // Récupérer l'incident avec le devis et l'artisan
       const res = await api.get(`/owner/incidents/${id}`);
       if (res.data.success) {
           setIncident(res.data.incident);
       }
       
-      // Récupérer l'user courant pour le chat
       const userRes = await api.get('/auth/session');
       if (userRes.data?.user) setCurrentUser(userRes.data.user);
 
     } catch (e) { 
       console.error(e);
-      router.push('/dashboard/owner/incidents'); // Décommenter en prod
+      // router.push('/dashboard/owner/incidents'); // Décommenter en prod
     } finally { 
       setLoading(false); 
     }
@@ -45,28 +43,75 @@ export default function OwnerIncidentDetail() {
 
   useEffect(() => { if(id) fetchData(); }, [id]);
 
-  // 2. ACTION : VALIDER OU REFUSER LE DEVIS
+  // 2. ACTION : VALIDER OU REFUSER LE DEVIS (AVEC LOGIQUE FINANCIÈRE)
   const handleQuoteResponse = async (quoteId: string, action: 'ACCEPT' | 'REJECT') => {
       try {
+          // Indicateur visuel de traitement
+          const toastId = toast.loading("Traitement de la transaction...");
+
           await api.post('/owner/quotes/respond', { quoteId, action });
           
+          toast.dismiss(toastId);
+
           if (action === 'ACCEPT') {
-            toast.success("Devis validé ! L'artisan a été notifié.");
-            // Confettis ou animation possible ici
+            // 🎉 SUCCÈS : Paiement effectué
+            Swal.fire({
+                title: 'Paiement Validé !',
+                text: 'Le montant a été débité et l\'artisan notifié.',
+                icon: 'success',
+                background: '#0F172A', color: '#fff',
+                confirmButtonColor: '#10B981'
+            });
+            fetchData(); // Mise à jour UI
           } else {
             toast.info("Devis refusé.");
+            fetchData();
           }
           
-          fetchData(); // Rafraîchir pour voir le changement de statut
-      } catch (e) {
-          toast.error("Erreur lors de la transmission de la réponse.");
+      } catch (e: any) {
+          toast.dismiss();
+
+          // 🚨 GESTION INTELLIGENTE DE L'ERREUR 402 (SOLDE INSUFFISANT)
+          if (e.response && e.response.status === 402) {
+              const { required, balance, redirectUrl } = e.response.data;
+              const missing = required - balance;
+
+              // Affichage de la Modale Tactique
+              Swal.fire({
+                  title: 'Fonds Insuffisants 💸',
+                  html: `
+                    <div class="text-slate-300 text-sm mb-4">
+                        Le devis s'élève à <b>${formatCurrency(required)}</b> mais votre Wallet ne contient que <b>${formatCurrency(balance)}</b>.
+                    </div>
+                    <div class="bg-orange-500/20 border border-orange-500/50 p-3 rounded-lg text-orange-400 font-bold text-lg">
+                        Manque à payer : ${formatCurrency(missing)} FCFA
+                    </div>
+                  `,
+                  icon: 'warning',
+                  background: '#1E293B', // Dark Slate
+                  color: '#fff',
+                  showCancelButton: true,
+                  confirmButtonText: '⚡ Recharger mon Wallet',
+                  cancelButtonText: 'Annuler',
+                  confirmButtonColor: '#F97316', // Orange Brand
+                  cancelButtonColor: '#64748B'
+              }).then((result) => {
+                  if (result.isConfirmed) {
+                      // Redirection vers la page de paiement CinetPay (via notre page de topup)
+                      router.push(redirectUrl);
+                  }
+              });
+              return;
+          }
+
+          // Autres erreurs génériques
+          toast.error(e.response?.data?.error || "Erreur technique lors de la validation.");
       }
   };
 
   if (loading) return <div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div>;
   if (!incident) return null;
 
-  // On récupère le devis actif (le dernier non rejeté)
   const activeQuote = incident.quotes && incident.quotes.length > 0 ? incident.quotes[0] : null;
 
   return (
@@ -89,7 +134,6 @@ export default function OwnerIncidentDetail() {
                     <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter">{incident.title}</h1>
                 </div>
                 
-                {/* Info Artisan */}
                 {incident.assignedTo && (
                     <div className="flex items-center gap-3 bg-white/5 border border-white/5 px-4 py-2 rounded-xl">
                         <div className="bg-blue-500/10 p-2 rounded-full">
@@ -106,10 +150,8 @@ export default function OwnerIncidentDetail() {
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10">
             
-            {/* --- COLONNE GAUCHE : CONTEXTE & CHAT --- */}
+            {/* GAUCHE : CONTEXTE & CHAT */}
             <div className="space-y-8">
-                
-                {/* Description Incident */}
                 <div className="bg-[#0F172A] border border-white/5 rounded-3xl p-8 relative overflow-hidden">
                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4" /> Rapport du Locataire
@@ -126,7 +168,6 @@ export default function OwnerIncidentDetail() {
                     )}
                 </div>
 
-                {/* ZONE DE TCHAT (Négociation) */}
                 {incident.assignedTo && (
                     <div className="bg-[#0F172A] border border-white/5 rounded-3xl overflow-hidden flex flex-col h-[500px]">
                         <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-2">
@@ -140,7 +181,7 @@ export default function OwnerIncidentDetail() {
                 )}
             </div>
 
-            {/* --- COLONNE DROITE : LE DEVIS (Action Requise) --- */}
+            {/* DROITE : LE DEVIS & ACTIONS */}
             <div className="space-y-6">
                 
                 {activeQuote ? (
@@ -189,11 +230,12 @@ export default function OwnerIncidentDetail() {
                                 >
                                     <XCircle className="mr-2 h-5 w-5"/> Refuser
                                 </Button>
+                                {/* LE BOUTON DÉCLENCHEUR DU PAIEMENT */}
                                 <Button 
                                     onClick={() => handleQuoteResponse(activeQuote.id, 'ACCEPT')} 
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white h-14 uppercase font-bold text-xs tracking-widest shadow-lg shadow-emerald-900/20"
                                 >
-                                    <CheckCircle className="mr-2 h-5 w-5"/> Valider & Lancer
+                                    <CheckCircle className="mr-2 h-5 w-5"/> Valider & Payer
                                 </Button>
                             </div>
                         )}
@@ -202,12 +244,11 @@ export default function OwnerIncidentDetail() {
                         {activeQuote.status === 'ACCEPTED' && (
                             <div className="p-4 bg-emerald-500/10 text-emerald-400 text-center font-bold text-xs uppercase tracking-widest border-t border-emerald-500/20">
                                 <CheckCircle className="w-4 h-4 inline-block mr-2"/>
-                                Travaux autorisés le {new Date(activeQuote.updatedAt).toLocaleDateString()}
+                                Travaux payés et autorisés le {new Date(activeQuote.updatedAt).toLocaleDateString()}
                             </div>
                         )}
                     </div>
                 ) : (
-                    // État vide (Pas encore de devis)
                     <div className="border-2 border-dashed border-slate-800 rounded-3xl p-12 text-center text-slate-500 flex flex-col items-center justify-center h-full min-h-[300px]">
                         <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4">
                             <Hammer className="w-8 h-8 opacity-50"/>

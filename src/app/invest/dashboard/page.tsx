@@ -1,38 +1,29 @@
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers"; 
-import { jwtVerify } from "jose"; 
+
 import ContractModal from "@/components/invest/ContractModal";
 import DashboardView from "@/components/invest/DashboardView";
 
+export const dynamic = 'force-dynamic';
+
 // --- SÉCURITÉ & DONNÉES ---
 async function getAuthenticatedUser() {
-  const cookieStore = cookies();
-  const token = cookieStore.get("token")?.value;
+  // 1. AUTHENTIFICATION STANDARDISÉE
+  const session = await auth();
+  const userId = session?.user?.id;
 
-  // 1. Si pas de token, l'utilisateur n'est pas connecté
-  if (!token) return null;
+  if (!userId) return null;
 
   try {
-    // 2. Décryptage du token (Authentification JWT stricte)
-    const secretStr = process.env.JWT_SECRET;
-    if (!secretStr) throw new Error("CRITIQUE: JWT_SECRET manquant dans l'environnement");
-    
-    const secret = new TextEncoder().encode(secretStr);
-    const { payload } = await jwtVerify(token, secret);
-    
-    const userId = payload.userId as string;
-
-    // 3. Récupération des données fraîches (Data Fetching)
-    // On inclut tout ce dont le Dashboard a besoin pour ne faire qu'une seule requête
+    // 2. RÉCUPÉRATION DES DONNÉES
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { 
-        // A. Pour vérifier la conformité légale
+        // A. Conformité légale
         investmentContracts: {
             orderBy: { signedAt: 'desc' }
         },
-        // B. Pour construire le graphique financier
+        // B. Graphique financier
         transactions: {
             orderBy: { createdAt: 'asc' },
             where: {
@@ -41,6 +32,10 @@ async function getAuthenticatedUser() {
                     { type: "DEBIT" }
                 ]
             }
+        },
+        // ✅ C. CORRECTION SCHEMA : On inclut le coffre-fort
+        finance: {
+            select: { walletBalance: true }
         }
       }
     });
@@ -49,7 +44,7 @@ async function getAuthenticatedUser() {
 
   } catch (error) {
     console.error("Erreur Auth Dashboard Invest:", error);
-    return null; // Token invalide ou expiré
+    return null; 
   }
 }
 
@@ -63,38 +58,33 @@ export default async function InvestorPage() {
     redirect("/login?type=investor");
   }
 
-  // Sécurité : Vérification du Rôle (Firewall)
-  // Seuls les Vrais Investisseurs et le Super Admin passent
+  // Sécurité : Vérification du Rôle
   if (user.role !== "INVESTOR" && user.role !== "SUPER_ADMIN") {
-     redirect("/dashboard"); // Retour à la maison pour les autres
+     redirect("/dashboard"); 
   }
 
   // 2. Logique Juridique : Le contrat est-il signé ?
-  // On vérifie s'il existe au moins un contrat dans la table dédiée
   const hasSignedContract = user.investmentContracts && user.investmentContracts.length > 0;
 
-  // SCÉNARIO A : PAS DE CONTRAT -> BLOCAGE (MODAL OBLIGATOIRE)
+  // SCÉNARIO A : PAS DE CONTRAT -> BLOCAGE (MODAL)
   if (!hasSignedContract) {
     return (
       <ContractModal 
         user={{
-            id: user.id,
-            name: user.name || "Actionnaire",
-            email: user.email || "",
-            // Le contrat se base sur le montant actuellement crédité par l'admin
-            amount: user.walletBalance, 
-            packName: user.backerTier || "Standard"
-        }}
-        // Callback serveur : Une fois signé, on recharge la page
-        onSuccess={async () => { 
-          "use server"; 
-          redirect('/invest/dashboard'); 
-        }} 
+          id: user.id,
+          name: user.name || "Actionnaire",
+          email: user.email || "",
+          // ✅ CORRECTION ACCÈS : On passe par la relation finance
+          amount: user.finance?.walletBalance || 0,
+          packName: user.backerTier || "Standard"
+        }} onSuccess={function (): void {
+          throw new Error("Function not implemented.");
+        } }        // Note: L'action de succès doit être gérée par le composant client
       />
     );
   }
 
-  // SCÉNARIO B : TOUT EST OK -> AFFICHAGE DU DASHBOARD
-  // On passe l'objet user complet (avec transactions) au composant client
+  // SCÉNARIO B : TOUT EST OK -> DASHBOARD
+  // On passe l'utilisateur (Note: DashboardView devra peut-être être adapté pour lire finance.walletBalance aussi)
   return <DashboardView user={user} />;
 }

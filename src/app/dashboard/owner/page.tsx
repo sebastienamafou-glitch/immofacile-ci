@@ -12,7 +12,6 @@ import { api } from "@/lib/api";
 
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useTenantAlert } from "@/hooks/useTenantAlert";
-
 import StatsOverview from "@/components/dashboard/owner/StatsOverview";
 import PropertiesGrid from "@/components/dashboard/owner/PropertiesGrid";
 import TenantsList from "@/components/dashboard/owner/TenantsList";

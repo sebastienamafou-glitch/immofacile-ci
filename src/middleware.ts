@@ -1,87 +1,81 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-// ✅ IMPORT CRUCIAL : C'est lui qui fait le pont avec NextAuth
-import { getToken } from 'next-auth/jwt'; 
+import NextAuth from "next-auth";
+import authConfig from "@/auth.config";
+import { NextResponse } from "next/server";
 
-// ZONES PROTÉGÉES
-const PROTECTED_PATHS = [
-  '/dashboard',      
-  '/api/superadmin', 
-  '/api/owner',      
-  '/api/tenant',     
-  '/api/agent',      
-  '/api/artisan',    
-  '/api/kyc',        
-  '/api/upload',     
-  '/api/leases',     
-  '/api/incidents',  
-  '/api/settings',  
-  '/api/payment',
-  '/api/profile',
-  '/api/guest',
-  '/api/akwaba',
-  '/api/auth/me',
-  '/api/documents',
-  '/api/user' ,
-  '/api/chat' ,
-  '/api/notifications'
+
+
+const { auth } = NextAuth(authConfig);
+
+// 1. ROUTES PUBLIQUES (Accessibles sans connexion)
+const PUBLIC_ROUTES = [
+  '/',           // Landing page
+  '/pricing',    // Page de prix
+  '/login', 
+  '/register', 
+  '/auth/error', // Page d'erreur NextAuth
+  '/api/webhooks/cinetpay', // Webhooks (Stripe/CinetPay/Wave)
+  '/api/webhooks/stripe'
 ];
 
-// EXCEPTIONS PUBLIQUES (Webhooks + Auth)
-const PUBLIC_EXCEPTIONS = [
-  '/api/payment/webhook',
-  '/api/payment/callback',
-  '/api/auth' // ✅ Indispensable pour laisser passer le login
-];
+// 2. ROUTES PROTÉGÉES PAR RÔLE
+const ADMIN_ROUTES = '/admin';
+const AGENCY_ROUTES = '/agency';
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { nextUrl } = req;
+  const isLoggedIn = !!req.auth;
+  // @ts-ignore
+  const userRole = req.auth?.user?.role; 
 
-  // 1. Laisser passer les exceptions publiques
-  if (PUBLIC_EXCEPTIONS.some(path => pathname.startsWith(path))) {
+  const isApiAuthRoute = nextUrl.pathname.startsWith('/api/auth');
+  const isWebhook = nextUrl.pathname.startsWith('/api/webhooks');
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    nextUrl.pathname === route || nextUrl.pathname.startsWith('/api/webhooks')
+  );
+
+  // A. SÉCURITÉ TECHNIQUE (API & Webhooks)
+  if (isApiAuthRoute || isWebhook) {
     return NextResponse.next();
   }
 
-  // 2. Vérifier si la route est protégée
-  const isProtected = PROTECTED_PATHS.some(path => pathname.startsWith(path));
+  // B. REDIRECTION DES UTILISATEURS NON CONNECTÉS
+  if (!isLoggedIn && !isPublicRoute) {
+    let callbackUrl = nextUrl.pathname;
+    if (nextUrl.search) callbackUrl += nextUrl.search;
+    const encodedCallbackUrl = encodeURIComponent(callbackUrl);
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${encodedCallbackUrl}`, nextUrl));
+  }
 
-  if (isProtected) {
-    // ✅ LE CORRECTIF EST ICI
-    // Au lieu de chercher 'token' manuellement, on utilise getToken.
-    // Il détecte automatiquement le cookie "next-auth.session-token"
-    // et le décrypte avec le NEXTAUTH_SECRET défini dans Vercel.
-    const session = await getToken({ 
-        req: request, 
-        secret: process.env.NEXTAUTH_SECRET 
-    });
+  // C. REDIRECTION DES UTILISATEURS CONNECTÉS
+  if (isLoggedIn) {
+    // 🛑 CORRECTIF ANTI-BOUCLE INFINIE 🛑
+    // Nous avons désactivé ce bloc. Cela permet d'accéder à /login même si on est connecté,
+    // ce qui casse la boucle de redirection "Login <-> Dashboard".
+    /*
+    if (nextUrl.pathname === '/login' || nextUrl.pathname === '/register') {
+      return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+    */
 
-    // Si pas de session valide NextAuth -> Redirection Login
-    if (!session) {
-      if (pathname.startsWith('/dashboard')) {
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('callbackUrl', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-      return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+    // 2. SÉCURITÉ RBAC (Contrôle d'accès par rôle)
+    
+    // Protection Espace ADMIN (Seul SUPER_ADMIN passe)
+    if (nextUrl.pathname.startsWith(ADMIN_ROUTES) && userRole !== 'SUPER_ADMIN') {
+      return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // ✅ SÉCURITÉ : On propage l'identité validée vers l'API
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-email', session.email as string);
-    requestHeaders.set('x-user-role', session.role as string); 
-    requestHeaders.set('x-user-id', session.id as string);
-
-    return NextResponse.next({
-      request: { headers: requestHeaders },
-    });
+    // Protection Espace AGENCE
+    if (nextUrl.pathname.startsWith(AGENCY_ROUTES)) {
+      const allowedAgencyRoles = ['AGENCY_ADMIN', 'AGENT', 'SUPER_ADMIN'];
+      if (!allowedAgencyRoles.includes(userRole)) {
+        return NextResponse.redirect(new URL("/dashboard", nextUrl));
+      }
+    }
   }
 
   return NextResponse.next();
-}
+});
 
-// Optimisation des performances (ne pas exécuter sur les images/static)
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public|logo.png).*)',
-  ],
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
 };

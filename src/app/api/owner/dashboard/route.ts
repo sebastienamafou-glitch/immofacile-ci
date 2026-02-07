@@ -1,28 +1,43 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : On bascule sur l'ID (Plus robuste que l'email)
-    const userId = request.headers.get("x-user-id");
-    
-    // Double sécurité : On vérifie aussi le rôle si le middleware l'a injecté
-    const userRole = request.headers.get("x-user-role");
+    // 1. SÉCURITÉ : Vérification Session (Cookies) au lieu des Headers
+    const session = await auth();
 
-    if (!userId || (userRole && userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN')) {
-        return NextResponse.json({ error: "Accès refusé. Zone Propriétaire." }, { status: 403 });
+    if (!session || !session.user || !session.user.id) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // 2. EXÉCUTION PARALLÈLE (Performance Max)
+    const userId = session.user.id;
+    // @ts-ignore
+    const userRole = session.user.role; // Le rôle vient du token
+
+    // Vérification stricte du rôle (On laisse passer les Super Admin pour debug)
+    if (userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: "Accès refusé. Zone Propriétaire uniquement." }, { status: 403 });
+    }
+
+    // 2. EXÉCUTION PARALLÈLE
     const [owner, artisansData] = await Promise.all([
         prisma.user.findUnique({
-            where: { id: userId }, // ✅ Recherche rapide par ID
+            where: { id: userId },
             select: {
-                id: true, name: true, email: true, walletBalance: true,
+                id: true, 
+                name: true, 
+                email: true, 
+                // ✅ Relation Finance
+                finance: {
+                    select: { walletBalance: true }
+                },
                 
-                // Patrimoine (Longue Durée)
+                // Patrimoine
                 propertiesOwned: { 
                     orderBy: { createdAt: 'desc' },
                     select: {
@@ -43,7 +58,7 @@ export async function GET(request: Request) {
                     }
                 },
 
-                // Akwaba (Courte Durée)
+                // Akwaba (Listings)
                 listings: {
                     select: {
                         id: true, title: true, pricePerNight: true, isPublished: true, images: true,
@@ -84,34 +99,35 @@ export async function GET(request: Request) {
     const myProperties = owner.propertiesOwned || [];
     const myListings = owner.listings || [];
 
-    // Revenus
+    // ✅ RÉCUPÉRATION DU SOLDE (Sécurisée)
+    const safeBalance = owner.finance?.walletBalance ?? 0;
+
     const monthlyIncome = myProperties.reduce((total, p) => {
         return total + p.leases.reduce((sum, l) => sum + l.monthlyRent, 0);
     }, 0);
 
-    // Taux d'Occupation
     const occupiedCount = myProperties.filter(p => p.leases.length > 0).length;
     const occupancyRate = myProperties.length > 0 
         ? Math.round((occupiedCount / myProperties.length) * 100) 
         : 0;
 
-    // Incidents
     const activeIncidentsCount = myProperties.reduce((sum, p) => sum + p.incidents.length, 0);
 
-    // 4. RÉPONSE JSON OPTIMISÉE
+    // 4. RÉPONSE JSON
     return NextResponse.json({
       success: true,
-      user: { name: owner.name, walletBalance: owner.walletBalance },
+      user: { 
+          name: owner.name, 
+          walletBalance: safeBalance 
+      },
       stats: {
         totalProperties: myProperties.length + myListings.length,
         occupancyRate,
         monthlyIncome,
         activeIncidentsCount,
       },
-      // Ajout du flag isAvailable pour le Frontend
       properties: myProperties.map(p => ({ ...p, isAvailable: p.leases.length === 0 })),
       listings: myListings,
-      // Aplatir les réservations
       bookings: myListings.flatMap(l => l.bookings.map(b => ({ ...b, listing: { title: l.title } }))),
       artisans: artisansData.map(a => ({ 
           id: a.id, name: a.name, phone: a.phone, 

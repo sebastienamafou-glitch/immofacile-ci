@@ -1,23 +1,32 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION DU PROPRIÉTAIRE (Profil & Soldes)
+    // 2. RÉCUPÉRATION DU PROPRIÉTAIRE
     const owner = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        // Nécessaire pour le calcul de sécurité du séquestre (Cautions)
+        // ✅ On récupère le coffre-fort financier
+        finance: {
+            select: { walletBalance: true, escrowBalance: true }
+        },
+        // Sécurité séquestre (Double vérification)
         propertiesOwned: {
             include: {
                 leases: {
-                    where: { OR: [{ isActive: true }, { status: 'ACTIVE' }] },
+                    where: { isActive: true }, 
                     select: { depositAmount: true }
                 }
             }
@@ -35,7 +44,7 @@ export async function GET(request: Request) {
         status: 'SUCCESS',
         lease: {
           property: {
-            ownerId: owner.id // Verrouillage par ID
+            ownerId: owner.id 
           }
         }
       },
@@ -52,25 +61,26 @@ export async function GET(request: Request) {
       }
     });
 
-    // Mapping propre
+    // Mapping sécurisé (Correction de l'erreur TypeScript)
     const leasePayments = rawPayments.map(p => ({
       id: p.id,
-      amount: p.amountOwner, // Montant NET
-      grossAmount: p.amount, // Montant BRUT
+      amount: p.amountOwner,
+      grossAmount: p.amount,
       type: p.type,
       status: p.status,
       date: p.date,
       source: "RENTAL",
       details: {
-        property: p.lease.property.title,
-        tenant: p.lease.tenant.name
+        // ✅ CORRECTION ICI : On utilise ?. et || pour gérer les nulls
+        property: p.lease?.property?.title || "Propriété inconnue",
+        tenant: p.lease?.tenant?.name || "Locataire inconnu"
       }
     }));
 
-    // 4. RECUPERATION OPTIMISÉE DES RÉSERVATIONS (COURTE DURÉE / AKWABA)
+    // 4. RECUPERATION OPTIMISÉE DES RÉSERVATIONS (AKWABA)
     const rawBookings = await prisma.booking.findMany({
       where: {
-        listing: { hostId: owner.id }, // Verrouillage par ID
+        listing: { hostId: owner.id },
         status: { in: ['PAID', 'CONFIRMED', 'COMPLETED'] }
       },
       orderBy: { createdAt: 'desc' },
@@ -84,7 +94,7 @@ export async function GET(request: Request) {
 
     const akwabaBookings = rawBookings.map(b => ({
       id: b.id,
-      amount: b.payment?.hostPayout || 0, // Montant NET
+      amount: b.payment?.hostPayout || 0,
       grossAmount: b.totalPrice,
       startDate: b.startDate,
       endDate: b.endDate,
@@ -92,8 +102,8 @@ export async function GET(request: Request) {
       status: b.status,
       source: "AKWABA",
       details: {
-        property: b.listing.title,
-        guest: b.guest.name
+        property: b.listing?.title || "Logement supprimé",
+        guest: b.guest?.name || "Voyageur inconnu"
       }
     }));
 
@@ -105,8 +115,9 @@ export async function GET(request: Request) {
     // 6. RÉPONSE FINALE
     return NextResponse.json({
       success: true,
-      walletBalance: owner.walletBalance, // Argent dispo
-      escrowBalance: calculatedEscrow,    // Argent bloqué
+      // Mapping sécurisé depuis la table finance
+      walletBalance: owner.finance?.walletBalance ?? 0, 
+      escrowBalance: calculatedEscrow, 
       
       payments: leasePayments,
       bookings: akwabaBookings,

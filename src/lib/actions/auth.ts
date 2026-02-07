@@ -1,12 +1,10 @@
 'use server';
 
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { signOut } from "@/auth"; // Importe ta config NextAuth principale
 
 export async function logoutUser() {
-  // 1. Suppression du cookie sécurisé
-  cookies().delete('token');
-  
-  // 2. Redirection vers la page de login
-  redirect('/login');
+  // ✅ Utilise la méthode native de NextAuth
+  // Elle nettoie tous les cookies de session (CSRF, Session Token, Callback URL)
+  // et gère la redirection.
+  await signOut({ redirectTo: "/login" });
 }

@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export async function POST(req: Request) {
   try {
     // 1. AUTH ZERO TRUST (ID injecté par Middleware)
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+    const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION DES DONNÉES

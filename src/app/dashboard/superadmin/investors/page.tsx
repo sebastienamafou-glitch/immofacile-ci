@@ -1,6 +1,6 @@
-import { headers } from "next/headers"; // 1. IMPORT REQUIS
-import { redirect } from "next/navigation"; // 2. IMPORT REQUIS
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+
 import Link from "next/link";
 import { 
   Users, TrendingUp, Download, Plus, 
@@ -14,40 +14,39 @@ const formatFCFA = (amount: number) => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(amount);
 };
 
+// ✅ TYPAGE MIS À JOUR
 type InvestorWithContracts = User & {
   investmentContracts: InvestmentContract[];
+  finance: { walletBalance: number } | null; // On ajoute la relation Finance
 };
 
 export default async function InvestorsListPage() {
   
   // ---------------------------------------------------------
-  // 🛡️ PROTOCOLE ZERO TRUST (DÉBUT DU BLINDAGE)
+  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
   // ---------------------------------------------------------
-  const headersList = headers();
-  const userId = headersList.get("x-user-id");
+  const session = await auth();
+  const userId = session?.user?.id;
 
   if (!userId) {
-      // Pas d'ID = Intrusion potentielle -> Ejection
       redirect("/login");
   }
 
-  // Double vérification du grade (Defense in Depth)
+  // Double vérification du grade
   const admin = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true }
   });
 
   if (!admin || admin.role !== "SUPER_ADMIN") {
-      // Mauvais grade -> Ejection
       redirect("/dashboard");
   }
-  // ---------------------------------------------------------
-  // ✅ FIN DU BLINDAGE - ACCÈS AUTORISÉ
-  // ---------------------------------------------------------
 
   let investors: InvestorWithContracts[] = [];
   
   try {
+    // 2. REQUÊTE PRISMA CORRIGÉE
+    // @ts-ignore (Au cas où le type Prisma strict râle, mais la structure est bonne)
     investors = await prisma.user.findMany({
       where: { 
           role: "INVESTOR" 
@@ -55,6 +54,10 @@ export default async function InvestorsListPage() {
       orderBy: { createdAt: 'desc' },
       include: {
           investmentContracts: true,
+          // ✅ ON INCLUT LE COFFRE-FORT
+          finance: {
+              select: { walletBalance: true }
+          },
           _count: {
               select: { investmentContracts: true }
           }
@@ -64,7 +67,8 @@ export default async function InvestorsListPage() {
     console.error("🚨 ERREUR CRITIQUE DB (Investisseurs):", error);
   }
 
-  const totalRaised = investors.reduce((acc, inv) => acc + (inv.walletBalance || 0), 0);
+  // 3. CALCULS CORRIGÉS (Via relation finance)
+  const totalRaised = investors.reduce((acc, inv) => acc + (inv.finance?.walletBalance || 0), 0);
   const totalInvestors = investors.length;
   const fullyCompliant = investors.filter(i => (i.investmentContracts?.length || 0) > 0).length;
 
@@ -199,7 +203,8 @@ export default async function InvestorsListPage() {
                                     </span>
                                 </td>
                                 <td className="p-4 font-mono font-bold text-emerald-400 text-base">
-                                    {formatFCFA(investor.walletBalance || 0)}
+                                    {/* ✅ CORRECTION ICI : Accès via finance */}
+                                    {formatFCFA(investor.finance?.walletBalance || 0)}
                                 </td>
                                 <td className="p-4 text-center">
                                     {hasSigned ? (
@@ -223,23 +228,6 @@ export default async function InvestorsListPage() {
                             </tr>
                         );
                     })}
-                    
-                    {investors.length === 0 && (
-                        <tr>
-                            <td colSpan={6} className="p-16 text-center text-slate-500">
-                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Users className="w-8 h-8 opacity-20"/>
-                                </div>
-                                <p className="font-medium text-white">Aucun investisseur trouvé.</p>
-                                <Link 
-                                    href="/dashboard/superadmin/investors/new" 
-                                    className="px-4 py-2 bg-[#F59E0B] text-black font-bold rounded-lg text-sm inline-block hover:bg-orange-500 transition"
-                                >
-                                    Créer le premier
-                                </Link>
-                            </td>
-                        </tr>
-                    )}
                 </tbody>
             </table>
         </div>

@@ -1,229 +1,272 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import axios from "axios";
 import { Role } from "@prisma/client";
+import { createHmac } from "crypto";
 
 // =============================================================================
-// 🔧 CONFIGURATION & SÉCURITÉ
+// 🔧 CONFIGURATION & SÉCURITÉ (BANK-GRADE)
 // =============================================================================
 const CINETPAY_CONFIG = {
   API_KEY: process.env.CINETPAY_API_KEY,
   SITE_ID: process.env.CINETPAY_SITE_ID,
+  SECRET_KEY: process.env.CINETPAY_SECRET_KEY, 
   CHECK_URL: "https://api-checkout.cinetpay.com/v2/payment/check"
 };
 
-// =============================================================================
-// 💰 RÈGLES FINANCIÈRES STRICTES (Business Logic)
-// =============================================================================
 const FEES = {
   TENANT_ENTRANCE_FEE: 20000, 
-  PLATFORM_RECURRING_RATE: 0.05, // 5%
-  AGENT_SUCCESS_FEE_RATE: 0.05, // 5%
-  AGENCY_DEFAULT_RATE: 0.10 // 10%
+  PLATFORM_RECURRING_RATE: 0.05,
+  AGENT_SUCCESS_FEE_RATE: 0.05,
+  AGENCY_DEFAULT_RATE: 0.10 
 };
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   let transactionId = "";
+  const rawBody = await request.text(); 
 
   try {
-    // 1. EXTRACTION
-    const contentType = request.headers.get("content-type") || "";
-    if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
-        const formData = await request.formData();
-        transactionId = (formData.get('cpm_trans_id') || formData.get('cpm_custom')) as string;
-    } else {
-        const jsonBody = await request.json();
-        transactionId = jsonBody.cpm_trans_id || jsonBody.cpm_custom;
+    // 1. AUTHENTIFICATION DE LA SOURCE (HMAC SHA256)
+    const signature = request.headers.get("x-cinetpay-signature");
+    if (CINETPAY_CONFIG.SECRET_KEY && signature) {
+        const expectedSignature = createHmac("sha256", CINETPAY_CONFIG.SECRET_KEY)
+          .update(rawBody)
+          .digest("hex");
+
+        if (signature !== expectedSignature) {
+            console.error("Critical: Invalid Webhook Signature Attempt");
+            return new NextResponse("Unauthorized", { status: 401 });
+        }
     }
 
-    if (!transactionId) return NextResponse.json({ error: "Missing Transaction ID" }, { status: 400 });
+    // 2. EXTRACTION DES DONNÉES
+    let body;
+    try {
+        body = JSON.parse(rawBody);
+    } catch (e) {
+        const params = new URLSearchParams(rawBody);
+        body = Object.fromEntries(params.entries());
+    }
+    
+    transactionId = body.cpm_trans_id || body.cpm_custom;
 
-    // 2. VÉRIFICATION
-    const verificationPayload = {
+    if (!transactionId) {
+        return NextResponse.json({ error: "Missing Transaction ID" }, { status: 400 });
+    }
+
+    // 3. DOUBLE VÉRIFICATION CÔTÉ FOURNISSEUR (API CHECK)
+    const verification = await axios.post(CINETPAY_CONFIG.CHECK_URL, {
       apikey: CINETPAY_CONFIG.API_KEY,
       site_id: CINETPAY_CONFIG.SITE_ID,
       transaction_id: transactionId
-    };
+    });
 
-    const response = await axios.post(CINETPAY_CONFIG.CHECK_URL, verificationPayload);
-    const data = response.data.data;
-    
-    const isValidPayment = response.data.code === "00" && data.status === "ACCEPTED";
-    const paymentMethod = data.payment_method || "MOBILE_MONEY";
-    const amountPaid = parseInt(data.amount); 
+    const apiData = verification.data.data;
+    // Note: CinetPay renvoie "00" pour succès
+    const isValidPayment = verification.data.code === "00" && apiData.status === "ACCEPTED";
+    const amountPaid = parseInt(apiData.amount); 
 
-    // 3. EXÉCUTION ATOMIQUE
+    // 4. EXÉCUTION ATOMIQUE AVEC ISOLATION SÉRIALISABLE
     await prisma.$transaction(async (tx) => {
         
-        // A. CONTEXTE
-        const rentalPayment = await tx.payment.findFirst({
+        // A. RECHERCHE ET VERROUILLAGE
+        const paymentRecord = await tx.payment.findUnique({
             where: { reference: transactionId },
-            include: { lease: { include: { property: { include: { agency: true } } } } }
+            include: { 
+                lease: { include: { property: { include: { agency: true } } } },
+                quote: { include: { artisan: true } } // On inclut l'artisan pour le scénario devis
+            }
         });
 
-        const investmentContract = !rentalPayment 
+        const investmentContract = !paymentRecord 
             ? await tx.investmentContract.findUnique({ where: { paymentReference: transactionId } })
             : null;
 
-        // B. GESTION LOCATIVE
-        if (rentalPayment) {
-            if (rentalPayment.status === "SUCCESS") return;
+        // B. SCÉNARIO 1 : GESTION DES PAIEMENTS STANDARDS
+        if (paymentRecord) {
+            
+            // Idempotence
+            if (paymentRecord.status === "SUCCESS") return;
+
+            // Anti-Fraude Montant
+            if (isValidPayment && amountPaid !== paymentRecord.amount) {
+                console.error(`Fraud Alert: Amount mismatch for Tx ${transactionId}`);
+                await tx.payment.update({
+                    where: { id: paymentRecord.id },
+                    data: { status: "FAILED" }
+                });
+                throw new Error("Security Breach: Payment amount integrity failure");
+            }
 
             if (isValidPayment) {
-                // DISTRIBUTION
-                let platformShare = 0; 
-                let agentShare = 0;    
-                let agencyShare = 0;   
-                let ownerShare = 0;    
-
-                const baseRent = rentalPayment.lease.monthlyRent; 
                 
-                // CALCUL TAUX AGENCE
-                let appliedAgencyRate = 0;
-                if (rentalPayment.lease.property.agency) {
-                    if (rentalPayment.lease.agencyCommissionRate) {
-                        appliedAgencyRate = rentalPayment.lease.agencyCommissionRate;
-                    } else if (rentalPayment.lease.property.agency.defaultCommissionRate) {
-                        appliedAgencyRate = rentalPayment.lease.property.agency.defaultCommissionRate;
+                // --- SCÉNARIO 1.1 : PAIEMENT LOCATIF (RENT/DEPOSIT) ---
+                if (paymentRecord.lease) {
+                    let platformShare = 0, agentShare = 0, agencyShare = 0, ownerShare = 0;
+                    const baseRent = paymentRecord.lease.monthlyRent;
+                    const appliedAgencyRate = paymentRecord.lease.agencyCommissionRate || FEES.AGENCY_DEFAULT_RATE;
+
+                    if (paymentRecord.type === "DEPOSIT") {
+                        platformShare = FEES.TENANT_ENTRANCE_FEE + Math.floor(baseRent * FEES.PLATFORM_RECURRING_RATE);
+                        if (paymentRecord.lease.agentId) agentShare = Math.floor(baseRent * FEES.AGENT_SUCCESS_FEE_RATE);
+                        if (paymentRecord.lease.property.agencyId) agencyShare = Math.floor(baseRent * appliedAgencyRate);
+                        ownerShare = amountPaid - platformShare - agentShare - agencyShare;
                     } else {
-                        appliedAgencyRate = FEES.AGENCY_DEFAULT_RATE;
+                        platformShare = Math.floor(amountPaid * FEES.PLATFORM_RECURRING_RATE);
+                        if (paymentRecord.lease.property.agencyId) agencyShare = Math.floor(amountPaid * appliedAgencyRate);
+                        ownerShare = amountPaid - platformShare - agencyShare;
+                    }
+
+                    // 1. Mise à jour Wallet Propriétaire (Upsert)
+                    const ownerId = paymentRecord.lease.property.ownerId;
+                    const ownerFinance = await tx.userFinance.findUnique({ where: { userId: ownerId } });
+
+                    if (!ownerFinance) {
+                        await tx.userFinance.create({
+                            data: { userId: ownerId, walletBalance: ownerShare, version: 1 }
+                        });
+                    } else {
+                        await tx.userFinance.update({
+                            where: { userId: ownerId, version: ownerFinance.version },
+                            data: { walletBalance: { increment: ownerShare }, version: { increment: 1 } }
+                        });
+                    }
+
+                    // 2. Activation Bail
+                    if (paymentRecord.lease.status === "PENDING" && paymentRecord.type === "DEPOSIT") {
+                        await tx.lease.update({ where: { id: paymentRecord.lease.id }, data: { status: "ACTIVE", isActive: true } });
+                    }
+
+                    // ✅ 3. [AJOUT CRITIQUE] CRÉATION DU LOG D'AUDIT (Pour SuperAdmin)
+                    // C'est ce qui manquait pour remplir ton tableau
+                    await tx.transaction.create({
+                        data: {
+                            amount: amountPaid,
+                            type: 'PAYMENT', 
+                            status: 'SUCCESS',
+                            reason: `Encaissement Loyer ${paymentRecord.lease.id}`,
+                            userId: paymentRecord.lease.tenantId, // Le locataire a payé
+                            reference: transactionId,
+                            balanceType: 'WALLET',
+                            propertyId: paymentRecord.lease.propertyId 
+                        }
+                    });
+                }
+
+                // --- SCÉNARIO 1.2 : RECHARGEMENT WALLET (TOPUP) ---
+                else if (paymentRecord.type === 'TOPUP' || paymentRecord.type === 'CHARGES') { 
+                    // Logique existante (déjà correcte)
+                    let userIdToCredit = null;
+                    if (apiData.metadata) {
+                        try {
+                            const meta = typeof apiData.metadata === 'string' ? JSON.parse(apiData.metadata) : apiData.metadata;
+                            userIdToCredit = meta.userId;
+                        } catch (e) {}
+                    }
+
+                    if (userIdToCredit) {
+                         const userFinance = await tx.userFinance.findUnique({ where: { userId: userIdToCredit } });
+                         if (!userFinance) {
+                             await tx.userFinance.create({ data: { userId: userIdToCredit, walletBalance: amountPaid, version: 1 } });
+                         } else {
+                             await tx.userFinance.update({ where: { userId: userIdToCredit, version: userFinance.version }, data: { walletBalance: { increment: amountPaid }, version: { increment: 1 } } });
+                         }
+                         
+                         await tx.transaction.create({
+                             data: {
+                                 amount: amountPaid,
+                                 type: "CREDIT",
+                                 balanceType: "WALLET",
+                                 reason: "Rechargement via CinetPay",
+                                 status: "SUCCESS",
+                                 reference: `TOPUP-${transactionId}`,
+                                 userId: userIdToCredit
+                             }
+                         });
                     }
                 }
 
-                // SPLIT
-                if (rentalPayment.type === "DEPOSIT") {
-                    platformShare += FEES.TENANT_ENTRANCE_FEE;
-                    platformShare += Math.floor(baseRent * FEES.PLATFORM_RECURRING_RATE);
+                // --- SCÉNARIO 1.3 : PAIEMENT DEVIS (QUOTE) ---
+                else if (paymentRecord.quote) {
+                    await tx.quote.update({ where: { id: paymentRecord.quoteId! }, data: { status: 'PAID' } });
 
-                    if (rentalPayment.lease.agentId) {
-                        agentShare = Math.floor(baseRent * FEES.AGENT_SUCCESS_FEE_RATE);
-                    }
-                    if (appliedAgencyRate > 0) {
-                        agencyShare = Math.floor(baseRent * appliedAgencyRate);
-                    }
-                    ownerShare = amountPaid - platformShare - agentShare - agencyShare;
+                    const artisanId = paymentRecord.quote.artisanId;
+                    const artisanNetIncome = paymentRecord.amount; // Ou calcul spécifique si commission
 
-                } else if (rentalPayment.type === "LOYER") {
-                    platformShare = Math.floor(amountPaid * FEES.PLATFORM_RECURRING_RATE);
-                    agentShare = 0;
-                    if (appliedAgencyRate > 0) {
-                        agencyShare = Math.floor(amountPaid * appliedAgencyRate);
+                    const artisanFinance = await tx.userFinance.findUnique({ where: { userId: artisanId } });
+
+                    if (!artisanFinance) {
+                        await tx.userFinance.create({ data: { userId: artisanId, walletBalance: artisanNetIncome, version: 1 } });
+                    } else {
+                        await tx.userFinance.update({ where: { userId: artisanId, version: artisanFinance.version }, data: { walletBalance: { increment: artisanNetIncome }, version: { increment: 1 } } });
                     }
-                    ownerShare = amountPaid - platformShare - agencyShare;
+
+                    await tx.transaction.create({
+                        data: {
+                            amount: artisanNetIncome,
+                            type: "CREDIT",
+                            balanceType: "WALLET",
+                            reason: `Paiement Devis #${paymentRecord.quote.number}`,
+                            status: "SUCCESS",
+                            reference: `QUOTE-${transactionId}`,
+                            userId: artisanId,
+                            quoteId: paymentRecord.quoteId
+                        }
+                    });
                 }
 
-                // UPDATES
+                // UPDATE FINAL PAIEMENT
                 await tx.payment.update({
-                    where: { id: rentalPayment.id },
+                    where: { id: paymentRecord.id },
                     data: {
                         status: "SUCCESS",
-                        method: paymentMethod,
-                        amountPlatform: platformShare,
-                        amountAgent: agentShare,
-                        amountAgency: agencyShare,
-                        amountOwner: ownerShare,
+                        method: apiData.payment_method || "UNKNOWN",
+                        providerResponse: apiData as any 
                     }
                 });
 
-                // PROPRIÉTAIRE
-                if (ownerShare > 0) {
-                    await tx.user.update({
-                        where: { id: rentalPayment.lease.property.ownerId },
-                        data: { walletBalance: { increment: ownerShare } }
-                    });
-                    await tx.transaction.create({
-                        data: {
-                            amount: ownerShare,
-                            type: "CREDIT",
-                            reason: `LOYER_NET_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
-                            status: "SUCCESS",
-                            userId: rentalPayment.lease.property.ownerId
-                        }
-                    });
-                }
-
-                // AGENT (Uber)
-                if (agentShare > 0 && rentalPayment.lease.agentId) {
-                    await tx.user.update({
-                        where: { id: rentalPayment.lease.agentId },
-                        data: { walletBalance: { increment: agentShare } }
-                    });
-                    await tx.transaction.create({
-                        data: {
-                            amount: agentShare,
-                            type: "CREDIT",
-                            reason: `COM_AGENT_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
-                            status: "SUCCESS",
-                            userId: rentalPayment.lease.agentId
-                        }
-                    });
-                }
-                
-                // ✅ AGENCE B2B (CORRECTION ICI)
-                // On utilise enfin le modèle AgencyTransaction 
-                if (agencyShare > 0 && rentalPayment.lease.property.agencyId) {
-                    // 1. Crédit du Solde
-                    await tx.agency.update({
-                        where: { id: rentalPayment.lease.property.agencyId },
-                        data: { walletBalance: { increment: agencyShare } }
-                    });
-                    
-                    // 2. Trace Comptable DÉDIÉE (Plus de commentaire, du vrai code)
-                    await tx.agencyTransaction.create({
-                        data: {
-                            amount: agencyShare,
-                            type: "CREDIT",
-                            reason: `COM_AGENCE_${rentalPayment.lease.property.title.substring(0, 10).toUpperCase()}`,
-                            status: "SUCCESS",
-                            agencyId: rentalPayment.lease.property.agencyId
-                        }
-                    });
-                }
-
-                // ACTIVATION BAIL
-                if (rentalPayment.lease.status === "PENDING" && rentalPayment.type === "DEPOSIT") {
-                    await tx.lease.update({
-                        where: { id: rentalPayment.lease.id },
-                        data: { status: "ACTIVE", isActive: true }
-                    });
-                }
-
             } else {
                 await tx.payment.update({
-                    where: { id: rentalPayment.id },
-                    data: { status: "FAILED" }
+                    where: { id: paymentRecord.id },
+                    data: { status: "FAILED", providerResponse: apiData as any }
                 });
             }
         } 
         
-        // C. INVESTISSEMENT
+        // C. SCÉNARIO 2 : INVESTISSEMENT (Legacy)
         else if (investmentContract) {
             if (investmentContract.status === "ACTIVE") return;
 
             if (isValidPayment) {
+                if (amountPaid !== investmentContract.amount) throw new Error("Investment amount mismatch");
+
                 await tx.investmentContract.update({
                     where: { id: investmentContract.id },
                     data: { status: "ACTIVE" }
                 });
+
                 await tx.user.update({
                     where: { id: investmentContract.userId },
-                    data: { 
-                        role: Role.INVESTOR,
-                        isBacker: true,
-                        backerTier: investmentContract.packName || "SUPPORTER"
-                    }
+                    data: { role: Role.INVESTOR, isBacker: true, backerTier: investmentContract.packName || "SUPPORTER" }
                 });
+                
+                // AJOUT : Log pour investissement aussi
                 await tx.transaction.create({
                     data: {
                         amount: amountPaid,
-                        type: "DEBIT", 
-                        reason: `INVESTISSEMENT_PACK_${(investmentContract.packName || 'STANDARD').toUpperCase()}`,
+                        type: "INVESTMENT",
+                        balanceType: "WALLET",
+                        reason: `Investissement ${investmentContract.packName}`,
                         status: "SUCCESS",
+                        reference: `INVEST-${transactionId}`,
                         userId: investmentContract.userId
                     }
                 });
+                
             } else {
                  await tx.investmentContract.update({
                     where: { id: investmentContract.id },
@@ -231,12 +274,16 @@ export async function POST(request: Request) {
                 });
             }
         }
+    }, {
+        isolationLevel: "Serializable",
+        maxWait: 10000, // Timeout augmenté pour éviter les erreurs de lock
+        timeout: 20000
     });
 
     return new NextResponse("OK", { status: 200 });
 
   } catch (error: any) {
-    console.error(`[Webhook Fatal Error] Tx: ${transactionId}`, error);
-    return new NextResponse("Error Handled", { status: 200 });
+    console.error(`[Fatal Webhook Error] Tx: ${transactionId}`, error.message);
+    return new NextResponse("Processed with error", { status: 200 });
   }
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma"; // ✅ Singleton Prisma
 
 // Import compatible Next.js pour éviter les bugs de polices sur Vercel

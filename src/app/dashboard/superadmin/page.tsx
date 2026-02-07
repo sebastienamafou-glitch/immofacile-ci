@@ -233,7 +233,11 @@ export default function WarRoomDashboard() {
                      <div className="space-y-3">
                         {data.lists.criticalIncidents.length > 0 ? data.lists.criticalIncidents.map((inc: any) => (
                             <div key={inc.id} className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-red-500/10 transition">
-                                <div><div className="text-xs font-bold text-red-400 uppercase">{inc.title}</div><div className="text-[10px] text-slate-500">{inc.property.title}</div></div>
+                                <div><div className="text-xs font-bold text-red-400 uppercase">{inc.title}</div>
+                                <div className="text-[10px] text-slate-500">
+                                 {inc.property?.title || "Bien non spécifié"}
+                            </div>
+                            </div>
                                 <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded font-bold">URGENT</span>
                             </div>
                         )) : <div className="text-center py-4 text-slate-500 text-xs italic">Aucune urgence.</div>}

@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = request.headers.get("x-user-id");
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+    
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     // 2. RÉCUPÉRATION DES LOCATAIRES
-    // On cherche les utilisateurs (TENANT) qui ont un bail sur une propriété de cet Owner (userId)
+    // On cherche les utilisateurs (TENANT) qui ont un bail sur une propriété de cet Owner
     const tenants = await prisma.user.findMany({
       where: {
         role: "TENANT",
         leases: {
             some: {
                 property: {
-                    ownerId: userId // 🔒 Verrouillage direct par ID
+                    ownerId: userId // 🔒 Verrouillage par ID session
                 }
             }
         }
@@ -27,10 +32,16 @@ export async function GET(request: Request) {
         name: true,
         email: true,
         phone: true,
-        kycStatus: true,
-        walletBalance: true,
         jobTitle: true,
         image: true,
+        
+        // ✅ CORRECTION SCHEMA : On passe par les relations
+        kyc: {
+            select: { status: true }
+        },
+        finance: {
+            select: { walletBalance: true }
+        },
         
         // Baux liés à CE propriétaire uniquement
         leases: {
@@ -70,9 +81,13 @@ export async function GET(request: Request) {
             email: t.email,
             phone: t.phone,
             image: t.image,
-            kycStatus: t.kycStatus,
-            solvency: t.walletBalance,
+            
+            // ✅ MAPPING : On extrait les valeurs des objets imbriqués
+            kycStatus: t.kyc?.status || "PENDING",
+            solvency: t.finance?.walletBalance || 0,
+            
             globalStatus: status,
+            jobTitle: t.jobTitle,
             
             // Résumé du bail en cours (pour affichage rapide en liste)
             currentProperty: currentLease ? {

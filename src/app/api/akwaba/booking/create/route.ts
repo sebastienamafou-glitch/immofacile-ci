@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 import { v4 as uuidv4 } from "uuid";
-import { verifyToken } from "@/lib/auth"; //
 import { differenceInDays } from "date-fns";
 
 export async function POST(request: Request) {
   try {
-    // 1. AUTHENTIFICATION BLINDÉE
-    // On extrait l'utilisateur via le JWT, pas via un header modifiable
-    const decodedToken = await verifyToken(request);
-    const userId = decodedToken.id; 
+    // 1. AUTHENTIFICATION BLINDÉE (MIGRÉE v5)
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+        return NextResponse.json({ error: "Session expirée ou invalide" }, { status: 401 });
+    }
 
     const body = await request.json();
     const { listingId, startDate, endDate } = body;
@@ -17,10 +21,10 @@ export async function POST(request: Request) {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // 2. TRANSACTION ATOMIQUE (Prévention des doubles réservations)
+    // 2. TRANSACTION ATOMIQUE
     const result = await prisma.$transaction(async (tx) => {
         
-        // RECUPÉRATION DE LA SOURCE DE VÉRITÉ (DB)
+        // RECUPÉRATION DE LA SOURCE DE VÉRITÉ
         const listing = await tx.listing.findUnique({
             where: { id: listingId },
             select: { pricePerNight: true, id: true }
@@ -28,8 +32,7 @@ export async function POST(request: Request) {
 
         if (!listing) throw new Error("NOT_FOUND");
 
-        // VÉRIFICATION DE DISPONIBILITÉ (Lock-check)
-        // Effectué à l'intérieur de la transaction pour bloquer les accès concurrents
+        // VÉRIFICATION DISPONIBILITÉ (Lock-check)
         const conflict = await tx.booking.findFirst({
             where: {
                 listingId,
@@ -42,31 +45,31 @@ export async function POST(request: Request) {
 
         if (conflict) throw new Error("CONFLICT");
 
-        // CALCULS FINANCIERS SERVEUR (Protection contre la fraude)
-        const nights = differenceInDays(end, start); //
+        // CALCULS FINANCIERS
+        const nights = differenceInDays(end, start);
         if (nights <= 0) throw new Error("INVALID_DATES");
 
-        const subTotal = listing.pricePerNight * nights; //
-        const agencyCommission = Math.round(subTotal * 0.10); //
+        const subTotal = listing.pricePerNight * nights;
+        const agencyCommission = Math.round(subTotal * 0.10);
         const totalPrice = subTotal + agencyCommission;
 
-        // CRÉATION DE LA RÉSERVATION
+        // CRÉATION RÉSERVATION
         const newBooking = await tx.booking.create({
             data: {
                 startDate: start,
                 endDate: end,
                 totalPrice: totalPrice,
-                status: "PAID", //
+                status: "PAID", // Idéalement PENDING jusqu'à validation webhook, mais OK pour MVP
                 guestId: userId,
                 listingId: listing.id,
             }
         });
 
-        // TRACE DE PAIEMENT CONFORME AU SCHÉMA
+        // TRACE PAIEMENT
         await tx.bookingPayment.create({
             data: {
                 amount: totalPrice,
-                provider: "WAVE", //
+                provider: "WAVE", // Placeholder
                 transactionId: `TRX-${uuidv4()}`,
                 status: "SUCCESS",
                 agencyCommission: agencyCommission,
@@ -84,8 +87,7 @@ export async function POST(request: Request) {
     const errorMap: Record<string, { msg: string, status: number }> = {
         "NOT_FOUND": { msg: "Logement introuvable", status: 404 },
         "CONFLICT": { msg: "Ces dates ont été réservées entre-temps", status: 409 },
-        "INVALID_DATES": { msg: "Dates invalides", status: 400 },
-        "Token invalide ou expiré": { msg: "Session expirée", status: 401 }
+        "INVALID_DATES": { msg: "Dates invalides", status: 400 }
     };
 
     const err = errorMap[error.message] || { msg: "Erreur serveur", status: 500 };

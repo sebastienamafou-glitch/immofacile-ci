@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const userId = request.headers.get("x-user-id");
-    
+    // 1. SÉCURITÉ ZERO TRUST
+    const session = await auth();
+    const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Session invalide" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION PROPRIÉTAIRE (Via ID)
+    // 2. RÉCUPÉRATION PROPRIÉTAIRE
     const owner = await prisma.user.findUnique({ 
         where: { id: userId },
         select: { id: true, name: true, email: true }
@@ -18,13 +21,13 @@ export async function GET(request: Request) {
 
     if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
 
-    // PARAMÈTRES DATE
+    // 3. FILTRES TEMPORELS
     const { searchParams } = new URL(request.url);
     const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
 
-    // REQUÊTE OPTIMISÉE
+    // 4. REQUÊTE HAUTE PRÉCISION
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       include: {
@@ -34,7 +37,8 @@ export async function GET(request: Request) {
                     where: {
                         date: { gte: startDate, lte: endDate },
                         status: 'SUCCESS',
-                        type: { not: 'DEPOSIT' } // ✅ FISCALITÉ : On exclut les cautions !
+                        // On garde les revenus locatifs, on exclut les cautions
+                        type: { in: ['LOYER', 'CHARGES'] } 
                     }
                 }
             }
@@ -42,23 +46,29 @@ export async function GET(request: Request) {
         incidents: {
             where: {
                 updatedAt: { gte: startDate, lte: endDate },
+                status: { in: ['RESOLVED', 'CLOSED'] }, // On ne déduit que les factures payées/fermées
                 finalCost: { not: null }
             }
         }
       }
     });
 
-    // CALCULS
+    // 5. MOTEUR DE CALCUL (Correction Fiscale)
     let totalRevenue = 0;
     let totalExpenses = 0;
 
     const breakdown = properties.map((prop) => {
-        // Revenus (Loyers + Charges)
+        
+        // REVENUS : On prend le NET PERÇU (amountOwner)
+        // Si ancien paiement avant migration, fallback sur une estimation (net = 90% brut) ou 0
         const propRevenue = prop.leases.reduce((sum, lease) => {
-            return sum + lease.payments.reduce((pSum, p) => pSum + (p.amount || 0), 0);
+            return sum + lease.payments.reduce((pSum, p) => {
+                // ✅ CORRECTIF CRITIQUE : Seul l'argent reçu dans le wallet est imposable
+                return pSum + (p.amountOwner || 0); 
+            }, 0);
         }, 0);
 
-        // Dépenses (Incidents / Travaux)
+        // DÉPENSES : Coût final des incidents
         const propExpenses = prop.incidents.reduce((sum, inc) => {
             return sum + (inc.finalCost || 0);
         }, 0);

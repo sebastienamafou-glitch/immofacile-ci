@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     // 1. SÉCURITÉ ZERO TRUST (Via ID injecté par Middleware)
-    const userId = req.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     
     // Protection radicale : Pas d'ID = Pas d'accès
     if (!userId) return NextResponse.json({ error: "Session invalide ou expirée" }, { status: 401 });

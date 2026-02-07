@@ -1,134 +1,91 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (Middleware ID)
-    const userId = req.headers.get("x-user-id");
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. SÉCURITÉ : Session Serveur (v5)
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    // 2. PARSING & VALIDATION INPUT
+    if (!userId) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { leaseId, deduction, comment } = body;
+    const { leaseId, deductionAmount, reason } = body;
 
-    if (!leaseId) return NextResponse.json({ error: "ID du bail manquant" }, { status: 400 });
-
-    const deductionAmount = Math.abs(Number(deduction) || 0); // Force positif
-
-    // 3. RÉCUPÉRATION SÉCURISÉE
-    const lease = await prisma.lease.findUnique({
-        where: { id: leaseId },
-        include: { property: true }
-    });
-
-    if (!lease) return NextResponse.json({ error: "Bail introuvable" }, { status: 404 });
-    
-    // VERROU DE SÉCURITÉ : Anti-IDOR
-    if (lease.property.ownerId !== userId) {
-        return NextResponse.json({ error: "Accès refusé : Ce bail ne vous appartient pas." }, { status: 403 });
+    if (!leaseId) {
+        return NextResponse.json({ error: "ID du bail requis" }, { status: 400 });
     }
 
-    if (!lease.isActive) {
-        return NextResponse.json({ error: "Ce bail est déjà clôturé." }, { status: 400 });
-    }
-
-    // 4. SÉCURITÉ FINANCIÈRE
-    if (deductionAmount > lease.depositAmount) {
-        return NextResponse.json({ 
-            error: `La retenue (${deductionAmount.toLocaleString()} F) dépasse la caution disponible.` 
-        }, { status: 400 });
-    }
-
-    const refundAmount = lease.depositAmount - deductionAmount;
-
-    // 5. TRANSACTION ATOMIQUE (Bank Grade)
-    await prisma.$transaction(async (tx) => {
+    // 2. TRANSACTION DE CLÔTURE
+    const result = await prisma.$transaction(async (tx) => {
         
-        // A. CLÔTURER LE BAIL
-        await tx.lease.update({
+        // A. Vérification (Lock)
+        const lease = await tx.lease.findUnique({
+            where: { id: leaseId },
+            include: { property: true }
+        });
+
+        if (!lease) throw new Error("Bail introuvable");
+        
+        // Vérif Propriétaire
+        if (lease.property.ownerId !== userId) {
+            throw new Error("Vous n'êtes pas le propriétaire de ce bail.");
+        }
+
+        if (lease.status !== "ACTIVE") {
+            throw new Error("Ce bail n'est pas actif.");
+        }
+
+        // B. Mise à jour statut Bail
+        const updatedLease = await tx.lease.update({
             where: { id: leaseId },
             data: {
+                // ✅ CORRECTION : On utilise le terme technique valide pour un contrat
+                status: "TERMINATED", 
                 isActive: false,
-                status: "TERMINATED",
-                endDate: new Date(), // Date de sortie immédiate
-                // On pourrait loguer le commentaire dans une note interne si le schéma le permettait
+                endDate: new Date() // On fige la date de fin réelle
             }
         });
 
-        // B. LIBÉRER LA PROPRIÉTÉ (Code Définitif)
-        // La propriété redevient disponible pour un nouveau locataire
-        await tx.property.update({
-            where: { id: lease.propertyId },
-            data: { 
-                isAvailable: true 
-            }
-        });
+        // C. Gestion des Retenues (Deductions)
+        if (deductionAmount && deductionAmount > 0) {
+            
+            // 1. Créditer le Propriétaire (Dans UserFinance)
+            await tx.userFinance.upsert({
+                where: { userId: userId },
+                create: { userId: userId, walletBalance: deductionAmount, version: 1, kycTier: 1 },
+                update: {
+                    walletBalance: { increment: deductionAmount },
+                    version: { increment: 1 }
+                }
+            });
 
-        // C. MOUVEMENTS FINANCIERS (Code Définitif)
-        
-        // C1. Encaissement de la retenue par le Propriétaire
-        if (deductionAmount > 0) {
+            // 2. Créer la Transaction (Trace)
             await tx.transaction.create({
                 data: {
                     userId: userId,
                     amount: deductionAmount,
                     type: "CREDIT",
-                    reason: `RETENUE_CAUTION_BAIL_${lease.id.slice(-6).toUpperCase()}`,
-                    status: "SUCCESS"
+                    balanceType: "WALLET",
+                    reason: reason || "Retenue sur caution",
+                    status: "SUCCESS",
+                    reference: `LEASE-END-${lease.id.substring(0, 8)}`
                 }
             });
-            
-            await tx.user.update({
-                where: { id: userId },
-                data: { walletBalance: { increment: deductionAmount } }
-            });
         }
-        
-        // C2. Remboursement du solde au Locataire
-        if (refundAmount > 0) {
-             await tx.transaction.create({
-                data: {
-                    userId: lease.tenantId,
-                    amount: refundAmount,
-                    type: "CREDIT",
-                    reason: `REMBOURSEMENT_CAUTION_BAIL_${lease.id.slice(-6).toUpperCase()}`,
-                    status: "SUCCESS"
-                }
-            });
-            
-            await tx.user.update({
-                where: { id: lease.tenantId },
-                data: { walletBalance: { increment: refundAmount } }
-            });
-        }
+
+        return updatedLease;
     });
 
-    // 6. INTELLIGENCE RELOGEMENT
-    const isGoodTenant = deductionAmount <= (lease.depositAmount * 0.2); // Moins de 20% de retenue
-    let rehousingProposals: any[] = [];
-
-    if (isGoodTenant) {
-        // Proposition de biens VACANTS du même propriétaire
-        rehousingProposals = await prisma.property.findMany({
-            where: {
-                ownerId: userId,
-                id: { not: lease.propertyId },
-                isAvailable: true // Utilisation du champ natif
-            },
-            take: 3,
-            select: { id: true, title: true, price: true, commune: true, images: true }
-        });
-    }
-
-    return NextResponse.json({ 
-        success: true,
-        refundAmount,
-        isGoodTenant,
-        rehousingProposals
-    });
+    return NextResponse.json({ success: true, lease: result });
 
   } catch (error: any) {
-    console.error("Erreur Clôture Bail:", error);
-    return NextResponse.json({ error: "Erreur serveur critique." }, { status: 500 });
+    console.error("Erreur End Lease:", error.message);
+    return NextResponse.json({ error: error.message || "Erreur serveur" }, { status: 500 });
   }
 }

@@ -1,28 +1,24 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
+
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER DE SÉCURITÉ (ZERO TRUST) ---
-async function checkSuperAdminPermission(request: Request) {
-  // 1. Identification par ID (Session sécurisée)
-  const userId = request.headers.get("x-user-id");
-  
-  if (!userId) {
-    return { authorized: false, status: 401, error: "Non authentifié" };
-  }
+// --- HELPER SÉCURITÉ (MIGRATION v5) ---
+async function checkSuperAdmin() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
 
-  // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 
     where: { id: userId },
     select: { id: true, role: true } 
   });
 
-  if (!admin || admin.role !== "SUPER_ADMIN") {
-    return { authorized: false, status: 403, error: "Accès refusé : Rôle Super Admin requis" };
-  }
-
-  return { authorized: true, admin };
+  if (!admin || admin.role !== "SUPER_ADMIN") return null;
+  return admin;
 }
 
 // =====================================================================
@@ -30,16 +26,15 @@ async function checkSuperAdminPermission(request: Request) {
 // =====================================================================
 export async function GET(request: Request) {
   try {
-    const auth = await checkSuperAdminPermission(request);
-    if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const admin = await checkSuperAdmin();
+    if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
     const users = await prisma.user.findMany({
       where: { 
-        OR: [
-            { kycStatus: "PENDING" },
-            { kycStatus: "VERIFIED" },
-            { kycStatus: "REJECTED" }
-        ]
+        // ✅ FILTRE VIA RELATION (User -> UserKYC)
+        kyc: {
+            status: { in: ["PENDING", "VERIFIED", "REJECTED"] }
+        }
       },
       orderBy: { updatedAt: 'desc' },
       select: { 
@@ -47,13 +42,30 @@ export async function GET(request: Request) {
         name: true, 
         email: true, 
         role: true, 
-        kycStatus: true, 
-        kycDocuments: true,
-        createdAt: true
+        createdAt: true,
+        
+        // ✅ SÉLECTION VIA RELATION
+        kyc: {
+            select: {
+                status: true,
+                documents: true
+            }
+        }
       }
     });
 
-    return NextResponse.json({ success: true, users });
+    // Remapping pour le frontend (Aplatissage)
+    const formattedUsers = users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        kycStatus: u.kyc?.status || "PENDING",
+        kycDocuments: u.kyc?.documents || []
+    }));
+
+    return NextResponse.json({ success: true, users: formattedUsers });
 
   } catch (error) {
     console.error("[API_KYC_GET] Error:", error);
@@ -66,8 +78,8 @@ export async function GET(request: Request) {
 // =====================================================================
 export async function PUT(request: Request) {
     try {
-        const auth = await checkSuperAdminPermission(request);
-        if (!auth.authorized) return NextResponse.json({ error: auth.error }, { status: auth.status });
+        const admin = await checkSuperAdmin();
+        if (!admin) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
 
         const body = await request.json();
         const { userId, status } = body;
@@ -76,18 +88,26 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: "Données invalides" }, { status: 400 });
         }
 
-        // Mise à jour + Validation du compte
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
+        // ✅ MISE À JOUR CIBLÉE (UserKYC)
+        // On met à jour le statut dans la table dédiée
+        const updatedKYC = await prisma.userKYC.update({
+            where: { userId: userId },
             data: { 
-                kycStatus: status,
-                isVerified: status === 'VERIFIED', // Le badge suit le statut
-                updatedAt: new Date()
-            },
-            select: { id: true, kycStatus: true, email: true }
+                status: status
+            }
         });
 
-        return NextResponse.json({ success: true, user: updatedUser });
+        // Optionnel : Si vous avez gardé un flag 'isVerified' sur User pour des perfs
+        // await prisma.user.update({
+        //    where: { id: userId },
+        //    data: { isVerified: status === 'VERIFIED' }
+        // });
+
+        return NextResponse.json({ 
+            success: true, 
+            userId: userId, 
+            newStatus: updatedKYC.status 
+        });
 
     } catch (error) {
         console.error("[API_KYC_PUT] Error:", error);

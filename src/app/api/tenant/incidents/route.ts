@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
@@ -6,7 +8,9 @@ export const dynamic = 'force-dynamic';
 // GET : Liste historique des incidents
 export async function GET(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const incidents = await prisma.incident.findMany({
@@ -29,7 +33,9 @@ export async function GET(request: Request) {
 // POST : Créer un incident
 export async function POST(request: Request) {
   try {
-    const userId = request.headers.get("x-user-id");
+    const session = await auth();
+if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const userId = session.user.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await request.json();
