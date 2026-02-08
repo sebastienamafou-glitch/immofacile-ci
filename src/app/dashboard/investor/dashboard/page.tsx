@@ -6,19 +6,20 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { 
   TrendingUp, Wallet, ArrowUpRight, Plus, 
-  Building2, FileText, LayoutDashboard, LogOut, PieChart, Loader2 
+  Building2, FileText, LayoutDashboard, LogOut, PieChart, Loader2,
+  ShieldCheck, Landmark, Lock, CheckCircle2
 } from "lucide-react";
-import { api } from "@/lib/api"; // ✅ Wrapper Sécurisé
+import { api } from "@/lib/api"; 
 
+// --- TYPES ---
 interface Investment {
     id: string;
     amount: number;
     status: string;
     createdAt: string;
-    // Note: Dans votre schema actuel, 'InvestmentContract' n'a pas de 'projectName' ou 'roiRate' explicites.
-    // Je suppose ici qu'ils sont stockés ou dérivés du 'packName'.
     packName?: string; 
 }
 
@@ -27,27 +28,90 @@ interface Stats {
     activeCount: number;
 }
 
+// ✅ WIDGET KYC INVESTISSEUR (Style "Gold Premium")
+const InvestorKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  if (isVerified) return (
+    <div className="mb-10 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+       <div className="flex items-center gap-4">
+          <div className="p-2 bg-amber-500/20 rounded-xl text-amber-500 border border-amber-500/20">
+              <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+              <h4 className="text-white font-bold text-sm">Investisseur Accrédité</h4>
+              <p className="text-amber-500/80 text-xs font-medium">Conformité AML/CFT validée. Plafonds débloqués.</p>
+          </div>
+       </div>
+       <div className="flex items-center gap-2 text-amber-500 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20">
+          <CheckCircle2 className="w-4 h-4" /> Vérifié
+       </div>
+    </div>
+  );
+
+  return (
+    <div className="mb-10 p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950/30 border border-amber-500/30 shadow-2xl relative overflow-hidden group transition hover:border-amber-500/50">
+        {/* Background Décoratif Or */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] -mr-20 -mt-20 pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center justify-center border w-8 h-8 bg-white/5 rounded-lg backdrop-blur-md border-white/10">
+                        <Landmark className="w-4 h-4 text-amber-200" />
+                    </div>
+                    <span className="bg-amber-950/50 border border-amber-500/30 text-amber-200 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                        <Lock className="w-3 h-3" /> Conformité Financière
+                    </span>
+                </div>
+                <h4 className="text-xl font-black text-white tracking-tight mb-2">Débloquez votre potentiel d'investissement</h4>
+                <p className="text-xs font-medium leading-relaxed text-slate-400 max-w-lg">
+                    En vertu des réglementations anti-blanchiment (AML), nous devons valider l'origine de vos fonds pour autoriser les transactions supérieures à 1.000.000 FCFA.
+                </p>
+            </div>
+
+            <Link href="/dashboard/investor/kyc" className="relative z-10 block w-full md:w-auto">
+                <button className="w-full md:w-auto bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-4 px-8 rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-amber-900/20 flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <ShieldCheck className="w-4 h-4" />
+                    Valider mon dossier AML
+                </button>
+            </Link>
+        </div>
+    </div>
+  );
+};
+
 export default function InvestorDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalInvested: 0, activeCount: 0 });
   const [investments, setInvestments] = useState<Investment[]>([]);
+  // ✅ État utilisateur local pour le statut immédiat
+  const [user, setUser] = useState<{ email: string; isVerified: boolean } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
         try {
-            // ✅ APPEL SÉCURISÉ (Cookie auto)
-            // Note: Vous devrez créer cet endpoint GET '/api/investor/dashboard'
-            // qui retourne { stats, investments } basé sur 'x-user-id'
-            const res = await api.get('/investor/dashboard'); 
-            
-            if (res.data.success) {
-                setStats(res.data.stats);
-                setInvestments(res.data.investments);
+            // 1. Récupération User Local
+            const storedUser = localStorage.getItem("immouser");
+            if (storedUser) {
+                const parsed = JSON.parse(storedUser);
+                setUser(parsed);
+                
+                // 2. Appel API avec header de sécurité
+                const res = await api.get('/investor/dashboard', {
+                    headers: { 'x-user-email': parsed.email }
+                }); 
+                
+                if (res.data.success) {
+                    setStats(res.data.stats);
+                    setInvestments(res.data.investments);
+                }
+            } else {
+                router.push('/login');
             }
         } catch (error: any) {
             console.error("Dashboard Load Error", error);
             if (error.response?.status === 401) router.push('/login');
+            else toast.error("Erreur de connexion aux marchés.");
         } finally {
             setLoading(false);
         }
@@ -57,8 +121,8 @@ export default function InvestorDashboard() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-white gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-        <p className="text-sm font-mono text-slate-500">Chargement du portefeuille...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+        <p className="text-sm font-mono text-slate-500 uppercase tracking-widest">Accès Salle des Marchés...</p>
     </div>
   );
 
@@ -68,21 +132,21 @@ export default function InvestorDashboard() {
       {/* SIDEBAR */}
       <aside className="w-64 border-r border-slate-800 p-6 hidden lg:flex flex-col fixed h-full bg-[#0B1120] z-10">
         <div className="flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white">I</div>
-            <span className="text-xl font-bold text-white tracking-tight">INVEST<span className="text-indigo-500">.CLUB</span></span>
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center font-black text-black shadow-lg shadow-amber-500/20">I</div>
+            <span className="text-xl font-bold text-white tracking-tight">INVEST<span className="text-amber-500">.CLUB</span></span>
         </div>
         
         <nav className="space-y-2 flex-1">
-            <Link href="/investor/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-900/20 font-medium">
-                <LayoutDashboard className="w-5 h-5" /> Vue d'ensemble
+            <Link href="/investor/dashboard" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800 border border-white/5 text-white shadow-lg font-bold text-sm">
+                <LayoutDashboard className="w-4 h-4 text-amber-500" /> Vue d'ensemble
             </Link>
-            <Link href="/investor/opportunities" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition font-medium">
-                <PieChart className="w-5 h-5" /> Opportunités
+            <Link href="/investor/opportunities" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition font-medium text-sm">
+                <PieChart className="w-4 h-4" /> Opportunités
             </Link>
         </nav>
 
-        <button onClick={() => router.push('/login')} className="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition font-bold text-sm">
-            <LogOut className="w-5 h-5" /> Déconnexion
+        <button onClick={() => router.push('/login')} className="flex items-center gap-3 px-4 py-3 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl transition font-bold text-sm border border-transparent hover:border-red-500/20">
+            <LogOut className="w-4 h-4" /> Déconnexion
         </button>
       </aside>
 
@@ -91,85 +155,93 @@ export default function InvestorDashboard() {
         
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
             <div>
-                <h1 className="text-3xl font-black text-white">Mon Portefeuille</h1>
-                <p className="text-slate-400 mt-1">Suivez la performance de vos placements immobiliers.</p>
+                <h1 className="text-3xl font-black text-white tracking-tight uppercase">Mon Portefeuille</h1>
+                <p className="text-slate-400 mt-1 text-sm font-medium">Suivez la performance de vos actifs immobiliers.</p>
             </div>
             <Link href="/investor/opportunities">
-                <Button className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 px-6 rounded-xl shadow-lg shadow-indigo-900/30 transition-transform active:scale-95">
-                    <Plus className="w-5 h-5 mr-2" /> Explorer les projets
+                <Button className="bg-amber-600 hover:bg-amber-500 text-black font-bold h-12 px-6 rounded-xl shadow-lg shadow-amber-900/30 transition-transform active:scale-95 uppercase text-xs tracking-widest">
+                    <Plus className="w-4 h-4 mr-2" /> Explorer les projets
                 </Button>
             </Link>
         </header>
 
+        {/* ✅ WIDGET KYC INVESTISSEUR (Inséré ici) */}
+        {user && <InvestorKycWidget isVerified={user.isVerified} />}
+
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Card className="bg-slate-900 border-slate-800">
+            <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
                 <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg"><Wallet className="w-5 h-5" /></div>
-                        <span className="text-xs font-bold text-slate-400 uppercase">Total Investi</span>
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg border border-blue-500/20"><Wallet className="w-5 h-5" /></div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Investi</span>
                     </div>
-                    <p className="text-3xl font-black text-white">{stats.totalInvested.toLocaleString()} F</p>
+                    <p className="text-3xl font-black text-white">{stats.totalInvested.toLocaleString()} <span className="text-lg text-slate-500 font-medium">FCFA</span></p>
                 </CardContent>
             </Card>
-            <Card className="bg-slate-900 border-slate-800">
+            <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
                 <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg"><TrendingUp className="w-5 h-5" /></div>
-                        <span className="text-xs font-bold text-slate-400 uppercase">Contrats Actifs</span>
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg border border-purple-500/20"><TrendingUp className="w-5 h-5" /></div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contrats Actifs</span>
                     </div>
-                    <p className="text-3xl font-black text-purple-500">{stats.activeCount}</p>
+                    <p className="text-3xl font-black text-purple-400">{stats.activeCount}</p>
                 </CardContent>
             </Card>
-            {/* Carte ROI (Statique pour l'instant ou calculée si données dispos) */}
-            <Card className="bg-slate-900 border-slate-800">
+            <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
                  <CardContent className="p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-green-500/10 text-green-500 rounded-lg"><ArrowUpRight className="w-5 h-5" /></div>
-                        <span className="text-xs font-bold text-slate-400 uppercase">ROI Moyen Estimé</span>
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 bg-green-500/10 text-green-500 rounded-lg border border-green-500/20"><ArrowUpRight className="w-5 h-5" /></div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ROI Estimé</span>
                     </div>
-                    <p className="text-3xl font-black text-green-500">~ 12.5 %</p>
+                    <p className="text-3xl font-black text-green-400">~ 12.5 %</p>
                 </CardContent>
             </Card>
         </div>
 
         <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-indigo-500" /> Mes Contrats
+            <Building2 className="w-5 h-5 text-amber-500" /> Mes Contrats
         </h2>
 
         <div className="space-y-4">
             {investments.length === 0 ? (
-                <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
-                    <p className="text-slate-500">Vous n'avez aucun investissement actif.</p>
+                <div className="p-12 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
+                    <p className="text-slate-500 font-medium">Vous n'avez aucun investissement actif.</p>
+                    <Link href="/investor/opportunities" className="text-amber-500 text-sm font-bold hover:underline mt-2 inline-block">
+                        Voir les opportunités disponibles &rarr;
+                    </Link>
                 </div>
             ) : (
                 investments.map(inv => (
-                    <div key={inv.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-indigo-500/50 transition duration-300 group relative overflow-hidden">
+                    <div key={inv.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-amber-500/30 transition duration-300 group relative overflow-hidden shadow-lg">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
                             
                             <div className="flex items-center gap-4 w-full md:w-auto">
-                                <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center font-bold text-indigo-400 text-xl border border-slate-700">
+                                <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center font-black text-amber-500 text-xl border border-slate-800 group-hover:border-amber-500/50 transition-colors">
                                     {(inv.packName || "I").charAt(0)}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white text-lg">{inv.packName || "Contrat Investisseur"}</h3>
-                                    <p className="text-xs text-slate-500 font-mono">Date : {new Date(inv.createdAt).toLocaleDateString()}</p>
+                                    <h3 className="font-bold text-white text-lg group-hover:text-amber-400 transition-colors">{inv.packName || "Contrat Investisseur"}</h3>
+                                    <p className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-slate-700"></span>
+                                        Signé le {new Date(inv.createdAt).toLocaleDateString()}
+                                    </p>
                                 </div>
                             </div>
 
                             <div className="flex gap-8 text-center w-full md:w-auto justify-between md:justify-end items-center">
                                 <div>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Montant</p>
-                                    <p className="font-bold text-slate-200">{inv.amount.toLocaleString()} F</p>
+                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-wider mb-1">Montant Investi</p>
+                                    <p className="font-bold text-white text-lg">{inv.amount.toLocaleString()} F</p>
                                 </div>
                                 <div>
-                                    <Badge className={`border-0 ${inv.status === 'ACTIVE' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}`}>
-                                        {inv.status}
+                                    <Badge className={`border-0 px-3 py-1 ${inv.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                        {inv.status === 'ACTIVE' ? 'ACTIF' : inv.status}
                                     </Badge>
                                 </div>
                                 <Link href={`/investor/contract/${inv.id}`}>
-                                    <Button variant="outline" size="icon" className="bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition">
-                                        <FileText className="w-4 h-4" />
+                                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl">
+                                        <FileText className="w-5 h-5" />
                                     </Button>
                                 </Link>
                             </div>

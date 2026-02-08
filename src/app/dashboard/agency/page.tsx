@@ -3,25 +3,75 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
   Building, Users, Wallet, TrendingUp, BarChart3, 
-  UserPlus, AlertTriangle, MapPin, LayoutDashboard 
+  UserPlus, AlertTriangle, MapPin, LayoutDashboard, 
+  ShieldCheck, FileCheck, CheckCircle2 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link"; // ✅ Import Link
 
 export const dynamic = 'force-dynamic';
 
+// ✅ WIDGET KYC AGENCE (Nouveau)
+const AgencyKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  if (isVerified) return (
+    <div className="mb-10 bg-slate-900/50 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+       <div className="flex items-center gap-4">
+          <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500 border border-emerald-500/20">
+              <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+              <h4 className="text-white font-bold text-sm">Agence Certifiée</h4>
+              <p className="text-emerald-400 text-xs">Conformité légale validée.</p>
+          </div>
+       </div>
+       <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-emerald-500/10 rounded-lg">
+          <CheckCircle2 className="w-4 h-4" /> Vérifié
+       </div>
+    </div>
+  );
+
+  return (
+    <div className="mb-10 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-blue-500/30 rounded-2xl p-6 md:p-8 relative overflow-hidden group shadow-2xl">
+       {/* Background Effect */}
+       <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
+       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+             <div className="flex items-center gap-2 mb-2">
+                <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">
+                   Conformité
+                </span>
+             </div>
+             <h3 className="text-xl font-black text-white mb-1">Validation Entreprise</h3>
+             <p className="text-slate-400 text-sm max-w-lg">
+                Pour activer les paiements et encaisser vos commissions, veuillez fournir les documents légaux de l'agence (RCCM, ID Fiscale).
+             </p>
+          </div>
+          
+          <Link href="/dashboard/agency/kyc">
+             <Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold h-12 px-6 shadow-lg shadow-blue-900/20 transition-all active:scale-95">
+                <FileCheck className="mr-2 h-4 w-4" />
+                Soumettre le dossier
+             </Button>
+          </Link>
+       </div>
+    </div>
+  );
+};
+
 export default async function AgencyDashboardPage() {
   // 1. SÉCURITÉ ZERO TRUST
-const session = await auth();
+  const session = await auth();
 
-if (!session || !session.user?.id) {
-  redirect("/login");
-}
+  if (!session || !session.user?.id) {
+    redirect("/login");
+  }
 
-const userId = session.user.id;
+  const userId = session.user.id;
 
-  // 2. VÉRIFICATION RÔLE (Optimisée : ID only)
+  // 2. VÉRIFICATION RÔLE (Optimisée)
   const admin = await prisma.user.findUnique({
     where: { id: userId },
     include: { agency: true }
@@ -38,16 +88,17 @@ const userId = session.user.id;
     );
   }
 
-  const agencyId = admin.agency!.id; // On est sûr qu'elle existe ici
+  const agencyId = admin.agency!.id;
 
-  // ✅ REQUÊTES OPTIMISÉES (Agrégations incluses)
+  // ✅ REQUÊTES OPTIMISÉES
   const [
     propertiesCount,
     listingsCount,
     agents,
     revenueData,
     propertiesByCommune,
-    listingsByCity
+    listingsByCity,
+    agencyData // On récupère l'agence pour vérifier son statut KYC
   ] = await Promise.all([
     prisma.property.count({ where: { agencyId } }),
     prisma.listing.count({ where: { agencyId } }),
@@ -64,42 +115,39 @@ const userId = session.user.id;
       where: { booking: { listing: { agencyId } }, status: "SUCCESS" },
       _sum: { agencyCommission: true }
     }),
-    // Agrégation Property
     prisma.property.groupBy({
       by: ['commune'],
       where: { agencyId },
       _count: { id: true },
     }),
-    // Agrégation Listing
     prisma.listing.groupBy({
       by: ['city'],
       where: { agencyId },
       _count: { id: true },
+    }),
+    prisma.agency.findUnique({ // ✅ Récupération info agence
+        where: { id: agencyId },
+        select: { isActive: true } // On utilise isActive comme proxy pour "Vérifié" pour l'instant
     })
   ]);
 
   // ✅ LOGIQUE MÉTIER
   const totalAssets = propertiesCount + listingsCount;
   const totalRevenue = revenueData._sum.agencyCommission || 0;
-  
-  // Calculs (À dynamiser avec API Stats plus tard pour l'historique)
   const growthRate = 12.5; 
   const occupancyRate = totalAssets > 0 ? Math.round((listingsCount / totalAssets) * 85) : 0; 
 
-  // 1. Fusion des zones géographiques
+  // Agrégation Zones
   const zoneMap = new Map<string, number>();
-
   propertiesByCommune.forEach((item) => {
     const zone = item.commune.trim();
     zoneMap.set(zone, (zoneMap.get(zone) || 0) + item._count.id);
   });
-
   listingsByCity.forEach((item) => {
     const zone = item.city.trim(); 
     zoneMap.set(zone, (zoneMap.get(zone) || 0) + item._count.id);
   });
 
-  // 2. Top 3 Zones
   const topZones = Array.from(zoneMap.entries())
     .map(([name, count]) => ({
       name,
@@ -109,8 +157,11 @@ const userId = session.user.id;
     .sort((a, b) => b.count - a.count)
     .slice(0, 3);
 
+  // ✅ Statut Vérifié de l'agence (Basé sur isActive ou un futur champ isVerified)
+  const isAgencyVerified = agencyData?.isActive || false;
+
   return (
-    <div className="p-8 bg-[#020617] min-h-screen text-slate-200 pb-24">
+    <div className="p-8 bg-[#020617] min-h-screen text-slate-200 pb-24 font-sans">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
@@ -135,6 +186,9 @@ const userId = session.user.id;
           </Button>
         </div>
       </div>
+
+      {/* ✅ BLOC KYC AGENCE (Nouveau) */}
+      <AgencyKycWidget isVerified={isAgencyVerified} />
 
       {/* KPI FINANCIERS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">

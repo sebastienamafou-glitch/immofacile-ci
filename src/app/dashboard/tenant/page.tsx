@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   Wallet, FolderOpen, UploadCloud, Loader2, 
-  MapPin, AlertTriangle, FileText, CheckCircle2, Clock, Download
+  MapPin, AlertTriangle, FileText, CheckCircle2, Clock, Download, ArrowRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,11 +20,12 @@ import RentPaymentCard from "@/components/dashboard/tenant/RentPaymentCard";
 import PaymentHistory from "@/components/dashboard/tenant/PaymentHistory";
 
 export default function TenantDashboard() {
-  // 1. ÉTAT TYPÉ STRICTEMENT (Plus de 'any')
+  // 1. ÉTAT TYPÉ STRICTEMENT
   const [data, setData] = useState<TenantDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  
+  // Note : 'isUploading' a été retiré car l'upload ne se fait plus ici
   
   const router = useRouter();
 
@@ -36,7 +37,6 @@ export default function TenantDashboard() {
         if (!stored) { router.push("/login"); return; }
         const user = JSON.parse(stored);
 
-        // L'API utilise maintenant le header pour la sécurité
         const res = await api.get('/tenant/dashboard', {
             headers: { 'x-user-email': user.email }
         });
@@ -56,38 +56,6 @@ export default function TenantDashboard() {
     };
     fetchData();
   }, [router]);
-
-  // Remplacer la fonction handleFileUpload existante par celle-ci :
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Sécurité : Vérification basique côté client
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validation taille (5MB) pour éviter d'envoyer une requête inutile
-    if (file.size > 5 * 1024 * 1024) {
-        toast.error("Fichier trop volumineux (Max 5MB)");
-        return;
-    }
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", "kyc"); // On marque le type pour le dossier sécurisé
-
-    try {
-        // L'instance 'api' gère déjà les cookies de session (withCredentials)
-        await api.post('/upload', formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
-        
-        toast.success("Document chiffré et transmis ! 🔒");
-    } catch (err) {
-        console.error("Upload error", err);
-        toast.error("Erreur lors de l'envoi du document.");
-    } finally {
-        setIsUploading(false);
-    }
-};
 
   // --- ÉTAT : CHARGEMENT ---
   if (loading) return (
@@ -182,7 +150,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   // --- ÉTAT : LOCATAIRE ACTIF (DASHBOARD COMPLET) ---
   const { lease, user, incidents } = data;
-  const property = lease.property; // TypeScript sait que property existe ici
+  const property = lease.property;
   const displayName = user.name ? user.name.split(' ')[0] : "Locataire";
 
   return (
@@ -223,7 +191,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         {/* COLONNE GAUCHE (Paiement & Infos) */}
         <div className="space-y-8 xl:col-span-2">
           
-          {/* 1. CARTE DE PAIEMENT (Nouveau Composant) */}
+          {/* 1. CARTE DE PAIEMENT */}
           <RentPaymentCard lease={lease} userPhone={user.phone} />
 
           {/* 2. ACTIONS RAPIDES */}
@@ -242,11 +210,11 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                         <span className="mt-1 text-xs text-slate-500">Signé le {new Date(lease.createdAt).toLocaleDateString()}</span>
                     </div>
                     <Button 
-                        onClick={() => router.push('/dashboard/tenant/contract')}
+                        onClick={() => router.push('/dashboard/tenant/documents')}
                         variant="ghost" 
                         className="mt-2 text-xs font-bold w-full bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl justify-between"
                     >
-                        Télécharger PDF <Download className="w-3 h-3" />
+                        Voir mes contrats <ArrowRight className="w-3 h-3" />
                     </Button>
                 </CardContent>
             </Card>
@@ -282,10 +250,10 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         {/* COLONNE DROITE (Historique & Upload) */}
         <aside className="space-y-8">
             
-            {/* 3. HISTORIQUE (Nouveau Composant) */}
+            {/* 3. HISTORIQUE */}
             <PaymentHistory payments={lease.payments} />
 
-            {/* 4. ZONE UPLOAD */}
+            {/* 4. ZONE MON DOSSIER (CORRIGÉE : C'EST ICI QUE ÇA CHANGE) */}
             <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-2xl relative overflow-hidden group shadow-indigo-500/20 transition hover:scale-[1.02]">
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
                 
@@ -303,16 +271,13 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     Mettez à jour vos justificatifs (Assurance, Revenus) pour maintenir votre score locataire.
                 </p>
 
-                <div className="relative z-10">
-                    <input type="file" id="doc-upload" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                    <label 
-                        htmlFor="doc-upload"
-                        className={`flex items-center justify-center w-full bg-white text-indigo-900 hover:bg-indigo-50 font-black py-5 rounded-xl text-[10px] uppercase tracking-widest shadow-xl cursor-pointer transition-all active:scale-95 gap-2 ${isUploading ? 'opacity-80 cursor-wait' : ''}`}
-                    >
-                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <UploadCloud className="w-4 h-4" />}
-                        {isUploading ? "Envoi sécurisé..." : "Ajouter un document"}
-                    </label>
-                </div>
+                {/* ✅ LE LIEN QUI MARCHE (Plus d'upload direct ici, plus de bug 404) */}
+                <Link href="/dashboard/tenant/kyc" className="relative z-10 block">
+                    <Button className="w-full bg-white text-indigo-900 hover:bg-indigo-50 font-black py-6 rounded-xl text-[10px] uppercase tracking-widest shadow-xl gap-2 transition-all active:scale-95">
+                        <UploadCloud className="w-4 h-4" />
+                        Gérer mes documents
+                    </Button>
+                </Link>
             </div>
         </aside>
       </div> 

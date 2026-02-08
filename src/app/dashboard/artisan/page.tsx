@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
   MapPin, CheckCircle, XCircle, Loader2, Wrench, Clock, 
-  DollarSign, Play, Camera, Phone 
+  DollarSign, Play, Camera, Phone, ShieldCheck, UserCheck 
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,10 +35,56 @@ interface ArtisanData {
     email: string;
     walletBalance: number;
     isAvailable: boolean;
+    isVerified: boolean; // ✅ Ajout pour le KYC
   };
   stats: any;
   jobs: Job[];
 }
+
+// ✅ WIDGET KYC ARTISAN
+const ArtisanKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  // Si vérifié, on affiche un bandeau discret de succès
+  if (isVerified) return (
+    <div className="mb-8 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+        <div className="p-2 bg-emerald-500/20 rounded-full text-emerald-500">
+            <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div>
+            <p className="text-sm font-bold text-white">Profil Artisan Certifié</p>
+            <p className="text-[10px] text-emerald-400 font-medium">Vous êtes éligible aux chantiers premium.</p>
+        </div>
+    </div>
+  );
+
+  // Sinon, gros bloc d'appel à l'action
+  return (
+    <div className="mb-8 p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-xl relative overflow-hidden group transition hover:scale-[1.01]">
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center justify-center border w-8 h-8 bg-white/10 rounded-lg backdrop-blur-md border-white/10">
+                        <UserCheck className="w-4 h-4 text-indigo-200" />
+                    </div>
+                    <span className="bg-indigo-900/50 border border-indigo-400/30 text-indigo-200 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                        Requis
+                    </span>
+                </div>
+                <h4 className="text-xl font-black tracking-tight mb-1">Vérification d'Identité</h4>
+                <p className="text-xs font-medium leading-relaxed text-indigo-100/80 max-w-lg">
+                    Pour accepter des chantiers et recevoir vos paiements, nous devons valider votre identité professionnelle.
+                </p>
+            </div>
+
+            <Link href="/dashboard/artisan/kyc" className="relative z-10 block w-full md:w-auto">
+                <button className="w-full md:w-auto bg-white text-indigo-900 hover:bg-indigo-50 font-black py-4 px-8 rounded-xl text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <ShieldCheck className="w-4 h-4" />
+                    Vérifier mon profil
+                </button>
+            </Link>
+        </div>
+    </div>
+  );
+};
 
 export default function ArtisanDashboard() {
   const router = useRouter();
@@ -52,7 +98,15 @@ export default function ArtisanDashboard() {
   // --- DATA FETCHING ---
   const fetchDashboard = async () => {
     try {
-        const res = await api.get('/artisan/dashboard');
+        const stored = localStorage.getItem("immouser");
+        if (!stored) { router.push("/login"); return; }
+        const user = JSON.parse(stored);
+
+        // ✅ Ajout du header x-user-email pour la sécurité
+        const res = await api.get('/artisan/dashboard', {
+             headers: { 'x-user-email': user.email }
+        });
+        
         if (res.data.success) {
             setData(res.data);
         }
@@ -101,22 +155,32 @@ export default function ArtisanDashboard() {
     <div className="p-6 md:p-10 font-sans text-slate-200 bg-[#0B1120] min-h-screen pb-20">
         
         {/* HEADER */}
-        <header className="flex justify-between items-end mb-10 border-b border-slate-800 pb-8">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-10 border-b border-slate-800 pb-8">
             <div>
                 <h1 className="text-3xl font-black text-white mb-2 uppercase">Bonjour, {data.user.name}</h1>
                 <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="border-orange-500 text-orange-500 bg-orange-500/10">Artisan Certifié</Badge>
+                    {data.user.isVerified ? (
+                        <Badge variant="outline" className="border-emerald-500 text-emerald-500 bg-emerald-500/10 gap-1 pl-1">
+                            <CheckCircle className="w-3 h-3" /> Artisan Certifié
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" className="border-slate-600 text-slate-400">Non Vérifié</Badge>
+                    )}
+                    
                     <button onClick={toggleAvailability} className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold transition-all ${data.user.isAvailable ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : 'border-slate-600 text-slate-400 bg-slate-800'}`}>
                         <div className={`w-2 h-2 rounded-full ${data.user.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
                         {data.user.isAvailable ? 'DISPONIBLE' : 'HORS LIGNE'}
                     </button>
                 </div>
             </div>
-             <div className="hidden md:block bg-slate-900 px-6 py-4 rounded-xl border border-slate-800 shadow-lg text-right">
+             <div className="bg-slate-900 px-6 py-4 rounded-xl border border-slate-800 shadow-lg text-right w-full md:w-auto">
                 <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solde Portefeuille</p>
                 <p className="text-3xl font-black text-emerald-400 tracking-tight">{formatCurrency(data.user.walletBalance)}</p>
             </div>
         </header>
+
+        {/* ✅ BLOC KYC */}
+        <ArtisanKycWidget isVerified={data.user.isVerified} />
 
         {/* LISTE DES MISSIONS */}
         <div className="space-y-4">
@@ -142,7 +206,6 @@ export default function ArtisanDashboard() {
                                 </div>
                                 
                                 <div>
-                                    {/* ✅ TITRE CLIQUABLE CORRECTEMENT PLACÉ ICI */}
                                     <Link href={`/dashboard/artisan/incidents/${job.id}`} className="hover:underline decoration-orange-500 underline-offset-4">
                                         <h3 className="text-2xl font-black text-white uppercase mb-2">{job.title}</h3>
                                     </Link>
@@ -181,7 +244,6 @@ export default function ArtisanDashboard() {
                                                 <XCircle className="w-3 h-3 mr-2"/> Refuser
                                             </Button>
                                         </div>
-                                        {/* Bouton Devis pour Open */}
                                         <Link href={`/dashboard/artisan/incidents/${job.id}/quote`} className="w-full block">
                                             <Button variant="secondary" className="w-full text-xs font-bold uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 h-10">
                                                 <DollarSign className="w-3 h-3 mr-2"/> Faire un devis
@@ -193,8 +255,6 @@ export default function ArtisanDashboard() {
                                 {/* CAS 2: EN COURS */}
                                 {job.status === 'IN_PROGRESS' && (
                                     <div className="space-y-3 w-full">
-                                        
-                                        {/* BOUTON DEVIS VISIBLE MÊME EN COURS (Si pas de montant fixé) */}
                                         {(!job.quoteAmount || job.quoteAmount === 0) && (
                                             <Link href={`/dashboard/artisan/incidents/${job.id}/quote`} className="w-full block">
                                                 <Button variant="secondary" className="w-full text-xs font-bold uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 h-10">
@@ -202,7 +262,6 @@ export default function ArtisanDashboard() {
                                                 </Button>
                                             </Link>
                                         )}
-
                                         <Button 
                                             onClick={() => handleOpenCompleteModal(job.id)} 
                                             className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black shadow-lg shadow-orange-900/20 py-6 text-sm uppercase tracking-wider"

@@ -1,47 +1,78 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, MapPin, ArrowRight, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Search, MapPin, ArrowRight, Loader2, ShieldCheck, UserCheck } from "lucide-react";
 import ListingCard from "@/components/guest/ListingCard"; 
 import { toast } from "sonner";
 import { Listing } from "@prisma/client"; 
 
-// ✅ 1. CORRECTION DE L'INTERFACE
-// On ajoute les champs que ListingCard réclame (location, image, etc.)
+// ✅ 1. INTERFACE ÉTENDUE
+// On étend le type Listing Prisma pour inclure les champs UI spécifiques
 interface ListingData extends Listing {
   rating?: number;
   isFavorite?: boolean;
   price?: number; 
-  location?: string;      // Requis par ListingCard
-  image?: string | null;  // Requis par ListingCard
+  location?: string;      
+  image?: string | null;  
 }
+
+// ✅ 2. WIDGET KYC VOYAGEUR (AKWABA)
+const GuestKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  // Si le voyageur est déjà vérifié, on n'affiche rien (ou un petit badge discret)
+  if (isVerified) return null;
+
+  return (
+    <div className="mb-12 p-6 md:p-8 rounded-[2.5rem] bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-xl relative overflow-hidden group transition hover:scale-[1.01] animate-in fade-in slide-in-from-bottom-4">
+        {/* Background Décoratif */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center justify-center border w-8 h-8 bg-white/10 rounded-lg backdrop-blur-md border-white/10">
+                        <UserCheck className="w-4 h-4 text-cyan-100" />
+                    </div>
+                    <span className="bg-cyan-900/50 border border-cyan-400/30 text-cyan-100 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                        Sécurité
+                    </span>
+                </div>
+                <h4 className="text-xl font-black tracking-tight mb-1">Profil Voyageur Certifié</h4>
+                <p className="text-xs font-medium leading-relaxed text-cyan-50/80 max-w-lg">
+                    Pour réserver instantanément sans attendre la validation de l'hôte, vérifiez votre identité en 2 minutes.
+                </p>
+            </div>
+
+            <Link href="/dashboard/guest/kyc" className="relative z-10 block w-full md:w-auto">
+                <button className="w-full md:w-auto bg-white text-cyan-900 hover:bg-cyan-50 font-black py-4 px-8 rounded-xl text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <ShieldCheck className="w-4 h-4" />
+                    Vérifier mon identité
+                </button>
+            </Link>
+        </div>
+    </div>
+  );
+};
 
 export default function GuestDashboard() {
   
   const [query, setQuery] = useState("");
   const [listings, setListings] = useState<ListingData[]>([]); 
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [user, setUser] = useState<{ email: string; isVerified: boolean } | null>(null);
 
-  // --- 2. FONCTION DE RECHERCHE API ---
+  // --- 3. CHARGEMENT API ---
   const fetchListings = async (searchQuery: string) => {
     setLoading(true);
     try {
         const headers: any = {};
-        const storedUser = localStorage.getItem("immouser");
-        if (storedUser) {
-            try {
-                 const parsed = JSON.parse(storedUser);
-                 if (parsed?.email) headers['x-user-email'] = parsed.email;
-            } catch (e) { /* ignore error */ }
-        }
+        if (user?.email) headers['x-user-email'] = user.email;
 
         const res = await fetch(`/api/guest/search?q=${searchQuery}`, { headers });
         const data = await res.json();
         
         if (data.success) {
-            // ✅ MAPPING DE DONNÉES (ADAPTATEUR)
-            // On transforme les données Prisma (DB) vers le format ListingCard (UI)
+            // MAPPING DES DONNÉES
             const formattedListings = data.listings.map((l: any) => ({
                 ...l,
                 price: l.price || l.pricePerNight || 0, 
@@ -49,11 +80,7 @@ export default function GuestDashboard() {
                 isFavorite: l.isFavorite || false,
                 createdAt: new Date(l.createdAt),
                 updatedAt: new Date(l.updatedAt),
-                
-                // --- LES CORRECTIFS SONT ICI ---
-                // On mappe 'city' vers 'location'
                 location: l.city || l.address || "Abidjan", 
-                // On prend la première image du tableau pour 'image'
                 image: (l.images && l.images.length > 0) ? l.images[0] : null
             }));
             setListings(formattedListings);
@@ -66,19 +93,30 @@ export default function GuestDashboard() {
     }
   };
 
-  // --- 1. CHARGEMENT SÉCURISÉ ---
+  // --- 4. INITIALISATION ---
   useEffect(() => {
     try {
         const storedUser = localStorage.getItem("immouser");
         if (storedUser) {
             const parsed = JSON.parse(storedUser);
-            if (parsed && parsed.email) setUserEmail(parsed.email);
+            if (parsed && parsed.email) {
+                setUser({ 
+                    email: parsed.email, 
+                    isVerified: parsed.isVerified || false // On récupère le statut vérifié
+                });
+            }
         }
     } catch (e) {
         localStorage.removeItem("immouser"); 
     }
+    // On lance la recherche initiale
     fetchListings("");
   }, []);
+
+  // Relance la recherche si l'user change (pour le header x-user-email)
+  useEffect(() => {
+      if (user?.email) fetchListings(query);
+  }, [user]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,15 +127,15 @@ export default function GuestDashboard() {
     <div className="min-h-screen bg-[#0B1120] text-slate-200 pb-20 font-sans">
       
       {/* HERO SECTION */}
-      <div className="relative bg-slate-900 border-b border-white/5 p-8 sm:p-12 rounded-b-[3rem] overflow-hidden shadow-2xl shadow-black/50">
+      <div className="relative bg-slate-900 border-b border-white/5 p-8 sm:p-12 rounded-b-[3rem] overflow-hidden shadow-2xl shadow-black/50 mb-8">
         <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] pointer-events-none"></div>
         
-        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6">
-          <span className="inline-block py-1 px-3 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider animate-pulse">
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-700">
+          <span className="inline-block py-1 px-3 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider">
             Espace Voyageur Akwaba
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-            Où souhaitez-vous aller{userEmail ? `, ` : ' '}<span className="text-orange-500">{userEmail ? userEmail.split('@')[0] : ''}</span> ?
+            Où souhaitez-vous aller{user?.email ? `, ` : ' '}<span className="text-orange-500">{user?.email ? user.email.split('@')[0] : ''}</span> ?
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
             Découvrez nos résidences exclusives à Abidjan, Assinie et au-delà.
@@ -126,7 +164,10 @@ export default function GuestDashboard() {
       </div>
 
       {/* CONTENU PRINCIPAL */}
-      <main className="max-w-7xl mx-auto px-6 py-12 space-y-12">
+      <main className="max-w-7xl mx-auto px-6 space-y-12">
+
+        {/* ✅ WIDGET KYC (S'affiche uniquement si non vérifié) */}
+        {user && <GuestKycWidget isVerified={user.isVerified} />}
 
         {/* PROMO BANNER */}
         <div className="bg-gradient-to-r from-blue-900/40 to-slate-900 border border-white/5 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group">
@@ -160,9 +201,9 @@ export default function GuestDashboard() {
                   listings.map((item) => (
                     <ListingCard 
                         key={item.id} 
-                        // @ts-ignore - On force le passage car on sait qu'on a mappé les bons champs
+                        // @ts-ignore
                         data={item} 
-                        currentUserEmail={userEmail} 
+                        currentUserEmail={user?.email || null} 
                     />
                   ))
                 ) : (

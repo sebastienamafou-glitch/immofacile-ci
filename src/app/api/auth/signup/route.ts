@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-
+import { logActivity } from "@/lib/logger"; // ✅ Import du logger d'audit
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +24,17 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
+      // 🚨 AUDIT SÉCURITÉ : Tentative d'inscription sur compte existant
+      await logActivity(
+        "SIGNUP_FAILED_DUPLICATE", 
+        "SECURITY", 
+        { 
+            email, 
+            phone, 
+            ip: request.headers.get("x-forwarded-for") || "unknown" 
+        }
+      );
+      
       return NextResponse.json({ error: "Un compte existe déjà avec cet email ou téléphone." }, { status: 409 });
     }
 
@@ -34,8 +43,9 @@ export async function POST(request: Request) {
 
     // Sécurité Rôles
     const allowedPublicRoles = ["OWNER", "TENANT", "AGENT", "ARTISAN", "GUEST", "INVESTOR"]; 
-    let userRole = "GUEST"; // Rôle par défaut prudent
+    let userRole = "TENANT"; // Par défaut "Locataire" si non spécifié (plus sûr que Guest)
     
+    // On force le typage pour éviter les erreurs TypeScript avec Prisma
     if (role && allowedPublicRoles.includes(role)) {
         userRole = role;
     }
@@ -48,7 +58,7 @@ export async function POST(request: Request) {
         phone,
         password: hashedPassword,
         name: name || "Utilisateur",
-        role: userRole as any,
+        role: userRole as any, // Cast nécessaire si l'enum n'est pas importé
         
         // ✅ INIT FINANCE (Obligatoire maintenant)
         finance: {
@@ -69,13 +79,30 @@ export async function POST(request: Request) {
       }
     });
 
-    // 5. Nettoyage réponse
+    // ✅ 5. AUDIT SUCCÈS : Enregistrement dans le journal
+    await logActivity(
+        "NEW_USER_REGISTERED", 
+        "AUTH", 
+        { 
+            role: newUser.role, 
+            method: email ? "EMAIL" : "PHONE",
+            name: newUser.name 
+        }, 
+        newUser.id // On lie l'action au nouvel utilisateur
+    );
+
+    // 6. Nettoyage réponse (On retire le hash du mot de passe)
+    // @ts-ignore
     const { password: _, ...userSafe } = newUser;
 
     return NextResponse.json({ success: true, user: userSafe });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur Inscription:", error);
+    
+    // Log d'erreur système (Optionnel)
+    await logActivity("SIGNUP_SYSTEM_ERROR", "SYSTEM", { error: error.message });
+
     return NextResponse.json({ error: "Erreur serveur lors de l'inscription." }, { status: 500 });
   }
 }

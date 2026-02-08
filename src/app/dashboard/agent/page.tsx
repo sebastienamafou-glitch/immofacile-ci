@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api"; // ✅ Wrapper sécurisé
+import { api } from "@/lib/api"; 
 import { 
   Briefcase, MapPin, Calendar, TrendingUp, 
-  Users, Wallet, Clock, ArrowRight, Loader2, CheckCircle2
+  Users, Wallet, Clock, ArrowRight, Loader2, CheckCircle2,
+  ShieldCheck, UserCheck, BadgeCheck
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,17 +47,70 @@ interface MissionData {
     }>;
 }
 
+// ✅ WIDGET KYC AGENT
+const AgentKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  if (isVerified) return (
+    <div className="mb-8 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+       <div className="p-2 bg-blue-500/20 rounded-xl text-blue-500 border border-blue-500/20">
+           <BadgeCheck className="w-6 h-6" />
+       </div>
+       <div>
+           <h4 className="text-white font-bold text-sm">Agent Mandataire Certifié</h4>
+           <p className="text-blue-400 text-xs font-medium">Votre carte professionnelle est valide.</p>
+       </div>
+    </div>
+  );
+
+  return (
+    <div className="mb-10 p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-blue-900 via-slate-900 to-slate-900 border border-blue-500/30 shadow-2xl relative overflow-hidden group transition hover:border-blue-500/50">
+        {/* Background Décoratif */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] -mr-16 -mt-16 pointer-events-none"></div>
+
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center justify-center border w-8 h-8 bg-white/10 rounded-lg backdrop-blur-md border-white/10">
+                        <UserCheck className="w-4 h-4 text-blue-200" />
+                    </div>
+                    <span className="bg-blue-950 border border-blue-400/30 text-blue-200 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                        Accréditation
+                    </span>
+                </div>
+                <h4 className="text-xl font-black text-white tracking-tight mb-1">Validation Professionnelle</h4>
+                <p className="text-xs font-medium leading-relaxed text-slate-400 max-w-lg">
+                    Pour accéder aux mandats exclusifs et percevoir vos commissions, veuillez valider votre accréditation (Carte Pro ou Attestation).
+                </p>
+            </div>
+
+            <Link href="/dashboard/agent/kyc" className="relative z-10 block w-full md:w-auto">
+                <button className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <ShieldCheck className="w-4 h-4" />
+                    Valider mon statut
+                </button>
+            </Link>
+        </div>
+    </div>
+  );
+};
+
 export default function AgentDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [missions, setMissions] = useState<MissionData | null>(null);
+  // ✅ État local pour l'utilisateur (récupéré du storage)
+  const [user, setUser] = useState<{ isVerified: boolean } | null>(null);
 
-  // 1. CHARGEMENT DES DONNÉES (ZERO TRUST)
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        // ✅ Appels parallèles sécurisés via le wrapper
+        // 1. Récupération User Local (pour le statut Verified immédiat)
+        const storedUser = localStorage.getItem("immouser");
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        }
+
+        // 2. Appels API
         const [resStats, resMissions] = await Promise.all([
            api.get('/agent/dashboard'),
            api.get('/agent/missions')
@@ -70,7 +124,8 @@ export default function AgentDashboard() {
         if (e.response?.status === 401) {
             router.push('/login');
         } else {
-            toast.error("Impossible de charger le tableau de bord.");
+            // On ne bloque pas tout si une API échoue, on affiche juste une notif
+            toast.error("Erreur de synchronisation.");
         }
       } finally {
         setLoading(false);
@@ -79,17 +134,11 @@ export default function AgentDashboard() {
     loadDashboard();
   }, [router]);
 
-  // 2. ACTION : ACCEPTER UNE MISSION
   const handleAcceptMission = async (id: string) => {
       try {
-        // ✅ POST Sécurisé
         await api.post(`/agent/missions/${id}/accept`, {});
-        
         toast.success("Mission acceptée ! Au travail ! 💼");
-        
-        // Rafraîchissement optimiste ou complet
         window.location.reload(); 
-
       } catch (e: any) {
           toast.error(e.response?.data?.error || "Erreur lors de l'acceptation.");
       }
@@ -106,7 +155,7 @@ export default function AgentDashboard() {
     <div className="p-6 md:p-10 font-sans text-slate-200 min-h-screen pb-24 bg-[#0B1120]">
         
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
             <div>
                 <h1 className="text-3xl font-black text-white mb-1 uppercase tracking-tight">Espace Agent</h1>
                 <p className="text-slate-400 text-sm">Gérez vos missions et développez votre réseau.</p>
@@ -123,6 +172,9 @@ export default function AgentDashboard() {
                 </div>
             </div>
         </div>
+
+        {/* ✅ WIDGET KYC AGENT (Nouveau) */}
+        {user && <AgentKycWidget isVerified={user.isVerified} />}
 
         {/* KPI CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -157,7 +209,7 @@ export default function AgentDashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             
-            {/* COLONNE GAUCHE : LE MARCHÉ DES MISSIONS */}
+            {/* COLONNE GAUCHE : MARKETPLACE */}
             <div className="xl:col-span-2 space-y-6">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">

@@ -1,94 +1,60 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { 
-  Camera, UploadCloud, CheckCircle2, 
-  Loader2, ArrowLeft, Shield 
-} from "lucide-react";
-import Swal from "sweetalert2";
+import { ArrowLeft, Shield, FileText, Lock, UserCheck, CheckCircle2, Loader2, Camera } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { CldUploadWidget } from "next-cloudinary";
+import { submitKycApplication } from "@/actions/kyc";
+import Swal from "sweetalert2";
 
 export default function KYCPage() {
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'IDENTITY' | 'RENTAL'>('IDENTITY');
+  const [status, setStatus] = useState<string>("NONE"); 
   const [uploading, setUploading] = useState(false);
-  const [status, setStatus] = useState<string>("PENDING"); // PENDING, VERIFIED, REJECTED, NONE
 
-  // --- CORRECTION MAJEURE ICI ---
-  // On ne fait plus d'appel API risque au chargement.
-  // On récupère le statut directement depuis le stockage local (mis à jour lors du login).
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('immouser');
       if (storedUser) {
         const user = JSON.parse(storedUser);
-        // Si le user a un statut, on l'utilise, sinon 'NONE'
         setStatus(user.kycStatus || "NONE");
-      } else {
-        // Si pas d'info locale, on met NONE par défaut (évite le crash)
-        setStatus("NONE");
       }
-    } catch (e) {
-      console.error("Erreur lecture user local:", e);
-      setStatus("NONE");
-    }
+    } catch (e) { console.error(e); }
   }, []);
 
-  // Gestion de la sélection de fichier
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selected = e.target.files[0];
-      setFile(selected);
-      setPreview(URL.createObjectURL(selected));
-    }
-  };
-
-  // Envoi vers le Backend
-  const handleUpload = async () => {
-    if (!file) return;
-
+  const handleKycSuccess = async (result: any) => {
     setUploading(true);
-    const formData = new FormData();
-    formData.append('document', file); 
+    const secureUrl = result?.info?.secure_url; // On récupère l'URL directement de Cloudinary
+
+    if (!secureUrl) {
+        setUploading(false);
+        return;
+    }
 
     try {
-      // Appel de la route d'upload
-      await api.post('/kyc/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // ON APPELLE LE SERVER ACTION (pas l'API /api/upload)
+      const response = await submitKycApplication(secureUrl, "CNI");
+      if (response.error) throw new Error(response.error);
 
-      // Mise à jour immédiate de l'interface
       setStatus("PENDING");
-      
-      // On met aussi à jour le localStorage pour la prochaine fois
+      // Mise à jour optimiste locale
       const storedUser = localStorage.getItem('immouser');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         user.kycStatus = "PENDING";
         localStorage.setItem('immouser', JSON.stringify(user));
       }
-      
+
       Swal.fire({
         icon: 'success',
-        title: 'Envoyé !',
-        text: 'Votre document est en cours de validation par nos services.',
+        title: 'Envoyé avec succès !',
+        text: 'Votre pièce d\'identité est en cours de validation.',
         background: '#0B1120', color: '#fff',
         confirmButtonColor: '#ea580c'
       });
 
     } catch (error) {
-      console.error(error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Erreur',
-        text: "L'envoi a échoué. Vérifiez que le fichier n'est pas trop lourd (Max 5Mo).",
-        background: '#0B1120', color: '#fff',
-        confirmButtonColor: '#ea580c'
-      });
+      Swal.fire({ icon: 'error', title: 'Erreur', text: "L'enregistrement a échoué.", background: '#0B1120', color: '#fff' });
     } finally {
       setUploading(false);
     }
@@ -96,92 +62,104 @@ export default function KYCPage() {
 
   return (
     <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 lg:p-10 font-sans">
-      
-      <div className="max-w-2xl mx-auto">
-        <Link href="/dashboard/tenant" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white mb-8 group">
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Retour
+      <div className="max-w-4xl mx-auto">
+        
+        <Link href="/dashboard/tenant/documents" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white mb-8 group">
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Retour aux documents
         </Link>
 
-        <div className="flex items-center gap-4 mb-8">
-            <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-500/20">
-                <Shield className="w-7 h-7" />
-            </div>
-            <div>
-                <h1 className="text-3xl font-black text-white tracking-tighter">Vérification d'Identité</h1>
-                <p className="text-slate-500 text-sm mt-1">Conformité KYC (Know Your Customer)</p>
-            </div>
+        <div className="mb-8">
+            <h1 className="text-3xl font-black text-white tracking-tighter mb-2">Mon Dossier Numérique</h1>
+            <p className="text-slate-400 text-sm">Gérez vos justificatifs (Identité & Solvabilité) en toute sécurité.</p>
         </div>
 
-        {/* ÉTAT : DÉJÀ VÉRIFIÉ */}
-        {status === 'VERIFIED' && (
-             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-[2rem] p-8 text-center animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
-                    <CheckCircle2 className="w-10 h-10 text-white" />
+        {/* --- ONGLETS (DISTINCTION CLAIRE) --- */}
+        <div className="grid grid-cols-2 gap-4 mb-8">
+            <button 
+                onClick={() => setActiveTab('IDENTITY')}
+                className={`p-5 rounded-2xl border flex flex-col items-center gap-3 transition-all ${activeTab === 'IDENTITY' ? 'bg-blue-600/10 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-[#0F172A] border-white/5 text-slate-500 hover:bg-white/5'}`}
+            >
+                <Shield className={`w-8 h-8 ${activeTab === 'IDENTITY' ? 'text-blue-500' : 'text-slate-600'}`} />
+                <div className="text-center">
+                    <span className="font-bold text-sm block">IDENTITÉ (KYC)</span>
+                    <span className="text-[10px] opacity-60">Visible par ImmoFacile (Admin)</span>
                 </div>
-                <h2 className="text-2xl font-black text-white mb-2">Identité Validée</h2>
-                <p className="text-emerald-400 font-medium">Votre dossier est complet et conforme.</p>
-             </div>
-        )}
+            </button>
 
-        {/* ÉTAT : EN ATTENTE */}
-        {status === 'PENDING' && (
-             <div className="bg-orange-500/10 border border-orange-500/20 rounded-[2rem] p-8 text-center animate-in fade-in zoom-in duration-500">
-                <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                    <Loader2 className="w-10 h-10 text-orange-500" />
+            <button 
+                onClick={() => setActiveTab('RENTAL')}
+                className={`p-5 rounded-2xl border flex flex-col items-center gap-3 transition-all ${activeTab === 'RENTAL' ? 'bg-purple-600/10 border-purple-500 text-white shadow-lg shadow-purple-900/20' : 'bg-[#0F172A] border-white/5 text-slate-500 hover:bg-white/5'}`}
+            >
+                <FileText className={`w-8 h-8 ${activeTab === 'RENTAL' ? 'text-purple-500' : 'text-slate-600'}`} />
+                <div className="text-center">
+                    <span className="font-bold text-sm block">DOSSIER LOCATIF</span>
+                    <span className="text-[10px] opacity-60">Visible par les Propriétaires</span>
                 </div>
-                <h2 className="text-2xl font-black text-white mb-2">Vérification en cours</h2>
-                <p className="text-orange-400 font-medium">Nos équipes analysent votre document.</p>
-             </div>
-        )}
+            </button>
+        </div>
 
-        {/* ÉTAT : NON SOUMIS (Formulaire) */}
-        {(status === 'NONE' || status === 'REJECTED') && (
-            <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                
-                <div className="text-center mb-8">
-                    <p className="text-sm text-slate-400 leading-relaxed">
-                        Pour finaliser votre dossier de location, veuillez télécharger une photo claire de votre 
-                        <strong className="text-white"> Carte Nationale d'Identité (CNI)</strong> ou <strong className="text-white">Passeport</strong>.
-                    </p>
-                </div>
-
-                {/* ZONE D'UPLOAD */}
-                <div className="relative group cursor-pointer">
-                    <input 
-                        type="file" 
-                        accept="image/*,application/pdf"
-                        onChange={handleFileChange}
-                        className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
-                    />
-                    
-                    <div className={`border-2 border-dashed rounded-[2rem] p-10 flex flex-col items-center justify-center transition-all ${preview ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-700 hover:border-slate-500 hover:bg-white/5'}`}>
-                        {preview ? (
-                            <img src={preview} alt="Aperçu" className="max-h-64 rounded-xl shadow-lg object-contain" />
-                        ) : (
-                            <>
-                                <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                    <Camera className="w-8 h-8 text-slate-400" />
-                                </div>
-                                <p className="font-bold text-white text-lg">Appuyez pour ajouter une photo</p>
-                                <p className="text-slate-500 text-xs mt-2 uppercase tracking-widest">JPG, PNG ou PDF (Max 5Mo)</p>
-                            </>
-                        )}
+        {/* --- ONGLET 1 : ADMIN KYC --- */}
+        {activeTab === 'IDENTITY' && (
+            <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 animate-in fade-in zoom-in duration-300">
+                <div className="flex items-start gap-4 mb-8 pb-8 border-b border-white/5">
+                    <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 shrink-0"><UserCheck className="w-6 h-6" /></div>
+                    <div>
+                        <h2 className="text-xl font-bold text-white">Vérification d'Identité</h2>
+                        <p className="text-sm text-slate-400 mt-2">Pour obtenir le badge <span className="text-blue-400 font-bold">"Vérifié"</span>.</p>
                     </div>
                 </div>
 
-                {file && (
-                    <Button 
-                        onClick={handleUpload} 
-                        disabled={uploading}
-                        className="w-full mt-6 h-16 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-lg shadow-xl shadow-blue-600/20 active:scale-[0.98] transition-all"
+                {status === 'VERIFIED' ? (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center">
+                        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-black text-white">Identité Validée ✅</h3>
+                    </div>
+                ) : status === 'PENDING' ? (
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-8 text-center">
+                        <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+                        <h3 className="text-xl font-black text-white">Vérification en cours...</h3>
+                    </div>
+                ) : (
+                    // WIDGET SANS SERVEUR (Évite l'erreur 500)
+                    <CldUploadWidget 
+                        uploadPreset="immofacile_kyc" // ⚠️ Vérifiez que ce preset existe et est "Unsigned" dans Cloudinary
+                        onSuccess={handleKycSuccess}
+                        options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                     >
-                        {uploading ? (
-                            <span className="flex items-center gap-2"><Loader2 className="animate-spin" /> Envoi...</span>
-                        ) : (
-                            <span className="flex items-center gap-2"><UploadCloud /> ENVOYER LE DOCUMENT</span>
+                        {({ open }) => (
+                            <div onClick={() => !uploading && open()} className="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer group transition-all">
+                                {uploading ? <Loader2 className="animate-spin text-blue-500 w-10 h-10" /> : (
+                                    <>
+                                        <Camera className="w-10 h-10 text-slate-400 group-hover:text-blue-500 mb-4 transition-colors" />
+                                        <p className="text-white font-bold">Scanner ma Pièce d'Identité</p>
+                                    </>
+                                )}
+                            </div>
                         )}
-                    </Button>
+                    </CldUploadWidget>
                 )}
+            </div>
+        )}
+
+        {/* --- ONGLET 2 : PROPRIÉTAIRE --- */}
+        {activeTab === 'RENTAL' && (
+            <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 animate-in fade-in zoom-in duration-300">
+                <div className="flex items-start gap-4 mb-8 pb-8 border-b border-white/5">
+                    <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500 shrink-0"><Lock className="w-6 h-6" /></div>
+                    <div>
+                        <h2 className="text-xl font-bold text-white">Justificatifs de Solvabilité</h2>
+                        <p className="text-sm text-slate-400 mt-2">Documents partagés uniquement sur candidature.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    {['Bulletins de Salaire', 'Contrat de Travail', 'Avis d\'Imposition'].map((doc, i) => (
+                        <div key={i} className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-xl">
+                            <span className="text-slate-300 text-sm font-medium">{doc}</span>
+                            <button className="text-xs font-bold text-purple-500 bg-purple-500/10 px-3 py-1.5 rounded-lg hover:bg-purple-500/20">AJOUTER +</button>
+                        </div>
+                    ))}
+                </div>
             </div>
         )}
 

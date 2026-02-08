@@ -10,7 +10,8 @@ export const {
   handlers: { GET, POST },
   auth,
   signIn,
-  signOut
+  signOut,
+  // ❌ J'ai retiré "update" ici, car il n'existe pas côté serveur
 } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -18,6 +19,7 @@ export const {
   providers: [
     Credentials({
       async authorize(credentials) {
+        // ... (votre code de connexion existant, ne changez rien)
         console.log("🔍 [AUTH] Tentative de connexion...");
         const parsedCredentials = z
           .object({ identifier: z.string(), password: z.string().min(6) })
@@ -29,45 +31,40 @@ export const {
             where: { OR: [{ email: identifier }, { phone: identifier }] }
           });
 
-          if (!user) {
-            console.log("❌ [AUTH] Utilisateur non trouvé:", identifier);
-            return null;
-          }
+          if (!user) return null;
 
           const passwordsMatch = await bcrypt.compare(password, user.password || "");
-          if (passwordsMatch) {
-            console.log("✅ [AUTH] Mot de passe OK pour:", user.email);
-            return user;
-          } else {
-             console.log("❌ [AUTH] Mot de passe incorrect");
-          }
+          if (passwordsMatch) return user;
         }
         return null;
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    // ✅ On garde cette logique, c'est elle qui fait le travail !
+    async jwt({ token, user, trigger, session }) {
       if (user) {
-        console.log("🎟️ [JWT] Création token pour User ID:", user.id);
         token.sub = user.id;
         // @ts-ignore
         token.role = user.role;
       }
+
+      // C'est ICI que la magie opère quand le client appelle update()
+      if (trigger === "update" && session?.role) {
+        console.log("🔄 [JWT] Mise à jour du Rôle vers :", session.role);
+        token.role = session.role;
+      }
+
       return token;
     },
     async session({ session, token }) {
-      console.log("📦 [SESSION] Récupération session. Token Sub:", token?.sub);
       if (token?.sub && session.user) {
         session.user.id = token.sub;
         // @ts-ignore
         session.user.role = token.role as string;
-      } else {
-        console.warn("⚠️ [SESSION] Token incomplet ou User manquant");
       }
       return session;
     }
   },
-  // Ajout de debug pour voir les erreurs internes
   debug: true, 
 })

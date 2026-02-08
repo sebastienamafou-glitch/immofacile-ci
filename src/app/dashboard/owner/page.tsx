@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link"; 
 import { useRouter } from "next/navigation";
 import { 
   AlertTriangle, CalendarDays, Wallet, MinusCircle, Phone, 
-  Hotel, Key, ArrowRight 
+  Hotel, Key, ArrowRight, ShieldCheck, UserCheck 
 } from "lucide-react";
 import Swal from 'sweetalert2'; 
 import { api } from "@/lib/api"; 
@@ -18,7 +18,7 @@ import TenantsList from "@/components/dashboard/owner/TenantsList";
 import DocumentsList from "@/components/dashboard/owner/DocumentsList";
 import IncidentWidget from "@/components/dashboard/owner/IncidentsWidget";
 
-// --- 1. COMPOSANTS UTILITAIRES ---
+// --- 1. COMPOSANTS UTILITAIRES & WIDGETS ---
 
 const ErrorState = ({ message, onRetry }: { message: string, onRetry: () => void }) => (
   <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500">
@@ -46,7 +46,48 @@ const PremiumLoader = () => (
     </div>
 );
 
-// --- 2. SOUS-COMPOSANT : LISTE DES RÉSERVATIONS AKWABA ---
+// ✅ NOUVEAU WIDGET KYC PROPRIÉTAIRE
+const OwnerKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+  // Si déjà vérifié, on n'affiche pas ce bloc pour gagner de la place (ou on affiche un badge discret)
+  if (isVerified) return (
+    <div className="mb-8 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-4">
+        <div className="p-2 bg-emerald-500/20 rounded-full text-emerald-500">
+            <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div>
+            <p className="text-sm font-bold text-white">Profil Vérifié</p>
+            <p className="text-[10px] text-emerald-400 font-medium">Votre identité est confirmée.</p>
+        </div>
+    </div>
+  );
+
+  return (
+    <div className="mb-8 p-6 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-xl relative overflow-hidden group transition hover:scale-[1.02]">
+        <div className="relative z-10 flex justify-between items-start mb-4">
+            <div className="flex items-center justify-center border w-10 h-10 bg-white/10 rounded-xl backdrop-blur-md border-white/10">
+                <UserCheck className="w-5 h-5 text-indigo-200" />
+            </div>
+            <span className="bg-indigo-900/50 border border-indigo-400/30 text-indigo-200 text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                Requis
+            </span>
+        </div>
+
+        <h4 className="relative z-10 text-xl font-black tracking-tight mb-2">Vérification d'Identité</h4>
+        <p className="relative z-10 text-xs font-medium leading-relaxed mb-6 text-indigo-100/80">
+            Obligatoire pour publier des annonces et sécuriser vos revenus locatifs.
+        </p>
+
+        <Link href="/dashboard/owner/kyc" className="relative z-10 block">
+            <button className="w-full bg-white text-indigo-900 hover:bg-indigo-50 font-black py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">
+                <ShieldCheck className="w-4 h-4" />
+                Vérifier mon profil
+            </button>
+        </Link>
+    </div>
+  );
+};
+
+// LISTE DES RÉSERVATIONS AKWABA
 const AkwabaBookingsList = ({ bookings }: { bookings: any[] }) => {
   if (!bookings || bookings.length === 0) return (
     <div className="p-8 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/50">
@@ -93,8 +134,6 @@ function OwnerDashboardContent() {
   const { data, loading, error } = useDashboardData(); 
   useTenantAlert();
 
-  // ✅ CORRECTION : on accepte l'objet 'property' complet (type any ou Property)
-  // Cela résout l'erreur "Type mismatch"
   const handleDelegate = (property: any) => {
       Swal.fire({
           icon: 'info',
@@ -180,6 +219,7 @@ function OwnerDashboardContent() {
   const artisans = data.artisans || [];
   const listings = data.listings || [];
   const bookings = data.bookings || [];
+  const user = data.user; // Pour accès facile aux données user
 
   return (
     <main className="min-h-screen bg-[#0B1120] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0B1120] to-[#0B1120] text-slate-200 p-6 lg:p-10 font-sans pb-32">
@@ -192,7 +232,7 @@ function OwnerDashboardContent() {
                 <span className="text-xs font-bold uppercase tracking-widest">{today}</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
-                Bonjour, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">{data.user?.name || 'Propriétaire'}</span> 👋
+                Bonjour, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">{user?.name || 'Propriétaire'}</span> 👋
             </h1>
             <p className="text-slate-400 mt-2 text-sm">
                 Aperçu global de votre écosystème <span className="text-white font-bold">ImmoFacile</span> & <span className="text-purple-400 font-bold">Akwaba</span>.
@@ -204,7 +244,7 @@ function OwnerDashboardContent() {
                 <span className="text-[10px] uppercase font-bold text-slate-500 group-hover:text-orange-400 transition">Solde Disponible</span>
                 <span className="text-xl font-bold text-white flex items-center gap-2">
                     <Wallet className="w-4 h-4 text-emerald-500" />
-                    {(data.user?.walletBalance || 0).toLocaleString()} FCFA
+                    {(user?.walletBalance || 0).toLocaleString()} FCFA
                     <ArrowRight className="w-3 h-3 text-slate-600 group-hover:translate-x-1 transition" />
                 </span>
              </Link>
@@ -214,7 +254,7 @@ function OwnerDashboardContent() {
       {/* STATS GLOBALES */}
       <section className="mb-10">
         <StatsOverview 
-            user={data.user} 
+            user={user} 
             stats={data.stats} 
             properties={data.properties || []}
             onWithdraw={handleWithdraw} 
@@ -224,6 +264,7 @@ function OwnerDashboardContent() {
       {/* CONTENU PRINCIPAL */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         
+        {/* COLONNE GAUCHE (Immobilier & Activité) */}
         <div className="xl:col-span-2 space-y-8">
           
           {/* Section 1: Immobilier (Long Terme) */}
@@ -237,7 +278,6 @@ function OwnerDashboardContent() {
                 </span>
              </div>
              
-             {/* Le composant PropertiesGrid est maintenant content car handleDelegate accepte l'objet */}
              <PropertiesGrid 
                 properties={data.properties || []} 
                 onDelegate={handleDelegate} 
@@ -286,34 +326,37 @@ function OwnerDashboardContent() {
 
           {/* Section 3: Locataires & Clients */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
             {/* Widget Locataires */}
-           <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
+            <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
                <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">Locataires (Baux)</h3>
                <TenantsList properties={data.properties || []} />
-          </div>
+            </div>
 
-          {/* Widget Voyageurs */}
-          <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-purple-400 uppercase tracking-widest">Voyageurs (Akwaba)</h3>
-                  <Link href="/dashboard/owner/akwaba/bookings" className="text-[10px] font-bold text-slate-500 hover:text-white transition flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg hover:bg-white/10">
-                      Gérer les réservations <ArrowRight size={12} />
-                  </Link>
-              </div>
-              <AkwabaBookingsList bookings={bookings} />
+            {/* Widget Voyageurs */}
+            <div className="bg-slate-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-purple-400 uppercase tracking-widest">Voyageurs (Akwaba)</h3>
+                    <Link href="/dashboard/owner/akwaba/bookings" className="text-[10px] font-bold text-slate-500 hover:text-white transition flex items-center gap-1 bg-white/5 px-2 py-1 rounded-lg hover:bg-white/10">
+                        Gérer les réservations <ArrowRight size={12} />
+                    </Link>
+                </div>
+                <AkwabaBookingsList bookings={bookings} />
+            </div>
           </div>
-
         </div>
 
-        </div>
-
-        {/* SIDEBAR */}
+        {/* SIDEBAR (Colonne Droite) */}
         <aside className="space-y-8">
           <div className="sticky top-8">
+              
+              {/* ✅ BLOC KYC PROPRIÉTAIRE (Ajouté ici) */}
+              <OwnerKycWidget isVerified={user?.isVerified || false} />
+
+              {/* Incidents Widget */}
               <IncidentWidget count={data.stats?.activeIncidentsCount || 0} />
               
               <div className="mt-8 space-y-8">
+                {/* Artisans Widget */}
                 <div className="bg-slate-900 border border-white/5 rounded-[2rem] p-6 shadow-xl relative overflow-hidden group">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-lg text-white flex items-center gap-2">
@@ -348,6 +391,7 @@ function OwnerDashboardContent() {
                   </div>
                 </div>
 
+                {/* Documents List */}
                 <DocumentsList properties={data.properties || []} />
               </div>
           </div>
