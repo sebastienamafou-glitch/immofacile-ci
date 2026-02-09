@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs"; // ✅ Import Sentry
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import "./globals.css";
@@ -23,16 +24,24 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export const metadata: Metadata = {
-  title: "ImmoFacile C.I",
-  description: "Gestion immobilière intelligente en Côte d'Ivoire",
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: "ImmoFacile",
-  },
-};
+// ✅ Modification Sentry : On passe de const metadata à generateMetadata()
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "ImmoFacile C.I",
+    description: "Gestion immobilière intelligente en Côte d'Ivoire",
+    manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: "ImmoFacile",
+    },
+    other: {
+      // C'est ici que la magie opère : Sentry injecte des balises meta pour lier 
+      // les erreurs du navigateur à celles du serveur.
+      ...Sentry.getTraceData()
+    }
+  };
+}
 
 export default function RootLayout({
   children,

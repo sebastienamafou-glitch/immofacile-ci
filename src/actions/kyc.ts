@@ -3,9 +3,12 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { logActivity } from "@/lib/logger";
+import { sendNotification } from "@/lib/notifications"; 
+import { logActivity } from "@/lib/logger"; // ✅ 1. IMPORT DU LOGGER
 
-// ✅ CORRECTION 1 : On accepte bien 2 arguments (url + type)
+// =========================================================
+// 1. SOUMISSION DU DOSSIER (Utilisateur)
+// =========================================================
 export async function submitKycApplication(documentUrl: string, idType: string) {
   try {
     const session = await auth();
@@ -15,7 +18,7 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
       return { error: "Vous devez être connecté." };
     }
 
-    // Mise à jour en base de données
+    // Mise à jour ou Création (Upsert)
     await prisma.userKYC.upsert({
       where: { userId: userId },
       update: {
@@ -33,15 +36,8 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
       }
     });
 
-    // Log de sécurité
-    await logActivity(
-        "KYC_SUBMITTED", 
-        "SECURITY", 
-        { method: "CLOUDINARY", docType: idType }, 
-        userId
-    );
-
     revalidatePath("/dashboard/tenant");
+    revalidatePath("/dashboard/owner");
     return { success: true };
 
   } catch (error) {
@@ -50,43 +46,128 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
   }
 }
 
-// ✅ CORRECTION 2 : Gestion du rôle admin pour la validation
+// =========================================================
+// 2. EXAMEN DU DOSSIER (SuperAdmin)
+// =========================================================
 export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED", reason?: string) {
-  const session = await auth();
-  
-  // Astuce TypeScript : On force le typage ou on vérifie en DB si le rôle manque dans la session
-  // Ici on fait une requête DB pour être sûr à 100% du rôle (plus sécurisé)
-  if (!session?.user?.id) return { error: "Non autorisé" };
-  
-  const adminUser = await prisma.user.findUnique({ 
-      where: { id: session.user.id },
-      select: { role: true }
-  });
+  try {
+    const session = await auth();
+    
+    // Vérification stricte du rôle via DB
+    if (!session?.user?.id) return { error: "Non autorisé" };
+    
+    const adminUser = await prisma.user.findUnique({ 
+        where: { id: session.user.id },
+        select: { role: true }
+    });
 
-  if (adminUser?.role !== "SUPER_ADMIN") {
-      return { error: "Action réservée aux administrateurs." };
+    if (adminUser?.role !== "SUPER_ADMIN") {
+        return { error: "Action réservée aux administrateurs." };
+    }
+
+    // 1. Mise à jour de la table UserKYC
+    const updatedKyc = await prisma.userKYC.update({
+      where: { id: kycId },
+      data: {
+        status: decision,
+        rejectionReason: decision === "REJECTED" ? reason : null,
+        reviewedAt: new Date(),
+        reviewedBy: session.user.id
+      }
+    });
+
+    // 2. Logique Métier + NOTIFICATIONS 🔔 + AUDIT LOG 📝
+    if (decision === "VERIFIED") {
+        // A. Update User Global
+        await prisma.user.update({
+            where: { id: updatedKyc.userId },
+            data: { isVerified: true }
+        });
+
+        // B. Audit Log (Preuve de validation)
+        await logActivity({
+            action: "KYC_VALIDATED",
+            entityId: updatedKyc.userId,
+            entityType: "USER",
+            userId: session.user.id, // L'admin responsable
+            metadata: { 
+                reviewer: session.user.id,
+                timestamp: new Date()
+            }
+        });
+
+        // C. Notification de Succès
+        await sendNotification({
+            userId: updatedKyc.userId,
+            title: "Identité Validée ✅",
+            message: "Félicitations ! Votre dossier est validé. Vous avez maintenant accès complet à la plateforme.",
+            type: "SUCCESS",
+            link: "/dashboard"
+        });
+
+    } else {
+        // A. Update User Global (Sécurité)
+        await prisma.user.update({
+            where: { id: updatedKyc.userId },
+            data: { isVerified: false }
+        });
+
+        // B. Audit Log (Trace du rejet)
+        await logActivity({
+            action: "KYC_REJECTED",
+            entityId: updatedKyc.userId,
+            entityType: "USER",
+            userId: session.user.id, // L'admin responsable
+            metadata: { 
+                reason: reason,
+                reviewer: session.user.id
+            }
+        });
+
+        // C. Notification de Rejet
+        await sendNotification({
+            userId: updatedKyc.userId,
+            title: "Action Requise : Dossier Rejeté 🛑",
+            message: `Votre pièce d'identité a été refusée. Motif : ${reason || "Non spécifié"}. Veuillez soumettre un nouveau document.`,
+            type: "ERROR",
+            link: "/dashboard/tenant/kyc"
+        });
+    }
+
+    revalidatePath("/dashboard/superadmin/kyc");
+    return { success: decision === "VERIFIED" ? "Validé" : "Rejeté" };
+
+  } catch (error) {
+    console.error("Erreur Review KYC:", error);
+    return { error: "Erreur lors de la validation." };
   }
+}
 
-  await prisma.userKYC.update({
-    where: { id: kycId },
-    data: {
-      status: decision,
-      rejectionReason: decision === "REJECTED" ? reason : null,
-      reviewedAt: new Date(),
-      reviewedBy: session.user.id
+// =========================================================
+// 3. POLLING TEMPS RÉEL (La Magie ✨)
+// =========================================================
+export async function getLiveKycStatus() {
+  const session = await auth();
+  if (!session || !session.user?.id) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      isVerified: true,
+      kyc: {
+        select: {
+          status: true,
+          rejectionReason: true
+        }
+      }
     }
   });
 
-  if (decision === "VERIFIED") {
-      const kyc = await prisma.userKYC.findUnique({ where: { id: kycId }});
-      if (kyc) {
-          await prisma.user.update({
-              where: { id: kyc.userId },
-              data: { isVerified: true }
-          });
-      }
-  }
+  if (!user) return null;
 
-  revalidatePath("/admin/kyc");
-  return { success: decision === "VERIFIED" ? "Validé" : "Rejeté" };
+  return {
+    status: user.kyc?.status || "NONE",
+    rejectionReason: user.kyc?.rejectionReason || null,
+    isVerified: user.isVerified
+  };
 }

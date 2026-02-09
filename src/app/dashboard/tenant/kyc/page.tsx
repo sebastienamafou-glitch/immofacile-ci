@@ -1,30 +1,86 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Shield, FileText, Lock, UserCheck, CheckCircle2, Loader2, Camera } from "lucide-react";
+import { ArrowLeft, Shield, FileText, UserCheck, CheckCircle2, Loader2, Camera, Lock, XCircle, RefreshCcw, ShieldCheck, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
-import { submitKycApplication } from "@/actions/kyc";
+import { submitKycApplication, getLiveKycStatus } from "@/actions/kyc"; // ✅ Import de l'action
 import Swal from "sweetalert2";
+import confetti from "canvas-confetti";
 
-export default function KYCPage() {
+export default function TenantKYCPage() {
   const [activeTab, setActiveTab] = useState<'IDENTITY' | 'RENTAL'>('IDENTITY');
   const [status, setStatus] = useState<string>("NONE"); 
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [consent, setConsent] = useState(false);
 
+  // 1. CHARGEMENT INITIAL (LocalStorage pour la vitesse)
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('immouser');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         setStatus(user.kycStatus || "NONE");
+        if (user.kycRejectionReason) setRejectionReason(user.kycRejectionReason);
       }
     } catch (e) { console.error(e); }
   }, []);
 
+  // 2. ⚡️ POLLING TEMPS RÉEL (La Magie)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    // On ne surveille que si on est EN ATTENTE
+    if (status === 'PENDING') {
+        interval = setInterval(async () => {
+            const freshData = await getLiveKycStatus();
+            
+            if (freshData && freshData.status !== 'PENDING') {
+                // CHANGEMENT DÉTECTÉ !
+                setStatus(freshData.status);
+                setRejectionReason(freshData.rejectionReason || null);
+
+                // Mise à jour du cache local
+                const storedUser = localStorage.getItem('immouser');
+                if (storedUser) {
+                    const user = JSON.parse(storedUser);
+                    user.kycStatus = freshData.status;
+                    user.isVerified = freshData.isVerified;
+                    user.kycRejectionReason = freshData.rejectionReason;
+                    localStorage.setItem('immouser', JSON.stringify(user));
+                }
+
+                // Feedback visuel immédiat
+                if (freshData.status === 'VERIFIED') {
+                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Félicitations ! 🥳',
+                        text: 'Votre identité vient d\'être validée par notre équipe.',
+                        timer: 4000,
+                        showConfirmButton: false,
+                        background: '#0F172A', color: '#fff'
+                    });
+                } else if (freshData.status === 'REJECTED') {
+                     Swal.fire({
+                        icon: 'error',
+                        title: 'Mise à jour Dossier',
+                        text: 'Votre document a été refusé. Veuillez consulter le motif.',
+                        background: '#0F172A', color: '#fff'
+                    });
+                }
+            }
+        }, 5000); // Vérification toutes les 5 secondes
+    }
+
+    return () => clearInterval(interval); // Nettoyage quand on quitte
+  }, [status]);
+
+
   const handleKycSuccess = async (result: any) => {
     setUploading(true);
-    const secureUrl = result?.info?.secure_url; // On récupère l'URL directement de Cloudinary
+    const secureUrl = result?.info?.secure_url;
 
     if (!secureUrl) {
         setUploading(false);
@@ -32,23 +88,24 @@ export default function KYCPage() {
     }
 
     try {
-      // ON APPELLE LE SERVER ACTION (pas l'API /api/upload)
       const response = await submitKycApplication(secureUrl, "CNI");
       if (response.error) throw new Error(response.error);
 
-      setStatus("PENDING");
-      // Mise à jour optimiste locale
+      setStatus("PENDING"); // Déclenche le polling
+      
+      // Update local storage
       const storedUser = localStorage.getItem('immouser');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         user.kycStatus = "PENDING";
+        user.kycRejectionReason = null;
         localStorage.setItem('immouser', JSON.stringify(user));
       }
 
       Swal.fire({
         icon: 'success',
         title: 'Envoyé avec succès !',
-        text: 'Votre pièce d\'identité est en cours de validation.',
+        text: 'Laissez cette page ouverte, la validation est souvent très rapide.',
         background: '#0B1120', color: '#fff',
         confirmButtonColor: '#ea580c'
       });
@@ -60,12 +117,18 @@ export default function KYCPage() {
     }
   };
 
+  const handleRetry = () => {
+      setStatus("NONE");
+      setRejectionReason(null);
+      setConsent(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 lg:p-10 font-sans pb-24">
       <div className="max-w-4xl mx-auto">
         
-        <Link href="/dashboard/tenant/documents" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white mb-8 group">
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Retour aux documents
+        <Link href="/dashboard/tenant" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white mb-8 group">
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" /> Retour Dashboard
         </Link>
 
         <div className="mb-8">
@@ -73,7 +136,7 @@ export default function KYCPage() {
             <p className="text-slate-400 text-sm">Gérez vos justificatifs (Identité & Solvabilité) en toute sécurité.</p>
         </div>
 
-        {/* --- ONGLETS (DISTINCTION CLAIRE) --- */}
+        {/* --- ONGLETS --- */}
         <div className="grid grid-cols-2 gap-4 mb-8">
             <button 
                 onClick={() => setActiveTab('IDENTITY')}
@@ -98,50 +161,137 @@ export default function KYCPage() {
             </button>
         </div>
 
-        {/* --- ONGLET 1 : ADMIN KYC --- */}
+        {/* --- ONGLET 1 : ADMIN KYC (LIVE UPDATE) --- */}
         {activeTab === 'IDENTITY' && (
             <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 animate-in fade-in zoom-in duration-300">
                 <div className="flex items-start gap-4 mb-8 pb-8 border-b border-white/5">
                     <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500 shrink-0"><UserCheck className="w-6 h-6" /></div>
                     <div>
                         <h2 className="text-xl font-bold text-white">Vérification d'Identité</h2>
-                        <p className="text-sm text-slate-400 mt-2">Pour obtenir le badge <span className="text-blue-400 font-bold">"Vérifié"</span>.</p>
+                        <p className="text-sm text-slate-400 mt-2">Pour obtenir le badge <span className="text-blue-400 font-bold">"Vérifié"</span> et rassurer les propriétaires.</p>
                     </div>
                 </div>
 
                 {status === 'VERIFIED' ? (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center">
+                    // CAS 1 : VÉRIFIÉ
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center animate-in zoom-in">
                         <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
                         <h3 className="text-xl font-black text-white">Identité Validée ✅</h3>
+                        <p className="text-emerald-400 mt-2 font-medium">Votre badge de confiance est actif.</p>
                     </div>
+
                 ) : status === 'PENDING' ? (
-                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-8 text-center">
+                    // CAS 2 : EN ATTENTE (LIVE)
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-8 text-center animate-pulse">
                         <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
                         <h3 className="text-xl font-black text-white">Vérification en cours...</h3>
+                        <p className="text-orange-400 mt-2">Nous analysons votre document en direct.</p>
+                        <p className="text-xs text-slate-500 mt-4">Ne fermez pas, cela prend quelques secondes...</p>
                     </div>
+
+                ) : status === 'REJECTED' ? (
+                    // CAS 3 : REJETÉ
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                            <XCircle className="w-8 h-8 text-red-500" />
+                        </div>
+                        <h3 className="text-xl font-black text-white mb-2">Pièce Refusée 🛑</h3>
+                        
+                        <div className="bg-red-950/30 border border-red-500/30 rounded-xl p-4 mb-6 max-w-md mx-auto">
+                            <p className="text-xs text-red-300 font-bold uppercase mb-1">Motif du rejet :</p>
+                            <p className="text-white font-medium italic">"{rejectionReason || "Photo floue ou document expiré."}"</p>
+                        </div>
+                        
+                        <button 
+                            onClick={handleRetry} 
+                            className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
+                        >
+                            <RefreshCcw className="w-4 h-4" /> Soumettre à nouveau
+                        </button>
+                    </div>
+
                 ) : (
-                    // WIDGET SANS SERVEUR (Évite l'erreur 500)
-                    <CldUploadWidget 
-                        uploadPreset="immofacile_kyc" // ⚠️ Vérifiez que ce preset existe et est "Unsigned" dans Cloudinary
-                        onSuccess={handleKycSuccess}
-                        options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
-                    >
-                        {({ open }) => (
-                            <div onClick={() => !uploading && open()} className="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer group transition-all">
-                                {uploading ? <Loader2 className="animate-spin text-blue-500 w-10 h-10" /> : (
-                                    <>
-                                        <Camera className="w-10 h-10 text-slate-400 group-hover:text-blue-500 mb-4 transition-colors" />
-                                        <p className="text-white font-bold">Scanner ma Pièce d'Identité</p>
-                                    </>
-                                )}
+                    // CAS 4 : UPLOAD
+                    <div>
+                        <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-blue-500/30">
+                            <input 
+                                type="checkbox" 
+                                id="kyc-consent"
+                                checked={consent}
+                                onChange={(e) => setConsent(e.target.checked)}
+                                className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500/50 cursor-pointer" 
+                            />
+                            <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
+                                Je certifie que les informations fournies sont exactes. 
+                                J'accepte qu'ImmoFacile vérifie mon identité pour sécuriser les locations.
+                            </label>
+                        </div>
+
+                        <CldUploadWidget 
+                            uploadPreset="immofacile_kyc"
+                            onSuccess={handleKycSuccess}
+                            options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
+                        >
+                            {({ open }) => (
+                                <div 
+                                    onClick={() => {
+                                        if (consent && !uploading) open();
+                                    }}
+                                    className={`
+                                        border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-300
+                                        ${consent 
+                                            ? "border-slate-700 hover:border-blue-500 cursor-pointer group bg-transparent" 
+                                            : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
+                                        }
+                                    `}
+                                >
+                                    {uploading ? (
+                                        <div className="text-center">
+                                            <Loader2 className="animate-spin text-blue-500 w-10 h-10 mx-auto mb-2" />
+                                            <p className="text-white font-bold">Envoi sécurisé...</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Camera className={`w-10 h-10 mb-4 transition-colors ${consent ? "text-slate-400 group-hover:text-blue-500" : "text-slate-600"}`} />
+                                            <p className="text-white font-bold">Scanner ma Pièce d'Identité</p>
+                                            
+                                            {!consent && (
+                                                <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-4 animate-pulse">
+                                                    ⚠️ Cochez la case pour activer
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </CldUploadWidget>
+
+                        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-8">
+                            <div>
+                                <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
+                                    <Lock className="w-3 h-3 text-blue-500"/> Qui voit mon document ?
+                                </h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    Seuls nos administrateurs voient votre CNI pour la validation. 
+                                    Les propriétaires voient uniquement le badge vert "Vérifié".
+                                </p>
                             </div>
-                        )}
-                    </CldUploadWidget>
+                            <div>
+                                <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
+                                    <ShieldCheck className="w-3 h-3 text-blue-500"/> Pourquoi c'est important ?
+                                </h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                    Les dossiers vérifiés sont prioritaires et ont <strong>3x plus de chances</strong> d'être acceptés pour un logement.
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
                 )}
             </div>
         )}
 
-        {/* --- ONGLET 2 : PROPRIÉTAIRE --- */}
+        {/* --- ONGLET 2 : PROPRIÉTAIRE (Inchangé) --- */}
         {activeTab === 'RENTAL' && (
             <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 animate-in fade-in zoom-in duration-300">
                 <div className="flex items-start gap-4 mb-8 pb-8 border-b border-white/5">
@@ -154,9 +304,9 @@ export default function KYCPage() {
 
                 <div className="space-y-3">
                     {['Bulletins de Salaire', 'Contrat de Travail', 'Avis d\'Imposition'].map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-xl">
+                        <div key={i} className="flex items-center justify-between p-4 bg-black/20 border border-white/5 rounded-xl hover:border-purple-500/30 transition">
                             <span className="text-slate-300 text-sm font-medium">{doc}</span>
-                            <button className="text-xs font-bold text-purple-500 bg-purple-500/10 px-3 py-1.5 rounded-lg hover:bg-purple-500/20">AJOUTER +</button>
+                            <button className="text-xs font-bold text-purple-500 bg-purple-500/10 px-3 py-1.5 rounded-lg hover:bg-purple-500/20 transition">AJOUTER +</button>
                         </div>
                     ))}
                 </div>

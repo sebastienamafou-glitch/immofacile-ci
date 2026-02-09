@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Plane, ShieldCheck, CheckCircle2, Loader2, Camera, MapPin, UserCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Plane, ShieldCheck, CheckCircle2, Loader2, Camera, MapPin, UserCheck, Sparkles, XCircle, RefreshCcw, Lock, Clock } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
 import { submitKycApplication } from "@/actions/kyc";
@@ -9,7 +9,11 @@ import Swal from "sweetalert2";
 
 export default function GuestKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // ✅ NOUVEAU : State pour le consentement
+  const [consent, setConsent] = useState(false);
 
   useEffect(() => {
     try {
@@ -17,6 +21,9 @@ export default function GuestKYCPage() {
       if (storedUser) {
         const user = JSON.parse(storedUser);
         setStatus(user.kycStatus || "NONE");
+        if (user.kycRejectionReason) {
+             setRejectionReason(user.kycRejectionReason);
+        }
       }
     } catch (e) { console.error(e); }
   }, []);
@@ -42,6 +49,7 @@ export default function GuestKYCPage() {
       if (storedUser) {
         const user = JSON.parse(storedUser);
         user.kycStatus = "PENDING";
+        user.kycRejectionReason = null;
         localStorage.setItem('immouser', JSON.stringify(user));
       }
 
@@ -67,8 +75,14 @@ export default function GuestKYCPage() {
     }
   };
 
+  const handleRetry = () => {
+      setStatus("NONE");
+      setRejectionReason(null);
+      setConsent(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-200 p-4 lg:p-10 font-sans">
+    <div className="min-h-screen bg-[#0B1120] text-slate-200 p-4 lg:p-10 font-sans pb-24">
       <div className="max-w-3xl mx-auto">
         
         {/* NAV */}
@@ -132,9 +146,48 @@ export default function GuestKYCPage() {
                     <p className="text-slate-400">Nous sécurisons votre profil voyageur.</p>
                 </div>
 
+            ) : status === 'REJECTED' ? (
+                // ✅ CAS 3 : REJETÉ (Feedback Loop)
+                <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                        <XCircle className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-black text-white mb-2">Vérification Échouée 🛑</h3>
+                    
+                    <div className="bg-red-950/30 border border-red-500/30 rounded-xl p-4 mb-6 max-w-md mx-auto">
+                        <p className="text-xs text-red-300 font-bold uppercase mb-1">Motif du refus :</p>
+                        <p className="text-white font-medium italic">"{rejectionReason || "Document illisible ou ne correspondant pas au profil."}"</p>
+                    </div>
+                    
+                    <p className="text-sm text-slate-400 mb-6">Assurez-vous que la photo de votre passeport/CNI est nette et sans reflets.</p>
+
+                    <button 
+                        onClick={handleRetry} 
+                        className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
+                    >
+                        <RefreshCcw className="w-4 h-4" /> Soumettre un nouveau document
+                    </button>
+                </div>
+
             ) : (
-                // UPLOAD
+                // CAS 4 : UPLOAD (DÉFAUT)
                 <div className="relative z-10">
+                    
+                    {/* ✅ CHECKBOX CONSENTEMENT */}
+                    <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-cyan-500/30">
+                        <input 
+                            type="checkbox" 
+                            id="kyc-consent"
+                            checked={consent}
+                            onChange={(e) => setConsent(e.target.checked)}
+                            className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500/50 cursor-pointer" 
+                        />
+                        <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
+                            Je certifie que cette pièce d'identité est la mienne. 
+                            J'accepte que <span className="text-white font-bold">Akwaba</span> vérifie mon identité pour sécuriser les séjours.
+                        </label>
+                    </div>
+
                     <CldUploadWidget 
                         uploadPreset="immofacile_kyc"
                         onSuccess={handleKycSuccess}
@@ -142,8 +195,16 @@ export default function GuestKYCPage() {
                     >
                         {({ open }) => (
                             <div 
-                                onClick={() => !uploading && open()}
-                                className="group border-2 border-dashed border-slate-700 hover:border-cyan-500 hover:bg-cyan-500/5 rounded-3xl p-12 flex flex-col items-center justify-center cursor-pointer transition-all duration-300"
+                                onClick={() => {
+                                    if (consent && !uploading) open();
+                                }}
+                                className={`
+                                    group border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300
+                                    ${consent 
+                                        ? "border-slate-700 hover:border-cyan-500 hover:bg-cyan-500/5 cursor-pointer" 
+                                        : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
+                                    }
+                                `}
                             >
                                 {uploading ? (
                                     <div className="text-center">
@@ -152,17 +213,29 @@ export default function GuestKYCPage() {
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform group-hover:bg-cyan-500 group-hover:text-black shadow-xl">
-                                            <Camera className="w-10 h-10 text-slate-400 group-hover:text-black transition-colors" />
+                                        <div className={`
+                                            w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform
+                                            ${consent ? "bg-slate-800 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-black shadow-xl" : "bg-slate-800"}
+                                        `}>
+                                            <Camera className={`w-10 h-10 transition-colors ${consent ? "text-slate-400 group-hover:text-black" : "text-slate-600"}`} />
                                         </div>
                                         <p className="font-black text-white text-xl mb-2">Scanner ma Pièce d'Identité</p>
-                                        <p className="text-sm text-slate-500 text-center max-w-sm mb-8">
+                                        <p className="text-sm text-slate-500 text-center max-w-sm">
                                             Passeport ou CNI en cours de validité. 
                                             <br/>Données chiffrées et supprimées après validation.
                                         </p>
-                                        <button className="bg-cyan-600 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-cyan-900/20 group-hover:bg-cyan-500 transition-all active:scale-95 flex items-center gap-2">
-                                            <ShieldCheck className="w-4 h-4" /> Commencer
-                                        </button>
+
+                                        {!consent && (
+                                            <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-6 animate-pulse">
+                                                ⚠️ Cochez la case ci-dessus pour activer
+                                            </p>
+                                        )}
+
+                                        {consent && (
+                                            <button className="mt-8 bg-cyan-600 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-cyan-900/20 group-hover:bg-cyan-500 transition-all active:scale-95 flex items-center gap-2">
+                                                <ShieldCheck className="w-4 h-4" /> Commencer
+                                            </button>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -178,6 +251,26 @@ export default function GuestKYCPage() {
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
                     <ShieldCheck className="w-3 h-3 text-emerald-500" /> Assurance AXA Incluse
+                </div>
+            </div>
+
+            {/* ✅ NOUVEAU : FAQ CONTEXTUELLE */}
+            <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-10">
+                <div>
+                    <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-cyan-500"/> Mes données sont-elles partagées ?
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                        Non. Vos documents d'identité sont strictement confidentiels et ne sont jamais transmis aux hôtes. Seul le badge "Vérifié" est visible.
+                    </p>
+                </div>
+                <div>
+                    <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-cyan-500"/> Réservation Instantanée ?
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                        Dès validation, vous n'aurez plus besoin d'attendre l'acceptation manuelle des hôtes pour les logements éligibles "Instant Book".
+                    </p>
                 </div>
             </div>
 

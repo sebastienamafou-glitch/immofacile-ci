@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Loader2, Save, User, MapPin, Briefcase, CreditCard, Lock, Shield } from "lucide-react";
+import { Loader2, Save, User, MapPin, Briefcase, CreditCard, Lock, Shield, Download, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api"; // Votre client axios configuré
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { signOut } from "next-auth/react";
+import Swal from "sweetalert2";
+import { exportUserData, deleteUserAccount } from "@/actions/settings"; // ✅ Import des Server Actions RGPD
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -33,9 +36,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchUser = async () => {
         try {
-            // On suppose une route qui renvoie "me" ou on utilise les données de session
-            // Ici j'appelle une route générique, adaptez selon votre auth
-            const res = await api.get("/user/settings"); // 
+            const res = await api.get("/user/settings"); 
             if (res.data) {
                 setFormData(prev => ({
                     ...prev,
@@ -177,6 +178,93 @@ export default function SettingsPage() {
                 </div>
             </CardContent>
         </Card>
+
+        {/* SECTION 4: ZONE DE DANGER (RGPD) */}
+        <div className="pt-8">
+            <h3 className="text-red-600 font-bold text-lg mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5"/> Zone de Danger
+            </h3>
+            
+            <div className="border border-red-100 bg-red-50 rounded-xl p-6 space-y-6">
+                
+                {/* EXPORT DONNÉES */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="font-bold text-slate-800">Exporter mes données</h4>
+                        <p className="text-sm text-slate-500">Recevez une copie de toutes vos données (JSON).</p>
+                    </div>
+                    <Button 
+                        type="button"
+                        onClick={async () => {
+                            toast.promise(
+                                async () => {
+                                    const res = await exportUserData();
+                                    if (res.error) throw new Error(res.error);
+                                    
+                                    // Créer un lien de téléchargement dynamique
+                                    const blob = new Blob([res.data as string], { type: "application/json" });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `immofacile-data-${Date.now()}.json`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                },
+                                {
+                                    loading: 'Préparation de l\'export...',
+                                    success: 'Téléchargement lancé ! 📂',
+                                    error: 'Erreur lors de l\'export'
+                                }
+                            );
+                        }}
+                        variant="outline" 
+                        className="border-slate-300 hover:bg-white"
+                    >
+                        <Download className="w-4 h-4 mr-2"/> Télécharger
+                    </Button>
+                </div>
+
+                <Separator className="bg-red-200/50"/>
+
+                {/* SUPPRESSION COMPTE */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="font-bold text-red-600">Supprimer mon compte</h4>
+                        <p className="text-sm text-red-400">Cette action est irréversible. Vos données seront anonymisées.</p>
+                    </div>
+                    <Button 
+                        type="button"
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={() => {
+                            Swal.fire({
+                                title: 'Êtes-vous sûr ?',
+                                text: "Vous ne pourrez pas revenir en arrière. Vos abonnements et annonces seront désactivés.",
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: '#d33',
+                                cancelButtonColor: '#3085d6',
+                                confirmButtonText: 'Oui, supprimer mon compte',
+                                cancelButtonText: 'Annuler'
+                            }).then(async (result) => {
+                                if (result.isConfirmed) {
+                                    const res = await deleteUserAccount();
+                                    if (res.error) {
+                                        Swal.fire('Erreur', res.error, 'error');
+                                    } else {
+                                        await Swal.fire('Supprimé !', 'Votre compte a été anonymisé.', 'success');
+                                        signOut({ callbackUrl: '/' }); // Déconnexion forcée
+                                    }
+                                }
+                            })
+                        }}
+                    >
+                        <Trash2 className="w-4 h-4 mr-2"/> Supprimer le compte
+                    </Button>
+                </div>
+            </div>
+        </div>
 
         {/* ACTIONS */}
         <div className="flex justify-end pt-4">

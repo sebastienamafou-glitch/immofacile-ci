@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 import { PropertyType } from "@prisma/client";
-
 
 export const dynamic = 'force-dynamic';
 
@@ -14,9 +12,8 @@ export async function GET(req: Request) {
   try {
     // ✅ ZERO TRUST : Auth via ID
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
     const properties = await prisma.property.findMany({
       where: {
@@ -43,34 +40,47 @@ const userId = session.user.id;
 }
 
 // ==========================================
-// 2. POST : Ajouter un bien
+// 2. POST : Ajouter un bien (SÉCURISÉ 🛡️)
 // ==========================================
 export async function POST(req: Request) {
   try {
     // A. Authentification Zero Trust
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
-    // B. Récupération User (pour vérifier Role & AgencyId)
+    // B. Récupération User + VÉRIFICATION KYC (Optimisée)
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, agencyId: true }
+      select: { 
+          id: true, 
+          role: true, 
+          agencyId: true,
+          isVerified: true // ✅ 1. On inclut le statut ici pour éviter une 2ème requête
+      }
     });
 
+    // C. Le Gatekeeper 🛑
     if (!user || user.role !== "OWNER") {
       return NextResponse.json({ error: "Vous devez être propriétaire pour publier." }, { status: 403 });
     }
 
-    // C. Validation Données
+    if (!user.isVerified) {
+        // ❌ 2. On bloque si pas vérifié avec le code spécifique
+        return NextResponse.json({ 
+            error: "Action refusée : Identité non vérifiée.",
+            code: "KYC_REQUIRED" // Code critique pour le Frontend
+        }, { status: 403 });
+    }
+
+    // D. Validation Données
     const body = await req.json();
 
     if (!body.title || !body.address || !body.price || !body.type) {
         return NextResponse.json({ error: "Champs obligatoires manquants" }, { status: 400 });
     }
 
-    // D. Création
+    // E. Création
     const property = await prisma.property.create({
       data: {
         title: body.title,

@@ -28,8 +28,10 @@ interface Stats {
     activeCount: number;
 }
 
-// ✅ WIDGET KYC INVESTISSEUR (Style "Gold Premium")
-const InvestorKycWidget = ({ isVerified }: { isVerified: boolean }) => {
+// ✅ WIDGET KYC INVESTISSEUR (Mis à jour pour gérer le statut REJECTED/PENDING)
+const InvestorKycWidget = ({ kycStatus, isVerified }: { kycStatus: string, isVerified: boolean }) => {
+  
+  // CAS 1 : VÉRIFIÉ
   if (isVerified) return (
     <div className="mb-10 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
        <div className="flex items-center gap-4">
@@ -47,6 +49,18 @@ const InvestorKycWidget = ({ isVerified }: { isVerified: boolean }) => {
     </div>
   );
 
+  // CAS 2 : EN ATTENTE
+  if (kycStatus === 'PENDING') return (
+    <div className="mb-10 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex items-center gap-4 animate-pulse">
+        <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+        <div>
+            <h4 className="text-white font-bold text-sm">Analyse en cours...</h4>
+            <p className="text-blue-400 text-xs">Vos documents sont en cours de traitement par notre équipe conformité.</p>
+        </div>
+    </div>
+  );
+
+  // CAS 3 : NON VÉRIFIÉ ou REJETÉ (Affiche le widget d'appel à l'action)
   return (
     <div className="mb-10 p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950/30 border border-amber-500/30 shadow-2xl relative overflow-hidden group transition hover:border-amber-500/50">
         {/* Background Décoratif Or */}
@@ -58,20 +72,31 @@ const InvestorKycWidget = ({ isVerified }: { isVerified: boolean }) => {
                     <div className="flex items-center justify-center border w-8 h-8 bg-white/5 rounded-lg backdrop-blur-md border-white/10">
                         <Landmark className="w-4 h-4 text-amber-200" />
                     </div>
-                    <span className="bg-amber-950/50 border border-amber-500/30 text-amber-200 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                        <Lock className="w-3 h-3" /> Conformité Financière
-                    </span>
+                    {kycStatus === 'REJECTED' ? (
+                         <span className="bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                            ⚠️ Dossier Refusé
+                         </span>
+                    ) : (
+                        <span className="bg-amber-950/50 border border-amber-500/30 text-amber-200 text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Conformité Financière
+                        </span>
+                    )}
                 </div>
-                <h4 className="text-xl font-black text-white tracking-tight mb-2">Débloquez votre potentiel d'investissement</h4>
+                <h4 className="text-xl font-black text-white tracking-tight mb-2">
+                    {kycStatus === 'REJECTED' ? "Mise à jour requise" : "Débloquez votre potentiel d'investissement"}
+                </h4>
                 <p className="text-xs font-medium leading-relaxed text-slate-400 max-w-lg">
-                    En vertu des réglementations anti-blanchiment (AML), nous devons valider l'origine de vos fonds pour autoriser les transactions supérieures à 1.000.000 FCFA.
+                    {kycStatus === 'REJECTED' 
+                        ? "Votre dossier a été refusé. Veuillez consulter les motifs et soumettre de nouveaux documents."
+                        : "En vertu des réglementations anti-blanchiment (AML), nous devons valider l'origine de vos fonds pour autoriser les transactions supérieures à 1.000.000 FCFA."
+                    }
                 </p>
             </div>
 
             <Link href="/dashboard/investor/kyc" className="relative z-10 block w-full md:w-auto">
                 <button className="w-full md:w-auto bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-4 px-8 rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-amber-900/20 flex items-center justify-center gap-2 transition-all active:scale-95">
                     <ShieldCheck className="w-4 h-4" />
-                    Valider mon dossier AML
+                    {kycStatus === 'REJECTED' ? "Corriger mon dossier" : "Valider mon dossier AML"}
                 </button>
             </Link>
         </div>
@@ -84,19 +109,30 @@ export default function InvestorDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({ totalInvested: 0, activeCount: 0 });
   const [investments, setInvestments] = useState<Investment[]>([]);
-  // ✅ État utilisateur local pour le statut immédiat
-  const [user, setUser] = useState<{ email: string; isVerified: boolean } | null>(null);
+  
+  // ✅ ÉTAT UTILISATEUR COMPLET (Email + Status KYC)
+  const [user, setUser] = useState<{ 
+      email: string; 
+      isVerified: boolean; 
+      kycStatus: string; // NONE, PENDING, REJECTED, VERIFIED
+  } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
         try {
-            // 1. Récupération User Local
+            // 1. Récupération User Local (Pré-chargement rapide)
             const storedUser = localStorage.getItem("immouser");
+            
             if (storedUser) {
                 const parsed = JSON.parse(storedUser);
-                setUser(parsed);
+                // On initialise avec le cache local en attendant l'API
+                setUser({
+                    email: parsed.email,
+                    isVerified: parsed.isVerified || false,
+                    kycStatus: parsed.kycStatus || "NONE"
+                });
                 
-                // 2. Appel API avec header de sécurité
+                // 2. Appel API (Source de vérité)
                 const res = await api.get('/investor/dashboard', {
                     headers: { 'x-user-email': parsed.email }
                 }); 
@@ -104,6 +140,20 @@ export default function InvestorDashboard() {
                 if (res.data.success) {
                     setStats(res.data.stats);
                     setInvestments(res.data.investments);
+                    
+                    // ✅ MISE À JOUR CRITIQUE AVEC LES DONNÉES FRAÎCHES DE L'API
+                    if (res.data.kyc) {
+                        const updatedUser = {
+                            email: parsed.email,
+                            isVerified: res.data.kyc.isVerified,
+                            kycStatus: res.data.kyc.status
+                        };
+                        setUser(updatedUser);
+                        
+                        // Optionnel : Mettre à jour le localStorage pour la prochaine fois
+                        const mergedStorage = { ...parsed, ...res.data.kyc, isVerified: res.data.kyc.isVerified, kycStatus: res.data.kyc.status, kycRejectionReason: res.data.kyc.rejectionReason };
+                        localStorage.setItem("immouser", JSON.stringify(mergedStorage));
+                    }
                 }
             } else {
                 router.push('/login');
@@ -165,8 +215,8 @@ export default function InvestorDashboard() {
             </Link>
         </header>
 
-        {/* ✅ WIDGET KYC INVESTISSEUR (Inséré ici) */}
-        {user && <InvestorKycWidget isVerified={user.isVerified} />}
+        {/* ✅ WIDGET KYC INVESTISSEUR CONNECTÉ À L'API */}
+        {user && <InvestorKycWidget isVerified={user.isVerified} kycStatus={user.kycStatus} />}
 
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">

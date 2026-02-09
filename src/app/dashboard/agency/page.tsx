@@ -9,7 +9,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import Link from "next/link"; // ✅ Import Link
+import Link from "next/link"; 
 
 export const dynamic = 'force-dynamic';
 

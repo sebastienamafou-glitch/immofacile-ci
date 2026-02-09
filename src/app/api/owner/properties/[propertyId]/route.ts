@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
+import { requireKyc } from "@/lib/gatekeeper"; // ✅ Import du Gatekeeper
 
 export const dynamic = 'force-dynamic';
 
@@ -16,16 +15,15 @@ export async function GET(
   try {
     const { propertyId } = await params;
 
-    // ✅ SÉCURITÉ ZERO TRUST : Identification par ID (Middleware)
+    // ✅ SÉCURITÉ ZERO TRUST : Identification par ID
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
     const property = await prisma.property.findUnique({
       where: { 
         id: propertyId,
-        ownerId: userId // 🔒 Vérifie que l'ID correspond au propriétaire du bien
+        ownerId: userId // 🔒 Vérifie que l'ID correspond au propriétaire
       },
       include: {
         leases: { 
@@ -56,7 +54,7 @@ const userId = session.user.id;
 }
 
 // =========================================================
-// 2. PUT : Modifier le bien
+// 2. PUT : Modifier le bien (SÉCURISÉ 🛡️)
 // =========================================================
 export async function PUT(
   req: Request,
@@ -64,15 +62,25 @@ export async function PUT(
 ) {
   try {
     const { propertyId } = await params;
+    
+    // A. Auth
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
+    // B. Gatekeeper : Vérification KYC 🛑
+    try {
+        await requireKyc(userId);
+    } catch (e) {
+        return NextResponse.json({ 
+            error: "Action refusée : Identité non vérifiée.",
+            code: "KYC_REQUIRED"
+        }, { status: 403 });
+    }
+
+    // C. Update
     const body = await req.json();
 
-    // Mise à jour sécurisée (Directement avec ownerId)
-    // Prisma lancera une erreur si l'enregistrement n'existe pas pour cet ownerId
     const updatedProperty = await prisma.property.update({
       where: { 
         id: propertyId,
@@ -82,7 +90,6 @@ const userId = session.user.id;
         title: body.title,
         price: Number(body.price),
         description: body.description,
-        // Validation stricte du type PropertyType si nécessaire, ici on fait confiance au schéma
         bedrooms: body.bedrooms ? Number(body.bedrooms) : undefined,
         bathrooms: body.bathrooms ? Number(body.bathrooms) : undefined,
         surface: body.surface ? Number(body.surface) : undefined,
@@ -94,13 +101,12 @@ const userId = session.user.id;
 
   } catch (error) {
     console.error("Error UPDATE Property:", error);
-    // Gestion fine : Si l'erreur vient du fait que le record n'existe pas (P2025)
     return NextResponse.json({ error: "Impossible de modifier (Bien introuvable ou droits insuffisants)" }, { status: 500 });
   }
 }
 
 // =========================================================
-// 3. DELETE : Supprimer le bien (Blindé)
+// 3. DELETE : Supprimer le bien (SÉCURISÉ 🛡️)
 // =========================================================
 export async function DELETE(
   req: Request,
@@ -108,12 +114,24 @@ export async function DELETE(
 ) {
   try {
     const { propertyId } = await params;
+    
+    // A. Auth
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
-    // 1. Vérification Métier : Baux actifs
+    // B. Gatekeeper : Vérification KYC 🛑
+    // Supprimer un bien est une action critique
+    try {
+        await requireKyc(userId);
+    } catch (e) {
+        return NextResponse.json({ 
+            error: "Action refusée : Identité non vérifiée.",
+            code: "KYC_REQUIRED"
+        }, { status: 403 });
+    }
+
+    // C. Vérification Métier : Baux actifs
     const property = await prisma.property.findUnique({
         where: { id: propertyId, ownerId: userId },
         include: { leases: { where: { isActive: true } } }
@@ -122,11 +140,10 @@ const userId = session.user.id;
     if (!property) return NextResponse.json({ error: "Bien introuvable" }, { status: 404 });
 
     if (property.leases.length > 0) {
-        return NextResponse.json({ error: "Impossible de supprimer un bien avec un locataire en place." }, { status: 409 }); // 409 Conflict
+        return NextResponse.json({ error: "Impossible de supprimer un bien avec un locataire en place." }, { status: 409 });
     }
 
-    // 2. Suppression (Cascade gérée par Prisma ou manuellement selon schéma)
-    // Ici on supprime le bien, Prisma gérera les cascades si configuré (listings, incidents...)
+    // D. Suppression
     await prisma.property.delete({
       where: { id: propertyId }
     });

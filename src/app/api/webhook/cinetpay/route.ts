@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import axios from "axios";
 import { Role } from "@prisma/client";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
+import { sendNotification } from "@/lib/notifications";
+import * as Sentry from "@sentry/nextjs"; 
+import { logActivity } from "@/lib/logger"; // ✅ 1. IMPORT DU LOGGER
 
 // =============================================================================
 // 🔧 CONFIGURATION & SÉCURITÉ (BANK-GRADE)
@@ -25,23 +28,47 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   let transactionId = "";
+  // On récupère le corps brut pour la validation de signature
   const rawBody = await request.text(); 
 
   try {
-    // 1. AUTHENTIFICATION DE LA SOURCE (HMAC SHA256)
-    const signature = request.headers.get("x-cinetpay-signature");
-    if (CINETPAY_CONFIG.SECRET_KEY && signature) {
+    // ====================================================
+    // 1. SÉCURITÉ PÉRIMÉTRIQUE (ZERO TRUST) 🛡️
+    // ====================================================
+    
+    // A. Présence Obligatoire de la Signature
+    const signatureHeader = request.headers.get("x-cinetpay-signature");
+    
+    if (!signatureHeader) {
+        console.error("🚨 Security Alert: Missing Signature Header from CinetPay");
+        return new NextResponse("Unauthorized: Missing Signature", { status: 401 });
+    }
+
+    // B. Validation Cryptographique (HMAC - Timing Safe)
+    if (CINETPAY_CONFIG.SECRET_KEY) {
         const expectedSignature = createHmac("sha256", CINETPAY_CONFIG.SECRET_KEY)
           .update(rawBody)
           .digest("hex");
 
-        if (signature !== expectedSignature) {
-            console.error("Critical: Invalid Webhook Signature Attempt");
-            return new NextResponse("Unauthorized", { status: 401 });
+        const sigBuffer = Buffer.from(signatureHeader);
+        const expectedBuffer = Buffer.from(expectedSignature);
+
+        if (sigBuffer.length !== expectedBuffer.length) {
+             console.error("🚨 Security Alert: Signature Length Mismatch");
+             return new NextResponse("Unauthorized: Invalid Signature", { status: 401 });
+        }
+
+        const valid = timingSafeEqual(sigBuffer, expectedBuffer);
+
+        if (!valid) {
+            console.error("🚨 Critical: Invalid Webhook Signature Attempt");
+            return new NextResponse("Unauthorized: Invalid Signature", { status: 401 });
         }
     }
 
+    // ====================================================
     // 2. EXTRACTION DES DONNÉES
+    // ====================================================
     let body;
     try {
         body = JSON.parse(rawBody);
@@ -56,7 +83,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Missing Transaction ID" }, { status: 400 });
     }
 
+    // ====================================================
     // 3. DOUBLE VÉRIFICATION CÔTÉ FOURNISSEUR (API CHECK)
+    // ====================================================
     const verification = await axios.post(CINETPAY_CONFIG.CHECK_URL, {
       apikey: CINETPAY_CONFIG.API_KEY,
       site_id: CINETPAY_CONFIG.SITE_ID,
@@ -67,11 +96,12 @@ export async function POST(request: Request) {
     const isValidPayment = verification.data.code === "00" && apiData.status === "ACCEPTED";
     const amountPaid = parseInt(apiData.amount); 
 
-    // 4. EXÉCUTION ATOMIQUE AVEC ISOLATION SÉRIALISABLE
+    // ====================================================
+    // 4. EXÉCUTION ATOMIQUE (PRISMA TRANSACTION)
+    // ====================================================
     await prisma.$transaction(async (tx) => {
         
-        // A. RECHERCHE ET VERROUILLAGE (Tous les types possibles)
-        // 1. Paiement Standard (Loyer, Devis...)
+        // A. RECHERCHE ET VERROUILLAGE
         const paymentRecord = await tx.payment.findUnique({
             where: { reference: transactionId },
             include: { 
@@ -80,22 +110,20 @@ export async function POST(request: Request) {
             }
         });
 
-        // 2. Investissement
         const investmentContract = !paymentRecord 
             ? await tx.investmentContract.findUnique({ where: { paymentReference: transactionId } })
             : null;
 
-        // 3. Réservation Akwaba (NOUVEAU 👇)
         const bookingPayment = (!paymentRecord && !investmentContract)
             ? await tx.bookingPayment.findUnique({ where: { transactionId: transactionId } })
             : null;
 
 
-        // B. ROUTAGE SELON LE TYPE DE PAIEMENT TROUVÉ
+        // B. ROUTAGE SELON LE TYPE DE PAIEMENT
 
-        // --- CAS 1 : PAIEMENT IMMO STANDARD (LOYER, CHARGES, DEVIS) ---
+        // --- CAS 1 : PAIEMENT IMMO STANDARD ---
         if (paymentRecord) {
-            if (paymentRecord.status === "SUCCESS") return; // Idempotence
+            if (paymentRecord.status === "SUCCESS") return;
 
             if (isValidPayment && amountPaid !== paymentRecord.amount) {
                 console.error(`Fraud Alert: Amount mismatch for Tx ${transactionId}`);
@@ -104,10 +132,7 @@ export async function POST(request: Request) {
             }
 
             if (isValidPayment) {
-                // Logique Loyer
                 if (paymentRecord.lease) {
-                    // ... (Ta logique existante pour les loyers) ...
-                    // Je reprends ton code exact pour ne rien casser
                     let platformShare = 0, agentShare = 0, agencyShare = 0, ownerShare = 0;
                     const baseRent = paymentRecord.lease.monthlyRent;
                     const appliedAgencyRate = paymentRecord.lease.agencyCommissionRate || FEES.AGENCY_DEFAULT_RATE;
@@ -123,7 +148,6 @@ export async function POST(request: Request) {
                         ownerShare = amountPaid - platformShare - agencyShare;
                     }
 
-                    // Upsert Owner Wallet
                     const ownerId = paymentRecord.lease.property.ownerId;
                     const ownerFinance = await tx.userFinance.findUnique({ where: { userId: ownerId } });
                     if (!ownerFinance) {
@@ -132,21 +156,25 @@ export async function POST(request: Request) {
                         await tx.userFinance.update({ where: { userId: ownerId }, data: { walletBalance: { increment: ownerShare } } });
                     }
 
-                    // Activation Bail
                     if (paymentRecord.lease.status === "PENDING" && paymentRecord.type === "DEPOSIT") {
                         await tx.lease.update({ where: { id: paymentRecord.lease.id }, data: { status: "ACTIVE", isActive: true } });
                     }
                     
-                    // Update Payment
                     await tx.payment.update({ where: { id: paymentRecord.id }, data: { status: "SUCCESS", method: apiData.payment_method || "UNKNOWN", providerResponse: apiData as any } });
+                    
+                    // ✅ AUDIT LOG (Optionnel pour Loyer)
+                    await logActivity({
+                        action: "PAYMENT_SUCCESS",
+                        entityId: transactionId,
+                        entityType: "PAYMENT",
+                        userId: ownerId, // Crédité
+                        metadata: { amount: amountPaid, type: "LEASE_RENT", provider: "CINETPAY" }
+                    });
 
-                } 
-                // Logique Devis
-                else if (paymentRecord.quote) {
+                } else if (paymentRecord.quote) {
                     await tx.quote.update({ where: { id: paymentRecord.quoteId! }, data: { status: 'PAID' } });
                     await tx.payment.update({ where: { id: paymentRecord.id }, data: { status: "SUCCESS" } });
                     
-                    // Créditer l'artisan
                      const artisanId = paymentRecord.quote.artisanId;
                      const artisanFinance = await tx.userFinance.findUnique({ where: { userId: artisanId } });
                      if (!artisanFinance) {
@@ -171,13 +199,11 @@ export async function POST(request: Request) {
              }
         }
 
-        // --- CAS 3 : RÉSERVATION AKWABA (NOUVEAU BLOQUE AJOUTÉ ICI) ---
+        // --- CAS 3 : RÉSERVATION AKWABA ---
         else if (bookingPayment) {
-            // Idempotence
-            if (bookingPayment.status === "SUCCESS") return; 
+            if (bookingPayment.status === "SUCCESS") return;
 
             if (isValidPayment) {
-                // Vérification Montant
                 if (amountPaid !== bookingPayment.amount) {
                      console.error(`Fraud Alert Akwaba: Amount mismatch ${transactionId}`);
                      await tx.bookingPayment.update({ where: { id: bookingPayment.id }, data: { status: "FAILED" } });
@@ -189,8 +215,8 @@ export async function POST(request: Request) {
                     where: { id: bookingPayment.id },
                     data: {
                         status: "SUCCESS",
-                        provider: apiData.payment_method || "CINETPAY", // ex: OMM, MOMO
-                        agencyCommission: Math.round(amountPaid * 0.10), // Exemple 10%
+                        provider: apiData.payment_method || "CINETPAY", 
+                        agencyCommission: Math.round(amountPaid * 0.10),
                         hostPayout: Math.round(amountPaid * 0.90)
                     }
                 });
@@ -201,18 +227,20 @@ export async function POST(request: Request) {
                     data: { status: "PAID" }
                 });
 
-                // 3. Créditer le Hôte (Wallet)
-                // On récupère le booking pour avoir l'hôte
-                const booking = await tx.booking.findUnique({ 
+                // 3. Créditer le Hôte
+                const bookingData = await tx.booking.findUnique({ 
                     where: { id: bookingPayment.bookingId }, 
-                    select: { listing: { select: { hostId: true } } } 
+                    select: { 
+                        guestId: true, 
+                        listing: { select: { title: true, hostId: true } } 
+                    } 
                 });
                 
-                if (booking?.listing?.hostId) {
-                    const hostId = booking.listing.hostId;
+                if (bookingData?.listing?.hostId) {
+                    const hostId = bookingData.listing.hostId;
                     const payout = Math.round(amountPaid * 0.90);
 
-                    // Upsert Wallet Hôte
+                    // A. Upsert Wallet
                     const hostFinance = await tx.userFinance.findUnique({ where: { userId: hostId } });
                     if (!hostFinance) {
                         await tx.userFinance.create({ data: { userId: hostId, walletBalance: payout, version: 1 } });
@@ -220,7 +248,7 @@ export async function POST(request: Request) {
                         await tx.userFinance.update({ where: { userId: hostId }, data: { walletBalance: { increment: payout } } });
                     }
                     
-                    // Transaction Log (Pour l'historique du Dashboard Hôte)
+                    // B. Log Transaction (Pour l'affichage Dashboard)
                     await tx.transaction.create({
                         data: {
                             amount: payout,
@@ -230,6 +258,38 @@ export async function POST(request: Request) {
                             userId: hostId,
                             reference: `AKW-${transactionId}`,
                             balanceType: 'WALLET'
+                        }
+                    });
+
+                    // C. ENVOI DES NOTIFICATIONS 🔔
+                    await sendNotification({
+                        userId: bookingData.guestId,
+                        title: "Réservation Confirmée ! 🎒",
+                        message: `Votre paiement pour "${bookingData.listing.title}" a bien été reçu.`,
+                        type: "SUCCESS",
+                        link: `/dashboard/tenant/bookings/${bookingPayment.bookingId}`
+                    });
+
+                    await sendNotification({
+                        userId: hostId,
+                        title: "Nouvelle Réservation ! 🏠",
+                        message: `Vous avez reçu une réservation payée pour "${bookingData.listing.title}".`,
+                        type: "INFO",
+                        link: `/dashboard/host/bookings/${bookingPayment.bookingId}`
+                    });
+
+                    // D. AUDIT LOG (Mouchard Financier Indépendant) ✅
+                    // Ici userId est celui du bénéficiaire (Host)
+                    await logActivity({
+                        action: "PAYMENT_SUCCESS",
+                        entityId: transactionId,
+                        entityType: "PAYMENT",
+                        userId: hostId, 
+                        metadata: {
+                            amount: amountPaid,
+                            provider: "CINETPAY",
+                            bookingId: bookingPayment.bookingId,
+                            payerId: bookingData.guestId
                         }
                     });
                 }
@@ -250,7 +310,20 @@ export async function POST(request: Request) {
     return new NextResponse("OK", { status: 200 });
 
   } catch (error: any) {
+  
     console.error(`[Fatal Webhook Error] Tx: ${transactionId}`, error.message);
+    
+    Sentry.captureException(error, {
+        tags: {
+            source: "webhook_cinetpay",
+            transaction_id: transactionId
+        },
+        extra: {
+            raw_body_snippet: rawBody?.substring(0, 200) 
+        }
+    });
+
+    // On renvoie 200 pour que CinetPay arrête de spammer
     return new NextResponse("Processed with error", { status: 200 });
   }
 }

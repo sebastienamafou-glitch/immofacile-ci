@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { requireKyc } from "@/lib/gatekeeper"; // ✅ Import
 import { v4 as uuidv4 } from "uuid";
 import { differenceInDays } from "date-fns";
 
 export async function POST(request: Request) {
   try {
-    // 1. AUTHENTIFICATION BLINDÉE (MIGRÉE v5)
+    // 1. AUTHENTIFICATION BLINDÉE
     const session = await auth();
     const userId = session?.user?.id;
 
     if (!userId) {
         return NextResponse.json({ error: "Session expirée ou invalide" }, { status: 401 });
+    }
+
+    // 🛑 2. GATEKEEPER : KYC OBLIGATOIRE
+    try {
+        await requireKyc(userId);
+    } catch (e) {
+        return NextResponse.json({ 
+            error: "Identité requise pour réserver ce logement.",
+            code: "KYC_REQUIRED"
+        }, { status: 403 });
     }
 
     const body = await request.json();
@@ -21,8 +31,9 @@ export async function POST(request: Request) {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // 2. TRANSACTION ATOMIQUE
+    // 3. TRANSACTION ATOMIQUE (Reste inchangé mais sécurisé par le point 2)
     const result = await prisma.$transaction(async (tx) => {
+        // ... (Tout votre code de transaction existant ici : listing check, conflict check, pricing, create booking, create payment) ...
         
         // RECUPÉRATION DE LA SOURCE DE VÉRITÉ
         const listing = await tx.listing.findUnique({
@@ -59,7 +70,7 @@ export async function POST(request: Request) {
                 startDate: start,
                 endDate: end,
                 totalPrice: totalPrice,
-                status: "PAID", // Idéalement PENDING jusqu'à validation webhook, mais OK pour MVP
+                status: "PAID", 
                 guestId: userId,
                 listingId: listing.id,
             }
@@ -69,7 +80,7 @@ export async function POST(request: Request) {
         await tx.bookingPayment.create({
             data: {
                 amount: totalPrice,
-                provider: "WAVE", // Placeholder
+                provider: "WAVE", 
                 transactionId: `TRX-${uuidv4()}`,
                 status: "SUCCESS",
                 agencyCommission: agencyCommission,

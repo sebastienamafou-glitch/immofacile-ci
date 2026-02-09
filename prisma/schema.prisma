@@ -681,18 +681,25 @@ model Notification {
 // ==========================================
 
 model AuditLog {
-  id       String @id @default(cuid())
-  action   String // Ex: "USER_SIGNUP", "PAYMENT_RECEIVED"
-  category String // Ex: "AUTH", "FINANCE", "SECURITY"
-  details  Json? // Ex: { method: "EMAIL", ip: "192.168.1.1" }
+  id          String   @id @default(cuid())
+  action      String   // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
+  entityId    String?  // L'ID de l'objet touché (ex: ID du Booking ou du User)
+  entityType  String?  // Ex: "BOOKING", "USER", "PAYMENT"
+  
+  userId      String?   // Celui qui a fait l'action (Admin, System ou User)
+  userEmail   String?  // Snapshot de l'email (au cas où le user est supprimé plus tard)
+  
+  metadata    Json?    // Détails techniques (ex: { oldStatus: "PENDING", newStatus: "VERIFIED" })
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
 
-  userId String? // Optionnel car parfois c'est le système ou un visiteur anonyme
-  user   User?   @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
+  // Relation optionnelle vers le User (si vous voulez faire des joins)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
-  @@index([category])
+  @@index([action])
 }
 
 // ==========================================
