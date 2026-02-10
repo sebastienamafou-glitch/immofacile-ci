@@ -1,53 +1,52 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ SÉCURITÉ : Session NextAuth
 import { prisma } from "@/lib/prisma";
 import { 
-  Calendar, User, MapPin, CheckCircle2, XCircle, Clock, Search, Phone, Mail 
+  Calendar, MapPin, CheckCircle2, XCircle, Clock, Search, Phone, Mail, User 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// Force le rendu dynamique pour avoir les données fraîches
+export const dynamic = 'force-dynamic';
+
 // Configuration des statuts (Couleurs & Labels)
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  PENDING: { label: "En attente", color: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200", icon: Clock },
-  PAID: { label: "Payé (À valider)", color: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200", icon: CheckCircle2 },
-  CONFIRMED: { label: "Confirmé", color: "bg-blue-100 text-blue-700 hover:bg-blue-200", icon: CheckCircle2 },
-  CANCELLED: { label: "Annulé", color: "bg-red-100 text-red-700 hover:bg-red-200", icon: XCircle },
+  PENDING: { label: "En attente", color: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200", icon: Clock },
+  PAID: { label: "Payé (À valider)", color: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200", icon: CheckCircle2 },
+  CONFIRMED: { label: "Confirmé", color: "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200", icon: CheckCircle2 },
+  CANCELLED: { label: "Annulé", color: "bg-red-100 text-red-700 hover:bg-red-200 border-red-200", icon: XCircle },
 };
 
 export default async function OwnerReservationsPage() {
-  // 1. SÉCURITÉ : Récupérer l'owner connecté
-  const headersList = headers();
-  const userEmail = headersList.get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ : Session NextAuth (Source de vérité)
+  const session = await auth();
+  if (!session?.user?.id) return redirect("/auth/login");
 
-  const user = await prisma.user.findUnique({ where: { email: userEmail } });
-  if (!user) redirect("/login");
-
-  // 2. DATA : Récupérer TOUTES les réservations sur MES annonces
-  // On cherche les bookings où le "listing" appartient à "user.id"
+  // 2. DATA : Récupération sécurisée via ID de session
+  // On récupère les réservations où le listing appartient à l'user connecté (Host)
   const bookings = await prisma.booking.findMany({
     where: {
         listing: {
-            hostId: user.id 
+            hostId: session.user.id // 🔒 Uniquement les biens de l'user connecté
         }
     },
     include: {
-        listing: {
-            select: { title: true, images: true, city: true }
+        listing: { 
+            select: { title: true, images: true, city: true } 
         },
-        guest: {
-            select: { name: true, email: true, phone: true, image: true }
+        guest: { 
+            select: { name: true, email: true, phone: true, image: true } 
         }
     },
     orderBy: { createdAt: 'desc' } // Les plus récentes en haut
   });
 
-  // Calculs rapides (KPIs)
+  // Calculs KPIs (Temps réel)
   const totalRevenue = bookings
     .filter(b => b.status === 'PAID' || b.status === 'CONFIRMED')
     .reduce((acc, b) => acc + b.totalPrice, 0);
@@ -75,7 +74,7 @@ export default async function OwnerReservationsPage() {
         </div>
       </div>
 
-      {/* Barre d'outils (Filtres) */}
+      {/* Barre d'outils (Filtres - Visuel pour l'instant) */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -90,8 +89,8 @@ export default async function OwnerReservationsPage() {
       {/* Liste des Réservations */}
       <div className="space-y-4">
         {bookings.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                     <Calendar className="w-8 h-8 text-slate-300" />
                 </div>
                 <h3 className="font-bold text-slate-900">Aucune réservation</h3>
@@ -101,76 +100,105 @@ export default async function OwnerReservationsPage() {
             bookings.map((booking) => {
                 const statusInfo = STATUS_CONFIG[booking.status] || STATUS_CONFIG.PENDING;
                 const StatusIcon = statusInfo.icon;
-                const startDate = new Date(booking.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+                
+                // Formatage des dates
+                const startDate = new Date(booking.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
                 const endDate = new Date(booking.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
                 return (
-                    <Card key={booking.id} className="group hover:shadow-md transition-shadow border-slate-200 overflow-hidden">
+                    <Card key={booking.id} className="group hover:shadow-md transition-shadow border-slate-200 overflow-hidden bg-white">
                         <div className="flex flex-col md:flex-row">
                             
                             {/* 1. L'Annonce (Image) */}
-                            <div className="w-full md:w-48 h-32 md:h-auto relative bg-slate-100 shrink-0">
-                                {booking.listing.images[0] ? (
-                                    <Image src={booking.listing.images[0]} alt="Listing" fill className="object-cover" />
+                            <div className="w-full md:w-48 h-48 md:h-auto relative bg-slate-100 shrink-0">
+                                {booking.listing.images && booking.listing.images.length > 0 ? (
+                                    <Image 
+                                        src={booking.listing.images[0]} 
+                                        alt={booking.listing.title} 
+                                        fill 
+                                        className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                                    />
                                 ) : (
-                                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">No Image</div>
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                                        <div className="w-8 h-8 mb-2 opacity-20"><User /></div>
+                                        <span className="text-xs">Sans image</span>
+                                    </div>
                                 )}
+                                {/* Badge Statut sur Mobile */}
+                                <div className="absolute top-2 left-2 md:hidden">
+                                     <Badge className={`${statusInfo.color} border shadow-sm`}>
+                                        <StatusIcon className="w-3 h-3 mr-1.5" /> {statusInfo.label}
+                                    </Badge>
+                                </div>
                             </div>
 
                             {/* 2. Détails Voyageur & Séjour */}
                             <div className="flex-1 p-6 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                                 
-                                <div className="space-y-4 flex-1">
+                                <div className="space-y-4 flex-1 w-full">
                                     {/* Info Logement */}
                                     <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Badge className={`${statusInfo.color} border-none`}>
+                                        <div className="hidden md:flex items-center gap-2 mb-2">
+                                            <Badge className={`${statusInfo.color} border shadow-sm`}>
                                                 <StatusIcon className="w-3 h-3 mr-1.5" /> {statusInfo.label}
                                             </Badge>
                                             <span className="text-xs font-mono text-slate-400">#{booking.id.slice(-6).toUpperCase()}</span>
                                         </div>
                                         <h3 className="font-bold text-lg text-slate-900 line-clamp-1">{booking.listing.title}</h3>
-                                        <p className="text-sm text-slate-500 flex items-center gap-1">
+                                        <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
                                             <MapPin className="w-3.5 h-3.5" /> {booking.listing.city}
                                         </p>
                                     </div>
 
                                     {/* Info Voyageur */}
-                                    <div className="flex items-center gap-3 pt-2 md:border-t border-slate-100 md:pt-4">
+                                    <div className="flex items-center gap-3 pt-4 border-t border-slate-100 w-full">
                                         <Avatar className="w-10 h-10 border border-slate-100">
                                             <AvatarImage src={booking.guest.image || ""} />
-                                            <AvatarFallback className="bg-orange-100 text-orange-700 font-bold">
+                                            <AvatarFallback className="bg-slate-100 text-slate-600 font-bold">
                                                 {booking.guest.name?.[0]?.toUpperCase() || "G"}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900">{booking.guest.name || "Voyageur Inconnu"}</p>
-                                            <div className="flex items-center gap-3 text-xs text-slate-500">
-                                                {booking.guest.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {booking.guest.email}</span>}
-                                                {booking.guest.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {booking.guest.phone}</span>}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-slate-900 truncate">
+                                                {booking.guest.name || "Voyageur Inconnu"}
+                                            </p>
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-0.5">
+                                                {booking.guest.email && (
+                                                    <span className="flex items-center gap-1 truncate max-w-[150px]">
+                                                        <Mail className="w-3 h-3" /> {booking.guest.email}
+                                                    </span>
+                                                )}
+                                                {booking.guest.phone && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Phone className="w-3 h-3" /> {booking.guest.phone}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 3. Dates & Prix (Aligné Droite) */}
-                                <div className="flex flex-row md:flex-col items-center md:items-end gap-6 md:gap-1 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-400 uppercase font-medium mb-1">Dates du séjour</p>
-                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg">
-                                            <Calendar className="w-4 h-4 text-slate-400" />
-                                            {startDate} ➝ {endDate}
+                                {/* 3. Dates & Prix (Aligné Droite sur Desktop) */}
+                                <div className="flex flex-col gap-4 w-full md:w-auto md:border-l border-slate-100 md:pl-6 md:min-w-[200px]">
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-1 gap-4 md:gap-2">
+                                        <div className="md:text-right">
+                                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Dates</p>
+                                            <div className="flex md:justify-end items-center gap-2 text-sm font-medium text-slate-700">
+                                                <Calendar className="w-4 h-4 text-slate-400" />
+                                                <span>{startDate} - {endDate}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="md:text-right">
+                                            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Total</p>
+                                            <p className="text-xl font-black text-slate-900">{booking.totalPrice.toLocaleString()} F</p>
                                         </div>
                                     </div>
-                                    
-                                    <div className="text-right mt-2">
-                                        <p className="text-xs text-slate-400 uppercase font-medium mb-1">Montant Total</p>
-                                        <p className="text-xl font-black text-slate-900">{booking.totalPrice.toLocaleString()} F</p>
-                                    </div>
 
-                                    <div className="mt-4 w-full md:w-auto">
-                                        <Button size="sm" className="w-full bg-slate-900 hover:bg-slate-800 text-white">
-                                            Détails
+                                    <div className="pt-2">
+                                        <Button size="sm" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium shadow-sm">
+                                            Voir les détails
                                         </Button>
                                     </div>
                                 </div>

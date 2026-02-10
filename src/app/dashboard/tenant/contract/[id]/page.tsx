@@ -1,331 +1,352 @@
-"use client";
+import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import ContractActions from "@/components/tenant/contract-actions";
+import { QRCodeSVG } from "qrcode.react";
+import { ShieldCheck, ArrowLeft, Building2 } from "lucide-react";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { 
-  Loader2, Download, ShieldCheck, 
-  CheckCircle2, PenTool, ArrowLeft
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import Swal from "sweetalert2";
+export const dynamic = 'force-dynamic';
 
-interface LeaseContract {
-  id: string;
-  startDate: string;
-  monthlyRent: number;
-  depositAmount: number;
-  signatureStatus: "PENDING" | "SIGNED_TENANT" | "SIGNED_OWNER" | "COMPLETED";
-  documentHash?: string;
-  updatedAt: string;
-  property: {
-    title: string;
-    address: string;
-    commune: string;
-    description?: string;
-    owner: {
-      name: string;
-      email: string;
-      phone?: string;
+export default async function TenantContractPage({ params }: { params: { id: string } }) {
+  // 1. SÉCURITÉ & SESSION
+  const session = await auth();
+  
+  // Vérification stricte pour TypeScript
+  if (!session?.user?.id) return redirect("/auth/login");
+  const userId = session.user.id;
+
+  // 2. RÉCUPÉRATION DES DONNÉES (SCHEMA STRICT)
+  const lease = await prisma.lease.findUnique({
+    where: { id: params.id },
+    include: {
+        property: {
+            include: {
+                owner: { select: { id: true, name: true, email: true, phone: true } },
+                // Inclusion de l'agence pour affichage du mandat
+                agency: true 
+            }
+        },
+        // ✅ Relation 'signatures' conforme au schema.prisma
+        signatures: { 
+            include: { 
+                signer: { select: { id: true, name: true } } 
+            } 
+        } 
     }
-  }
-}
+  });
 
-export default function TenantContractPage({ params }: { params: { id: string } }) {
-  const { id } = params;
-  const [lease, setLease] = useState<LeaseContract | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [signing, setSigning] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const router = useRouter();
+  // 3. VÉRIFICATIONS D'ACCÈS
+  if (!lease) return notFound();
+  if (lease.tenantId !== userId) return redirect("/dashboard/tenant");
 
-  // 1. CHARGEMENT
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const storedUser = localStorage.getItem("immouser");
-        if (!storedUser) { router.push("/login"); return; }
-        const currentUser = JSON.parse(storedUser);
-        setUser(currentUser);
+  const user = session.user;
+  const isTenantSigned = lease.signatureStatus !== 'PENDING';
+  
+  // 4. LOGIQUE INTELLIGENTE DE DÉTECTION DES SIGNATAIRES
+  
+  // A. Trouver la signature du Locataire (Moi)
+  const tenantProof = lease.signatures.find(p => p.signerId === lease.tenantId);
+  
+  // B. Trouver la signature du "Bailleur" (Celui qui n'est pas le locataire)
+  const bailleurProof = lease.signatures.find(p => p.signerId !== lease.tenantId);
 
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email }
-        });
+  // C. Détection : Est-ce une signature par Mandat ?
+  // Si l'ID du signataire bailleur est DIFFERENT de l'ID du propriétaire => C'est un Agent/Agence
+  const isMandateSignature = bailleurProof && bailleurProof.signerId !== lease.property.owner.id;
 
-        if (res.data.success && res.data.lease) {
-            setLease(res.data.lease); 
-        }
-      } catch (error) {
-        toast.error("Erreur lors du chargement du contrat.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router, id]);
+  // D. Préparation des variables d'affichage
+  const ownerName = lease.property.owner.name || "LE PROPRIÉTAIRE";
+  const agencyName = lease.property.agency?.name;
+  
+  // Nom à afficher dans le cadre : Soit l'Agent (si mandat), soit le Proprio
+  const bailleurSignerName = isMandateSignature ? bailleurProof?.signer.name : ownerName;
 
-  // 2. SIGNATURE
-  const handleSignContract = async () => {
-    if (!lease || !user) return;
-
-    const result = await Swal.fire({
-        title: 'Signature Officielle',
-        text: "En signant, vous acceptez les termes de la Loi n° 2019-576 du 26 juin 2019 relative au bail d'habitation.",
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonColor: '#059669',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Je signe le bail',
-        cancelButtonText: 'Annuler',
-        background: '#0F172A',
-        color: '#fff'
-    });
-
-    if (!result.isConfirmed) return;
-
-    setSigning(true);
-    try {
-        const res = await api.post('/tenant/contract/sign', {
-            leaseId: lease.id
-        }, {
-            headers: { 'x-user-email': user.email }
-        });
-
-        if (res.data.success) {
-            setLease(prev => prev ? ({
-                ...prev,
-                signatureStatus: "SIGNED_TENANT",
-                documentHash: res.data.hash,
-                updatedAt: res.data.date 
-            }) : null);
-            toast.success("Contrat signé et horodaté !");
-        }
-    } catch (error) {
-        toast.error("Erreur lors de la signature.");
-    } finally {
-        setSigning(false);
-    }
+  // 5. FORMATAGE DES DONNÉES
+  const startDate = lease.startDate ? new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long'}) : "....................";
+  
+  const formatAuditDate = (date: Date) => {
+      return date.toLocaleString('fr-FR', { 
+          day: '2-digit', month: '2-digit', year: 'numeric', 
+          hour: '2-digit', minute: '2-digit', second: '2-digit' 
+      });
   };
-
-  // 3. TÉLÉCHARGEMENT PDF (Client-Side)
-  const handleDownload = async () => {
-    if(!lease) return;
-    setDownloading(true);
-
-    try {
-        const html2pdf = (await import('html2pdf.js')).default;
-        const element = document.getElementById('printable-contract');
-
-        if (!element) {
-            toast.error("Document introuvable.");
-            setDownloading(false);
-            return;
-        }
-        
-        // ✅ CORRECTION ICI : Ajout de ': any' pour calmer TypeScript
-        const opt: any = {
-          margin:       [15, 15, 15, 15], 
-          filename:     `Bail_Habitation_${lease.id.substring(0,8)}.pdf`,
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true },
-          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        await html2pdf().set(opt).from(element).save();
-        toast.success("Bail téléchargé avec succès.");
-
-    } catch (error) {
-        console.error("Erreur PDF:", error);
-        toast.error("Erreur de génération PDF.");
-    } finally {
-        setDownloading(false);
-    }
-  };
-
-  if (loading) return <div className="min-h-screen bg-[#060B18] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-12 h-12"/></div>;
-  if (!lease) return <div className="text-white p-10 text-center">Contrat introuvable</div>;
-
-  const isSigned = lease.signatureStatus !== 'PENDING';
-  const signedDate = lease.updatedAt ? new Date(lease.updatedAt) : new Date();
 
   return (
-    <div className="min-h-screen bg-[#060B18] text-slate-200 font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 print:bg-white print:pb-0">
         
-        {/* HEADER NAVIGATION */}
-        <div className="p-4 lg:p-8 pb-0 max-w-7xl mx-auto">
-             <Button variant="ghost" onClick={() => router.back()} className="text-slate-400 hover:text-white mb-6 pl-0">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Retour au tableau de bord
-            </Button>
+        {/* HEADER DASHBOARD */}
+        <div className="bg-[#0B1120] text-white pt-8 pb-12 px-4 lg:px-8 print:hidden">
+            <div className="max-w-5xl mx-auto">
+                <Link href="/dashboard/tenant" className="inline-flex items-center text-slate-400 hover:text-white mb-6 transition-colors text-sm font-medium">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Retour au tableau de bord
+                </Link>
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-white flex items-center gap-3">
-                        <ShieldCheck className={`w-8 h-8 ${isSigned ? 'text-emerald-500' : 'text-orange-500'}`} /> 
-                        <span>Bail d'Habitation</span>
-                    </h1>
-                    <div className="flex items-center gap-3 mt-3">
-                        <span className="text-slate-500 text-sm font-mono">Réf: {lease.id.split('-')[0]}...</span>
-                        {isSigned ? 
-                            <span className="text-emerald-500 text-xs font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">CONTRAT ACTIF & SÉCURISÉ</span> 
-                            : <span className="text-orange-500 text-xs font-bold bg-orange-500/10 px-2 py-0.5 rounded border border-orange-500/20">EN ATTENTE DE SIGNATURE</span>
-                        }
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <h1 className="text-3xl font-black flex items-center gap-3 mb-2">
+                            <ShieldCheck className={`w-8 h-8 ${isTenantSigned ? 'text-emerald-500' : 'text-orange-500'}`} /> 
+                            <span>Contrat de Bail</span>
+                        </h1>
+                        <p className="text-slate-400 flex items-center gap-2">
+                            <Building2 className="w-4 h-4" /> 
+                            {lease.property.title}
+                        </p>
+                    </div>
+
+                    <div>
+                        <ContractActions 
+                            leaseId={lease.id} 
+                            isSigned={isTenantSigned} 
+                            userName={user.name || "Locataire"}
+                        />
                     </div>
                 </div>
-                
-                {isSigned ? (
-                    <Button 
-                        onClick={handleDownload} 
-                        disabled={downloading}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 px-6 rounded-xl gap-2 shadow-lg shadow-emerald-900/20"
-                    >
-                        {downloading ? <Loader2 className="animate-spin w-5 h-5" /> : <Download className="w-5 h-5" />}
-                        {downloading ? "GÉNÉRATION..." : "TÉLÉCHARGER LE PDF"}
-                    </Button>
-                ) : (
-                    <Button 
-                        onClick={handleSignContract} 
-                        disabled={signing} 
-                        className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-8 h-12 rounded-xl gap-2 shadow-lg animate-pulse"
-                    >
-                        {signing ? <Loader2 className="animate-spin" /> : <PenTool className="w-5 h-5" />}
-                        SIGNER LE CONTRAT
-                    </Button>
-                )}
             </div>
         </div>
 
-        {/* --- ZONE DU CONTRAT JURIDIQUE (Cible PDF) --- */}
-        <div className="flex justify-center px-4 pb-10">
-            <div id="printable-contract" className="bg-white text-[#1f2937] p-[15mm] w-full max-w-[210mm] shadow-2xl rounded-sm">
+        {/* --- DOCUMENT OFFICIEL --- */}
+        <div className="flex justify-center -mt-8 px-4 print:mt-0 print:px-0 print:block">
+            <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl rounded-sm border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
                 
-                {/* EN-TÊTE LEGAL */}
-                <div className="text-center border-b-2 border-black pb-4 mb-6">
-                    <h1 className="text-xl font-serif font-bold tracking-tight mb-2 text-black uppercase">CONTRAT DE BAIL À USAGE D'HABITATION</h1>
-                    <p className="text-slate-600 italic font-serif text-[10px]">
-                        Régis par la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.
-                    </p>
-                </div>
-
-                {/* PARTIES */}
-                <div className="grid grid-cols-2 gap-4 mb-6 text-[11px] font-serif">
-                    <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                        <p className="font-bold text-[9px] uppercase tracking-widest text-slate-500 mb-1">Le Bailleur (Propriétaire)</p>
-                        <p className="font-bold text-sm text-black">{lease.property.owner.name.toUpperCase()}</p>
-                        <p>Domicilié(e) à Abidjan</p>
-                        <p>Email : {lease.property.owner.email}</p>
-                        <p>Tél : {lease.property.owner.phone || 'Non renseigné'}</p>
+                {/* 1. EN-TÊTE LEGAL */}
+                <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
+                    <div className="flex-1 pr-4"> 
+                        <h1 className="text-2xl font-serif font-black uppercase tracking-wide mb-2">Contrat de Bail <br/>à Usage d'Habitation</h1>
+                        <p className="text-[10px] italic text-slate-500 font-serif">
+                            Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.
+                        </p>
                     </div>
-
-                    <div className="bg-slate-50 p-3 rounded border border-slate-200">
-                        <p className="font-bold text-[9px] uppercase tracking-widest text-slate-500 mb-1">Le Preneur (Locataire)</p>
-                        <p className="font-bold text-sm text-black">{user?.name.toUpperCase()}</p>
-                        <p>Agissant en son nom personnel</p>
-                        <p>Email : {user?.email}</p>
-                        <p>Tél : {user?.phone || 'Non renseigné'}</p>
+                    <div className="flex flex-col items-center gap-1">
+                         <div className="border border-slate-800 p-1">
+                            <QRCodeSVG value={`https://immofacile.ci/compliance/${lease.id}`} size={65} />
+                         </div>
+                         <span className="text-[8px] font-mono font-bold text-slate-400">AUTH: {lease.id.substring(0,6).toUpperCase()}</span>
                     </div>
                 </div>
 
-                {/* CORPS DU CONTRAT (Articles de Loi) */}
-                <div className="space-y-4 text-justify font-serif text-[10px] leading-relaxed">
-                    <p className="font-bold mb-2">IL A ÉTÉ ARRÊTÉ ET CONVENU CE QUI SUIT :</p>
+                {/* 2. LES PARTIES */}
+                <div className="mb-8 font-serif text-sm">
+                    <p className="font-bold text-base border-b border-black mb-4 pb-1 uppercase">ENTRE LES SOUSSIGNÉS :</p>
+                    
+                    <div className="mb-4 pl-4 border-l-2 border-slate-200">
+                        <p><strong>LE BAILLEUR :</strong> {ownerName.toUpperCase()}</p>
+                        {/* Mention Mandataire si applicable */}
+                        {lease.property.agency && (
+                            <p className="text-xs mt-0.5 text-slate-600">Représenté par son mandataire : <strong>L'Agence {lease.property.agency.name}</strong></p>
+                        )}
+                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Bailleur".</p>
+                    </div>
 
+                    <div className="pl-4 border-l-2 border-slate-200">
+                        <p><strong>LE PRENEUR :</strong> {user.name?.toUpperCase() || "LE LOCATAIRE"}</p>
+                        <p>Contact : {user.email}</p>
+                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Preneur".</p>
+                    </div>
+                </div>
+
+                <p className="font-serif text-center font-bold text-sm italic mb-6">
+                    IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :
+                </p>
+
+                {/* 3. CLAUSES OBLIGATOIRES (12 ARTICLES COMPLETS) */}
+                <div className="space-y-4 font-serif text-[10px] text-slate-800 mb-8">
+                    
                     <div>
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 1 : OBJET ET CONSISTANCE</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 1 : Désignation des Lieux</h3>
                         <p>
-                            Le Bailleur donne en location au Preneur, qui accepte, les locaux à usage d'habitation sis à 
-                            <strong> {lease.property.commune}, {lease.property.address}</strong>. 
-                            Le bien loué, objet du présent bail, consiste en : <strong>{lease.property.title}</strong>. 
-                            Le Preneur déclare bien connaître les lieux pour les avoir visités.
+                            Le Bailleur donne en location au Preneur, qui accepte, les locaux situés à : <strong>{lease.property.title}, {lease.property.address}</strong>. 
+                            Le bien comprend : {lease.property.bedrooms} chambre(s), {lease.property.bathrooms} salle(s) d'eau. 
+                            Le Preneur déclare prendre les lieux dans l'état où ils se trouvent lors de l'entrée en jouissance.
                         </p>
                     </div>
 
                     <div>
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 2 : DURÉE ET RENOUVELLEMENT</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 2 : Durée du Bail</h3>
                         <p>
-                            Le présent bail est consenti pour une durée ferme d'un (1) an, commençant à courir le 
-                            <strong> {new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long'})}</strong>. 
-                            Il se renouvellera ensuite par tacite reconduction pour la même durée, sauf congé donné par l'une des parties 
-                            par acte extrajudiciaire ou lettre recommandée avec avis de réception, au moins trois (3) mois à l'avance.
+                            Le bail est conclu pour une durée de <strong>UN (1) AN</strong> à compter du <strong>{startDate}</strong>. 
+                            Il se renouvellera par tacite reconduction pour la même durée, sauf dénonciation par l'une des parties par acte extrajudiciaire ou lettre recommandée avec accusé de réception, moyennant un préavis de trois (3) mois.
                         </p>
                     </div>
 
-                    <div className="bg-slate-50 p-2 border border-slate-200">
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 3 : CONDITIONS FINANCIÈRES</h3>
-                        <ul className="list-disc pl-5 space-y-1">
-                            <li><strong>Loyer Mensuel :</strong> Le loyer est fixé à la somme principale de <span className="font-bold">{lease.monthlyRent.toLocaleString()} FCFA</span>.</li>
-                            <li><strong>Date de paiement :</strong> Le loyer est payable d'avance au plus tard le 05 de chaque mois.</li>
-                            <li><strong>Dépôt de Garantie (Caution) :</strong> Le Preneur verse ce jour la somme de <span className="font-bold">{lease.depositAmount.toLocaleString()} FCFA</span>, correspondant à deux (2) mois de loyer, conformément à la réglementation en vigueur.</li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 4 : RÉVISION DU LOYER</h3>
+                    <div className="bg-slate-50 p-2 -mx-2 border-l-4 border-slate-300">
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer et Dépôt de Garantie</h3>
+                        <p className="mb-1">
+                            Loyer mensuel : <strong className="text-sm mx-1">{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.
+                        </p>
                         <p>
-                            Conformément à la Loi, le loyer pourra être révisé tous les trois (3) ans. La majoration ne pourra excéder 
-                            la variation de l'indice de référence des loyers publié par l'autorité compétente.
+                            Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. 
+                            Cette somme ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restituée au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.
                         </p>
                     </div>
 
                     <div>
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 5 : OBLIGATIONS ET ENTRETIEN</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 4 : Paiement et Pénalités</h3>
                         <p>
-                            <strong>Le Preneur est tenu :</strong> De payer le loyer aux termes convenus, d'user paisiblement des lieux ("en bon père de famille"), 
-                            d'assurer l'entretien courant et les menues réparations locatives. Il est responsable des dégradations survenant pendant la location.<br/>
-                            <strong>Le Bailleur est tenu :</strong> De délivrer un logement décent, d'assurer au locataire la jouissance paisible des lieux et d'effectuer 
-                            toutes les grosses réparations (structure, toiture) nécessaires au maintien en état du logement.
+                            Le loyer est exigible le 05 de chaque mois. Tout retard de paiement au-delà du 10 du mois entraînera de plein droit l'application d'une pénalité de 10% sur le montant dû, sans préjudice de l'action en résiliation.
                         </p>
                     </div>
 
                     <div>
-                        <h3 className="font-bold text-black underline mb-1 text-[11px]">ARTICLE 6 : CLAUSE RÉSOLUTOIRE</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 5 : Obligations du Preneur</h3>
                         <p>
-                            À défaut de paiement d'un seul terme de loyer à son échéance, ou d'inexécution d'une seule des clauses du bail, 
-                            et un mois après un simple commandement de payer ou une mise en demeure restée infructueuse, le bail sera résilié de plein droit 
-                            si bon semble au Bailleur.
+                            Le Preneur s'oblige à : 
+                            1) Payer le loyer aux termes convenus. 
+                            2) User paisiblement des locaux suivant la destination bourgeoise prévue. 
+                            3) Entretenir les lieux en bon état de réparations locatives (plomberie, électricité, serrures, vitres).
+                            4) Ne pas troubler la jouissance paisible des voisins.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 6 : Obligations du Bailleur</h3>
+                        <p>
+                            Le Bailleur est tenu de : 
+                            1) Délivrer au Preneur le logement en bon état d'usage et de réparation. 
+                            2) Assurer au Preneur la jouissance paisible du logement. 
+                            3) Entretenir les locaux en état de servir à l'usage prévu par le contrat (grosses réparations, clos et couvert).
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 7 : Travaux et Transformations</h3>
+                        <p>
+                            Le Preneur ne pourra faire aucuns travaux de transformation ou de perçage de gros œuvre sans l'accord écrit et préalable du Bailleur. 
+                            À défaut d'accord, le Bailleur pourra exiger la remise en état des lieux aux frais du Preneur lors de son départ.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 8 : Cession et Sous-location</h3>
+                        <p>
+                            Toute cession de bail ou sous-location, même partielle ou temporaire, est <strong>strictement interdite</strong> sans l'accord écrit du Bailleur. En cas de non-respect, le bail sera résilié immédiatement de plein droit.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 9 : Droit de Visite</h3>
+                        <p>
+                            Le Bailleur ou son représentant pourra visiter les lieux pour vérifier leur état d'entretien, sur rendez-vous pris 48h à l'avance. 
+                            En cas de mise en vente ou de relocation, le Preneur devra laisser visiter les lieux deux heures par jour les jours ouvrables.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 10 : Clause Résolutoire</h3>
+                        <p>
+                            À défaut de paiement d'un seul terme de loyer à son échéance ou d'inexécution d'une seule des conditions du bail, et un mois après un commandement de payer ou une mise en demeure resté infructueux, le bail sera résilié de plein droit si bon semble au Bailleur.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 11 : État des Lieux</h3>
+                        <p>
+                            Un état des lieux contradictoire sera établi lors de la remise des clés et lors de leur restitution. À défaut d'état des lieux de sortie, le Preneur sera présumé avoir reçu les lieux en bon état de réparations locatives.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 12 : Élection de Domicile et Litiges</h3>
+                        <p>
+                            Pour l'exécution des présentes, les parties font élection de domicile en leurs demeures respectives. En cas de litige, compétence est attribuée aux tribunaux du lieu de situation de l'immeuble.
                         </p>
                     </div>
                 </div>
 
-                {/* SIGNATURES */}
-                <div className="mt-6 pt-4 border-t-2 border-black">
-                    <p className="mb-4 text-[10px]">
-                        Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>, en deux exemplaires originaux électroniques faisant foi.
+                {/* 4. SIGNATURES AVEC AUDIT TRAIL (LOGIQUE INTELLIGENTE) */}
+                <div className="mt-auto pt-4 border-t-2 border-black font-sans">
+                    <p className="mb-6 text-xs text-right italic font-serif">
+                        Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>, en deux exemplaires originaux.
                     </p>
                     
-                    <div className="flex justify-between gap-6">
-                        {/* BAILLEUR */}
+                    <div className="flex justify-between gap-6 mt-4">
+                        
+                        {/* === CADRE TECHNIQUE : BAILLEUR (Auto-adaptatif Mandat/Direct) === */}
                         <div className="w-1/2">
-                            <p className="font-bold uppercase text-[9px] mb-2 text-slate-600">LE BAILLEUR (Lu et approuvé)</p>
-                            <div className="h-20 border border-slate-300 bg-white p-2 flex flex-col justify-end">
-                                <p className="text-[8px] text-slate-400 font-mono text-center">Signature électronique en attente</p>
-                            </div>
-                        </div>
-
-                        {/* PRENEUR */}
-                        <div className="w-1/2">
-                            <p className="font-bold uppercase text-[9px] mb-2 text-slate-600">LE PRENEUR (Lu et approuvé)</p>
-                            {isSigned ? (
-                                <div className="h-20 border-2 border-emerald-600 bg-emerald-50/50 p-2 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-600 mb-1" />
-                                    <p className="text-emerald-800 font-bold text-[9px] uppercase">Signé numériquement</p>
-                                    <p className="text-emerald-700 text-[8px] font-bold truncate w-full">{user?.name}</p>
-                                    <p className="text-emerald-600 text-[7px]">{signedDate.toLocaleString()}</p>
+                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Bailleur (ou son Mandataire)</p>
+                            
+                            {bailleurProof ? (
+                                <div className={`border-2 p-3 rounded-sm bg-white text-left ${isMandateSignature ? 'border-purple-600' : 'border-emerald-600'}`}>
+                                    {/* TITRE DU CADRE */}
+                                    <p className={`${isMandateSignature ? 'text-purple-600' : 'text-emerald-600'} font-bold text-sm uppercase mb-3`}>
+                                        {isMandateSignature ? "SIGNÉ PAR MANDAT (P/O)" : "SIGNÉ ÉLECTRONIQUEMENT"}
+                                    </p>
+                                    
+                                    {/* DÉTAILS TECHNIQUES */}
+                                    <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
+                                        
+                                        {/* Si Mandat : On affiche POUR QUI on signe */}
+                                        {isMandateSignature && (
+                                            <p className="font-bold text-black">POUR: AGENCE {agencyName?.toUpperCase()}</p>
+                                        )}
+                                        
+                                        <p>
+                                            <span className="font-bold mr-2">Signataire:</span> 
+                                            {bailleurSignerName?.toUpperCase()}
+                                        </p>
+                                        <p>
+                                            <span className="font-bold mr-2">Date:</span> 
+                                            {formatAuditDate(new Date(bailleurProof.signedAt))}
+                                        </p>
+                                        <p>
+                                            <span className="font-bold mr-2">IP:</span> 
+                                            {bailleurProof.ipAddress}
+                                        </p>
+                                        <p className="truncate">
+                                            <span className="font-bold mr-2">Preuve ID:</span> 
+                                            {bailleurProof.id.split('-')[0].toUpperCase()}...
+                                        </p>
+                                    </div>
                                 </div>
                             ) : (
-                                <div className="h-20 border border-dashed border-slate-400 bg-slate-50 p-2 flex items-center justify-center">
-                                    <p className="text-[9px] text-slate-500 font-bold uppercase italic">Emplacement Signature</p>
+                                <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
+                                    <p className="text-[9px] text-slate-400 italic">En attente de signature</p>
                                 </div>
                             )}
                         </div>
+
+                        {/* === CADRE TECHNIQUE : PRENEUR (MOI) === */}
+                        <div className="w-1/2">
+                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Preneur (Lu et approuvé)</p>
+                            
+                            {isTenantSigned && tenantProof ? (
+                                <div className="border-2 border-blue-600 p-3 rounded-sm bg-white text-left">
+                                    <p className="text-blue-600 font-bold text-sm uppercase mb-3">
+                                        SIGNÉ ÉLECTRONIQUEMENT
+                                    </p>
+                                    <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
+                                        <p>
+                                            <span className="text-blue-700 font-bold mr-2">Signataire:</span> 
+                                            {user.name?.toUpperCase() || "LOCATAIRE"}
+                                        </p>
+                                        <p>
+                                            <span className="text-blue-700 font-bold mr-2">Date:</span> 
+                                            {formatAuditDate(new Date(tenantProof.signedAt))}
+                                        </p>
+                                        <p>
+                                            <span className="text-blue-700 font-bold mr-2">IP:</span> 
+                                            {tenantProof.ipAddress}
+                                        </p>
+                                        <p className="truncate">
+                                            <span className="text-blue-700 font-bold mr-2">Preuve ID:</span> 
+                                            {tenantProof.id.split('-')[0].toUpperCase()}...
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
+                                    <p className="text-[9px] text-slate-400 italic">Zone de signature</p>
+                                </div>
+                            )}
+                        </div>
+
                     </div>
                 </div>
-
-                {/* FOOTER */}
-                <div className="mt-6 pt-2 border-t border-slate-200 text-center">
-                    <p className="text-[7px] text-slate-400 font-sans">
-                        Ce document est un titre exécutoire certifié par ImmoFacile • ID : {lease.id} • Page 1/1
+                
+                {/* Footer Légal */}
+                <div className="mt-8 pt-2 border-t border-slate-200 text-center">
+                    <p className="text-[8px] text-slate-400 font-mono">
+                        Document certifié par ImmoFacile.ci • Audit ID: {lease.id} • Page 1/1
                     </p>
                 </div>
 

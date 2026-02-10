@@ -1,42 +1,61 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { logActivity } from "@/lib/logger"; // ✅ Audit Trail
 
 export async function POST(request: Request) {
   try {
-    // 1. Récupération de l'utilisateur (via les Headers du Middleware)
+    // 1. AUTHENTIFICATION SÉCURISÉE (NextAuth)
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non connecté" }, { status: 401 });
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Vous devez être connecté pour postuler." }, { status: 401 });
+    }
+    const userId = session.user.id;
 
+    // 2. VALIDATION DU PAYLOAD
     const body = await request.json();
     const { propertyId } = body;
 
-    // 2. Vérifier si une demande existe déjà
+    if (!propertyId) {
+        return NextResponse.json({ error: "ID du bien manquant." }, { status: 400 });
+    }
+
+    // 3. VÉRIFICATION DE DOUBLON (Anti-Spam)
+    // On vérifie si une demande est déjà en cours ou active
     const existingLease = await prisma.lease.findFirst({
       where: {
         tenantId: userId,
         propertyId: propertyId,
-        status: { in: ['PENDING', 'ACTIVE'] } // Pas de doublons
+        status: { in: ['PENDING', 'ACTIVE'] } 
       }
     });
 
     if (existingLease) {
-      return NextResponse.json({ error: "Vous avez déjà un dossier en cours pour ce bien." }, { status: 400 });
+      return NextResponse.json({ 
+          error: "Dossier déjà transmis. Veuillez vérifier votre tableau de bord." 
+      }, { status: 409 }); // 409 Conflict
     }
 
-    // 3. Récupérer infos du bien pour le prix
-    const property = await prisma.property.findUnique({ where: { id: propertyId } });
-    if (!property) return NextResponse.json({ error: "Bien introuvable" }, { status: 404 });
+    // 4. RÉCUPÉRATION DU BIEN
+    const property = await prisma.property.findUnique({ 
+        where: { id: propertyId },
+        select: { id: true, price: true, title: true, isAvailable: true }
+    });
 
-    // 4. Créer la demande (Lease PENDING)
-    await prisma.lease.create({
+    if (!property) {
+        return NextResponse.json({ error: "Ce bien n'existe plus." }, { status: 404 });
+    }
+
+    if (!property.isAvailable) {
+        return NextResponse.json({ error: "Ce bien n'est plus disponible." }, { status: 400 });
+    }
+
+    // 5. CRÉATION DE LA CANDIDATURE (Lease PENDING)
+    const newLease = await prisma.lease.create({
       data: {
-        startDate: new Date(), // Date de demande
+        startDate: new Date(), // Date de la demande (sera ajustée à la signature)
         monthlyRent: property.price,
-        depositAmount: property.price * 2, // Règle par défaut (2 mois)
+        depositAmount: property.price * 2, // Convention : 2 mois de caution
         status: 'PENDING',
         isActive: false,
         tenantId: userId,
@@ -44,10 +63,22 @@ const userId = session.user.id;
       }
     });
 
-    return NextResponse.json({ success: true });
+    // 6. 🔒 AUDIT LOG (Traçabilité)
+    await logActivity({
+        action: "LEASE_APPLICATION", // Pensez à l'ajouter dans logger.ts
+        entityId: newLease.id,
+        entityType: "LEASE",
+        userId: userId,
+        metadata: { 
+            propertyTitle: property.title,
+            rent: property.price 
+        }
+    });
+
+    return NextResponse.json({ success: true, leaseId: newLease.id });
 
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Erreur lors de la candidature" }, { status: 500 });
+    console.error("Apply Error:", error);
+    return NextResponse.json({ error: "Erreur serveur lors de la candidature." }, { status: 500 });
   }
 }

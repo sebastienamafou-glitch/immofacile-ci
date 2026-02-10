@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Swal from "sweetalert2";
+import { signOut } from "next-auth/react";
 import {
   Users, Wallet, ShieldAlert, Server, LogOut, Loader2, Building2, 
   Hammer, Plane, AlertCircle, TrendingUp, CreditCard, CheckCircle, Eye,
@@ -277,7 +278,7 @@ export default function WarRoomDashboard() {
 
                 <div className="h-8 w-[1px] bg-slate-800"></div>
 
-                <button onClick={() => router.push('/logout')} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-500 transition group" title="Déconnexion">
+                <button onClick={() => signOut({ callbackUrl: '/' })} className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 group" title="Déconnexion">
                     <LogOut className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
             </div>

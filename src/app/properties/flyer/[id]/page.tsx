@@ -1,124 +1,152 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { Loader2, MapPin, BedDouble, Bath, Ruler, Phone, Globe, User } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { notFound, redirect } from "next/navigation";
 import Image from "next/image";
+import { auth } from "@/auth"; // Session Serveur
+import { prisma } from "@/lib/prisma";
+import { 
+  MapPin, BedDouble, Bath, Ruler, Phone, User, Globe, Printer 
+} from "lucide-react";
+import { QRCodeSVG } from "qrcode.react"; // Assurez-vous d'avoir installé ce package
+import PrintButton from "@/components/ui/print-button"; // Petit composant client à créer
 
-export default function PropertyFlyerPage({ params }: { params: { id: string } }) {
-  const { id } = params;
-  const [property, setProperty] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+// Force le rendu dynamique pour avoir les données fraîches
+export const dynamic = 'force-dynamic';
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await api.get(`/properties/public/${id}`);
-        if (res.data.success) setProperty(res.data.property);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (id) fetch();
-  }, [id]);
+export default async function PropertyFlyerPage({ params }: { params: { id: string } }) {
+  // 1. SÉCURITÉ & DONNÉES (Server-Side)
+  const session = await auth();
+  if (!session?.user?.id) return redirect("/auth/login");
 
-  if (loading || !property) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div>;
+  // On récupère le bien et son propriétaire (pour le téléphone)
+  const property = await prisma.property.findUnique({
+    where: { id: params.id },
+    include: {
+        owner: { select: { name: true, phone: true, email: true } }
+    }
+  });
 
-  // URL dynamique (sera localhost en dev, et votre vrai site en prod)
-  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/properties/public/${id}` : '';
+  if (!property) return notFound();
+
+  // URL absolue pour le QR Code (Utilisez votre variable d'env PROD)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const publicUrl = `${appUrl}/properties/public/${property.id}`;
 
   return (
-    <div className="min-h-screen bg-white text-black p-0 m-0 flex justify-center font-sans">
-      <div className="w-[21cm] min-h-[29.7cm] bg-white p-8 md:p-12 flex flex-col relative border border-slate-200 shadow-2xl print:shadow-none print:border-0">
+    <div className="min-h-screen bg-slate-100 print:bg-white p-8 flex justify-center font-sans">
+      
+      {/* BOUTON D'IMPRESSION (Flottant, caché à l'impression) */}
+      <div className="fixed top-6 right-6 print:hidden z-50">
+         <PrintButton />
+      </div>
+
+      {/* FEUILLE A4 (21cm x 29.7cm) */}
+      <div className="w-[21cm] min-h-[29.7cm] bg-white p-12 flex flex-col relative shadow-2xl print:shadow-none print:border-0 print:p-0 print:m-0">
         
         {/* EN-TÊTE */}
-        <div className="bg-[#0B1120] text-white p-6 -mx-12 -mt-12 mb-8 text-center print:bg-black print:text-white">
-            <h1 className="text-4xl font-black uppercase tracking-widest">À LOUER</h1>
-            <p className="text-lg text-orange-400 font-bold mt-2">DISPONIBLE IMMÉDIATEMENT</p>
+        <div className="bg-[#0B1120] text-white py-8 -mx-12 -mt-12 mb-8 text-center print:bg-black print:text-white print:-mx-0 print:-mt-0">
+            <h1 className="text-4xl font-black uppercase tracking-[0.2em]">À LOUER</h1>
+            <p className="text-lg text-orange-400 font-bold mt-2 tracking-wider">
+                {property.isAvailable ? "DISPONIBLE IMMÉDIATEMENT" : "BIEN LOUÉ"}
+            </p>
         </div>
 
-        {/* PHOTO */}
-        <div className="relative w-full h-80 bg-slate-100 mb-8 rounded-xl overflow-hidden border-4 border-black">
-            {property.images?.[0] && (
-                <Image src={property.images[0]} alt="Bien" fill className="object-cover" />
+        {/* PHOTO PRINCIPALE */}
+        <div className="relative w-full h-80 bg-slate-100 mb-8 rounded-none border-b-8 border-black overflow-hidden print:h-72">
+            {property.images?.[0] ? (
+                <Image 
+                    src={property.images[0]} 
+                    alt="Bien Immobilier" 
+                    fill 
+                    className="object-cover"
+                    priority 
+                />
+            ) : (
+                <div className="flex items-center justify-center h-full bg-slate-200 text-slate-400 font-bold text-2xl">
+                    PHOTO NON DISPONIBLE
+                </div>
             )}
         </div>
 
         {/* INFO PRINCIPALES */}
-        <div className="flex justify-between items-start mb-8 border-b-4 border-black pb-6">
-            <div className="w-2/3">
-                <h2 className="text-3xl font-black leading-tight mb-2 line-clamp-2">{property.title}</h2>
+        <div className="flex justify-between items-start mb-8 border-b-2 border-slate-100 pb-6">
+            <div className="w-2/3 pr-4">
+                <h2 className="text-3xl font-black leading-tight mb-2 text-slate-900 uppercase">
+                    {property.title}
+                </h2>
                 <div className="flex items-center gap-2 text-xl font-bold text-slate-600">
-                    <MapPin className="w-6 h-6 text-orange-500" /> {property.commune}
+                    <MapPin className="w-6 h-6 text-orange-500 shrink-0" /> 
+                    {property.commune}, {property.address}
                 </div>
             </div>
             <div className="w-1/3 text-right">
-                <div className="text-4xl font-black text-black whitespace-nowrap">{property.price?.toLocaleString()} F</div>
-                <div className="text-sm font-bold text-slate-500 uppercase">Par Mois</div>
+                <div className="text-4xl font-black text-black whitespace-nowrap tracking-tight">
+                    {property.price.toLocaleString()} <span className="text-2xl text-orange-500">F</span>
+                </div>
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Loyer Mensuel</div>
             </div>
         </div>
 
-        {/* GRILLE DETAILS */}
-        <div className="grid grid-cols-3 gap-6 mb-12">
-             <div className="flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl">
-                <BedDouble className="w-10 h-10 mb-2 text-slate-800"/>
-                <span className="text-2xl font-black">{property.bedrooms}</span>
-                <span className="text-xs uppercase font-bold text-slate-500">Chambres</span>
+        {/* GRILLE DETAILS (KPIs) */}
+        <div className="grid grid-cols-3 gap-6 mb-10">
+             <div className="flex flex-col items-center p-4 border-2 border-slate-100 bg-slate-50 rounded-xl print:border-black">
+                <BedDouble className="w-8 h-8 mb-2 text-slate-900"/>
+                <span className="text-3xl font-black text-slate-900">{property.bedrooms}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Chambres</span>
              </div>
-             <div className="flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl">
-                <Bath className="w-10 h-10 mb-2 text-slate-800"/>
-                <span className="text-2xl font-black">{property.bathrooms}</span>
-                <span className="text-xs uppercase font-bold text-slate-500">Douches</span>
+             <div className="flex flex-col items-center p-4 border-2 border-slate-100 bg-slate-50 rounded-xl print:border-black">
+                <Bath className="w-8 h-8 mb-2 text-slate-900"/>
+                <span className="text-3xl font-black text-slate-900">{property.bathrooms}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Douches</span>
              </div>
-             <div className="flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl">
-                <Ruler className="w-10 h-10 mb-2 text-slate-800"/>
-                <span className="text-2xl font-black">{property.surface} m²</span>
-                <span className="text-xs uppercase font-bold text-slate-500">Surface</span>
+             <div className="flex flex-col items-center p-4 border-2 border-slate-100 bg-slate-50 rounded-xl print:border-black">
+                <Ruler className="w-8 h-8 mb-2 text-slate-900"/>
+                <span className="text-3xl font-black text-slate-900">{property.surface || '-'}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500">Surface (m²)</span>
              </div>
         </div>
 
         {/* DESCRIPTION */}
         <div className="mb-auto">
-            <h3 className="font-bold text-lg uppercase mb-2 border-l-4 border-orange-500 pl-3">Description</h3>
-            <p className="text-lg leading-relaxed text-slate-700 line-clamp-5 text-justify">
-                {property.description || "Un bien exceptionnel à visiter absolument. Contactez-nous pour plus d'informations et organiser une visite rapidement."}
+            <h3 className="font-bold text-sm text-orange-500 uppercase mb-3 tracking-widest border-b border-orange-200 w-fit pb-1">
+                Description du bien
+            </h3>
+            <p className="text-lg leading-relaxed text-slate-700 text-justify font-medium">
+                {property.description || "Aucune description détaillée n'a été fournie pour ce bien. Veuillez contacter le propriétaire pour plus d'informations ou pour planifier une visite."}
             </p>
         </div>
 
-        {/* CONTACT & QR CODE */}
-        <div className="mt-8 bg-slate-50 rounded-3xl p-6 flex items-center gap-6 border-2 border-black print:bg-slate-50">
-            <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                {/* Le QR Code pointera vers la vraie URL une fois en ligne */}
-                {publicUrl && <QRCodeSVG value={publicUrl} size={130} />}
+        {/* CONTACT & QR CODE (Footer) */}
+        <div className="mt-8 bg-slate-900 text-white rounded-3xl p-6 flex items-center gap-8 print:bg-white print:text-black print:border-2 print:border-black">
+            
+            {/* QR CODE */}
+            <div className="bg-white p-2 rounded-xl shrink-0 print:border print:border-slate-300">
+                <QRCodeSVG value={publicUrl} size={100} />
             </div>
             
-            <div className="flex-1 space-y-3">
+            <div className="flex-1 space-y-4">
                 <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Contact Propriétaire</p>
-                    <div className="flex items-center gap-3 font-black text-3xl">
-                        <Phone className="w-8 h-8 text-orange-500 fill-orange-500"/> 
-                        {/* 📞 VRAI TÉLÉPHONE ICI */}
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">
+                        Contactez le Propriétaire
+                    </p>
+                    <div className="flex items-center gap-3 font-black text-3xl print:text-black">
+                        <Phone className="w-6 h-6 text-orange-500 fill-orange-500"/> 
                         {property.owner?.phone || "Non renseigné"}
                     </div>
                 </div>
 
-                <div className="h-px bg-slate-300 w-full" />
+                <div className="h-px bg-slate-700 w-full print:bg-slate-300" />
                 
                 <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2 font-bold text-lg text-slate-700">
-                        <User className="w-5 h-5"/> {property.owner?.name || "Propriétaire"}
+                     <div className="flex items-center gap-2 font-bold text-lg text-slate-200 print:text-slate-700">
+                        <User className="w-5 h-5"/> {property.owner?.name || "Agence"}
                     </div>
-                    <div className="flex items-center gap-2 font-bold text-sm text-slate-400">
+                    <div className="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest">
                         <Globe className="w-4 h-4"/> immofacile.ci
                     </div>
                 </div>
             </div>
         </div>
 
-        <p className="text-center text-[10px] text-slate-400 mt-6 font-mono">
+        <p className="text-center text-[10px] text-slate-400 mt-6 font-mono print:mt-4">
             Réf: {property.id.slice(-8).toUpperCase()} • Scannez le code pour postuler en ligne.
         </p>
 

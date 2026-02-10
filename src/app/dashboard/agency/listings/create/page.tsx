@@ -1,67 +1,73 @@
-
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import CreateListingForm from "@/components/agency/CreateListingForm";
-import { Palmtree } from "lucide-react";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import CreateListingForm from "./create-form"; // Import du formulaire client
 
+// Rendu dynamique pour avoir les users frais
 export const dynamic = 'force-dynamic';
 
 export default async function CreateListingPage() {
-  // 1. SÉCURITÉ ZERO TRUST
+  // 1. SÉCURITÉ
   const session = await auth();
+  if (!session?.user?.id) return redirect("/auth/login");
 
-  // Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
-  if (!session || !session.user?.id) {
-    redirect("/login");
-  }
-
-  const userId = session.user.id;
-
-  // 2. VÉRIFICATION ADMIN
-  const admin = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, role: true, agencyId: true }
+  // 2. RÉCUPÉRATION DU CONTEXTE AGENCE
+  const currentUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, agencyId: true }
   });
 
-  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
-    redirect("/dashboard");
+  if (!currentUser?.agencyId) {
+    return (
+        <div className="p-8 text-center">
+            <h2 className="text-xl font-bold text-red-600">Accès Refusé</h2>
+            <p>Vous devez appartenir à une agence pour créer des annonces.</p>
+        </div>
+    );
   }
 
-  // 3. CHARGEMENT HÔTES (Cloisonnement Agence)
-  const hosts = await prisma.user.findMany({
+  // 3. RÉCUPÉRATION DES HÔTES POTENTIELS (Utilisateurs de l'agence)
+  // On récupère tous les membres de l'agence (Admins, Agents, Propriétaires)
+  const agencyUsers = await prisma.user.findMany({
     where: {
-        // Uniquement les membres/clients de CETTE agence
-        agencyId: admin.agencyId, 
-        
-        // Rôles autorisés à être "Hôte"
-        OR: [
-            { role: "OWNER" },
-            { role: "AGENCY_ADMIN" },
-            { role: "INVESTOR" } // Ajout possible
-        ]
+      agencyId: currentUser.agencyId,
+      // Optionnel : Vous pourriez filtrer par rôle ici si besoin
+      // role: { in: ['AGENCY_ADMIN', 'AGENT', 'OWNER'] }
     },
-    select: { 
-        id: true, 
-        name: true, 
-        email: true 
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true
     },
-    orderBy: {
-        name: 'asc'
-    }
+    orderBy: { name: 'asc' }
   });
 
   return (
-    <div className="p-6 md:p-10 max-w-5xl mx-auto min-h-screen bg-[#020617] text-slate-200">
-      <div className="mb-8 border-b border-slate-800 pb-6">
-        <h1 className="text-3xl font-black text-white flex items-center gap-3">
-            <Palmtree className="text-orange-500" /> Nouvelle Annonce
-        </h1>
-        <p className="text-slate-400 mt-2">Créez une annonce Akwaba pour la location courte durée.</p>
-      </div>
+    <div className="max-w-3xl mx-auto py-8 px-4 space-y-6">
       
-      {/* Formulaire Client Component sécurisé précédemment */}
-      <CreateListingForm hosts={hosts} />
+      {/* HEADER PAGE */}
+      <div>
+        <Link 
+            href="/dashboard/agency/listings" 
+            className="flex items-center text-sm text-muted-foreground hover:text-primary mb-4 transition-colors"
+        >
+            <ArrowLeft className="mr-2 h-4 w-4" /> Retour aux locations
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight">Nouvelle Location Saisonnière</h1>
+        <p className="text-muted-foreground mt-1">
+            Ajoutez un bien au parc "Court Séjour".
+        </p>
+      </div>
+
+      {/* COMPOSANT CLIENT (FORMULAIRE) */}
+      <CreateListingForm 
+        potentialHosts={agencyUsers} 
+        currentUserId={currentUser.id} 
+      />
+      
     </div>
   );
 }

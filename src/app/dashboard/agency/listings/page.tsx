@@ -1,128 +1,145 @@
-
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Palmtree, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { Palmtree, Plus, Search, TrendingUp, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import AgencyListingCard from "@/components/agency/AgencyListingCard";
-import Link from "next/link";
-import { auth } from "@/auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AgencyListingCard from "@/components/agency/AgencyListingCard"; // Assurez-vous que ce composant existe
 
+// Force le rendu dynamique pour des KPIs temps réel
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyListingsPage() {
-  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
-const session = await auth();
+  // 1. SÉCURITÉ : Auth & Rôle
+  const session = await auth();
+  if (!session?.user?.id) return redirect("/auth/login");
 
-// Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
-if (!session || !session.user?.id) {
-  redirect("/login");
-}
-
-const userId = session.user.id;
-
-  // 2. VÉRIFICATION RÔLE
-  const admin = await prisma.user.findUnique({
-    where: { id: userId },
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
     select: { id: true, role: true, agencyId: true }
   });
 
-  if (!admin || !admin.agencyId || (admin.role !== "AGENCY_ADMIN" && admin.role !== "SUPER_ADMIN")) {
-    redirect("/dashboard");
-  }
+  if (!user?.agencyId) return redirect("/dashboard");
 
-  // 3. DATA FETCHING (Listings + Stats)
+  // 2. DATA FETCHING OPTIMISÉ
   const listings = await prisma.listing.findMany({
     where: {
-      agencyId: admin.agencyId // 🔒 SCOPE AGENCE
+      agencyId: user.agencyId // 🔒 Isolation Agence
     },
     include: {
-        host: {
-            select: { name: true, image: true }
-        },
+        host: { select: { name: true, image: true } },
         bookings: {
-            where: { 
-                status: { in: ["CONFIRMED", "COMPLETED"] } // CA Réel
-            },
+            where: { status: { in: ["CONFIRMED", "COMPLETED"] } }, // Seules les réservations validées comptent
             select: { totalPrice: true }
         },
-        _count: {
-            select: { reviews: true, bookings: true }
-        }
+        _count: { select: { reviews: true, bookings: true } }
     },
     orderBy: { createdAt: 'desc' }
   });
 
-  // 4. CALCUL KPI (Live)
-  const totalListings = listings.length;
+  // 3. CALCUL DES KPIS (Business Logic)
   const totalRevenue = listings.reduce((acc, l) => {
-      const listingRevenue = l.bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-      return acc + listingRevenue;
+      return acc + l.bookings.reduce((sum, b) => sum + b.totalPrice, 0);
   }, 0);
   
-  // Listings ayant au moins 1 resa
   const activeListingsCount = listings.filter(l => l._count.bookings > 0).length;
-  const activityRate = totalListings > 0 ? Math.round((activeListingsCount / totalListings) * 100) : 0;
+  const activityRate = listings.length > 0 
+    ? Math.round((activeListingsCount / listings.length) * 100) 
+    : 0;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 min-h-screen bg-[#020617] text-slate-200">
+    <div className="space-y-8 p-6 pb-20">
       
-      {/* HEADER & KPI */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+      {/* HEADER & ACTIONS */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-black text-white flex items-center gap-3 tracking-tight">
-             <Palmtree className="text-orange-500 w-8 h-8" /> Locations Saisonnières
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+             <Palmtree className="h-8 w-8 text-primary" /> 
+             Locations Saisonnières
           </h1>
-          <p className="text-slate-400 mt-1">
-            Pilotez votre parc "Akwaba" (Court Séjour) et maximisez vos taux d'occupation.
+          <p className="text-muted-foreground">
+            Gérez votre parc "Court Séjour" et suivez vos performances.
           </p>
         </div>
         
-        {/* KPI CARDS */}
-        <div className="flex gap-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center min-w-[140px] shadow-lg">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Chiffre d'Affaires</p>
-                <p className="text-xl font-black text-emerald-500">{(totalRevenue).toLocaleString()} <span className="text-sm">F</span></p>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl text-center min-w-[140px] shadow-lg">
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Taux Activité</p>
-                <p className="text-xl font-black text-blue-500">{activityRate}%</p>
-            </div>
+        <Link href="/dashboard/agency/listings/create">
+            <Button className="w-full md:w-auto shadow-lg">
+                <Plus className="mr-2 h-4 w-4" /> Créer une annonce
+            </Button>
+        </Link>
+      </div>
+
+      {/* KPI SECTION */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Chiffre d'Affaires Global</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{totalRevenue.toLocaleString()} FCFA</div>
+                <p className="text-xs text-muted-foreground">Revenus générés sur la plateforme</p>
+            </CardContent>
+        </Card>
+        
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taux d'Activité</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{activityRate}%</div>
+                <p className="text-xs text-muted-foreground">Annonces ayant au moins 1 réservation</p>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Parc Immobilier</CardTitle>
+                <Palmtree className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{listings.length}</div>
+                <p className="text-xs text-muted-foreground">Mandats courte durée actifs</p>
+            </CardContent>
+        </Card>
+      </div>
+
+      {/* SEARCH TOOLBAR */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Rechercher par titre ou ville..."
+              className="pl-8"
+            />
         </div>
       </div>
 
-      {/* TOOLBAR */}
-      <div className="flex flex-col md:flex-row gap-4 w-full justify-between bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-md">
-            <div className="relative flex-1 md:max-w-md">
-                <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
-                <Input placeholder="Rechercher une annonce..." className="pl-9 bg-slate-950 border-slate-800 text-white h-11 rounded-xl" />
-            </div>
-            <Link href="/dashboard/agency/listings/create">
-                <Button className="w-full md:w-auto bg-orange-600 hover:bg-orange-500 text-white font-bold gap-2 h-11 rounded-xl shadow-lg shadow-orange-900/20">
-                    <Plus size={18} /> Créer une annonce
-                </Button>
-            </Link>
-      </div>
-
-      {/* GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {listings.length === 0 ? (
-            <div className="col-span-full py-20 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
-                <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Palmtree className="h-8 w-8 text-slate-600" />
+      {/* LISTINGS GRID */}
+      {listings.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-xl bg-muted/50">
+                <div className="bg-background p-4 rounded-full mb-4 shadow-sm">
+                    <Palmtree className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-white font-bold text-xl mb-2">Aucune annonce saisonnière</h3>
-                <p className="text-slate-500 mb-6 max-w-md mx-auto">Ajoutez des biens en courte durée pour augmenter vos revenus et diversifier votre portefeuille.</p>
+                <h3 className="text-lg font-semibold">Aucune annonce disponible</h3>
+                <p className="text-muted-foreground mb-6 text-center max-w-sm">
+                    Commencez par ajouter votre premier bien en gestion saisonnière.
+                </p>
                 <Link href="/dashboard/agency/listings/create">
-                    <Button variant="outline" className="border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white">Créer ma première annonce</Button>
+                    <Button variant="outline">Créer ma première annonce</Button>
                 </Link>
             </div>
-        ) : (
-            listings.map((listing) => (
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listings.map((listing) => (
                 <AgencyListingCard key={listing.id} listing={listing} />
-            ))
-        )}
-      </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
