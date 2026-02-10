@@ -12,6 +12,7 @@ import {
   ClipboardCheck, MapPin, ClipboardList, UserCheck,
   ShieldCheck, Receipt, Briefcase, Landmark, Server, CalendarCheck, CalendarDays, Building2,
   MessageCircle, Heart, Compass, Map as MapIcon, LucideIcon, Palmtree, TrendingUp,
+  FileSignature,
 } from "lucide-react";
 
 // 1. DÉFINITION DU TYPE
@@ -77,6 +78,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },
     { icon: Users, label: "Mon Équipe", href: "/dashboard/agency/team" },
     { icon: Building2, label: "Biens Gérés", href: "/dashboard/agency/properties" },
+    { icon: FileSignature, label: "Gestion Baux (Mandat)", href: "/dashboard/agency/contracts" }, 
     { icon: Palmtree, label: "Locations Saisonnières", href: "/dashboard/agency/listings" },
     { icon: Wallet, label: "Portefeuille", href: "/dashboard/agency/wallet" },
     { icon: Settings, label: "Paramètres Agence", href: "/dashboard/agency/settings" },
