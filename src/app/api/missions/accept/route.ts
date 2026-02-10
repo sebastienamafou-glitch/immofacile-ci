@@ -1,20 +1,40 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Role, MissionStatus } from "@prisma/client";
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ
+    // 1. SÉCURITÉ : Authentification
     const session = await auth();
-    if (!session || !session.user?.id) {
+    const userId = session?.user?.id;
+
+    if (!userId) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { missionId } = await request.json();
-    const agentId = session.user.id;
+    // 2. VÉRIFICATION DU RÔLE (Conformité Schema User.role)
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+    });
 
-    // 2. VÉRIFICATION
-    // On vérifie que la mission est bien LIBRE (status PENDING et pas d'agent)
+    // Seuls les utilisateurs avec le rôle AGENT peuvent accepter une mission
+    if (!user || user.role !== Role.AGENT) {
+        return NextResponse.json({ 
+            error: "Accès refusé. Seuls les agents peuvent accepter des missions." 
+        }, { status: 403 });
+    }
+
+    const { missionId } = await request.json();
+
+    if (!missionId) {
+        return NextResponse.json({ error: "ID de mission manquant." }, { status: 400 });
+    }
+
+    // 3. VÉRIFICATION DE LA DISPONIBILITÉ (Conformité MissionStatus)
     const mission = await prisma.mission.findUnique({
         where: { id: missionId }
     });
@@ -23,23 +43,42 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
     }
 
-    if (mission.agentId || mission.status !== "PENDING") {
-        return NextResponse.json({ error: "Cette mission a déjà été prise par un autre agent." }, { status: 409 });
+    // Vérifie si la mission est déjà assignée ou n'est plus en attente
+    if (mission.agentId || mission.status !== MissionStatus.PENDING) {
+        return NextResponse.json({ 
+            error: "Cette mission n'est plus disponible ou a déjà été acceptée." 
+        }, { status: 409 });
     }
 
-    // 3. ASSIGNATION (Action Atomique)
+    // 4. ASSIGNATION ATOMIQUE
     const updatedMission = await prisma.mission.update({
         where: { id: missionId },
         data: {
-            agentId: agentId,     // On assigne l'agent connecté
-            status: "ACCEPTED"    // On passe le statut à ACCEPTÉ
+            agentId: userId,               // Assigne l'ID de l'agent connecté
+            status: MissionStatus.ACCEPTED // Passe le statut à ACCEPTED (Enum MissionStatus)
         }
     });
 
-    return NextResponse.json({ success: true, mission: updatedMission });
+    // 5. AUDIT LOG (Tracé de sécurité selon le schéma)
+    await prisma.auditLog.create({
+        data: {
+            action: "MISSION_ACCEPTED",
+            entityId: updatedMission.id,
+            entityType: "MISSION",
+            userId: userId,
+            userEmail: session.user?.email,
+            metadata: { previousStatus: "PENDING", newStatus: "ACCEPTED" }
+        }
+    });
+
+    return NextResponse.json({ 
+        success: true, 
+        mission: updatedMission,
+        message: "Mission acceptée avec succès." 
+    });
 
   } catch (error) {
     console.error("Erreur acceptation mission:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de l'acceptation." }, { status: 500 });
   }
 }

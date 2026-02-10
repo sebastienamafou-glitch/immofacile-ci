@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 
-
-// Import compatible Next.js pour le moteur PDF serveur
+// Import compatible Next.js pour le moteur PDF serveur (Identique à la version owner)
 const PDFDocument = require("pdfkit/js/pdfkit.standalone");
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { leaseId: string } } // ✅ CORRECTION : Format Next.js 14
+  { params }: { params: Promise<{ id: string }> } // Adaptation pour le dossier [id]
 ) {
   try {
-    const { leaseId } = params; // Pas de await en Next.js 14
+    // Gestion des params (Compatible Next.js 15)
+    const resolvedParams = await params;
+    const leaseId = resolvedParams.id;
 
-    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    // 1. SÉCURITÉ & AUTHENTIFICATION
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -26,12 +26,12 @@ export async function GET(
 
     const user = await prisma.user.findUnique({ 
         where: { id: userId },
-        select: { id: true, role: true, email: true } // Optimisation select
+        select: { id: true, role: true, email: true }
     });
 
     if (!user) return NextResponse.json({ error: "Compte introuvable" }, { status: 403 });
 
-    // 2. RÉCUPÉRATION DU BAIL
+    // 2. RÉCUPÉRATION DU BAIL (Même structure que pour le propriétaire)
     const lease = await prisma.lease.findUnique({
       where: { id: leaseId },
       include: {
@@ -49,36 +49,36 @@ export async function GET(
       return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
     }
 
-    // 3. VÉRIFICATION DES DROITS (ACL)
-    // - Le locataire du bail
-    // - Le propriétaire du bien
-    // - Un Super Admin
+    // 3. VÉRIFICATION DES DROITS (Spécifique Locataire)
+    // On vérifie que le User ID correspond au tenantId du bail
     const isTenant = lease.tenantId === user.id;
-    const isOwner = lease.property.ownerId === user.id;
     const isAdmin = user.role === 'SUPER_ADMIN';
 
-    if (!isTenant && !isOwner && !isAdmin) {
-        console.error(`[PDF SECURITY] Tentative accès non autorisé User ${user.id} sur Bail ${leaseId}`);
+    if (!isTenant && !isAdmin) {
+        console.error(`[PDF SECURITY] Tentative accès non autorisé Tenant ${user.id} sur Bail ${leaseId}`);
         return NextResponse.json({ error: "Accès interdit à ce document." }, { status: 403 });
     }
 
     // 4. GÉNÉRATION DU PDF
+    // On utilise exactement la même fonction pour garantir l'identité du document
     const pdfBuffer = await generateLeasePDF(lease);
 
     return new NextResponse(pdfBuffer as any, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Contrat_Bail_${lease.id.substring(0, 8)}.pdf"`,
+        // Nom du fichier personnalisé pour le locataire
+        "Content-Disposition": `attachment; filename="Mon_Bail_${lease.property.commune}_${lease.id.substring(0, 8)}.pdf"`,
       },
     });
 
   } catch (error) {
-    console.error("Erreur PDF:", error);
+    console.error("Erreur PDF Tenant:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
-// --- MOTEUR DE GÉNÉRATION (PDFKit) ---
+// --- MOTEUR DE GÉNÉRATION (Strictement identique à la version Owner) ---
+// Cela garantit que le locataire et le propriétaire voient exactement la même chose.
 function generateLeasePDF(lease: any): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -123,7 +123,8 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     doc.fontSize(12).font('Helvetica-Bold').text("4. SIGNATURES & VALIDATION");
     doc.moveDown(1);
 
-    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "TERMINATED"; // Adapté au nouveau statut
+    // Logique de statut identique au schema et au fichier précédent
+    const isSigned = lease.signatureStatus === "SIGNED_TENANT" || lease.signatureStatus === "TERMINATED" || lease.signatureStatus === "COMPLETED"; 
     
     if (isSigned) {
         doc.fillColor('green').text("[ DOCUMENT SIGNÉ ÉLECTRONIQUEMENT ]", { align: 'center' });

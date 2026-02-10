@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
-// ✅ FIX : Version standalone pour compatibilité Edge/Serverless
+// ✅ Type de données généré automatiquement par Prisma
+// Si tu changes ton schema.prisma, ce type se mettra à jour ou signalera une erreur ici.
+type LeaseWithDetails = Prisma.LeaseGetPayload<{
+  include: {
+    property: {
+      include: { owner: true } // On récupère le propriétaire via la propriété
+    };
+    tenant: true;             // On récupère le locataire
+    signatures: true;         // On récupère les preuves de signature
+  }
+}>;
+
+// Version standalone pour compatibilité Edge/Serverless (Vercel)
+// On utilise require ici car l'import ES6 de pdfkit peut poser problème en serverless
 const PDFDocument = require("pdfkit/js/pdfkit.standalone");
 
 export const dynamic = 'force-dynamic';
@@ -13,11 +27,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-
     const session = await auth();
     const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    // 1. Récupération typée
     const lease = await prisma.lease.findUnique({
       where: { id },
       include: {
@@ -29,237 +44,213 @@ export async function GET(
 
     if (!lease) return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
 
-    const isOwner = lease.property?.owner?.id === userId;
-    const isTenant = lease.tenant?.id === userId;
+    // 2. Vérification des droits (Sécurité)
+    const isOwner = lease.property.owner.id === userId;
+    const isTenant = lease.tenant.id === userId;
+    
+    // On autorise uniquement le propriétaire ou le locataire
     if (!isOwner && !isTenant) {
-        return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+        return NextResponse.json({ error: "Accès refusé au document." }, { status: 403 });
     }
 
+    // 3. Génération du PDF
     const pdfBuffer = await generateSinglePageLease(lease);
 
-    const safeTitle = (lease.property?.title || "Bail").replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+    // Nettoyage du titre pour le nom de fichier
+    const safeTitle = (lease.property.title || "Bail").replace(/[^a-z0-9]/gi, '_').substring(0, 30);
     
-    return new NextResponse(pdfBuffer as any, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Bail_${safeTitle}.pdf"`,
-      },
-    });
+    return new NextResponse(new Uint8Array(pdfBuffer), {
+  headers: {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="Bail_${safeTitle}.pdf"`,
+  },
+});
 
-  } catch (error: any) {
-    console.error("Erreur PDF:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("Erreur Génération PDF:", error);
+    return NextResponse.json({ error: "Erreur serveur lors de la génération du bail" }, { status: 500 });
   }
 }
 
-// --- UTILITAIRES ---
+// --- UTILITAIRES DE FORMATAGE ---
 const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('fr-CI', { style: 'decimal' }).format(amount).replace(/,/g, ' ');
 };
 
 const formatDate = (date: Date | string | null) => {
     if (!date) return "....................";
-    return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    // Force UTC pour éviter les décalages horaires (ex: 23h le jour d'avant)
+    return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 
 // --- MOTEUR PDF ---
-function generateSinglePageLease(lease: any): Promise<Buffer> {
+function generateSinglePageLease(lease: LeaseWithDetails): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     
-    // 1. MARGES ASYMÉTRIQUES (CRUCIAL POUR EVITER LA PAGE 2)
-    // On met bottom à 10 pour que le footer (qui est à 20 du bas) ne soit pas considéré comme "hors limite"
-    const MARGIN = 25; 
+    const MARGIN = 30;
     const doc = new PDFDocument({ 
-        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 10 }, 
-        size: 'A4' 
+        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 20 }, 
+        size: 'A4',
+        bufferPages: true 
     });
-    const chunks: Buffer[] = [];
 
-    doc.on('data', (chunk: any) => chunks.push(chunk));
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // Largeur utile (basée sur les marges latérales)
     const width = doc.page.width - (MARGIN * 2);
     
     const COLORS = {
-        title: '#000000',
-        subtitle: '#555555',
-        boxBg: '#F8FAFC',
-        boxBorder: '#E2E8F0',
-        headerText: '#475569',
-        bodyText: '#1e293b',
-        accent: '#16a34a' 
+        title: '#0F172A',     // Slate-900
+        subtitle: '#64748B',  // Slate-500
+        boxBg: '#F8FAFC',     // Slate-50
+        boxBorder: '#E2E8F0', // Slate-200
+        accent: '#EA580C'     // Orange-600
     };
 
-    // --- EN-TÊTE COMPACT ---
-    let y = MARGIN;
-
-    doc.font('Times-Bold').fontSize(14).fillColor(COLORS.title)
-       .text("CONTRAT DE BAIL À USAGE D'HABITATION", MARGIN, y, { align: 'center', width });
+    // --- EN-TÊTE ---
+    doc.font('Times-Bold').fontSize(16).fillColor(COLORS.title)
+       .text("CONTRAT DE BAIL À USAGE D'HABITATION", { align: 'center' });
     
-    y += 18; 
+    doc.moveDown(0.5);
 
-    doc.font('Times-Italic').fontSize(8).fillColor(COLORS.subtitle)
-       .text("Régis par la Loi n° 2019-576 du 26 juin 2019 (Code de la Construction)", MARGIN, y, { align: 'center', width });
+    doc.font('Times-Italic').fontSize(9).fillColor(COLORS.subtitle)
+       .text("Régis par la Loi n° 2019-576 du 26 juin 2019 (Code de la Construction)", { align: 'center' });
     
-    y += 12;
-    doc.moveTo(MARGIN, y).lineTo(doc.page.width - MARGIN, y).lineWidth(1).strokeColor('#000000').stroke();
-    y += 10; 
+    doc.moveDown(0.5);
+    
+    const currentY = doc.y;
+    doc.moveTo(MARGIN, currentY).lineTo(doc.page.width - MARGIN, currentY).lineWidth(1).strokeColor(COLORS.title).stroke();
+    
+    doc.moveDown(1);
 
-    // --- LES PARTIES (BOX HAUTEUR 55) ---
-    const boxHeight = 55;
-    const boxWidth = (width / 2) - 8;
-    const rightBoxX = MARGIN + boxWidth + 16;
+    // --- LES PARTIES ---
+    const startY = doc.y;
+    const boxWidth = (width / 2) - 10;
+    const boxHeight = 65;
+    const rightBoxX = MARGIN + boxWidth + 20;
 
-    doc.save();
-    doc.roundedRect(MARGIN, y, boxWidth, boxHeight, 3).fillColor(COLORS.boxBg).fill();
-    doc.roundedRect(rightBoxX, y, boxWidth, boxHeight, 3).fillColor(COLORS.boxBg).fill();
-    doc.roundedRect(MARGIN, y, boxWidth, boxHeight, 3).lineWidth(0.5).strokeColor(COLORS.boxBorder).stroke();
-    doc.roundedRect(rightBoxX, y, boxWidth, boxHeight, 3).lineWidth(0.5).strokeColor(COLORS.boxBorder).stroke();
-    doc.restore();
+    const drawPartyBox = (x: number, title: string, name: string | null, phone: string | null, email: string | null) => {
+        doc.roundedRect(x, startY, boxWidth, boxHeight, 4).fillColor(COLORS.boxBg).fill();
+        doc.roundedRect(x, startY, boxWidth, boxHeight, 4).lineWidth(0.5).strokeColor(COLORS.boxBorder).stroke();
+        
+        const pad = 10;
+        let textY = startY + pad;
+        
+        doc.font('Times-Bold').fontSize(7).fillColor(COLORS.subtitle).text(title, x + pad, textY);
+        
+        textY += 10;
+        // Gestion des valeurs nulles (conformité schéma User)
+        const safeName = (name ?? "Non renseigné").toUpperCase().substring(0, 30);
+        doc.font('Times-Bold').fontSize(10).fillColor(COLORS.title).text(safeName, x + pad, textY);
+        
+        textY += 14;
+        doc.font('Times-Roman').fontSize(8).fillColor('#334155')
+           .text(`Tél: ${phone ?? "Non renseigné"}`, x + pad, textY);
+        
+        textY += 10;
+        doc.text(`Email: ${email ?? "Non renseigné"}`, x + pad, textY);
+    };
 
-    // Contenu Bailleur
-    const textPadding = 8;
-    let localY = y + textPadding;
-    
-    doc.font('Times-Bold').fontSize(6).fillColor(COLORS.headerText)
-       .text("LE BAILLEUR", MARGIN + textPadding, localY);
-    
-    doc.font('Times-Bold').fontSize(9).fillColor(COLORS.title)
-       .text((lease.property?.owner?.name || "NOM PROPRIÉTAIRE").substring(0, 35).toUpperCase(), MARGIN + textPadding, localY + 9);
-    
-    doc.font('Times-Roman').fontSize(7.5).fillColor(COLORS.bodyText)
-       .text(`${lease.property?.owner?.phone || "Tél: N/A"}`, MARGIN + textPadding, localY + 22)
-       .text(`${lease.property?.owner?.email || ""}`, MARGIN + textPadding, localY + 32);
+    // Appel avec les données typées du schéma
+    drawPartyBox(MARGIN, "LE BAILLEUR", lease.property.owner.name, lease.property.owner.phone, lease.property.owner.email);
+    drawPartyBox(rightBoxX, "LE PRENEUR", lease.tenant.name, lease.tenant.phone, lease.tenant.email);
 
-    // Contenu Preneur
-    localY = y + textPadding;
-    doc.font('Times-Bold').fontSize(6).fillColor(COLORS.headerText)
-       .text("LE PRENEUR", rightBoxX + textPadding, localY);
-    
-    doc.font('Times-Bold').fontSize(9).fillColor(COLORS.title)
-       .text((lease.tenant?.name || "NOM LOCATAIRE").substring(0, 35).toUpperCase(), rightBoxX + textPadding, localY + 9);
-    
-    doc.font('Times-Roman').fontSize(7.5).fillColor(COLORS.bodyText)
-       .text(`${lease.tenant?.phone || "Tél: N/A"}`, rightBoxX + textPadding, localY + 22)
-       .text(`${lease.tenant?.email || ""}`, rightBoxX + textPadding, localY + 32);
+    doc.y = startY + boxHeight + 20;
 
-    y += boxHeight + 10;
-
-    // --- ARTICLES (MODE COMPACT) ---
-    
+    // --- ARTICLES ---
     const drawArticle = (title: string, content: string) => {
-        doc.font('Times-Bold').fontSize(8.5).fillColor('#000000')
-           .text(title, MARGIN, y); 
-        
-        y = doc.y + 2; 
-
-        doc.font('Times-Roman').fontSize(8).fillColor('#333333')
-           .text(content, MARGIN, y, { align: 'justify', width: width, lineGap: 0 }); 
-        
-        y = doc.y + 5; 
+        doc.font('Times-Bold').fontSize(9).fillColor('#000000').text(title);
+        doc.moveDown(0.3);
+        doc.font('Times-Roman').fontSize(9).fillColor('#333333').text(content, { align: 'justify', width: width });
+        doc.moveDown(0.8);
     };
 
-    drawArticle("1. OBJET", 
-        `Location à usage d'habitation sise à ${lease.property?.address}, ${lease.property?.commune}. Le Preneur accepte les lieux en l'état.`
+    drawArticle("1. OBJET ET DÉSIGNATION", 
+        `Le Bailleur donne en location au Preneur les locaux sis à : ${lease.property.address}, ${lease.property.commune}. Le bien est accepté en l'état.`
     );
 
-    drawArticle("2. DURÉE", 
-        `1 an ferme du ${formatDate(lease.startDate)}, renouvelable par tacite reconduction. Préavis: 3 mois.`
+    drawArticle("2. DURÉE DU CONTRAT", 
+        `Le bail est consenti pour une durée d'un (1) an ferme commençant le ${formatDate(lease.startDate)}, renouvelable par tacite reconduction. Le préavis de départ est fixé à trois (3) mois.`
     );
 
-    // Article 3 : Finances compact
-    doc.font('Times-Bold').fontSize(8.5).fillColor('#000000').text("3. CONDITIONS FINANCIÈRES", MARGIN, y);
-    y = doc.y + 2;
+    // Cadre Financier
+    doc.font('Times-Bold').fontSize(9).fillColor('#000000').text("3. CONDITIONS FINANCIÈRES");
+    doc.moveDown(0.3);
     
-    doc.rect(MARGIN, y, width, 32).fillColor('#F1F5F9').fill();
+    const financeY = doc.y;
+    doc.rect(MARGIN, financeY, width, 30).fillColor('#F1F5F9').fill();
     
-    const fy = y + 5;
-    const fx = MARGIN + 10;
-    
-    doc.font('Times-Bold').fontSize(8).fillColor('#000000');
-    doc.text(`LOYER : ${formatMoney(lease.monthlyRent)} FCFA / mois`, fx, fy);
-    doc.text(`CAUTION : ${formatMoney(lease.depositAmount)} FCFA`, fx + 200, fy);
-    
-    doc.font('Times-Italic').fontSize(7.5).fillColor('#555555')
-       .text("Payable d'avance le 05 du mois. Révision triennale légale.", fx, fy + 12);
-    
-    y += 38;
+    const textFinanceY = financeY + 10;
+    doc.font('Times-Bold').fontSize(9).fillColor('#000000');
+    // Utilisation des champs Int du schema Lease (monthlyRent, depositAmount)
+    doc.text(`LOYER MENSUEL : ${formatMoney(lease.monthlyRent)} FCFA`, MARGIN + 10, textFinanceY, { continued: true });
+    doc.text(`        CAUTION : ${formatMoney(lease.depositAmount)} FCFA`, { continued: false });
 
-    // Articles Juridiques Condensés
-    drawArticle("4. OBLIGATIONS & TRAVAUX", 
-        `Usage en "bon père de famille". Aucune transformation sans accord écrit. Menues réparations à charge du locataire. Grosses réparations (clos/couvert) à charge du bailleur.`
+    doc.y = financeY + 45;
+
+    drawArticle("4. OBLIGATIONS ET ENTRETIEN", 
+        `Le Preneur s'oblige à user des lieux en "bon père de famille". Il prend à sa charge l'entretien courant et les menues réparations locatives.`
     );
 
-    drawArticle("5. INTERDICTION DE SOUS-LOUER", 
-        `Sous-location (totale/partielle) et cession rigoureusement interdites sans accord écrit, sous peine de résiliation.`
-    );
-
-    drawArticle("6. VISITE DES LIEUX", 
-        `Droit de visite du Bailleur pour vérification d'état ou relocation, sur rendez-vous, aux heures légales.`
-    );
-
-    drawArticle("7. CLAUSE RÉSOLUTOIRE & LITIGES", 
-        `Résiliation de plein droit 1 mois après commandement de payer infructueux. Compétence exclusive : Tribunaux d'Abidjan.`
+    drawArticle("5. CLAUSE RÉSOLUTOIRE", 
+        `À défaut de paiement d'un seul terme de loyer à son échéance, le présent bail sera résilié de plein droit un mois après un commandement de payer resté infructueux.`
     );
 
     // --- SIGNATURES ---
+    doc.moveDown(1.5);
+    const sigLineY = doc.y;
+    doc.moveTo(MARGIN, sigLineY).lineTo(doc.page.width - MARGIN, sigLineY).lineWidth(0.5).strokeColor('#CBD5E1').stroke();
     
-    let sigY = y + 15; 
-    
-    doc.moveTo(MARGIN, sigY).lineTo(doc.page.width - MARGIN, sigY).lineWidth(0.5).strokeColor('#ccc').stroke();
-    sigY += 10;
+    doc.moveDown(1);
+    doc.font('Times-Italic').fontSize(9).fillColor('#000000')
+       .text(`Fait à Abidjan, en deux exemplaires originaux, le ${formatDate(new Date())}.`, { align: 'right' });
 
-    doc.font('Times-Italic').fontSize(8).fillColor('#000000')
-       .text(`Fait à Abidjan, le ${formatDate(new Date())}.`, MARGIN, sigY, { align: 'right' });
-    
-    sigY += 12;
+    doc.moveDown(1);
+    const sigBoxY = doc.y;
 
-    const sigHeight = 65;
+    doc.font('Times-Bold').fontSize(8).fillColor(COLORS.subtitle)
+       .text("POUR LE BAILLEUR", MARGIN, sigBoxY)
+       .text("POUR LE PRENEUR", rightBoxX, sigBoxY);
 
-    // Cadres
-    doc.rect(MARGIN, sigY, boxWidth, sigHeight).strokeColor(COLORS.boxBorder).stroke();
-    doc.rect(rightBoxX, sigY, boxWidth, sigHeight).strokeColor(COLORS.boxBorder).stroke();
+    const drawStamp = (x: number, y: number, name: string | null, isDigital: boolean, date?: Date) => {
+        const stampY = y + 15;
+        doc.roundedRect(x, stampY, boxWidth, 50, 4).lineWidth(1)
+           .strokeColor(isDigital ? COLORS.accent : '#CBD5E1').dash(isDigital ? 0 : 3, { space: 3 }).stroke();
+        doc.undash();
 
-    // Titres cadres
-    doc.font('Times-Bold').fontSize(7).fillColor(COLORS.headerText)
-       .text("LE BAILLEUR", MARGIN + 5, sigY + 5)
-       .text("LE PRENEUR", rightBoxX + 5, sigY + 5);
-
-    // Signature Bailleur
-    if (lease.signatureStatus === 'SIGNED_OWNER' || lease.signatureStatus === 'COMPLETED') {
-        doc.font('Times-Bold').fontSize(9).fillColor(COLORS.accent)
-           .text("SIGNÉ", MARGIN, sigY + 25, { align: 'center', width: boxWidth });
-        doc.font('Times-Roman').fontSize(7).fillColor('#000000')
-           .text(lease.property?.owner?.name?.toUpperCase(), MARGIN, sigY + 40, { align: 'center', width: boxWidth });
-    }
-
-    // Signature Preneur
-    if (lease.signatureStatus === 'SIGNED_TENANT' || lease.signatureStatus === 'COMPLETED') {
-        doc.rect(rightBoxX, sigY, boxWidth, sigHeight).lineWidth(1).strokeColor(COLORS.accent).stroke();
-        
-        doc.font('Times-Bold').fontSize(9).fillColor(COLORS.accent)
-           .text("✔ SIGNÉ NUMÉRIQUEMENT", rightBoxX, sigY + 25, { align: 'center', width: boxWidth });
-        
-        doc.font('Times-Roman').fontSize(7).fillColor('#000000')
-           .text(lease.tenant?.name?.toUpperCase(), rightBoxX, sigY + 38, { align: 'center', width: boxWidth });
-        
-        const sig = lease.signatures?.[0];
-        if (sig) {
-            doc.fontSize(5).font('Courier').fillColor('#888')
-               .text(`ID: ${sig.id}`, rightBoxX, sigY + 50, { align: 'center', width: boxWidth })
-               .text(`${new Date(sig.signedAt).toLocaleString()}`, rightBoxX, sigY + 56, { align: 'center', width: boxWidth });
+        if (isDigital) {
+            doc.font('Times-Bold').fontSize(10).fillColor(COLORS.accent)
+               .text("SIGNE NUMERIQUEMENT", x, stampY + 15, { width: boxWidth, align: 'center' });
+            
+            doc.font('Times-Roman').fontSize(7).fillColor('#000000')
+               .text(`Par : ${(name ?? "Inconnu").toUpperCase()}`, x, stampY + 30, { width: boxWidth, align: 'center' });
+            
+            if (date) {
+               doc.text(`${formatDate(date)}`, x, stampY + 38, { width: boxWidth, align: 'center' });
+            }
+        } else {
+             doc.font('Times-Italic').fontSize(8).fillColor('#94A3B8')
+               .text("(En attente de signature)", x, stampY + 20, { width: boxWidth, align: 'center' });
         }
-    }
+    };
 
-    // --- FOOTER SANS PAGE BREAK ---
-    // On remonte légèrement le footer à -30 pour être sûr d'être dans la zone "bottom: 10" autorisée.
-    doc.fontSize(6).fillColor('#cbd5e1').font('Times-Roman')
+    // Vérification des statuts basée sur l'Enum du schéma (SignatureStatus)
+    const isOwnerSigned = lease.signatureStatus === 'SIGNED_OWNER' || lease.signatureStatus === 'COMPLETED';
+    const isTenantSigned = lease.signatureStatus === 'SIGNED_TENANT' || lease.signatureStatus === 'COMPLETED';
+    const sigData = lease.signatures?.[0];
+
+    drawStamp(MARGIN, sigBoxY, lease.property.owner.name, isOwnerSigned);
+    drawStamp(rightBoxX, sigBoxY, lease.tenant.name, isTenantSigned, sigData?.signedAt);
+
+    // --- FOOTER ---
+    const bottomPage = doc.page.height - 30;
+    doc.fontSize(7).fillColor('#94A3B8').font('Times-Roman')
        .text(
-           `Titre exécutoire certifié par ImmoFacile - Ref: ${lease.id} - Page 1/1`, 
+           `Document généré par ImmoFacile.CI - Ref: ${lease.id} - Ce document vaut titre exécutoire.`, 
            MARGIN, 
-           doc.page.height - 30, 
+           bottomPage, 
            { align: 'center', width }
        );
 

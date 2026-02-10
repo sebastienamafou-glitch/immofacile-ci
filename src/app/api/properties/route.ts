@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-
-import { prisma } from "@/lib/prisma"; // Singleton
-import { Prisma } from "@prisma/client"; // Pour le typage strict
+import { prisma } from "@/lib/prisma";
+import { Prisma, PropertyType } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,11 +8,14 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const commune = searchParams.get("commune");
+    const type = searchParams.get("type");
 
-    // 1. Construction de la requête (Typage Strict)
+    // 1. Construction de la requête (Filtres de base)
     const whereClause: Prisma.PropertyWhereInput = {
-      isPublished: true, // Le bien doit être visible
-      // LOGIQUE STRICTE : Un bien est "Disponible" s'il n'a AUCUN bail actif
+      isPublished: true, // Le bien doit être visible (publié par le proprio)
+      isAvailable: true, // Le bien doit être marqué "Disponible" (ex: pas en travaux)
+      
+      // LOGIQUE MÉTIER : Un bien n'est proposé que s'il n'a AUCUN bail actif
       leases: {
         none: {
             isActive: true
@@ -22,20 +23,34 @@ export async function GET(request: Request) {
       }
     };
 
-    // 2. Filtre optionnel
+    // 2. Filtres dynamiques (Commune & Type)
     if (commune) {
       whereClause.commune = { 
         contains: commune, 
-        mode: "insensitive" 
+        mode: "insensitive" // Insensible à la casse (ex: "cocody" trouve "Cocody")
       };
     }
 
-    // 3. Récupération des biens
+    if (type && Object.values(PropertyType).includes(type as PropertyType)) {
+      whereClause.type = type as PropertyType;
+    }
+
+    // 3. Récupération des données optimisée
     const properties = await prisma.property.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        commune: true,
+        type: true,
+        bedrooms: true,
+        bathrooms: true,
+        surface: true,
+        images: true,
+        // On inclut le nom du propriétaire uniquement si nécessaire pour l'affichage (confidentialité)
         owner: {
-          select: { name: true } // On ne montre que le nom (Confidentialité)
+          select: { name: true } 
         }
       },
       orderBy: { createdAt: "desc" }
@@ -44,7 +59,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: properties });
 
   } catch (error) {
-    console.error("Erreur chargement propriétés:", error);
-    return NextResponse.json({ success: false, error: "Erreur serveur" }, { status: 500 });
+    console.error("Erreur API Properties:", error);
+    return NextResponse.json(
+        { success: false, error: "Erreur serveur lors du chargement des biens" }, 
+        { status: 500 }
+    );
   }
 }

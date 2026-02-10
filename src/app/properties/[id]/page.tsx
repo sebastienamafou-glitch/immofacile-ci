@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react"; // ❌ "use" retiré ici
+import PropertyMap from "@/components/property/PropertyMap";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api } from "@/lib/api";

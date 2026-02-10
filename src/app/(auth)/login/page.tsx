@@ -118,9 +118,9 @@ function LoginForm() {
       <div className="relative z-10 w-full max-w-md px-4 py-8">
         {/* HEADER LOGO */}
         <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-            <div className="relative w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-4 overflow-hidden border-2 border-white/10">
-                <Image src="/logo.png" alt="Logo ImmoFacile" width={80} height={80} className="object-contain p-2" />
-            </div>
+            <Link href="/" className="relative w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-4 overflow-hidden border-2 border-white/10 hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" title="Retour à l'accueil">
+                <Image src="/logo.png" alt="Logo ImmoFacile" width={80} height={80} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
+            </Link>
             <h1 className="text-3xl font-black text-white tracking-tight text-center">
                 Espace <span className="text-orange-500 italic">CLIENT</span>
             </h1>
