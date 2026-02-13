@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth"; // ✅ L'IMPORT MANQUANT A ÉTÉ AJOUTÉ ICI
 
 import ContractModal from "@/components/invest/ContractModal";
 import DashboardView from "@/components/invest/DashboardView";
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // --- SÉCURITÉ & DONNÉES ---
 async function getAuthenticatedUser() {
   // 1. AUTHENTIFICATION STANDARDISÉE
-  const session = await auth();
+  const session = await auth(); // Maintenant, cette fonction est reconnue
   const userId = session?.user?.id;
 
   if (!userId) return null;
@@ -33,7 +34,7 @@ async function getAuthenticatedUser() {
                 ]
             }
         },
-        // ✅ C. CORRECTION SCHEMA : On inclut le coffre-fort
+        // C. CORRECTION SCHEMA : On inclut le coffre-fort
         finance: {
             select: { walletBalance: true }
         }
@@ -64,6 +65,7 @@ export default async function InvestorPage() {
   }
 
   // 2. Logique Juridique : Le contrat est-il signé ?
+  // Vérification sécurisée si le tableau existe
   const hasSignedContract = user.investmentContracts && user.investmentContracts.length > 0;
 
   // SCÉNARIO A : PAS DE CONTRAT -> BLOCAGE (MODAL)
@@ -74,17 +76,17 @@ export default async function InvestorPage() {
           id: user.id,
           name: user.name || "Actionnaire",
           email: user.email || "",
-          // ✅ CORRECTION ACCÈS : On passe par la relation finance
+          // On passe par la relation finance comme prévu
           amount: user.finance?.walletBalance || 0,
           packName: user.backerTier || "Standard"
-        }} onSuccess={function (): void {
-          throw new Error("Function not implemented.");
-        } }        // Note: L'action de succès doit être gérée par le composant client
+        }} 
+        // Note : Dans un Server Component, on ne passe généralement pas de fonction
+        // Si ContractModal est un Client Component, gérez la redirection interne là-bas.
+        onSuccess={undefined}       
       />
     );
   }
 
   // SCÉNARIO B : TOUT EST OK -> DASHBOARD
-  // On passe l'utilisateur (Note: DashboardView devra peut-être être adapté pour lire finance.walletBalance aussi)
   return <DashboardView user={user} />;
 }
