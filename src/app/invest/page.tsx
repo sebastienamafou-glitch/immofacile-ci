@@ -83,7 +83,9 @@ export default async function CrowdfundingPage() {
             className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#F59E0B] to-orange-600 transition-all duration-1000 ease-out flex items-center justify-end px-2"
             style={{ width: `${progressPercent}%` }}
           >
-            <span className="text-[10px] font-black text-black">{progressPercent.toFixed(1)}%</span>
+            <span className="text-[10px] font-black text-black drop-shadow-sm">
+              {progressPercent.toFixed(1)}%
+              </span>
           </div>
         </div>
         <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-tighter">
