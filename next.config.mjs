@@ -1,17 +1,27 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import withPWAInit from "@ducanh2912/next-pwa";
+
+// 1. Configuration PWA
+const withPWA = withPWAInit({
+  dest: "public", // Le dossier où le service worker sera généré
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  swcMinify: true,
+  disable: process.env.NODE_ENV === "development", // Désactive le cache en mode dev pour ne pas vous gêner
+  workboxOptions: {
+    disableDevLogs: true,
+  },
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ 1. LE JOKER : On ignore les fautes d'orthographe/style pour que le build passe
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // On ignore aussi les erreurs TypeScript mineures pour garantir le succès
   typescript: {
     ignoreBuildErrors: true,
   },
-
-  // 2. GESTION DES IMAGES
   images: {
     remotePatterns: [
       {
@@ -20,26 +30,23 @@ const nextConfig = {
       },
     ],
   },
-
-  // ✅ 3. REDIRECTION SEO (NOUVEAU BLOC AJOUTÉ)
-  // C'est ici qu'on force Google à valider le changement d'adresse
+  // Redirection SEO (Gardée intacte)
   async redirects() {
     return [
       {
-        source: '/:path*', // Peu importe la page demandée
+        source: '/:path*',
         has: [
           {
             type: 'host',
-            value: 'immofacile-ci.vercel.app', // Si l'utilisateur vient de l'ancien domaine
+            value: 'immofacile-ci.vercel.app',
           },
         ],
-        destination: 'https://www.immofacile.ci/:path*', // On l'envoie vers le nouveau
-        permanent: true, // Code 308 (équivalent moderne du 301)
+        destination: 'https://www.immofacile.ci/:path*',
+        permanent: true,
       },
     ];
   },
-
-  // 4. SÉCURITÉ RENFORCÉE (HEADERS HTTP)
+  // Sécurité (Gardée intacte)
   async headers() {
     return [
       {
@@ -67,16 +74,13 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
+// On enveloppe la config avec PWA, puis avec Sentry
+export default withSentryConfig(withPWA(nextConfig), {
   org: "webappci",
   project: "javascript-nextjs",
   silent: !process.env.CI,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-
   webpack: {
     automaticVercelMonitors: true,
     treeshake: {

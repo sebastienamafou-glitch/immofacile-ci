@@ -4,29 +4,24 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'ImmoFacile - Gestion Immobilière',
     short_name: 'ImmoFacile',
-    description: 'Plateforme intelligente pour propriétaires et locataires en Côte d\'Ivoire.',
+    description: "Plateforme intelligente pour propriétaires et locataires en Côte d'Ivoire.",
     start_url: '/',
     display: 'standalone',
     background_color: '#0B1120',
     theme_color: '#ea580c',
+    orientation: 'portrait',
     icons: [
       {
-        src: '/icon.png',
+        src: '/icon-192x192.png', // ✅ Nom corrigé (était /icon.png)
         sizes: '192x192',
         type: 'image/png',
+        purpose: 'maskable'
       },
       {
-        src: '/icon.png',
+        src: '/icon-512x512.png', // ✅ Nom corrigé
         sizes: '512x512',
         type: 'image/png',
-      },
-    ],
-    // Nettoyage strict pour Next.js (Suppression de label et form_factor)
-    screenshots: [
-      {
-        src: '/screenshots/mobile-home.png',
-        sizes: '1080x1920',
-        type: 'image/png',
+        purpose: 'maskable'
       },
     ],
   };
