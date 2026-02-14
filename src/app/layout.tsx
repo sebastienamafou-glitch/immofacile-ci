@@ -37,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     // ✅ AJOUT : Vérification Google Search Console
     verification: {
-      google: "googleb0109549a71dafd5",
+      google: "luOxhCBCEgEEIEC6u3FCbHoDGezlCVm-KRz4alzLXs0",
     },
     other: {
       // C'est ici que la magie opère : Sentry injecte des balises meta pour lier 
