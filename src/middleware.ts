@@ -1,18 +1,17 @@
 import NextAuth from "next-auth";
-import authConfig from "@/auth.config"; // Assurez-vous d'avoir ce fichier (ou pointez vers votre config auth)
+import authConfig from "@/auth.config";
 import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-// 1. INITIALISATION DU RATE LIMITER (Sécurisé)
-// On utilise une fenêtre glissante : 20 requêtes toutes les 10 secondes par IP.
+// 1. INITIALISATION DU RATE LIMITER
 let ratelimit: Ratelimit | null = null;
 
 try {
   if (process.env.UPSTASH_REDIS_REST_URL) {
     ratelimit = new Ratelimit({
       redis: Redis.fromEnv(),
-      limiter: Ratelimit.slidingWindow(20, "10 s"), // Ajustable selon vos besoins
+      limiter: Ratelimit.slidingWindow(20, "10 s"),
       analytics: true,
     });
   }
@@ -22,10 +21,9 @@ try {
 
 const { auth } = NextAuth(authConfig);
 
-// Routes publiques (Accessibles sans login)
 const PUBLIC_ROUTES = [
   '/', '/pricing', '/search', '/properties', '/login', '/register', '/auth/error',
-  '/api/webhooks/cinetpay', '/api/webhooks/stripe' // ✅ Toujours ouvert pour les paiements
+  '/api/webhooks/cinetpay', '/api/webhooks/stripe'
 ];
 
 // @ts-ignore
@@ -36,25 +34,28 @@ export default auth(async (req) => {
   const userRole = req.auth?.user?.role; 
   const path = nextUrl.pathname;
   
-  // Récupération IP (Support Vercel/Proxy)
+  // ============================================================
+  // 🚨 0. URGENCE SEO : REDIRECTION 301 STRICTE (Google Fix)
+  // ============================================================
+  // On force le code 301 pour satisfaire la Search Console
+  const hostname = req.headers.get("host");
+  if (hostname === "immofacile-ci.vercel.app") {
+    const newUrl = new URL(`https://www.immofacile.ci${path}${nextUrl.search}`);
+    return NextResponse.redirect(newUrl, { status: 301 });
+  }
+
+  // Récupération IP
   const ip = req.ip ?? req.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
   // ============================================================
-  // 🛡️ 1. SÉCURITÉ : RATE LIMITING (Protection DDoS / BruteForce)
+  // 🛡️ 1. SÉCURITÉ : RATE LIMITING
   // ============================================================
-  
-  // On ne limite pas les fichiers statiques (_next, images) pour la performance
   const isStatic = path.startsWith("/_next") || path.includes(".");
   
   if (ratelimit && !isStatic) {
-    // On cible spécifiquement les routes sensibles (API, Login, Register)
     const isSensitive = path.startsWith("/api") || path.startsWith("/login") || path.startsWith("/register");
-    
     if (isSensitive) {
-      // Identifiant unique : "ratelimit_middleware_" + IP
       const { success, limit, reset, remaining } = await ratelimit.limit(`ratelimit_middleware_${ip}`);
-      
-      // Si la limite est dépassée -> Erreur 429 (Too Many Requests)
       if (!success) {
         return new NextResponse("Trop de requêtes. Veuillez patienter.", {
             status: 429,
@@ -69,22 +70,19 @@ export default auth(async (req) => {
   }
 
   // ============================================================
-  // 👤 2. AUTHENTIFICATION & RÔLES (Navigation)
+  // 👤 2. AUTHENTIFICATION & RÔLES
   // ============================================================
-
   const isApiAuthRoute = path.startsWith('/api/auth');
   const isPublicRoute = PUBLIC_ROUTES.some(route => path === route || path.startsWith('/api/webhooks'));
 
   if (isApiAuthRoute || isPublicRoute) return NextResponse.next();
 
-  // Si pas connecté -> Redirection vers Login
   if (!isLoggedIn) {
     let callbackUrl = path;
     if (nextUrl.search) callbackUrl += nextUrl.search;
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, nextUrl));
   }
 
-  // Gatekeeper par Rôle (Protection des Dashboards)
   if (isLoggedIn && userRole) {
     if (path.startsWith('/dashboard/agent') && userRole !== 'AGENT' && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
@@ -101,6 +99,5 @@ export default auth(async (req) => {
 });
 
 export const config = {
-  // Matcher optimisé pour ignorer les fichiers statiques
   matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)', '/dashboard/:path*'],
 };
