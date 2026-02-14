@@ -34,10 +34,13 @@ export default auth(async (req) => {
   const path = nextUrl.pathname;
   
   // ============================================================
-  // 🚨 SEO FIX ULTIME : REDIRECTION 301
+  // 🚨 SEO FIX : REDIRECTION 301 VIA HEADER (MÉTHODE BRUTE)
   // ============================================================
-  // On vérifie le nom de domaine directement via NextURL (plus fiable)
-  if (nextUrl.hostname === "immofacile-ci.vercel.app") {
+  // On lit directement l'en-tête "Host" envoyé par le navigateur.
+  // C'est la seule vérité absolue.
+  const host = req.headers.get("host");
+
+  if (host && host.includes("immofacile-ci.vercel.app")) {
     // On reconstruit l'URL vers le nouveau domaine
     const targetUrl = new URL(`https://www.immofacile.ci${path}`);
     if (nextUrl.search) targetUrl.search = nextUrl.search;
