@@ -35,6 +35,10 @@ export async function generateMetadata(): Promise<Metadata> {
       statusBarStyle: 'black-translucent',
       title: "ImmoFacile",
     },
+    // ✅ AJOUT : Vérification Google Search Console
+    verification: {
+      google: "googleb0109549a71dafd5",
+    },
     other: {
       // C'est ici que la magie opère : Sentry injecte des balises meta pour lier 
       // les erreurs du navigateur à celles du serveur.
