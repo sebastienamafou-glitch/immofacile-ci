@@ -1,4 +1,5 @@
 import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // ✅ 1. LE JOKER : On ignore les fautes d'orthographe/style pour que le build passe
@@ -10,17 +11,35 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // 2. GESTION DES IMAGES (Mode Permissif - Conservé)
+  // 2. GESTION DES IMAGES
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**", // ✅ Autorise TOUS les domaines d'images
+        hostname: "**", 
       },
     ],
   },
 
-  // 3. SÉCURITÉ RENFORCÉE (HEADERS HTTP - Conservé)
+  // ✅ 3. REDIRECTION SEO (NOUVEAU BLOC AJOUTÉ)
+  // C'est ici qu'on force Google à valider le changement d'adresse
+  async redirects() {
+    return [
+      {
+        source: '/:path*', // Peu importe la page demandée
+        has: [
+          {
+            type: 'host',
+            value: 'immofacile-ci.vercel.app', // Si l'utilisateur vient de l'ancien domaine
+          },
+        ],
+        destination: 'https://www.immofacile.ci/:path*', // On l'envoie vers le nouveau
+        permanent: true, // Code 308 (équivalent moderne du 301)
+      },
+    ];
+  },
+
+  // 4. SÉCURITÉ RENFORCÉE (HEADERS HTTP)
   async headers() {
     return [
       {
@@ -53,34 +72,14 @@ export default withSentryConfig(nextConfig, {
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
   org: "webappci",
-
   project: "javascript-nextjs",
-
-  // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
-
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
   tunnelRoute: "/monitoring",
 
   webpack: {
-    // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-    // See the following for more information:
-    // https://docs.sentry.io/product/crons/
-    // https://vercel.com/docs/cron-jobs
     automaticVercelMonitors: true,
-
-    // Tree-shaking options for reducing bundle size
     treeshake: {
-      // Automatically tree-shake Sentry logger statements to reduce bundle size
       removeDebugLogging: true,
     },
   },
