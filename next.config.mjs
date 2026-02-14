@@ -1,14 +1,13 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-// 1. Configuration PWA
 const withPWA = withPWAInit({
-  dest: "public", // Le dossier où le service worker sera généré
+  dest: "public",
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  disable: process.env.NODE_ENV === "development", // Désactive le cache en mode dev pour ne pas vous gêner
+  disable: process.env.NODE_ENV === "development",
   workboxOptions: {
     disableDevLogs: true,
   },
@@ -30,23 +29,8 @@ const nextConfig = {
       },
     ],
   },
-  // Redirection SEO (Gardée intacte)
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'immofacile-ci.vercel.app',
-          },
-        ],
-        destination: 'https://www.immofacile.ci/:path*',
-        permanent: true,
-      },
-    ];
-  },
-  // Sécurité (Gardée intacte)
+  // ❌ J'AI SUPPRIMÉ LE BLOC REDIRECTS ICI POUR ÉVITER LE CONFLIT
+
   async headers() {
     return [
       {
@@ -74,7 +58,6 @@ const nextConfig = {
   },
 };
 
-// On enveloppe la config avec PWA, puis avec Sentry
 export default withSentryConfig(withPWA(nextConfig), {
   org: "webappci",
   project: "javascript-nextjs",

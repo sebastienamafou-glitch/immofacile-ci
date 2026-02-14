@@ -6,7 +6,6 @@ import { Redis } from "@upstash/redis";
 
 // 1. INITIALISATION DU RATE LIMITER
 let ratelimit: Ratelimit | null = null;
-
 try {
   if (process.env.UPSTASH_REDIS_REST_URL) {
     ratelimit = new Ratelimit({
@@ -16,7 +15,7 @@ try {
     });
   }
 } catch (e) {
-  console.warn("⚠️ Rate Limiting désactivé (Redis non configuré)");
+  console.warn("⚠️ Rate Limiting désactivé");
 }
 
 const { auth } = NextAuth(authConfig);
@@ -35,20 +34,22 @@ export default auth(async (req) => {
   const path = nextUrl.pathname;
   
   // ============================================================
-  // 🚨 0. URGENCE SEO : REDIRECTION 301 STRICTE (Google Fix)
+  // 🚨 SEO FIX ULTIME : REDIRECTION 301
   // ============================================================
-  // On force le code 301 pour satisfaire la Search Console
-  const hostname = req.headers.get("host");
-  if (hostname === "immofacile-ci.vercel.app") {
-    const newUrl = new URL(`https://www.immofacile.ci${path}${nextUrl.search}`);
-    return NextResponse.redirect(newUrl, { status: 301 });
+  // On vérifie le nom de domaine directement via NextURL (plus fiable)
+  if (nextUrl.hostname === "immofacile-ci.vercel.app") {
+    // On reconstruit l'URL vers le nouveau domaine
+    const targetUrl = new URL(`https://www.immofacile.ci${path}`);
+    if (nextUrl.search) targetUrl.search = nextUrl.search;
+    
+    return NextResponse.redirect(targetUrl, 301);
   }
 
   // Récupération IP
   const ip = req.ip ?? req.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
   // ============================================================
-  // 🛡️ 1. SÉCURITÉ : RATE LIMITING
+  // 🛡️ SÉCURITÉ & AUTH (Reste du code inchangé)
   // ============================================================
   const isStatic = path.startsWith("/_next") || path.includes(".");
   
@@ -57,21 +58,11 @@ export default auth(async (req) => {
     if (isSensitive) {
       const { success, limit, reset, remaining } = await ratelimit.limit(`ratelimit_middleware_${ip}`);
       if (!success) {
-        return new NextResponse("Trop de requêtes. Veuillez patienter.", {
-            status: 429,
-            headers: {
-                "X-RateLimit-Limit": limit.toString(),
-                "X-RateLimit-Remaining": remaining.toString(),
-                "X-RateLimit-Reset": reset.toString()
-            }
-        });
+        return new NextResponse("Trop de requêtes.", { status: 429 });
       }
     }
   }
 
-  // ============================================================
-  // 👤 2. AUTHENTIFICATION & RÔLES
-  // ============================================================
   const isApiAuthRoute = path.startsWith('/api/auth');
   const isPublicRoute = PUBLIC_ROUTES.some(route => path === route || path.startsWith('/api/webhooks'));
 
