@@ -4,9 +4,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/logger";
+// 👇 IMPORT DE SÉCURITÉ
+import { encrypt } from "@/lib/crypto";
 
-// ✅ CORRECTION 1 : On accepte bien 2 arguments (url + type)
-export async function submitKycApplication(documentUrl: string, idType: string) {
+// ✅ CORRECTION : On ajoute idNumber en argument optionnel
+export async function submitKycApplication(documentUrl: string, idType: string, idNumber?: string) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -15,6 +17,9 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
       return { error: "Vous devez être connecté." };
     }
 
+    // 🛡️ CHIFFREMENT
+    const encryptedIdNumber = idNumber ? encrypt(idNumber) : undefined;
+
     // Mise à jour en base de données
     await prisma.userKYC.upsert({
       where: { userId: userId },
@@ -22,6 +27,8 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
         status: "PENDING",
         documents: [documentUrl],
         idType: idType,
+        // Si un numéro est fourni, on le met à jour (chiffré), sinon on ne touche pas
+        ...(encryptedIdNumber && { idNumber: encryptedIdNumber }),
         updatedAt: new Date(),
         rejectionReason: null 
       },
@@ -29,11 +36,12 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
         userId: userId,
         status: "PENDING",
         documents: [documentUrl],
-        idType: idType
+        idType: idType,
+        idNumber: encryptedIdNumber || null // ✅ Création sécurisée
       }
     });
 
-    // Log de sécurité
+    // Log de sécurité (On ne logue PAS le numéro, même chiffré)
     await logActivity(
         "KYC_SUBMITTED", 
         "SECURITY", 
@@ -50,43 +58,42 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
   }
 }
 
-// ✅ CORRECTION 2 : Gestion du rôle admin pour la validation
+// La fonction reviewKyc reste inchangée (elle ne manipule pas le idNumber en écriture)
 export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED", reason?: string) {
-  const session = await auth();
+    // ... (Gardez votre code reviewKyc existant ici, il est correct) ...
+    const session = await auth();
   
-  // Astuce TypeScript : On force le typage ou on vérifie en DB si le rôle manque dans la session
-  // Ici on fait une requête DB pour être sûr à 100% du rôle (plus sécurisé)
-  if (!session?.user?.id) return { error: "Non autorisé" };
+    if (!session?.user?.id) return { error: "Non autorisé" };
+    
+    const adminUser = await prisma.user.findUnique({ 
+        where: { id: session.user.id },
+        select: { role: true }
+    });
   
-  const adminUser = await prisma.user.findUnique({ 
-      where: { id: session.user.id },
-      select: { role: true }
-  });
-
-  if (adminUser?.role !== "SUPER_ADMIN") {
-      return { error: "Action réservée aux administrateurs." };
-  }
-
-  await prisma.userKYC.update({
-    where: { id: kycId },
-    data: {
-      status: decision,
-      rejectionReason: decision === "REJECTED" ? reason : null,
-      reviewedAt: new Date(),
-      reviewedBy: session.user.id
+    if (adminUser?.role !== "SUPER_ADMIN") {
+        return { error: "Action réservée aux administrateurs." };
     }
-  });
-
-  if (decision === "VERIFIED") {
-      const kyc = await prisma.userKYC.findUnique({ where: { id: kycId }});
-      if (kyc) {
-          await prisma.user.update({
-              where: { id: kyc.userId },
-              data: { isVerified: true }
-          });
+  
+    await prisma.userKYC.update({
+      where: { id: kycId },
+      data: {
+        status: decision,
+        rejectionReason: decision === "REJECTED" ? reason : null,
+        reviewedAt: new Date(),
+        reviewedBy: session.user.id
       }
-  }
-
-  revalidatePath("/admin/kyc");
-  return { success: decision === "VERIFIED" ? "Validé" : "Rejeté" };
+    });
+  
+    if (decision === "VERIFIED") {
+        const kyc = await prisma.userKYC.findUnique({ where: { id: kycId }});
+        if (kyc) {
+            await prisma.user.update({
+                where: { id: kyc.userId },
+                data: { isVerified: true }
+            });
+        }
+    }
+  
+    revalidatePath("/admin/kyc");
+    return { success: decision === "VERIFIED" ? "Validé" : "Rejeté" };
 }

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { 
   ArrowLeft, Building2, FileText, CheckCircle2, Loader2, UploadCloud, 
-  ShieldCheck, Lock, XCircle, RefreshCcw, Briefcase, AlertTriangle, Scale 
+  ShieldCheck, Lock, XCircle, RefreshCcw, Briefcase, AlertTriangle, Scale,
+  FileBadge
 } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
@@ -15,8 +16,10 @@ export default function AgencyKYCPage() {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // ✅ Consentement Représentant Légal
+  // ✅ NOUVEAUX STATES POUR LA SÉCURITÉ & CONFORMITÉ KYB
   const [consent, setConsent] = useState(false);
+  const [idNumber, setIdNumber] = useState(""); // Le numéro RCCM/NINEA
+  const [idType, setIdType] = useState("RCCM"); // Type de document par défaut
 
   useEffect(() => {
     try {
@@ -42,8 +45,8 @@ export default function AgencyKYCPage() {
     }
 
     try {
-      // ✅ Envoi TYPE "NINEA_AGENCY" (KYB)
-      const response = await submitKycApplication(secureUrl, "NINEA_AGENCY");
+      // ✅ Envoi TYPE, URL et NUMÉRO (Sécurisé)
+      const response = await submitKycApplication(secureUrl, idType, idNumber);
       
       if (response.error) throw new Error(response.error);
 
@@ -60,7 +63,7 @@ export default function AgencyKYCPage() {
       Swal.fire({
         icon: 'success',
         title: 'Dossier Juridique Transmis',
-        text: 'L\'audit de conformité de votre agence démarre maintenant.',
+        text: 'L\'audit de conformité de votre agence démarre maintenant. Vos données sont chiffrées.',
         confirmButtonColor: '#2563EB', // Bleu Corporate
         background: '#0F172A',
         color: '#fff'
@@ -77,6 +80,7 @@ export default function AgencyKYCPage() {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
+      setIdNumber(""); // Reset
   };
 
   return (
@@ -157,8 +161,6 @@ export default function AgencyKYCPage() {
                         <p className="text-white font-medium italic">"{rejectionReason || "K-BIS expiré ou illisible."}"</p>
                     </div>
                     
-                    <p className="text-sm text-slate-400 mb-6">Veuillez fournir un document officiel de moins de 3 mois.</p>
-
                     <button 
                         onClick={handleRetry} 
                         className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
@@ -168,22 +170,47 @@ export default function AgencyKYCPage() {
                 </div>
 
             ) : (
-                // UPLOAD
-                <div className="relative z-10">
+                // FORMULAIRE D'UPLOAD
+                <div className="relative z-10 space-y-6">
                     
-                    <div className="mb-8 p-4 bg-slate-950/50 rounded-2xl border border-slate-800">
-                        <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-indigo-400"/> Documents Acceptés (PDF/JPG)
-                        </h4>
-                        <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside ml-1">
-                            <li>Registre de Commerce (RCCM)</li>
-                            <li>Déclaration Fiscale d'Existence (DFE/NINEA)</li>
-                            <li>Statuts de la société (Première page)</li>
-                        </ul>
+                    {/* 1. CHOIX DU DOCUMENT */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <button 
+                            onClick={() => setIdType("RCCM")}
+                            className={`p-4 rounded-xl border font-bold text-sm transition ${idType === "RCCM" ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50" : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900"}`}
+                        >
+                            Registre de Commerce (RCCM)
+                        </button>
+                        <button 
+                            onClick={() => setIdType("NINEA")}
+                            className={`p-4 rounded-xl border font-bold text-sm transition ${idType === "NINEA" ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50" : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-900"}`}
+                        >
+                            NINEA / DFE
+                        </button>
                     </div>
 
-                    {/* ✅ CHECKBOX CONSENTEMENT */}
-                    <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-indigo-500/30">
+                    {/* 2. NUMÉRO D'IMMATRICULATION (OBLIGATOIRE) */}
+                    <div>
+                        <label className="text-xs font-bold uppercase text-slate-500 mb-2 block ml-1">
+                            Numéro d'immatriculation <span className="text-indigo-400">*</span>
+                        </label>
+                        <div className="relative group">
+                            <FileBadge className="absolute left-4 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+                            <input 
+                                type="text" 
+                                placeholder={idType === "RCCM" ? "Ex: CI-ABJ-2024-B-12345" : "Ex: 0001234567"}
+                                value={idNumber}
+                                onChange={(e) => setIdNumber(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white font-mono placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1.5 ml-1 flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Ce numéro sera chiffré (AES-256) avant stockage.
+                        </p>
+                    </div>
+
+                    {/* 3. CONSENTEMENT */}
+                    <div className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-indigo-500/30">
                         <input 
                             type="checkbox" 
                             id="kyb-consent"
@@ -197,19 +224,21 @@ export default function AgencyKYCPage() {
                         </label>
                     </div>
 
+                    {/* 4. ZONE D'UPLOAD */}
                     <CldUploadWidget 
                         uploadPreset="immofacile_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["pdf", "jpg", "png"] }}
                     >
                         {({ open }) => (
-                            <div 
+                            <button 
                                 onClick={() => {
-                                    if (consent && !uploading) open();
+                                    if (consent && idNumber.length > 5 && !uploading) open();
                                 }}
+                                disabled={!consent || idNumber.length < 5 || uploading}
                                 className={`
-                                    group border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300
-                                    ${consent 
+                                    w-full group border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center transition-all duration-300
+                                    ${consent && idNumber.length > 5
                                         ? "border-slate-700 hover:border-indigo-500 hover:bg-indigo-500/5 cursor-pointer" 
                                         : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
                                     }
@@ -218,51 +247,34 @@ export default function AgencyKYCPage() {
                                 {uploading ? (
                                     <div className="text-center">
                                         <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mx-auto mb-4" />
-                                        <p className="text-white font-bold">Chiffrement SSL...</p>
+                                        <p className="text-white font-bold">Chiffrement & Envoi...</p>
                                     </div>
                                 ) : (
                                     <>
                                         <div className={`
-                                            w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform
-                                            ${consent ? "bg-slate-800 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white shadow-xl" : "bg-slate-800"}
+                                            w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-transform
+                                            ${consent && idNumber.length > 5 ? "bg-indigo-600 text-white shadow-xl group-hover:scale-110" : "bg-slate-800 text-slate-600"}
                                         `}>
-                                            <UploadCloud className={`w-10 h-10 transition-colors ${consent ? "text-slate-400 group-hover:text-white" : "text-slate-600"}`} />
+                                            <UploadCloud className="w-8 h-8" />
                                         </div>
-                                        <p className="font-black text-white text-xl mb-2">Téléverser le Dossier</p>
-                                        <p className="text-sm text-slate-500 text-center max-w-xs">
-                                            Glissez vos fichiers ou cliquez pour parcourir.
-                                        </p>
-
-                                        {!consent && (
-                                            <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-6 animate-pulse">
-                                                ⚠️ Validation requise ci-dessus
+                                        <p className="font-black text-white text-lg mb-1">Téléverser le Justificatif</p>
+                                        
+                                        {(!consent || idNumber.length < 5) ? (
+                                            <p className="text-indigo-400 text-[10px] font-bold uppercase tracking-widest animate-pulse mt-2">
+                                                (Remplissez le formulaire d'abord)
                                             </p>
-                                        )}
-
-                                        {consent && (
-                                            <button className="mt-8 bg-indigo-600 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-indigo-900/30 group-hover:bg-indigo-500 transition-all active:scale-95">
-                                                Sélectionner le fichier
-                                            </button>
+                                        ) : (
+                                            <p className="text-xs text-slate-500">Cliquez pour parcourir (PDF/JPG)</p>
                                         )}
                                     </>
                                 )}
-                            </div>
+                            </button>
                         )}
                     </CldUploadWidget>
                 </div>
             )}
 
-            {/* FOOTER INFO */}
-            <div className="mt-8 flex flex-col md:flex-row items-center justify-center gap-6 opacity-60 border-t border-slate-800 pt-6">
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
-                    <Lock className="w-3 h-3 text-emerald-500" /> Données Entreprise Sécurisées
-                </div>
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
-                    <Briefcase className="w-3 h-3 text-indigo-500" /> Facturation Conforme
-                </div>
-            </div>
-
-            {/* ✅ FAQ B2B */}
+            {/* FAQ B2B */}
             <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-10">
                 <div>
                     <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">

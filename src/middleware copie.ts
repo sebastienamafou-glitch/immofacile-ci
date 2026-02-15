@@ -32,16 +32,19 @@ export default auth(async (req) => {
   // @ts-ignore
   const userRole = req.auth?.user?.role; 
   const path = nextUrl.pathname;
-
+  
   // ============================================================
-  // 🚨 RETOUR DE LA REDIRECTION 301 OBLIGATOIRE
+  // 🚨 SEO FIX : REDIRECTION 301 VIA HEADER (MÉTHODE BRUTE)
   // ============================================================
-  // On ne fait pas confiance à la config serveur seule.
-  // On force la redirection ici aussi.
+  // On lit directement l'en-tête "Host" envoyé par le navigateur.
+  // C'est la seule vérité absolue.
   const host = req.headers.get("host");
+
   if (host && host.includes("immofacile-ci.vercel.app")) {
+    // On reconstruit l'URL vers le nouveau domaine
     const targetUrl = new URL(`https://www.immofacile.ci${path}`);
     if (nextUrl.search) targetUrl.search = nextUrl.search;
+    
     return NextResponse.redirect(targetUrl, 301);
   }
 
@@ -49,7 +52,7 @@ export default auth(async (req) => {
   const ip = req.ip ?? req.headers.get("x-forwarded-for") ?? "127.0.0.1";
 
   // ============================================================
-  // 🛡️ SÉCURITÉ : RATE LIMITING
+  // 🛡️ SÉCURITÉ & AUTH (Reste du code inchangé)
   // ============================================================
   const isStatic = path.startsWith("/_next") || path.includes(".");
   

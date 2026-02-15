@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Shield, FileText, UserCheck, CheckCircle2, Loader2, Camera, Lock, XCircle, RefreshCcw, ShieldCheck, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
-import { submitKycApplication, getLiveKycStatus } from "@/actions/kyc"; // ✅ Import de l'action
+import { submitKycApplication, getLiveKycStatus } from "@/actions/kyc"; 
 import Swal from "sweetalert2";
 import confetti from "canvas-confetti";
 
@@ -13,9 +13,13 @@ export default function TenantKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  
+  // ✅ NOUVEAUX STATES POUR LA SÉCURITÉ
   const [consent, setConsent] = useState(false);
+  const [idNumber, setIdNumber] = useState(""); // Le numéro à chiffrer
+  const [idType, setIdType] = useState("CNI");  // Le type de document
 
-  // 1. CHARGEMENT INITIAL (LocalStorage pour la vitesse)
+  // 1. CHARGEMENT INITIAL
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('immouser');
@@ -27,21 +31,18 @@ export default function TenantKYCPage() {
     } catch (e) { console.error(e); }
   }, []);
 
-  // 2. ⚡️ POLLING TEMPS RÉEL (La Magie)
+  // 2. ⚡️ POLLING TEMPS RÉEL
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    // On ne surveille que si on est EN ATTENTE
     if (status === 'PENDING') {
         interval = setInterval(async () => {
             const freshData = await getLiveKycStatus();
             
             if (freshData && freshData.status !== 'PENDING') {
-                // CHANGEMENT DÉTECTÉ !
                 setStatus(freshData.status);
                 setRejectionReason(freshData.rejectionReason || null);
 
-                // Mise à jour du cache local
                 const storedUser = localStorage.getItem('immouser');
                 if (storedUser) {
                     const user = JSON.parse(storedUser);
@@ -51,13 +52,12 @@ export default function TenantKYCPage() {
                     localStorage.setItem('immouser', JSON.stringify(user));
                 }
 
-                // Feedback visuel immédiat
                 if (freshData.status === 'VERIFIED') {
                     confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
                     Swal.fire({
                         icon: 'success',
                         title: 'Félicitations ! 🥳',
-                        text: 'Votre identité vient d\'être validée par notre équipe.',
+                        text: 'Votre identité vient d\'être validée.',
                         timer: 4000,
                         showConfirmButton: false,
                         background: '#0F172A', color: '#fff'
@@ -66,15 +66,15 @@ export default function TenantKYCPage() {
                      Swal.fire({
                         icon: 'error',
                         title: 'Mise à jour Dossier',
-                        text: 'Votre document a été refusé. Veuillez consulter le motif.',
+                        text: 'Votre document a été refusé.',
                         background: '#0F172A', color: '#fff'
                     });
                 }
             }
-        }, 5000); // Vérification toutes les 5 secondes
+        }, 5000); 
     }
 
-    return () => clearInterval(interval); // Nettoyage quand on quitte
+    return () => clearInterval(interval); 
   }, [status]);
 
 
@@ -88,12 +88,13 @@ export default function TenantKYCPage() {
     }
 
     try {
-      const response = await submitKycApplication(secureUrl, "CNI");
+      // ✅ MISE À JOUR : On envoie aussi le numéro et le type
+      const response = await submitKycApplication(secureUrl, idType, idNumber);
+      
       if (response.error) throw new Error(response.error);
 
-      setStatus("PENDING"); // Déclenche le polling
+      setStatus("PENDING"); 
       
-      // Update local storage
       const storedUser = localStorage.getItem('immouser');
       if (storedUser) {
         const user = JSON.parse(storedUser);
@@ -105,7 +106,7 @@ export default function TenantKYCPage() {
       Swal.fire({
         icon: 'success',
         title: 'Envoyé avec succès !',
-        text: 'Laissez cette page ouverte, la validation est souvent très rapide.',
+        text: 'Votre identité est en cours de chiffrement et validation.',
         background: '#0B1120', color: '#fff',
         confirmButtonColor: '#ea580c'
       });
@@ -121,6 +122,7 @@ export default function TenantKYCPage() {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
+      setIdNumber(""); // On reset
   };
 
   return (
@@ -186,7 +188,6 @@ export default function TenantKYCPage() {
                         <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
                         <h3 className="text-xl font-black text-white">Vérification en cours...</h3>
                         <p className="text-orange-400 mt-2">Nous analysons votre document en direct.</p>
-                        <p className="text-xs text-slate-500 mt-4">Ne fermez pas, cela prend quelques secondes...</p>
                     </div>
 
                 ) : status === 'REJECTED' ? (
@@ -196,24 +197,52 @@ export default function TenantKYCPage() {
                             <XCircle className="w-8 h-8 text-red-500" />
                         </div>
                         <h3 className="text-xl font-black text-white mb-2">Pièce Refusée 🛑</h3>
-                        
                         <div className="bg-red-950/30 border border-red-500/30 rounded-xl p-4 mb-6 max-w-md mx-auto">
                             <p className="text-xs text-red-300 font-bold uppercase mb-1">Motif du rejet :</p>
                             <p className="text-white font-medium italic">"{rejectionReason || "Photo floue ou document expiré."}"</p>
                         </div>
-                        
-                        <button 
-                            onClick={handleRetry} 
-                            className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
-                        >
+                        <button onClick={handleRetry} className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto">
                             <RefreshCcw className="w-4 h-4" /> Soumettre à nouveau
                         </button>
                     </div>
 
                 ) : (
-                    // CAS 4 : UPLOAD
-                    <div>
-                        <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-blue-500/30">
+                    // CAS 4 : FORMULAIRE COMPLET
+                    <div className="space-y-6">
+                        
+                        {/* 1. TYPE DE DOCUMENT */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <button 
+                                onClick={() => setIdType("CNI")}
+                                className={`p-4 rounded-xl border font-bold text-sm transition ${idType === "CNI" ? "bg-blue-500/20 border-blue-500 text-white" : "bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+                            >
+                                Carte d'Identité (CNI)
+                            </button>
+                            <button 
+                                onClick={() => setIdType("PASSPORT")}
+                                className={`p-4 rounded-xl border font-bold text-sm transition ${idType === "PASSPORT" ? "bg-blue-500/20 border-blue-500 text-white" : "bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800"}`}
+                            >
+                                Passeport
+                            </button>
+                        </div>
+
+                        {/* 2. NUMÉRO DU DOCUMENT */}
+                        <div>
+                            <label className="text-xs font-bold uppercase text-slate-500 mb-2 block ml-1">Numéro du document (Sera chiffré)</label>
+                            <div className="relative">
+                                <FileText className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                                <input 
+                                    type="text" 
+                                    placeholder={idType === "CNI" ? "Ex: C00123456789" : "Ex: 12AA34567"}
+                                    value={idNumber}
+                                    onChange={(e) => setIdNumber(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl py-3 pl-12 pr-4 text-white font-mono placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 3. CONSENTEMENT */}
+                        <div className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-blue-500/30">
                             <input 
                                 type="checkbox" 
                                 id="kyc-consent"
@@ -227,20 +256,22 @@ export default function TenantKYCPage() {
                             </label>
                         </div>
 
+                        {/* 4. UPLOAD */}
                         <CldUploadWidget 
                             uploadPreset="immofacile_kyc"
                             onSuccess={handleKycSuccess}
                             options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                         >
                             {({ open }) => (
-                                <div 
+                                <button 
                                     onClick={() => {
-                                        if (consent && !uploading) open();
+                                        if (consent && idNumber.length > 3 && !uploading) open();
                                     }}
+                                    disabled={!consent || idNumber.length < 3 || uploading}
                                     className={`
-                                        border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-300
-                                        ${consent 
-                                            ? "border-slate-700 hover:border-blue-500 cursor-pointer group bg-transparent" 
+                                        w-full border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-300
+                                        ${consent && idNumber.length > 3
+                                            ? "border-slate-700 hover:border-blue-500 cursor-pointer group bg-transparent hover:scale-[1.01]" 
                                             : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
                                         }
                                     `}
@@ -248,40 +279,32 @@ export default function TenantKYCPage() {
                                     {uploading ? (
                                         <div className="text-center">
                                             <Loader2 className="animate-spin text-blue-500 w-10 h-10 mx-auto mb-2" />
-                                            <p className="text-white font-bold">Envoi sécurisé...</p>
+                                            <p className="text-white font-bold">Chiffrement & Envoi...</p>
                                         </div>
                                     ) : (
                                         <>
                                             <Camera className={`w-10 h-10 mb-4 transition-colors ${consent ? "text-slate-400 group-hover:text-blue-500" : "text-slate-600"}`} />
                                             <p className="text-white font-bold">Scanner ma Pièce d'Identité</p>
                                             
-                                            {!consent && (
-                                                <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-4 animate-pulse">
-                                                    ⚠️ Cochez la case pour activer
+                                            {(!consent || idNumber.length < 3) && (
+                                                <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-4">
+                                                    (Remplissez le formulaire d'abord)
                                                 </p>
                                             )}
                                         </>
                                     )}
-                                </div>
+                                </button>
                             )}
                         </CldUploadWidget>
 
-                        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-8">
+                        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-8">
                             <div>
                                 <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                                    <Lock className="w-3 h-3 text-blue-500"/> Qui voit mon document ?
+                                    <Lock className="w-3 h-3 text-emerald-500"/> Données Chiffrées (AES-256)
                                 </h4>
                                 <p className="text-xs text-slate-500 leading-relaxed">
                                     Seuls nos administrateurs voient votre CNI pour la validation. 
                                     Les propriétaires voient uniquement le badge vert "Vérifié".
-                                </p>
-                            </div>
-                            <div>
-                                <h4 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                                    <ShieldCheck className="w-3 h-3 text-blue-500"/> Pourquoi c'est important ?
-                                </h4>
-                                <p className="text-xs text-slate-500 leading-relaxed">
-                                    Les dossiers vérifiés sont prioritaires et ont <strong>3x plus de chances</strong> d'être acceptés pour un logement.
                                 </p>
                             </div>
                         </div>

@@ -82,7 +82,7 @@ export default async function InvestorPage() {
         }} 
         // Note : Dans un Server Component, on ne passe généralement pas de fonction
         // Si ContractModal est un Client Component, gérez la redirection interne là-bas.
-        onSuccess={undefined}       
+        onSuccess={() => {}}       
       />
     );
   }

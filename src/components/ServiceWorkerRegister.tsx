@@ -13,6 +13,14 @@ export default function ServiceWorkerRegister() {
             console.log("Service Worker actif (Scope: ", registration.scope, ")");
           })
           .catch((error) => {
+            // 🛡️ FIX POUR SENTRY & GOOGLEBOT
+            // Les robots (comme Google) rejettent souvent l'installation du SW.
+            // On ignore silencieusement cette erreur précise pour ne pas polluer les logs.
+            const errorMessage = error?.message || error?.toString() || "";
+            if (errorMessage.includes("Rejected")) {
+              return; // On s'arrête là, pas de console.error
+            }
+            
             console.error("Erreur Service Worker :", error);
           });
       };
