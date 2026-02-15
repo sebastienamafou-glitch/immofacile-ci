@@ -22,7 +22,7 @@ const { auth } = NextAuth(authConfig);
 
 const PUBLIC_ROUTES = [
   '/', '/pricing', '/search', '/properties', '/login', '/register', '/auth/error',
-  '/api/webhooks/cinetpay', '/api/webhooks/stripe'
+  '/api/webhooks/cinetpay', '/api/webhooks/stripe', '/signup'
 ];
 
 // @ts-ignore
