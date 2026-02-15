@@ -20,9 +20,40 @@ try {
 
 const { auth } = NextAuth(authConfig);
 
+// ✅ LISTE COMPLÈTE DES ROUTES PUBLIQUES (Basée sur vos dossiers)
 const PUBLIC_ROUTES = [
-  '/', '/pricing', '/search', '/properties', '/login', '/register', '/auth/error',
-  '/api/webhooks/cinetpay', '/api/webhooks/stripe', '/signup'
+  '/', 
+  '/login', 
+  '/register', 
+  '/signup', 
+  '/auth/error',
+  
+  // Pages Marketing & Landing
+  '/agency', 
+  '/owner', 
+  '/invest', 
+  '/demo-investor', 
+  '/akwaba', 
+  '/plaquette', 
+  
+  // Outils & Recherche
+  '/devis', 
+  '/search', 
+  '/properties', 
+  '/pricing',
+
+  // Juridique
+  '/privacy', 
+  '/terms', 
+  '/complaince', // Orthographe conservée selon votre dossier
+  
+  // Récupération de compte
+  '/forgot-password', 
+  '/reset-password',
+
+  // Webhooks (Toujours publics)
+  '/api/webhooks/cinetpay', 
+  '/api/webhooks/stripe'
 ];
 
 // @ts-ignore
@@ -36,8 +67,6 @@ export default auth(async (req) => {
   // ============================================================
   // 🚨 RETOUR DE LA REDIRECTION 301 OBLIGATOIRE
   // ============================================================
-  // On ne fait pas confiance à la config serveur seule.
-  // On force la redirection ici aussi.
   const host = req.headers.get("host");
   if (host && host.includes("immofacile-ci.vercel.app")) {
     const targetUrl = new URL(`https://www.immofacile.ci${path}`);
@@ -64,7 +93,13 @@ export default auth(async (req) => {
   }
 
   const isApiAuthRoute = path.startsWith('/api/auth');
-  const isPublicRoute = PUBLIC_ROUTES.some(route => path === route || path.startsWith('/api/webhooks'));
+
+  // ✅ LOGIQUE AMÉLIORÉE : Autorise la route exacte OU ses sous-dossiers
+  // Ex: '/properties' autorise aussi '/properties/maison-abidjan'
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    path === route || 
+    (route !== '/' && path.startsWith(`${route}/`))
+  );
 
   if (isApiAuthRoute || isPublicRoute) return NextResponse.next();
 
