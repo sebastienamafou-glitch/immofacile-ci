@@ -1,42 +1,47 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-
+import { auth } from "@/auth"; // ✅ SÉCURITÉ : On utilise la session réelle
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns"; // Assurez-vous d'avoir date-fns
+import { startOfMonth, endOfMonth, subMonths, addMonths, isValid } from "date-fns";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ
-    const userEmail = request.headers.get("x-user-email");
-    if (!userEmail) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    // 1. AUTHENTIFICATION ROBUSTE
+    const session = await auth();
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+    const userId = session.user.id; // C'est l'ID de l'hôte
 
-    const owner = await prisma.user.findUnique({
-      where: { email: userEmail },
-      select: { id: true }
-    });
-
-    if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
-
-    // 2. RECUPERATION DES PARAMÈTRES (Mois affiché)
+    // 2. GESTION DES DATES (Sécurisée)
     const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get('date'); // ex: "2024-02-01"
+    const dateParam = searchParams.get('date'); 
     
-    const viewDate = dateParam ? new Date(dateParam) : new Date();
+    let viewDate = new Date();
+    if (dateParam) {
+        const parsedDate = new Date(dateParam);
+        if (isValid(parsedDate)) {
+            viewDate = parsedDate;
+        }
+    }
     
-    // On prend une marge de sécurité (Mois d'avant et Mois d'après) pour gérer les événements à cheval
+    // Plage de 3 mois (Précédent, Courant, Suivant) pour le confort visuel
     const startRange = startOfMonth(subMonths(viewDate, 1));
     const endRange = endOfMonth(addMonths(viewDate, 1));
 
-    // 3. REQUÊTE UNIFIÉE
+    // 3. REQUÊTE PRISMA OPTIMISÉE
     const rawBookings = await prisma.booking.findMany({
       where: {
-        listing: { hostId: owner.id },
-        status: { in: ['CONFIRMED', 'PAID'] }, // Seuls les confirmés apparaissent
-        OR: [
-             // L'événement touche notre plage de dates
-            { startDate: { lte: endRange }, endDate: { gte: startRange } } 
+        listing: { hostId: userId }, // ✅ On filtre par l'ID de session
+        // On inclut les réservations bloquées (CONFIRMED) et payées (PAID)
+        // + CHECKED_IN et COMPLETED pour l'historique
+        status: { in: ['CONFIRMED', 'PAID', 'CHECKED_IN', 'COMPLETED'] }, 
+        
+        // Logique de chevauchement correcte
+        AND: [
+             { startDate: { lte: endRange } },
+             { endDate: { gte: startRange } }
         ]
       },
       select: {
@@ -44,16 +49,16 @@ export async function GET(request: Request) {
         startDate: true,
         endDate: true,
         guestId: true,
+        status: true, // Utile pour la couleur
         listing: { select: { title: true } },
         guest: { select: { name: true } }
       }
     });
 
-    // 4. TRANSFORMATION EN "EVENTS" POUR LE FRONT
+    // 4. TRANSFORMATION (Mapping)
     const events = rawBookings.map(b => {
-      // Détection : Est-ce un blocage ou un client ?
-      // Règle définie précédemment : Guest = Owner => Blocage
-      const isBlock = b.guestId === owner.id;
+      // Si l'invité est le propriétaire lui-même, c'est un BLOCAGE
+      const isBlock = b.guestId === userId;
 
       return {
         id: b.id,
@@ -62,7 +67,9 @@ export async function GET(request: Request) {
         start: b.startDate,
         end: b.endDate,
         type: isBlock ? 'BLOCK' : 'BOOKING',
-        color: isBlock ? 'red' : 'emerald' // Pour le front
+        status: b.status,
+        // Logique de couleur pour le frontend
+        color: isBlock ? 'red' : (b.status === 'CHECKED_IN' ? 'blue' : 'emerald') 
       };
     });
 

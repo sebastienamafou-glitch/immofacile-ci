@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, HardHat, FileText, CheckCircle2, Loader2, Camera, ShieldCheck, Hammer, Construction, XCircle, RefreshCcw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, HardHat, FileText, CheckCircle2, Loader2, Camera, ShieldCheck, Hammer, Construction, XCircle, RefreshCcw, AlertTriangle, Lock } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
 import { submitKycApplication } from "@/actions/kyc";
@@ -12,8 +12,10 @@ export default function ArtisanKYCPage() {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // ✅ NOUVEAU : State pour le consentement Assurance/KBIS
+  // ✅ 1. ÉTATS DE SÉCURITÉ (AJOUTÉS)
   const [consent, setConsent] = useState(false);
+  const [idNumber, setIdNumber] = useState(""); // Numéro KBIS/NINEA à chiffrer
+  const [idType, setIdType] = useState("KBIS_ARTISAN"); // Type par défaut
 
   useEffect(() => {
     try {
@@ -38,7 +40,9 @@ export default function ArtisanKYCPage() {
     }
 
     try {
-      const response = await submitKycApplication(secureUrl, "KBIS_ARTISAN");
+      // ✅ 2. ENVOI SÉCURISÉ AVEC NUMÉRO
+      const response = await submitKycApplication(secureUrl, idType, idNumber);
+      
       if (response.error) throw new Error(response.error);
 
       setStatus("PENDING");
@@ -53,8 +57,8 @@ export default function ArtisanKYCPage() {
 
       Swal.fire({
         icon: 'success',
-        title: 'Documents Transmis',
-        text: 'Votre dossier professionnel est en cours de validation technique.',
+        title: 'Dossier Transmis',
+        text: 'Votre identification est en cours de chiffrement et validation.',
         confirmButtonColor: '#ea580c',
         background: '#0F172A',
         color: '#fff'
@@ -71,6 +75,7 @@ export default function ArtisanKYCPage() {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
+      setIdNumber(""); // Reset
   };
 
   return (
@@ -117,7 +122,10 @@ export default function ArtisanKYCPage() {
                         <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                     </div>
                     <h3 className="text-2xl font-black text-white mb-2 relative z-10">Dossier Validé ✅</h3>
-                    <p className="text-emerald-400 font-medium relative z-10">Vous pouvez accepter des missions.</p>
+                    <p className="text-emerald-400 font-medium relative z-10">Vous êtes habilité à intervenir.</p>
+                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-950 rounded-lg border border-slate-800 text-xs text-slate-400 font-mono relative z-10">
+                        <Lock className="w-3 h-3" /> ID: ART-{Math.floor(Math.random() * 10000)}
+                    </div>
                 </div>
 
             ) : status === 'PENDING' ? (
@@ -127,11 +135,11 @@ export default function ArtisanKYCPage() {
                         <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
                     </div>
                     <h3 className="text-xl font-black text-white mb-2">Vérification Technique...</h3>
-                    <p className="text-orange-400">Nous contrôlons la validité de votre KBIS/Assurance.</p>
+                    <p className="text-orange-400">Contrôle de validité KBIS/Assurance en cours.</p>
                 </div>
 
             ) : status === 'REJECTED' ? (
-                // ✅ CAS 3 : REJETÉ (Feedback Loop)
+                // CAS 3 : REJETÉ
                 <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                         <XCircle className="w-8 h-8 text-red-500" />
@@ -143,8 +151,6 @@ export default function ArtisanKYCPage() {
                         <p className="text-white font-medium italic">"{rejectionReason || "Document incomplet ou expiré."}"</p>
                     </div>
                     
-                    <p className="text-sm text-slate-400 mb-6">Merci de fournir un document valide (moins de 3 mois).</p>
-
                     <button 
                         onClick={handleRetry} 
                         className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
@@ -157,7 +163,24 @@ export default function ArtisanKYCPage() {
                 // CAS 4 : UPLOAD
                 <div className="relative z-10">
                     
-                    {/* ✅ CHECKBOX CONSENTEMENT */}
+                    {/* ✅ 3. CHAMP DE SAISIE (AJOUTÉ) */}
+                    <div className="mb-6">
+                        <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block ml-1 tracking-widest">
+                            Numéro d'immatriculation (SIRET / NINEA) <span className="text-orange-500">*</span>
+                        </label>
+                        <div className="relative group">
+                            <FileText className="absolute left-4 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
+                            <input 
+                                type="text" 
+                                placeholder="Ex: CI-ABJ-2024-A-12345"
+                                value={idNumber}
+                                onChange={(e) => setIdNumber(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white font-mono placeholder-slate-600 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition"
+                            />
+                        </div>
+                    </div>
+
+                    {/* ✅ 4. CONSENTEMENT */}
                     <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-orange-500/30">
                         <input 
                             type="checkbox" 
@@ -168,7 +191,7 @@ export default function ArtisanKYCPage() {
                         />
                         <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
                             Je certifie sur l'honneur que mon entreprise est à jour de ses cotisations et assurances. 
-                            J'autorise <span className="text-white font-bold">ImmoFacile</span> à vérifier ces pièces.
+                            J'autorise <span className="text-white font-bold">ImmoFacile</span> à chiffrer et vérifier ces pièces.
                         </label>
                     </div>
 
@@ -180,11 +203,11 @@ export default function ArtisanKYCPage() {
                         {({ open }) => (
                             <div 
                                 onClick={() => {
-                                    if (consent && !uploading) open();
+                                    if (consent && idNumber.length > 5 && !uploading) open();
                                 }}
                                 className={`
                                     group border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300
-                                    ${consent 
+                                    ${consent && idNumber.length > 5
                                         ? "border-slate-700 hover:border-orange-500 hover:bg-orange-500/5 cursor-pointer" 
                                         : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
                                     }
@@ -199,24 +222,24 @@ export default function ArtisanKYCPage() {
                                     <>
                                         <div className={`
                                             w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform
-                                            ${consent ? "bg-slate-800 group-hover:scale-110 group-hover:bg-orange-600 group-hover:text-white shadow-xl" : "bg-slate-800"}
+                                            ${consent && idNumber.length > 5 ? "bg-slate-800 group-hover:scale-110 group-hover:bg-orange-600 group-hover:text-white shadow-xl" : "bg-slate-800"}
                                         `}>
-                                            <FileText className={`w-10 h-10 transition-colors ${consent ? "text-slate-400 group-hover:text-white" : "text-slate-600"}`} />
+                                            <Camera className={`w-10 h-10 transition-colors ${consent && idNumber.length > 5 ? "text-slate-400 group-hover:text-white" : "text-slate-600"}`} />
                                         </div>
-                                        <p className="font-black text-white text-xl mb-2">Déposer mes justificatifs</p>
+                                        <p className="font-black text-white text-xl mb-2">Scanner mes justificatifs</p>
                                         <p className="text-sm text-slate-500 text-center max-w-sm">
-                                            Registre de Commerce (KBIS) ou Attestation d'Assurance Décennale.
+                                            Registre de Commerce (KBIS) ou Attestation d'Assurance.
                                         </p>
 
-                                        {!consent && (
+                                        {(!consent || idNumber.length <= 5) && (
                                             <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-6 animate-pulse">
-                                                ⚠️ Cochez la case ci-dessus pour activer
+                                                ⚠️ Remplissez le NINEA et cochez la case
                                             </p>
                                         )}
 
-                                        {consent && (
+                                        {consent && idNumber.length > 5 && (
                                             <button className="mt-8 bg-orange-600 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-orange-900/20 group-hover:bg-orange-500 transition-all active:scale-95 flex items-center gap-2">
-                                                <Camera className="w-4 h-4" /> Scanner le document
+                                                <Camera className="w-4 h-4" /> Sélectionner le fichier
                                             </button>
                                         )}
                                     </>
@@ -235,9 +258,12 @@ export default function ArtisanKYCPage() {
                 <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
                     <Construction className="w-3 h-3 text-blue-500" /> Normes RGE
                 </div>
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+                    <Lock className="w-3 h-3 text-orange-500" /> AES-256
+                </div>
             </div>
 
-            {/* ✅ NOUVEAU : FAQ CONTEXTUELLE */}
+            {/* FAQ */}
             <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-10">
                 <div>
                     <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">

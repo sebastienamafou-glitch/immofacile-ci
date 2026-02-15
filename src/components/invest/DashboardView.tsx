@@ -172,7 +172,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Solde Wallet</p>
                     </div>
                     <p className="text-2xl font-black text-white">
-                        {user.walletBalance.toLocaleString('fr-FR')} <span className="text-sm font-medium text-slate-500">FCFA</span>
+                        {(user.walletBalance || 0).toLocaleString('fr-FR')} <span className="text-sm font-medium text-slate-500">FCFA</span>
                     </p>
                 </div>
 

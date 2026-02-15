@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+// ✅ IMPORT DU CLIENT UUID
+import { v4 as uuidv4 } from 'uuid'; 
+import { api } from "@/lib/api"; // Assurez-vous que c'est votre client axios configuré
 import { toast } from "sonner";
 import { 
   X, Wallet, ArrowRight, Loader2, Smartphone, ShieldCheck, AlertCircle 
@@ -11,10 +13,9 @@ interface WithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   userBalance: number;
-  onSuccess: () => void; // Callback pour rafraîchir le dashboard après succès
+  onSuccess: () => void; 
 }
 
-// Configuration des opérateurs (Scalable)
 const PROVIDERS = [
   { 
     id: 'WAVE', 
@@ -48,10 +49,8 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
   const [provider, setProvider] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  // Si fermé, on ne rend rien (Clean DOM)
   if (!isOpen) return null;
 
-  // Calcul du solde restant en temps réel pour l'UX
   const numericAmount = Number(amount) || 0;
   const isOverBalance = numericAmount > userBalance;
   const remainingBalance = userBalance - numericAmount;
@@ -69,7 +68,7 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
         return;
     }
     if (!provider) {
-        toast.error("Veuillez sélectionner un opérateur (Wave, Orange, MTN).");
+        toast.error("Veuillez sélectionner un opérateur.");
         return;
     }
     if (!phone || phone.length < 10) {
@@ -80,29 +79,39 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
     setLoading(true);
 
     try {
-        const res = await api.post('/invest/withdraw', {
+        // ✅ GÉNÉRATION CLÉ UNIQUE (Idempotence)
+        const idempotencyKey = uuidv4();
+
+        const res = await api.post('/invest/withdraw', { // Route API Backend
             amount: numericAmount,
             provider,
-            phone
+            phone,
+            idempotencyKey // ✅ Indispensable pour votre Backend
         });
 
         if (res.data.success) {
-            toast.success("Retrait initié avec succès !", {
-                description: "Les fonds seront transférés après validation réseau."
+            toast.success("Retrait validé !", {
+                description: `Nouveau solde : ${res.data.balance.toLocaleString()} FCFA`
             });
-            onSuccess(); // Refresh parent
-            onClose();   // Close modal
+            onSuccess(); // Refresh dashboard
+            onClose();   // Fermer modal
         }
     } catch (error: any) {
         console.error("Erreur retrait:", error);
-        const msg = error.response?.data?.error || "Erreur technique lors du retrait.";
-        toast.error("Échec du retrait", { description: msg });
+        
+        // Gestion fine des erreurs Backend
+        const msg = error.response?.data?.error || "Erreur technique.";
+        
+        if (msg.includes("Solde")) toast.error("Fonds insuffisants.");
+        else if (msg.includes("KYC")) toast.error("Vérification d'identité requise.");
+        else if (msg.includes("Transaction")) toast.error("Doublon détecté, veuillez patienter.");
+        else toast.error("Échec du retrait", { description: msg });
+        
     } finally {
         setLoading(false);
     }
   };
 
-  // Helper de formatage
   const formatMoney = (val: number) => new Intl.NumberFormat('fr-FR').format(val);
 
   return (
@@ -177,7 +186,7 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                             type="number" 
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
-                            placeholder="Ex: 50000"
+                            placeholder="Min 1000"
                             className="w-full bg-[#020617] border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:border-[#F59E0B] focus:ring-1 focus:ring-[#F59E0B] outline-none transition"
                         />
                         <span className="absolute right-4 top-3.5 text-xs font-bold text-slate-500">FCFA</span>
@@ -196,7 +205,7 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                 </div>
             </div>
 
-            {/* 4. RÉCAPITULATIF & ACTION */}
+            {/* 4. ACTION */}
             <div className="pt-2">
                 <div className="flex justify-between items-center text-xs text-slate-500 mb-4 px-1">
                     <span>Nouveau solde estimé :</span>

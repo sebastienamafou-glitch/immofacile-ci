@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ : Session Serveur (v5)
+    // 1. SÉCURITÉ
     const session = await auth();
     const userId = session?.user?.id;
 
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RECUPERER LES RÉSERVATIONS (Côté Host)
-    // On cherche les bookings dont le listing appartient au userId
+    // 2. RECUPERER LES RÉSERVATIONS
     const bookings = await prisma.booking.findMany({
       where: {
         listing: {
-          hostId: userId // 🔒 Verrouillage par ID session
+          hostId: userId 
         }
       },
       orderBy: {
@@ -30,7 +29,6 @@ export async function GET(request: Request) {
             email: true,
             image: true,
             phone: true,
-            // ✅ CORRECTION SCHEMA : On passe par la relation kyc
             kyc: {
                 select: { status: true }
             }
@@ -47,29 +45,35 @@ export async function GET(request: Request) {
         payment: {
             select: {
                 status: true,
-                hostPayout: true, // MONTANT NET
-                amount: true // MONTANT BRUT
+                hostPayout: true,
+                amount: true
             }
         }
       }
     });
 
-    // 3. REMAPPING & STATS
-    // On doit aplatir l'objet pour le frontend qui attend kycStatus à plat
+    // 3. REMAPPING
     const formattedBookings = bookings.map(b => ({
         ...b,
         guest: {
             ...b.guest,
-            kycStatus: b.guest.kyc?.status || "PENDING", // Mapping intelligent
-            kyc: undefined // On nettoie
+            kycStatus: b.guest.kyc?.status || "PENDING",
+            kyc: undefined
         }
     }));
 
+    // Définition des statuts "Payés"
+    const PAID_STATUSES = ['PAID', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED'];
+
     const stats = {
-        upcoming: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) > new Date()).length,
-        active: bookings.filter(b => ['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.startDate) <= new Date() && new Date(b.endDate) >= new Date()).length,
-        completed: bookings.filter(b => b.status === 'COMPLETED' || (['CONFIRMED', 'PAID'].includes(b.status) && new Date(b.endDate) < new Date())).length,
-        revenue: bookings.reduce((acc, b) => acc + (b.payment?.hostPayout || 0), 0)
+        upcoming: bookings.filter(b => PAID_STATUSES.includes(b.status) && new Date(b.startDate) > new Date()).length,
+        active: bookings.filter(b => PAID_STATUSES.includes(b.status) && new Date(b.startDate) <= new Date() && new Date(b.endDate) >= new Date()).length,
+        completed: bookings.filter(b => b.status === 'COMPLETED' || (PAID_STATUSES.includes(b.status) && new Date(b.endDate) < new Date())).length,
+        
+        // ✅ CORRECTION ICI : On ne compte l'argent que si la réservation est payée
+        revenue: bookings
+            .filter(b => PAID_STATUSES.includes(b.status)) 
+            .reduce((acc, b) => acc + (b.payment?.hostPayout || 0), 0)
     };
 
     return NextResponse.json({ success: true, bookings: formattedBookings, stats });

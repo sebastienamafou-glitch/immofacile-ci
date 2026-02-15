@@ -1,38 +1,32 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-// 1. GET - Récupérer une annonce spécifique
+// ==========================================
+// 1. GET - RÉCUPÉRER UNE ANNONCE SPÉCIFIQUE
+// ==========================================
 export async function GET(
   request: Request,
   { params }: { params: { listingId: string } }
 ) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
-    // 2. RÉCUPÉRATION SÉCURISÉE
     const listing = await prisma.listing.findUnique({
       where: {
         id: params.listingId,
-        hostId: userId // 🔒 Verrouillage par ID
+        hostId: userId 
       },
       include: {
-        _count: {
-            select: { bookings: true }
-        }
+        _count: { select: { bookings: true } }
       }
     });
 
-    if (!listing) {
-      return NextResponse.json({ error: "Annonce introuvable." }, { status: 404 });
-    }
+    if (!listing) return NextResponse.json({ error: "Annonce introuvable." }, { status: 404 });
 
     return NextResponse.json(listing);
 
@@ -42,44 +36,46 @@ const userId = session.user.id;
   }
 }
 
-// 2. PUT - Mettre à jour l'annonce
+// ==========================================
+// 2. PUT - METTRE À JOUR L'ANNONCE
+// ==========================================
 export async function PUT(
   request: Request,
   { params }: { params: { listingId: string } }
 ) {
   try {
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
+
+    const body = await request.json();
 
     // Vérification Existence + Propriété
     const existingListing = await prisma.listing.findUnique({
       where: { id: params.listingId, hostId: userId }
     });
 
-    if (!existingListing) {
-      return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+    if (!existingListing) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+
+    // Validation du prix
+    let cleanPrice = undefined;
+    if (body.pricePerNight !== undefined) {
+        cleanPrice = Number(body.pricePerNight);
+        if (isNaN(cleanPrice) || cleanPrice < 0) return NextResponse.json({ error: "Prix invalide" }, { status: 400 });
     }
 
-    const body = await request.json();
-
-    // Mise à jour
     const updatedListing = await prisma.listing.update({
       where: { id: params.listingId },
       data: {
         title: body.title,
         description: body.description,
-        pricePerNight: body.pricePerNight ? Number(body.pricePerNight) : undefined,
-        
+        pricePerNight: cleanPrice,
         address: body.address,
         city: body.city,
         neighborhood: body.neighborhood,
-        
         images: body.images, 
         amenities: body.amenities, 
-        
-        isPublished: body.isPublished !== undefined ? body.isPublished : undefined
+        isPublished: body.isPublished
       }
     });
 
@@ -91,49 +87,42 @@ const userId = session.user.id;
   }
 }
 
-// 3. DELETE - Supprimer
+// ==========================================
+// 3. DELETE - SUPPRESSION SÉCURISÉE
+// ==========================================
 export async function DELETE(
   request: Request,
   { params }: { params: { listingId: string } }
 ) {
   try {
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
-    // 1. Vérif Owner
     const listing = await prisma.listing.findUnique({
-      where: { id: params.listingId, hostId: userId }
+      where: { id: params.listingId, hostId: userId },
+      include: { _count: { select: { bookings: true } } }
     });
 
-    if (!listing) {
-      return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+    if (!listing) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+
+    // SÉCURITÉ AUDIT : On ne supprime pas si un historique de réservation existe
+    // On préfère désactiver l'annonce pour garder la trace financière
+    if (listing._count.bookings > 0) {
+        await prisma.listing.update({
+            where: { id: params.listingId },
+            data: { isPublished: false } // "Soft Delete"
+        });
+        return NextResponse.json({ 
+            success: true, 
+            message: "L'annonce a été retirée du marché car elle possède un historique de réservations." 
+        });
     }
 
-    // 2. SÉCURITÉ : Vérifier réservations futures
-    const activeBookingsCount = await prisma.booking.count({
-      where: {
-        listingId: params.listingId,
-        status: { in: ['CONFIRMED', 'PAID'] },
-        endDate: { gte: new Date() }
-      }
-    });
+    // Si vraiment aucune réservation n'a jamais eu lieu, on supprime
+    await prisma.listing.delete({ where: { id: params.listingId } });
 
-    if (activeBookingsCount > 0) {
-      return NextResponse.json({ 
-        error: `Impossible de supprimer : ${activeBookingsCount} réservation(s) active(s).` 
-      }, { status: 400 });
-    }
-
-    // 3. Suppression en cascade manuelle (Cleaner)
-    await prisma.$transaction([
-        prisma.booking.deleteMany({ where: { listingId: params.listingId } }),
-        prisma.review.deleteMany({ where: { listingId: params.listingId } }),
-        prisma.listing.delete({ where: { id: params.listingId } })
-    ]);
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Annonce supprimée définitivement." });
 
   } catch (error) {
     console.error("Erreur DELETE Listing:", error);

@@ -3,20 +3,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
-// ✅ Type de données généré automatiquement par Prisma
-// Si tu changes ton schema.prisma, ce type se mettra à jour ou signalera une erreur ici.
+// ✅ Type de données enrichi pour inclure les signatures et métadonnées
 type LeaseWithDetails = Prisma.LeaseGetPayload<{
   include: {
     property: {
-      include: { owner: true } // On récupère le propriétaire via la propriété
+      include: { owner: true }
     };
-    tenant: true;             // On récupère le locataire
-    signatures: true;         // On récupère les preuves de signature
+    tenant: true;
+    signatures: true; // Indispensable pour l'IP et le Hash
   }
 }>;
 
-// Version standalone pour compatibilité Edge/Serverless (Vercel)
-// On utilise require ici car l'import ES6 de pdfkit peut poser problème en serverless
+// Version standalone pour compatibilité Vercel / Edge
 const PDFDocument = require("pdfkit/js/pdfkit.standalone");
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +30,7 @@ export async function GET(
 
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 1. Récupération typée
+    // 1. Récupération des données
     const lease = await prisma.lease.findUnique({
       where: { id },
       include: {
@@ -44,52 +42,58 @@ export async function GET(
 
     if (!lease) return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
 
-    // 2. Vérification des droits (Sécurité)
+    // 2. Sécurité : Vérification des droits d'accès
     const isOwner = lease.property.owner.id === userId;
     const isTenant = lease.tenant.id === userId;
+    // On autorise aussi les admins si nécessaire (à ajouter ici selon votre logique role)
     
-    // On autorise uniquement le propriétaire ou le locataire
     if (!isOwner && !isTenant) {
         return NextResponse.json({ error: "Accès refusé au document." }, { status: 403 });
     }
 
-    // 3. Génération du PDF
-    const pdfBuffer = await generateSinglePageLease(lease);
+    // 3. Génération du PDF "Bank-Grade"
+    const pdfBuffer = await generateFullLegalLease(lease);
 
-    // Nettoyage du titre pour le nom de fichier
     const safeTitle = (lease.property.title || "Bail").replace(/[^a-z0-9]/gi, '_').substring(0, 30);
     
     return new NextResponse(new Uint8Array(pdfBuffer), {
-  headers: {
-    "Content-Type": "application/pdf",
-    "Content-Disposition": `inline; filename="Bail_${safeTitle}.pdf"`,
-  },
-});
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="Bail_Conforme_${safeTitle}.pdf"`,
+      },
+    });
 
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error("Erreur Génération PDF:", error);
-    return NextResponse.json({ error: "Erreur serveur lors de la génération du bail" }, { status: 500 });
+    return NextResponse.json({ error: "Erreur serveur lors de la génération" }, { status: 500 });
   }
 }
 
-// --- UTILITAIRES DE FORMATAGE ---
+// --- UTILITAIRES ---
 const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('fr-CI', { style: 'decimal' }).format(amount).replace(/,/g, ' ');
 };
 
 const formatDate = (date: Date | string | null) => {
     if (!date) return "....................";
-    // Force UTC pour éviter les décalages horaires (ex: 23h le jour d'avant)
-    return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+    return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
-// --- MOTEUR PDF ---
-function generateSinglePageLease(lease: LeaseWithDetails): Promise<Buffer> {
+const formatDateTime = (date: Date | string | null) => {
+    if (!date) return "";
+    return new Date(date).toLocaleString('fr-FR', { 
+        day: 'numeric', month: '2-digit', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+    });
+};
+
+// --- MOTEUR DE GÉNÉRATION COMPLET ---
+function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     
-    const MARGIN = 30;
+    const MARGIN = 40; // Marge plus standard pour un contrat
     const doc = new PDFDocument({ 
-        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 20 }, 
+        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: MARGIN }, 
         size: 'A4',
         bufferPages: true 
     });
@@ -101,158 +105,154 @@ function generateSinglePageLease(lease: LeaseWithDetails): Promise<Buffer> {
 
     const width = doc.page.width - (MARGIN * 2);
     
-    const COLORS = {
-        title: '#0F172A',     // Slate-900
-        subtitle: '#64748B',  // Slate-500
-        boxBg: '#F8FAFC',     // Slate-50
-        boxBorder: '#E2E8F0', // Slate-200
-        accent: '#EA580C'     // Orange-600
-    };
-
-    // --- EN-TÊTE ---
-    doc.font('Times-Bold').fontSize(16).fillColor(COLORS.title)
-       .text("CONTRAT DE BAIL À USAGE D'HABITATION", { align: 'center' });
+    // --- EN-TÊTE JURIDIQUE ---
+    doc.font('Times-Bold').fontSize(16).text("CONTRAT DE BAIL À USAGE D'HABITATION", { align: 'center' });
+    doc.moveDown(0.5);
+    doc.font('Times-Italic').fontSize(10).text("Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.", { align: 'center' });
     
     doc.moveDown(0.5);
-
-    doc.font('Times-Italic').fontSize(9).fillColor(COLORS.subtitle)
-       .text("Régis par la Loi n° 2019-576 du 26 juin 2019 (Code de la Construction)", { align: 'center' });
-    
-    doc.moveDown(0.5);
-    
-    const currentY = doc.y;
-    doc.moveTo(MARGIN, currentY).lineTo(doc.page.width - MARGIN, currentY).lineWidth(1).strokeColor(COLORS.title).stroke();
-    
+    const yLine = doc.y;
+    doc.moveTo(MARGIN, yLine).lineTo(doc.page.width - MARGIN, yLine).stroke();
     doc.moveDown(1);
 
-    // --- LES PARTIES ---
-    const startY = doc.y;
-    const boxWidth = (width / 2) - 10;
-    const boxHeight = 65;
-    const rightBoxX = MARGIN + boxWidth + 20;
+    // --- IDENTIFICATION DES PARTIES ---
+    doc.font('Times-Bold').fontSize(11).text("ENTRE LES SOUSSIGNÉS :", { underline: true });
+    doc.moveDown(0.5);
 
-    const drawPartyBox = (x: number, title: string, name: string | null, phone: string | null, email: string | null) => {
-        doc.roundedRect(x, startY, boxWidth, boxHeight, 4).fillColor(COLORS.boxBg).fill();
-        doc.roundedRect(x, startY, boxWidth, boxHeight, 4).lineWidth(0.5).strokeColor(COLORS.boxBorder).stroke();
-        
-        const pad = 10;
-        let textY = startY + pad;
-        
-        doc.font('Times-Bold').fontSize(7).fillColor(COLORS.subtitle).text(title, x + pad, textY);
-        
-        textY += 10;
-        // Gestion des valeurs nulles (conformité schéma User)
-        const safeName = (name ?? "Non renseigné").toUpperCase().substring(0, 30);
-        doc.font('Times-Bold').fontSize(10).fillColor(COLORS.title).text(safeName, x + pad, textY);
-        
-        textY += 14;
-        doc.font('Times-Roman').fontSize(8).fillColor('#334155')
-           .text(`Tél: ${phone ?? "Non renseigné"}`, x + pad, textY);
-        
-        textY += 10;
-        doc.text(`Email: ${email ?? "Non renseigné"}`, x + pad, textY);
-    };
+    // BAILLEUR
+    doc.font('Times-Bold').text("LE BAILLEUR : ", { continued: true }).font('Times-Roman').text(lease.property.owner.name?.toUpperCase() || "NON RENSEIGNÉ");
+    doc.text(`Contact: ${lease.property.owner.email || "Non renseigné"} / Tél: ${lease.property.owner.phone || "Non renseigné"}`);
+    doc.font('Times-Italic').text("Ci-après dénommé \"Le Bailleur\".");
+    
+    doc.moveDown(0.5);
 
-    // Appel avec les données typées du schéma
-    drawPartyBox(MARGIN, "LE BAILLEUR", lease.property.owner.name, lease.property.owner.phone, lease.property.owner.email);
-    drawPartyBox(rightBoxX, "LE PRENEUR", lease.tenant.name, lease.tenant.phone, lease.tenant.email);
+    // PRENEUR
+    doc.font('Times-Bold').text("LE PRENEUR : ", { continued: true }).font('Times-Roman').text(lease.tenant.name?.toUpperCase() || "NON RENSEIGNÉ");
+    doc.text(`Contact: ${lease.tenant.email || "Non renseigné"} / Tél: ${lease.tenant.phone || "Non renseigné"}`);
+    doc.font('Times-Italic').text("Ci-après dénommé \"Le Preneur\".");
 
-    doc.y = startY + boxHeight + 20;
+    doc.moveDown(1);
+    doc.font('Times-Bold').text("IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :", { align: 'center' });
+    doc.moveDown(1);
 
-    // --- ARTICLES ---
-    const drawArticle = (title: string, content: string) => {
-        doc.font('Times-Bold').fontSize(9).fillColor('#000000').text(title);
-        doc.moveDown(0.3);
-        doc.font('Times-Roman').fontSize(9).fillColor('#333333').text(content, { align: 'justify', width: width });
+    // --- FONCTION D'ÉCRITURE DES ARTICLES ---
+    const writeArticle = (num: number, title: string, content: string) => {
+        doc.font('Times-Bold').fontSize(10).text(`ARTICLE ${num}: ${title}`);
+        doc.font('Times-Roman').fontSize(10).text(content, { align: 'justify' });
         doc.moveDown(0.8);
     };
 
-    drawArticle("1. OBJET ET DÉSIGNATION", 
-        `Le Bailleur donne en location au Preneur les locaux sis à : ${lease.property.address}, ${lease.property.commune}. Le bien est accepté en l'état.`
+    // --- CORPS DU CONTRAT (12 Articles Conformes au PDF) ---
+
+    writeArticle(1, "DÉSIGNATION DES LIEUX", 
+        `Le Bailleur donne en location au Preneur, qui accepte, les locaux situés à : ${lease.property.address}, ${lease.property.commune}. \n` +
+        `Le bien comprend : ${lease.property.bedrooms} chambre(s), ${lease.property.bathrooms} salle(s) d'eau. \n` +
+        `Le Preneur déclare prendre les lieux dans l'état où ils se trouvent lors de l'entrée en jouissance.`
     );
 
-    drawArticle("2. DURÉE DU CONTRAT", 
-        `Le bail est consenti pour une durée d'un (1) an ferme commençant le ${formatDate(lease.startDate)}, renouvelable par tacite reconduction. Le préavis de départ est fixé à trois (3) mois.`
+    writeArticle(2, "DURÉE DU BAIL", 
+        `Le bail est conclu pour une durée de UN (1) AN à compter du ${formatDate(lease.startDate)}. ` +
+        `Il se renouvellera par tacite reconduction pour la même durée, sauf dénonciation par l'une des parties par acte extrajudiciaire ou lettre recommandée avec accusé de réception, moyennant un préavis de trois (3) mois.`
     );
 
-    // Cadre Financier
-    doc.font('Times-Bold').fontSize(9).fillColor('#000000').text("3. CONDITIONS FINANCIÈRES");
-    doc.moveDown(0.3);
-    
-    const financeY = doc.y;
-    doc.rect(MARGIN, financeY, width, 30).fillColor('#F1F5F9').fill();
-    
-    const textFinanceY = financeY + 10;
-    doc.font('Times-Bold').fontSize(9).fillColor('#000000');
-    // Utilisation des champs Int du schema Lease (monthlyRent, depositAmount)
-    doc.text(`LOYER MENSUEL : ${formatMoney(lease.monthlyRent)} FCFA`, MARGIN + 10, textFinanceY, { continued: true });
-    doc.text(`        CAUTION : ${formatMoney(lease.depositAmount)} FCFA`, { continued: false });
-
-    doc.y = financeY + 45;
-
-    drawArticle("4. OBLIGATIONS ET ENTRETIEN", 
-        `Le Preneur s'oblige à user des lieux en "bon père de famille". Il prend à sa charge l'entretien courant et les menues réparations locatives.`
+    writeArticle(3, "LOYER ET DÉPÔT DE GARANTIE", 
+        `Loyer mensuel : ${formatMoney(lease.monthlyRent)} FCFA payable d'avance.\n` +
+        `Dépôt de garantie : ${formatMoney(lease.depositAmount)} FCFA. Cette somme ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restituée au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.`
     );
 
-    drawArticle("5. CLAUSE RÉSOLUTOIRE", 
-        `À défaut de paiement d'un seul terme de loyer à son échéance, le présent bail sera résilié de plein droit un mois après un commandement de payer resté infructueux.`
+    writeArticle(4, "PAIEMENT ET PÉNALITÉS", 
+        `Le loyer est exigible le 05 de chaque mois. Tout retard de paiement au-delà du 10 du mois entraînera de plein droit l'application d'une pénalité de 10% sur le montant dû, sans préjudice de l'action en résiliation.`
     );
 
-    // --- SIGNATURES ---
-    doc.moveDown(1.5);
-    const sigLineY = doc.y;
-    doc.moveTo(MARGIN, sigLineY).lineTo(doc.page.width - MARGIN, sigLineY).lineWidth(0.5).strokeColor('#CBD5E1').stroke();
-    
+    writeArticle(5, "OBLIGATIONS DU PRENEUR", 
+        `Le Preneur s'oblige à : 1) Payer le loyer aux termes convenus. 2) User paisiblement des locaux suivant la destination bourgeoise prévue. 3) Entretenir les lieux en bon état de réparations locatives (plomberie, électricité, serrures, vitres). 4) Ne pas troubler la jouissance paisible des voisins.`
+    );
+
+    writeArticle(6, "OBLIGATIONS DU BAILLEUR", 
+        `Le Bailleur est tenu de : 1) Délivrer au Preneur le logement en bon état d'usage et de réparation. 2) Assurer au Preneur la jouissance paisible du logement. 3) Entretenir les locaux en état de servir à l'usage prévu par le contrat (grosses réparations, clos et couvert).`
+    );
+
+    writeArticle(7, "TRAVAUX ET TRANSFORMATIONS", 
+        `Le Preneur ne pourra faire aucuns travaux de transformation ou de perçage de gros œuvre sans l'accord écrit et préalable du Bailleur. À défaut d'accord, le Bailleur pourra exiger la remise en état des lieux aux frais du Preneur lors de son départ.`
+    );
+
+    writeArticle(8, "CESSION ET SOUS-LOCATION", 
+        `Toute cession de bail ou sous-location, même partielle ou temporaire, est strictement interdite sans l'accord écrit du Bailleur. En cas de non-respect, le bail sera résilié immédiatement de plein droit.`
+    );
+
+    writeArticle(9, "DROIT DE VISITE", 
+        `Le Bailleur ou son représentant pourra visiter les lieux pour vérifier leur état d'entretien, sur rendez-vous pris 48h à l'avance. En cas de mise en vente ou de relocation, le Preneur devra laisser visiter les lieux deux heures par jour les jours ouvrables.`
+    );
+
+    writeArticle(10, "CLAUSE RÉSOLUTOIRE", 
+        `À défaut de paiement d'un seul terme de loyer à son échéance ou d'inexécution d'une seule des conditions du bail, et un mois après un commandement de payer ou une mise en demeure resté infructueux, le bail sera résilié de plein droit si bon semble au Bailleur.`
+    );
+
+    writeArticle(11, "ÉTAT DES LIEUX", 
+        `Un état des lieux contradictoire sera établi lors de la remise des clés et lors de leur restitution. À défaut d'état des lieux de sortie, le Preneur sera présumé avoir reçu les lieux en bon état de réparations locatives.`
+    );
+
+    writeArticle(12, "ÉLECTION DE DOMICILE ET LITIGES", 
+        `Pour l'exécution des présentes, les parties font élection de domicile en leurs demeures respectives. En cas de litige, compétence est attribuée aux tribunaux du lieu de situation de l'immeuble.`
+    );
+
     doc.moveDown(1);
-    doc.font('Times-Italic').fontSize(9).fillColor('#000000')
-       .text(`Fait à Abidjan, en deux exemplaires originaux, le ${formatDate(new Date())}.`, { align: 'right' });
 
-    doc.moveDown(1);
-    const sigBoxY = doc.y;
+    // --- ZONE DE SIGNATURE SÉCURISÉE ---
+    
+    // On s'assure qu'on ne coupe pas la zone de signature
+    if (doc.y > doc.page.height - 150) doc.addPage();
 
-    doc.font('Times-Bold').fontSize(8).fillColor(COLORS.subtitle)
-       .text("POUR LE BAILLEUR", MARGIN, sigBoxY)
-       .text("POUR LE PRENEUR", rightBoxX, sigBoxY);
+    const signY = doc.y;
+    
+    // Titres
+    doc.font('Times-Bold').fontSize(10).text("LE BAILLEUR", MARGIN, signY);
+    doc.text("LE PRENEUR (LU ET APPROUVÉ)", 300, signY);
 
-    const drawStamp = (x: number, y: number, name: string | null, isDigital: boolean, date?: Date) => {
-        const stampY = y + 15;
-        doc.roundedRect(x, stampY, boxWidth, 50, 4).lineWidth(1)
-           .strokeColor(isDigital ? COLORS.accent : '#CBD5E1').dash(isDigital ? 0 : 3, { space: 3 }).stroke();
-        doc.undash();
+    // Recherche de la preuve de signature
+    // On suppose ici que la dernière signature est la bonne ou on cherche celle du locataire
+    const tenantSignature = lease.signatures.find(s => s.signerId === lease.tenant.id) || lease.signatures[0];
+    const isSigned = !!tenantSignature;
 
-        if (isDigital) {
-            doc.font('Times-Bold').fontSize(10).fillColor(COLORS.accent)
-               .text("SIGNE NUMERIQUEMENT", x, stampY + 15, { width: boxWidth, align: 'center' });
-            
-            doc.font('Times-Roman').fontSize(7).fillColor('#000000')
-               .text(`Par : ${(name ?? "Inconnu").toUpperCase()}`, x, stampY + 30, { width: boxWidth, align: 'center' });
-            
-            if (date) {
-               doc.text(`${formatDate(date)}`, x, stampY + 38, { width: boxWidth, align: 'center' });
-            }
-        } else {
-             doc.font('Times-Italic').fontSize(8).fillColor('#94A3B8')
-               .text("(En attente de signature)", x, stampY + 20, { width: boxWidth, align: 'center' });
-        }
-    };
+    // Dessin du cadre de signature "PRENEUR"
+    const boxX = 300;
+    const boxY = signY + 15;
+    const boxW = 200;
+    const boxH = 80;
 
-    // Vérification des statuts basée sur l'Enum du schéma (SignatureStatus)
-    const isOwnerSigned = lease.signatureStatus === 'SIGNED_OWNER' || lease.signatureStatus === 'COMPLETED';
-    const isTenantSigned = lease.signatureStatus === 'SIGNED_TENANT' || lease.signatureStatus === 'COMPLETED';
-    const sigData = lease.signatures?.[0];
+    doc.rect(boxX, boxY, boxW, boxH).strokeColor(isSigned ? '#16A34A' : '#CBD5E1').lineWidth(1).stroke(); // Vert si signé, Gris sinon
 
-    drawStamp(MARGIN, sigBoxY, lease.property.owner.name, isOwnerSigned);
-    drawStamp(rightBoxX, sigBoxY, lease.tenant.name, isTenantSigned, sigData?.signedAt);
+    if (isSigned) {
+        // --- AFFICHAGE DES MÉTADONNÉES DE SÉCURITÉ (Comme le PDF) ---
+        const textX = boxX + 10;
+        let textY = boxY + 10;
 
-    // --- FOOTER ---
-    const bottomPage = doc.page.height - 30;
-    doc.fontSize(7).fillColor('#94A3B8').font('Times-Roman')
-       .text(
-           `Document généré par ImmoFacile.CI - Ref: ${lease.id} - Ce document vaut titre exécutoire.`, 
-           MARGIN, 
-           bottomPage, 
-           { align: 'center', width }
-       );
+        doc.fillColor('#16A34A').font('Times-Bold').fontSize(10).text("SIGNÉ ÉLECTRONIQUEMENT", textX, textY);
+        textY += 15;
+        
+        doc.fillColor('#000000').font('Times-Roman').fontSize(8);
+        doc.text(`Signataire : ${lease.tenant.name?.toUpperCase()}`, textX, textY);
+        textY += 10;
+        doc.text(`Date : ${formatDateTime(tenantSignature.signedAt)}`, textX, textY);
+        textY += 10;
+        doc.text(`IP : ${tenantSignature.ipAddress}`, textX, textY);
+        textY += 10;
+        // User Agent tronqué pour faire "Drone Th..." style ou propre
+        const device = tenantSignature.userAgent ? tenantSignature.userAgent.substring(0, 25) + "..." : "Device inconnu";
+        doc.text(`Device : ${device}`, textX, textY);
+    } else {
+        doc.fillColor('#94A3B8').font('Times-Italic').fontSize(9)
+           .text("(En attente de signature)", boxX, boxY + 35, { width: boxW, align: 'center' });
+    }
+
+    // Bas de page technique
+    const bottomY = doc.page.height - 40;
+    doc.fontSize(7).fillColor('#64748B').text(
+        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.documentHash || "En attente"} | Page 1/1`,
+        MARGIN,
+        bottomY,
+        { align: 'center', width }
+    );
 
     doc.end();
   });

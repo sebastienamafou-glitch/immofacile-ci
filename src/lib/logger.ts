@@ -21,7 +21,10 @@ type LogAction =
   | "LEASE_TERMINATED"
   | "RENT_PAYMENT"
   | "MAINTENANCE_REQUEST"
-  | "MAINTENANCE_RESOLVED";
+  | "MAINTENANCE_RESOLVED"
+  | "BOOKING_PAYMENT_SUCCESS";
+  
+
 
 interface LogOptions {
   action: LogAction;

@@ -191,8 +191,10 @@ function LoginForm() {
                 <p className="text-slate-400 text-sm">
                     Pas encore de compte ? <br/>
                     <Link
-                        href={`/signup${searchParams.get('callbackUrl') ? '?callbackUrl=' + searchParams.get('callbackUrl') : ''}`}
-                        className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group"
+                        href={searchParams.get('callbackUrl')
+                          ? `/signup?callbackUrl=${encodeURIComponent(searchParams.get('callbackUrl')!)}`
+                          : '/signup'}
+                        className="text-white font-bold hover:text-orange-500 transition inline-flex items-center gap-1 mt-1 group cursor-pointer relative z-20"
                     >
                         Créer un compte maintenant <ShieldCheck className="w-3 h-3 group-hover:text-orange-500" />
                     </Link>

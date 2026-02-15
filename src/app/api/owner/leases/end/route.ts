@@ -1,38 +1,37 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
+import { logActivity } from "@/lib/logger"; 
+import { sendNotification } from "@/lib/notifications"; 
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ : Session Serveur (v5)
+    // 1. SÉCURITÉ
     const session = await auth();
     const userId = session?.user?.id;
 
-    if (!userId) {
-        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await req.json();
     const { leaseId, deductionAmount, reason } = body;
 
-    if (!leaseId) {
-        return NextResponse.json({ error: "ID du bail requis" }, { status: 400 });
-    }
+    if (!leaseId) return NextResponse.json({ error: "ID du bail requis" }, { status: 400 });
 
-    // 2. TRANSACTION DE CLÔTURE
+    // Typage sécurisé (Schéma Prisma attend un Int/Float, pas un string)
+    const safeAmount = deductionAmount ? Number(deductionAmount) : 0;
+
+    // 2. TRANSACTION ATOMIQUE
     const result = await prisma.$transaction(async (tx) => {
         
         // A. Vérification (Lock)
         const lease = await tx.lease.findUnique({
             where: { id: leaseId },
-            include: { property: true }
+            include: { property: true } // On a besoin du ownerId pour vérifier
         });
 
         if (!lease) throw new Error("Bail introuvable");
         
-        // Vérif Propriétaire
+        // Vérif Propriétaire via la relation Property définie dans le schema
         if (lease.property.ownerId !== userId) {
             throw new Error("Vous n'êtes pas le propriétaire de ce bail.");
         }
@@ -41,35 +40,36 @@ export async function POST(req: Request) {
             throw new Error("Ce bail n'est pas actif.");
         }
 
-        // B. Mise à jour statut Bail
+        // B. Clôture du Bail
         const updatedLease = await tx.lease.update({
             where: { id: leaseId },
             data: {
-                // ✅ CORRECTION : On utilise le terme technique valide pour un contrat
                 status: "TERMINATED", 
                 isActive: false,
-                endDate: new Date() // On fige la date de fin réelle
+                endDate: new Date() 
+            },
+            // ✅ CORRECTION CRITIQUE ICI :
+            // On demande explicitement la relation 'property' pour avoir l'adresse plus bas
+            include: {
+                property: true
             }
         });
 
-        // C. Gestion des Retenues (Deductions)
-        if (deductionAmount && deductionAmount > 0) {
-            
-            // 1. Créditer le Propriétaire (Dans UserFinance)
+        // C. Gestion Financière
+        if (safeAmount > 0) {
             await tx.userFinance.upsert({
                 where: { userId: userId },
-                create: { userId: userId, walletBalance: deductionAmount, version: 1, kycTier: 1 },
+                create: { userId: userId, walletBalance: safeAmount, version: 1, kycTier: 1 },
                 update: {
-                    walletBalance: { increment: deductionAmount },
+                    walletBalance: { increment: safeAmount },
                     version: { increment: 1 }
                 }
             });
 
-            // 2. Créer la Transaction (Trace)
             await tx.transaction.create({
                 data: {
                     userId: userId,
-                    amount: deductionAmount,
+                    amount: safeAmount,
                     type: "CREDIT",
                     balanceType: "WALLET",
                     reason: reason || "Retenue sur caution",
@@ -79,10 +79,33 @@ export async function POST(req: Request) {
             });
         }
 
-        return updatedLease;
+        return { updatedLease, tenantId: lease.tenantId };
     });
 
-    return NextResponse.json({ success: true, lease: result });
+    // 3. ACTIONS POST-TRANSACTION
+    
+    // A. Notification au locataire
+    if (result.tenantId) {
+        await sendNotification({
+            userId: result.tenantId,
+            title: "Bail Terminé 🏠",
+            // ✅ MAINTENANT CA MARCHE : result.updatedLease.property existe grâce au include
+            message: `Votre bail pour "${result.updatedLease.property.address}" a été clôturé.`,
+            type: "INFO",
+            link: `/dashboard/tenant/contracts/${leaseId}`
+        });
+    }
+
+    // B. Audit Log
+    await logActivity({
+        action: "LEASE_TERMINATED",
+        entityId: leaseId,
+        entityType: "LEASE",
+        userId: userId,
+        metadata: { deduction: safeAmount, reason: reason }
+    });
+
+    return NextResponse.json({ success: true, lease: result.updatedLease });
 
   } catch (error: any) {
     console.error("Erreur End Lease:", error.message);

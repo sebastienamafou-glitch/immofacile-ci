@@ -241,6 +241,11 @@ model Property {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([commune])
+  @@index([price])
+  @@index([type])
+  @@index([commune, price]) // Pour les recherches type "Villas à moins de X millions"
 }
 
 // ==========================================
@@ -382,6 +387,10 @@ model Listing {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([city])
+  @@index([pricePerNight])
+  @@index([city, pricePerNight]) // Pour les recherches type "Studio à Abidjan à moins de 50k"
 }
 
 model Booking {
@@ -400,6 +409,8 @@ model Booking {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   guestCount Int           @default(1)
+
+  @@unique([listingId, startDate])
 }
 
 model Review {
@@ -682,7 +693,7 @@ model Notification {
 
 model AuditLog {
   id          String   @id @default(cuid())
-  action      String   // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
+  action      String?   // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
   entityId    String?  // L'ID de l'objet touché (ex: ID du Booking ou du User)
   entityType  String?  // Ex: "BOOKING", "USER", "PAYMENT"
   

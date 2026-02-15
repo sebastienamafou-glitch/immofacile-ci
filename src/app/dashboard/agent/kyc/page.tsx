@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, ShieldCheck, BadgeCheck, CheckCircle2, Loader2, Camera, Lock, Briefcase, FileCheck, XCircle, RefreshCcw, Clock } from "lucide-react";
+import { ArrowLeft, ShieldCheck, BadgeCheck, CheckCircle2, Loader2, Camera, Lock, Briefcase, FileCheck, XCircle, RefreshCcw, Clock, FileText } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
 import { submitKycApplication } from "@/actions/kyc";
@@ -12,8 +12,10 @@ export default function AgentKYCPage() {
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // ✅ NOUVEAU : State pour le consentement
+  // ✅ 1. ÉTATS DE SÉCURITÉ (AJOUTÉS)
   const [consent, setConsent] = useState(false);
+  const [idNumber, setIdNumber] = useState(""); // Le numéro à chiffrer
+  const [idType, setIdType] = useState("CARTE_PRO"); // Type fixe
 
   // Chargement du statut actuel
   useEffect(() => {
@@ -22,7 +24,6 @@ export default function AgentKYCPage() {
       if (storedUser) {
         const user = JSON.parse(storedUser);
         setStatus(user.kycStatus || "NONE");
-        // Récupération du motif de rejet
         if (user.kycRejectionReason) {
              setRejectionReason(user.kycRejectionReason);
         }
@@ -40,8 +41,9 @@ export default function AgentKYCPage() {
     }
 
     try {
-      // ✅ On précise "CARTE_PRO" comme type de document pour les agents
-      const response = await submitKycApplication(secureUrl, "CARTE_PRO");
+      // ✅ 2. ENVOI SÉCURISÉ (MODIFIÉ)
+      // On transmet le numéro pour qu'il soit chiffré par le serveur
+      const response = await submitKycApplication(secureUrl, idType, idNumber);
       
       if (response.error) throw new Error(response.error);
 
@@ -52,15 +54,15 @@ export default function AgentKYCPage() {
       if (storedUser) {
         const user = JSON.parse(storedUser);
         user.kycStatus = "PENDING";
-        user.kycRejectionReason = null; // Reset du motif
+        user.kycRejectionReason = null;
         localStorage.setItem('immouser', JSON.stringify(user));
       }
 
       Swal.fire({
         icon: 'success',
         title: 'Accréditation Transmise',
-        text: 'Votre dossier est en cours d\'analyse par la direction.',
-        confirmButtonColor: '#2563EB', // Bleu Agent
+        text: 'Votre dossier est en cours de chiffrement et d\'analyse.',
+        confirmButtonColor: '#2563EB',
         background: '#0F172A',
         color: '#fff'
       });
@@ -78,11 +80,11 @@ export default function AgentKYCPage() {
     }
   };
 
-  // Fonction pour réessayer après un refus
   const handleRetry = () => {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
+      setIdNumber(""); // Reset
   };
 
   return (
@@ -127,7 +129,7 @@ export default function AgentKYCPage() {
             {/* --- ÉTATS DU STATUT --- */}
             
             {status === 'VERIFIED' ? (
-                // CAS 1 : VÉRIFIÉ (SUCCÈS)
+                // CAS 1 : VÉRIFIÉ
                 <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-3xl p-10 text-center animate-in zoom-in duration-500">
                     <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <CheckCircle2 className="w-10 h-10 text-emerald-500" />
@@ -151,7 +153,7 @@ export default function AgentKYCPage() {
                 </div>
 
             ) : status === 'REJECTED' ? (
-                // ✅ CAS 3 : REJETÉ (Feedback Loop)
+                // CAS 3 : REJETÉ
                 <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                         <XCircle className="w-8 h-8 text-red-500" />
@@ -163,8 +165,6 @@ export default function AgentKYCPage() {
                         <p className="text-white font-medium italic">"{rejectionReason || "Document non conforme ou illisible."}"</p>
                     </div>
                     
-                    <p className="text-sm text-slate-400 mb-6">Vérifiez que votre carte professionnelle est à jour et lisible.</p>
-
                     <button 
                         onClick={handleRetry} 
                         className="bg-red-600 hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold transition flex items-center gap-2 mx-auto shadow-lg shadow-red-900/20 active:scale-95"
@@ -174,10 +174,27 @@ export default function AgentKYCPage() {
                 </div>
 
             ) : (
-                // CAS 4 : UPLOAD (DÉFAUT)
+                // CAS 4 : UPLOAD (FORMULAIRE)
                 <div className="relative z-10">
                     
-                    {/* ✅ CHECKBOX CONSENTEMENT */}
+                    {/* ✅ 3. CHAMP DE SAISIE (AJOUTÉ) */}
+                    <div className="mb-6">
+                        <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block ml-1 tracking-widest">
+                            Numéro de Carte Professionnelle / Attestation <span className="text-blue-500">*</span>
+                        </label>
+                        <div className="relative group">
+                            <FileText className="absolute left-4 top-3.5 w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                            <input 
+                                type="text" 
+                                placeholder="Ex: CPI-7501-2024-0000"
+                                value={idNumber}
+                                onChange={(e) => setIdNumber(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white font-mono placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                            />
+                        </div>
+                    </div>
+
+                    {/* ✅ 4. CONSENTEMENT (CONSERVÉ ET AMÉLIORÉ) */}
                     <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-blue-500/30">
                         <input 
                             type="checkbox" 
@@ -187,11 +204,11 @@ export default function AgentKYCPage() {
                             className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500/50 cursor-pointer" 
                         />
                         <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
-                            Je certifie être titulaire d'une carte professionnelle ou d'une habilitation valide. 
-                            J'autorise <span className="text-white font-bold">ImmoFacile</span> à vérifier ces informations auprès du registre légal.
+                            Je certifie l'exactitude des informations. J'autorise <span className="text-white font-bold">ImmoFacile</span> à stocker mon numéro de carte de manière chiffrée (AES-256).
                         </label>
                     </div>
 
+                    {/* ZONE D'UPLOAD */}
                     <CldUploadWidget 
                         uploadPreset="immofacile_kyc"
                         onSuccess={handleKycSuccess}
@@ -200,11 +217,12 @@ export default function AgentKYCPage() {
                         {({ open }) => (
                             <div 
                                 onClick={() => {
-                                    if (consent && !uploading) open();
+                                    // On vérifie le consentement ET le numéro (min 3 chars)
+                                    if (consent && idNumber.length > 3 && !uploading) open();
                                 }}
                                 className={`
                                     group border-2 border-dashed rounded-3xl p-12 flex flex-col items-center justify-center transition-all duration-300
-                                    ${consent 
+                                    ${consent && idNumber.length > 3
                                         ? "border-slate-700 hover:border-blue-500 hover:bg-blue-500/5 cursor-pointer" 
                                         : "border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed grayscale"
                                     }
@@ -213,28 +231,29 @@ export default function AgentKYCPage() {
                                 {uploading ? (
                                     <div className="text-center">
                                         <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-                                        <p className="text-white font-bold">Transmission sécurisée...</p>
+                                        <p className="text-white font-bold tracking-tight">Chiffrement AES-256 en cours...</p>
                                     </div>
                                 ) : (
                                     <>
                                         <div className={`
                                             w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-transform
-                                            ${consent ? "bg-slate-800 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white shadow-xl" : "bg-slate-800"}
+                                            ${consent && idNumber.length > 3 ? "bg-slate-800 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white shadow-xl" : "bg-slate-800"}
                                         `}>
-                                            <FileCheck className={`w-10 h-10 transition-colors ${consent ? "text-slate-400 group-hover:text-white" : "text-slate-600"}`} />
+                                            <FileCheck className={`w-10 h-10 transition-colors ${consent && idNumber.length > 3 ? "text-slate-400 group-hover:text-white" : "text-slate-600"}`} />
                                         </div>
                                         <p className="font-black text-white text-xl mb-2">Téléverser mon Justificatif</p>
                                         <p className="text-sm text-slate-500 text-center max-w-sm">
                                             Carte Professionnelle (Recto/Verso) ou Attestation Employeur. Format PDF ou Photo lisible.
                                         </p>
                                         
-                                        {!consent && (
+                                        {(!consent || idNumber.length <= 3) && (
                                             <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-6 animate-pulse">
-                                                ⚠️ Cochez la case ci-dessus pour activer
+                                                ⚠️ Remplissez le numéro et cochez la case
                                             </p>
                                         )}
 
-                                        {consent && (
+                                        {/* ✅ BOUTON VISUEL RESTAURÉ */}
+                                        {consent && idNumber.length > 3 && (
                                             <button className="mt-8 bg-blue-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-900/20 group-hover:bg-blue-500 transition">
                                                 Sélectionner le fichier
                                             </button>
@@ -257,7 +276,7 @@ export default function AgentKYCPage() {
                 </div>
             </div>
 
-            {/* ✅ NOUVEAU : FAQ CONTEXTUELLE */}
+            {/* FAQ */}
             <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/5 pt-10">
                 <div>
                     <h4 className="text-white font-bold text-sm mb-3 flex items-center gap-2">

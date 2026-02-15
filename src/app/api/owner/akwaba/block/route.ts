@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    // 1. AUTHENTIFICATION ZERO TRUST (Via ID)
+    // 1. AUTHENTIFICATION ZERO TRUST
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const userId = session.user.id;
 
     const body = await request.json();
     const { listingId, startDate, endDate, reason } = body;
@@ -23,52 +21,56 @@ const userId = session.user.id;
 
     const start = new Date(startDate);
     const end = new Date(endDate);
+    
+    // On normalise les dates (début de journée) pour éviter les bugs d'heures
+    start.setHours(0,0,0,0);
+    end.setHours(23,59,59,999);
 
     if (start >= end) {
         return NextResponse.json({ error: "La date de fin doit être après le début." }, { status: 400 });
     }
 
-    // 3. VÉRIFICATION DE PROPRIÉTÉ (ANTI-IDOR)
-    // Le listing doit exister ET appartenir à l'utilisateur
-    const listing = await prisma.listing.findUnique({
+    // 3. VÉRIFICATION DE PROPRIÉTÉ
+    const listing = await prisma.listing.findFirst({
         where: { 
             id: listingId,
-            hostId: userId // 🔒 Verrouillage
+            hostId: userId 
         }
     });
 
     if (!listing) {
-        return NextResponse.json({ error: "Annonce introuvable ou accès refusé." }, { status: 403 });
+        return NextResponse.json({ error: "Logement introuvable ou accès refusé." }, { status: 403 });
     }
 
-    // 4. VÉRIFICATION DE CHEVAUCHEMENT
-    // On vérifie s'il existe déjà une réservation CONFIRMÉE ou PAYÉE sur cette période
+    // 4. VÉRIFICATION DE CHEVAUCHEMENT (CORRIGÉE)
+    // La logique exacte est : (StartA < EndB) ET (EndA > StartB)
     const overlap = await prisma.booking.findFirst({
         where: {
             listingId: listingId,
-            status: { in: ['CONFIRMED', 'PAID'] },
-            OR: [
-                { startDate: { lte: end }, endDate: { gte: start } }
+            // On inclut CHECKED_IN et COMPLETED pour ne pas écraser l'historique ou le présent
+            status: { in: ['CONFIRMED', 'PAID', 'CHECKED_IN', 'COMPLETED'] },
+            AND: [
+                { startDate: { lt: end } },
+                { endDate: { gt: start } }
             ]
         }
     });
 
     if (overlap) {
-        return NextResponse.json({ error: "Impossible : Ces dates sont déjà occupées." }, { status: 409 });
+        return NextResponse.json({ error: "Ces dates sont déjà réservées par un client." }, { status: 409 });
     }
 
     // 5. CRÉATION DU BLOCAGE
-    // Un blocage est techniquement une réservation "CONFIRMED" à prix 0 pour le propriétaire
     await prisma.booking.create({
         data: {
             startDate: start,
             endDate: end,
-            totalPrice: 0, // Gratuit (Blocage)
-            status: "CONFIRMED",
-            guestId: userId, // Le propriétaire est son propre invité
+            totalPrice: 0,
+            status: "CONFIRMED", // Considéré comme occupé
+            guestId: userId,     // Le propriétaire se réserve à lui-même
             listingId: listingId,
-            // On pourrait stocker la "reason" dans un champ commentaire si le schéma le permettait,
-            // mais ici on le garde juste pour log ou on l'ignore si pas de champ.
+            guestCount: 1,       // ✅ Obligatoire pour le schema
+            // On pourrait utiliser un champ 'notes' ou 'internalNote' si dispo, sinon on perd la raison
         }
     });
 

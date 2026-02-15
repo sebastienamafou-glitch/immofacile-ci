@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 // ==========================================
-// 1. GET : LISTER MES ANNONCES (Dashboard + Selectors)
+// 1. GET : LISTER MES ANNONCES
 // ==========================================
 export async function GET(request: Request) {
   try {
     // 1. SÉCURITÉ ZERO TRUST
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     // 2. RÉCUPÉRATION
     const listings = await prisma.listing.findMany({
@@ -44,15 +44,21 @@ export async function POST(request: Request) {
   try {
     // 1. SÉCURITÉ ZERO TRUST
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
 
     const body = await request.json();
     
-    // 2. VALIDATION MINIMALE
+    // 2. VALIDATION DONNÉES
     if (!body.title || !body.pricePerNight || !body.address || !body.city) {
         return NextResponse.json({ error: "Champs obligatoires manquants (Titre, Prix, Adresse, Ville)" }, { status: 400 });
+    }
+
+    const price = Number(body.pricePerNight);
+    if (isNaN(price) || price < 0) {
+        return NextResponse.json({ error: "Prix invalide" }, { status: 400 });
     }
 
     // 3. CRÉATION
@@ -60,18 +66,18 @@ const userId = session.user.id;
       data: {
         title: body.title,
         description: body.description || "",
-        pricePerNight: Number(body.pricePerNight),
+        pricePerNight: price,
         
         address: body.address,
         city: body.city,
         neighborhood: body.neighborhood || "",
         
         images: body.images || [],
-        amenities: body.amenities || {}, // JSON
+        amenities: body.amenities || {}, 
         
-        isPublished: true, // Publié par défaut (ou false selon votre logique métier)
+        isPublished: true, 
         
-        hostId: userId // 🔒 L'utilisateur connecté est l'hôte
+        hostId: userId 
       }
     });
 
