@@ -1,74 +1,91 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth"; // ✅ On utilise auth() pour la cohérence
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import crypto from "crypto";
 
-export async function POST(request: Request) {
+// On utilise les params de l'URL pour la sécurité (évite de signer le mauvais ID)
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    // 1. SÉCURITÉ : Authentification Robuste
+    const { id } = await params; // L'ID du bail vient de l'URL
+
+    // 1. SÉCURITÉ : Authentification
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    
-    // Vérification du rôle (Si nécessaire, sinon retirez cette ligne)
-    // if (!user || user.role !== "TENANT") { ... }
-
-    const body = await request.json();
-    const { leaseId, signatureData } = body; // ✅ On récupère le dessin de signature
-
-    if (!leaseId) return NextResponse.json({ error: "ID du bail manquant" }, { status: 400 });
+    const user = session.user;
 
     // 2. VÉRIFICATION DU BAIL
     const lease = await prisma.lease.findUnique({
-        where: { id: leaseId },
-        include: { tenant: true }
+        where: { id },
+        include: { signatures: true, property: true } // On regarde qui a déjà signé
     });
 
-    // Sécurité : On vérifie que c'est bien SON bail
-    if (!lease || lease.tenantId !== user?.id) {
-        return NextResponse.json({ error: "Bail introuvable ou accès refusé" }, { status: 403 });
+    // Sécurité : Vérifier que c'est bien le locataire du bail
+    if (!lease || lease.tenantId !== user.id) {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    if (lease.signatureStatus !== "PENDING") {
-        return NextResponse.json({ error: "Ce document est déjà signé." }, { status: 400 });
+    // On vérifie si le locataire a déjà signé
+    const existingSignature = lease.signatures.find(s => s.signerId === user.id);
+    if (existingSignature) {
+        return NextResponse.json({ error: "Vous avez déjà signé ce document." }, { status: 400 });
     }
 
-    // 3. CAPTURE DES MÉTADONNÉES LÉGALES (Pour le PDF)
+    // 3. LOGIQUE D'ÉTAT (State Machine)
+    // On vérifie si le propriétaire a DÉJÀ signé avant nous
+    const hasOwnerSigned = lease.signatures.some(s => s.signerId === lease.property.ownerId || s.signerId !== lease.tenantId);
+    
+    // Si le propriétaire a déjà signé, alors ma signature complète le contrat
+    // Sinon, on passe juste en "SIGNED_TENANT"
+    const newSignatureStatus = hasOwnerSigned ? "COMPLETED" : "SIGNED_TENANT";
+    const shouldActivate = hasOwnerSigned; // Le bail ne devient actif que si TOUT LE MONDE a signé
+
+    // 4. MÉTADONNÉES LÉGALES
     const ipAddress = request.headers.get("x-forwarded-for") || "IP_INCONNUE";
-    const userAgent = request.headers.get("user-agent") || "Device Inconnu"; // ✅ Capture du Device
+    const userAgent = request.headers.get("user-agent") || "Device Inconnu";
+    
+    // Récupération de la signature dessinée (si envoyée)
+    const body = await request.json();
+    const { signatureData } = body;
 
-    // 4. CRÉATION DU HASH (Empreinte numérique)
+    // 5. CRÉATION DU HASH (Empreinte numérique unique de CETTE action)
+    // On mélange ID + User + Date + Secret pour rendre le hash infalsifiable
     const signatureString = `${lease.id}-${user.id}-${new Date().toISOString()}-${process.env.AUTH_SECRET}`;
-    const documentHash = crypto.createHash('sha256').update(signatureString).digest('hex').toUpperCase();
+    const actionHash = crypto.createHash('sha256').update(signatureString).digest('hex').toUpperCase();
 
-    // 5. TRANSACTION ATOMIQUE
-    const updatedLease = await prisma.$transaction(async (tx) => {
+    // 6. TRANSACTION ATOMIQUE (Tout ou rien)
+    const result = await prisma.$transaction(async (tx) => {
         
-        // A. Créer la preuve juridique COMPLÈTE
+        // A. Enregistrer la preuve technique (Audit Log)
         await tx.signatureProof.create({
             data: {
                 leaseId: lease.id,
                 signerId: user.id,
                 ipAddress: ipAddress,
-                userAgent: userAgent, // ✅ On stocke le device
-                signatureData: signatureData, // ✅ On stocke le dessin (Base64)
+                userAgent: userAgent,
+                signatureData: signatureData, 
                 signedAt: new Date(),
                 documentType: "LEASE"
             }
         });
 
-        // B. Activer le bail
+        // B. Mettre à jour le statut du bail
+        // Note : On ne met le documentHash global que si le contrat est COMPLET
         return await tx.lease.update({
             where: { id: lease.id },
             data: {
-                signatureStatus: "SIGNED_TENANT", 
-                documentHash: documentHash,       
-                isActive: true,                   
-                status: "ACTIVE",                 
+                signatureStatus: newSignatureStatus,
+                // Si complet, on active, sinon on laisse en attente
+                isActive: shouldActivate, 
+                status: shouldActivate ? "ACTIVE" : "PENDING",
+                // On met à jour le hash du document seulement si c'est la dernière signature
+                // Sinon on garde l'ancien ou on met celui de l'action
+                documentHash: actionHash, 
                 updatedAt: new Date()
             }
         });
@@ -76,9 +93,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
         success: true, 
-        message: "Signature enregistrée. Contrat scellé.",
-        hash: updatedLease.documentHash,
-        date: updatedLease.updatedAt
+        message: shouldActivate ? "Bail signé et activé !" : "Signature enregistrée. En attente du propriétaire.",
+        status: result.signatureStatus,
+        hash: result.documentHash
     });
 
   } catch (error) {

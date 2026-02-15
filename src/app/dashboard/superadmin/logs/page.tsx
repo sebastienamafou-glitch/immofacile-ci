@@ -10,11 +10,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// ✅ CORRECTION : Interface alignée avec Prisma (metadata au lieu de details)
 interface AuditLog {
   id: string;
   action: string;
   category: string;
-  details: any;
+  metadata: any; 
   createdAt: string;
   user: {
     name: string | null;
@@ -36,7 +37,6 @@ export default function AdminLogsPage() {
   useEffect(() => {
     const fetchLogs = async () => {
         try {
-            // ✅ APPEL SÉCURISÉ
             const res = await api.get('/superadmin/logs');
             
             if (res.data.success) {
@@ -79,7 +79,7 @@ export default function AdminLogsPage() {
   const handleExportCSV = () => {
     if (filteredLogs.length === 0) return toast.error("Aucune donnée à exporter.");
 
-    const headers = ["ID_LOG", "DATE_ISO", "CATEGORIE", "UTILISATEUR", "ROLE", "ACTION", "MONTANT"];
+    const headers = ["ID_LOG", "DATE_ISO", "CATEGORIE", "UTILISATEUR", "ROLE", "ACTION", "DETAILS"];
     
     const rows = filteredLogs.map(log => [
         `"${log.id}"`,
@@ -88,7 +88,8 @@ export default function AdminLogsPage() {
         `"${log.user?.name || 'SYSTEM'}"`,
         `"${log.user?.role || 'BOT'}"`,
         `"${log.action.replace(/"/g, '""')}"`,
-        `"${log.details?.amount || 0}"`
+        // ✅ CORRECTION : Utilisation de metadata pour l'export aussi
+        `"${log.metadata ? JSON.stringify(log.metadata).replace(/"/g, "'") : ''}"`
     ]);
 
     const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
@@ -112,6 +113,19 @@ export default function AdminLogsPage() {
           case 'AUTH': return <UserPlus className="w-4 h-4 text-blue-500" />;
           default: return <Activity className="w-4 h-4 text-slate-500" />;
       }
+  };
+
+  // Helper pour afficher proprement les métadonnées
+  const renderMetadata = (meta: any) => {
+    if (!meta || Object.keys(meta).length === 0) return <span className="text-slate-600 italic">-</span>;
+    
+    // Si c'est un montant
+    if (meta.amount) {
+        return <span className="text-emerald-400 font-bold">{meta.amount.toLocaleString()} FCFA {meta.type ? `(${meta.type})` : ''}</span>;
+    }
+
+    // Sinon on affiche un résumé JSON propre
+    return <span className="text-slate-500 truncate block max-w-[200px]" title={JSON.stringify(meta)}>{JSON.stringify(meta)}</span>;
   };
 
   if (loading) return (
@@ -216,9 +230,10 @@ export default function AdminLogsPage() {
                                 </td>
                                 <td className="p-4">
                                     <p className="text-slate-300 font-medium text-xs mb-1">{log.action}</p>
-                                    <p className="text-[10px] text-slate-500 font-mono">
-                                        {log.details?.amount ? `${log.details.amount} F (${log.details.type})` : ''}
-                                    </p>
+                                    <div className="text-[10px] font-mono">
+                                        {/* ✅ CORRECTION : Appel de la fonction helper pour afficher metadata */}
+                                        {renderMetadata(log.metadata)}
+                                    </div>
                                 </td>
                                 <td className="p-4 text-right">
                                     <span className="font-mono text-[10px] text-slate-600 bg-slate-950 px-2 py-1 rounded select-all cursor-copy hover:text-blue-400 hover:bg-blue-500/10 transition-colors">

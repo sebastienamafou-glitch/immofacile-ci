@@ -3,31 +3,33 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import ContractActions from "@/components/tenant/contract-actions";
-import { QRCodeSVG } from "qrcode.react";
+// ✅ CORRECTION : Utilisation de Canvas pour que le QR s'affiche sur le PDF
+import { QRCodeCanvas } from "qrcode.react"; 
 import { ShieldCheck, ArrowLeft, Building2 } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
 export default async function TenantContractPage({ params }: { params: { id: string } }) {
+  const { id } = await params; // Accès asynchrone aux params (Next.js 15)
+
   // 1. SÉCURITÉ & SESSION
   const session = await auth();
   
-  // Vérification stricte pour TypeScript
+  // Vérification stricte
   if (!session?.user?.id) return redirect("/auth/login");
   const userId = session.user.id;
 
   // 2. RÉCUPÉRATION DES DONNÉES (SCHEMA STRICT)
   const lease = await prisma.lease.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
         property: {
             include: {
                 owner: { select: { id: true, name: true, email: true, phone: true } },
-                // Inclusion de l'agence pour affichage du mandat
-                agency: true 
+                agency: true // Inclusion de l'agence pour affichage du mandat
             }
         },
-        // ✅ Relation 'signatures' conforme au schema.prisma
+        // Relation 'signatures' conforme au schema.prisma
         signatures: { 
             include: { 
                 signer: { select: { id: true, name: true } } 
@@ -75,7 +77,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 print:bg-white print:pb-0">
         
-        {/* HEADER DASHBOARD */}
+        {/* HEADER DASHBOARD (Caché à l'impression) */}
         <div className="bg-[#0B1120] text-white pt-8 pb-12 px-4 lg:px-8 print:hidden">
             <div className="max-w-5xl mx-auto">
                 <Link href="/dashboard/tenant" className="inline-flex items-center text-slate-400 hover:text-white mb-6 transition-colors text-sm font-medium">
@@ -95,6 +97,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
 
                     <div>
+                        {/* Le bouton "SIGNER" s'affichera ici grâce à ce composant */}
                         <ContractActions 
                             leaseId={lease.id} 
                             isSigned={isTenantSigned} 
@@ -119,7 +122,13 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                     <div className="flex flex-col items-center gap-1">
                          <div className="border border-slate-800 p-1">
-                            <QRCodeSVG value={`https://immofacile.ci/compliance/${lease.id}`} size={65} />
+                            {/* ✅ QR CODE CANVAS : Visible à l'impression PDF */}
+                            <QRCodeCanvas 
+                                value={`https://immofacile.ci/compliance/${lease.id}`} 
+                                size={65}
+                                level={"H"} // Haute correction d'erreur
+                                marginSize={1}
+                            />
                          </div>
                          <span className="text-[8px] font-mono font-bold text-slate-400">AUTH: {lease.id.substring(0,6).toUpperCase()}</span>
                     </div>

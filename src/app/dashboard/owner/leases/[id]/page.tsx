@@ -3,9 +3,10 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import OwnerContractActions from "@/components/owner/owner-contract-actions";
-import { QRCodeSVG } from "qrcode.react";
+// ✅ CORRECTION : Utilisation de Canvas pour le PDF (comme chez le locataire)
+import { QRCodeCanvas } from "qrcode.react"; 
 import { 
-  ShieldCheck, ArrowLeft, Printer, Scale 
+  ShieldCheck, ArrowLeft, Printer, Scale, Building2 
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -13,43 +14,60 @@ import { Button } from "@/components/ui/button";
 export const dynamic = 'force-dynamic';
 
 export default async function OwnerLeasePage({ params }: { params: { id: string } }) {
-  const leaseId = params.id; 
+  const { id } = await params;
 
   const session = await auth();
   if (!session?.user?.id) return redirect("/auth/login");
 
-  // 1. RÉCUPÉRATION DES DONNÉES AVEC LES PREUVES DE SIGNATURE
+  // 1. RÉCUPÉRATION DES DONNÉES (STRUCTURE IDENTIQUE AU LOCATAIRE)
   const lease = await prisma.lease.findUnique({
-    where: { id: leaseId },
+    where: { id },
     include: {
         property: {
             include: {
-                owner: { select: { id: true, name: true, email: true } }
+                // On inclut l'agence pour la détection du mandat
+                owner: { select: { id: true, name: true, email: true } },
+                agency: true 
             }
         },
         tenant: { select: { id: true, name: true, email: true, phone: true } },
-        // ✅ Relation conforme au schema.prisma
-        signatures: true 
+        signatures: { 
+            include: { 
+                signer: { select: { id: true, name: true } } 
+            } 
+        } 
     }
   });
 
-  // 2. SÉCURITÉ & VALIDATION
+  // 2. SÉCURITÉ
   if (!lease) return notFound();
+  // Vérification : L'utilisateur doit être le PROPRIÉTAIRE
   if (lease.property.owner.id !== session.user.id) return redirect("/dashboard/owner");
 
   const isCompleted = lease.signatureStatus === "COMPLETED";
   const isTenantSigned = lease.signatureStatus !== "PENDING"; 
 
-  // 3. EXTRACTION DES PREUVES D'AUDIT
-  const ownerProof = lease.signatures.find(p => p.signerId === lease.property.owner.id);
+  // 3. LOGIQUE INTELLIGENTE (MIROIR DU LOCATAIRE)
+  
+  // A. Signature Locataire
   const tenantProof = lease.signatures.find(p => p.signerId === lease.tenant.id);
+  
+  // B. Signature Bailleur (Peut être moi OU mon agent)
+  // On cherche une signature qui N'EST PAS celle du locataire
+  const bailleurProof = lease.signatures.find(p => p.signerId !== lease.tenant.id);
 
-  // 4. FORMATAGE
+  // C. Détection Mandat
+  const isMandateSignature = bailleurProof && bailleurProof.signerId !== lease.property.owner.id;
+
+  // D. Noms d'affichage
   const ownerName = lease.property.owner.name || "LE PROPRIÉTAIRE";
   const tenantName = lease.tenant.name || "LE LOCATAIRE";
+  const agencyName = lease.property.agency?.name;
+  const bailleurSignerName = isMandateSignature ? bailleurProof?.signer.name : ownerName;
+
+  // 4. FORMATAGE
   const startDate = lease.startDate ? new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long'}) : "....................";
 
-  // Helper date audit
   const formatAuditDate = (date: Date) => {
       return date.toLocaleString('fr-FR', { 
           day: '2-digit', month: '2-digit', year: 'numeric', 
@@ -60,7 +78,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 print:bg-white print:pb-0">
         
-        {/* HEADER DASHBOARD (Caché à l'impression) */}
+        {/* HEADER DASHBOARD PROPRIÉTAIRE (Spécifique, différent du locataire) */}
         <div className="bg-white border-b border-slate-200 py-6 px-8 mb-8 print:hidden">
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
@@ -75,7 +93,9 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
                             {isCompleted ? 'ACTIF & SIGNÉ' : 'EN ATTENTE DE SIGNATURE'}
                         </span>
-                        <p className="text-slate-500 text-sm">Réf: {lease.id.substring(0,8).toUpperCase()}</p>
+                        <p className="text-slate-500 text-sm flex items-center gap-1">
+                            <Building2 className="w-3 h-3"/> {lease.property.title}
+                        </p>
                      </div>
                 </div>
 
@@ -83,7 +103,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     <Link 
                         href={`/properties/flyer/${lease.propertyId}`} 
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-md shadow-sm text-sm font-medium hover:bg-slate-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-md shadow-sm text-sm font-medium hover:bg-slate-50 transition-colors"
                     >
                         <Printer className="w-4 h-4 text-orange-500" />
                         <span>Affiche</span>
@@ -97,7 +117,12 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-4 bg-white">
                              <div className="flex flex-col items-center">
-                                <QRCodeSVG value={`https://immofacile.ci/compliance/${lease.id}`} size={120} />
+                                {/* QR Code Canvas pour l'UI Web */}
+                                <QRCodeCanvas 
+                                    value={`https://immofacile.ci/compliance/${lease.id}`} 
+                                    size={120} 
+                                    level={"H"}
+                                />
                                 <p className="text-[10px] text-slate-400 mt-2 font-mono">SCAN ME</p>
                              </div>
                         </PopoverContent>
@@ -112,7 +137,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
             </div>
         </div>
 
-        {/* --- DOCUMENT OFFICIEL (Format A4) --- */}
+        {/* --- DOCUMENT OFFICIEL (IDENTIQUE AU LOCATAIRE) --- */}
         <div className="flex justify-center px-4 print:px-0 print:block">
             <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
                 
@@ -126,7 +151,13 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     </div>
                     <div className="flex flex-col items-center gap-1">
                          <div className="border border-slate-800 p-1">
-                            <QRCodeSVG value={`https://immofacile.ci/compliance/${lease.id}`} size={65} />
+                            {/* ✅ QR CODE CANVAS : Visible à l'impression PDF */}
+                            <QRCodeCanvas 
+                                value={`https://immofacile.ci/compliance/${lease.id}`} 
+                                size={65}
+                                level={"H"}
+                                marginSize={1}
+                            />
                          </div>
                          <span className="text-[8px] font-mono font-bold text-slate-400">AUTH: {lease.id.substring(0,6).toUpperCase()}</span>
                     </div>
@@ -138,7 +169,10 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     
                     <div className="mb-4 pl-4 border-l-2 border-slate-200">
                         <p><strong>LE BAILLEUR :</strong> {ownerName.toUpperCase()}</p>
-                        <p>Contact : {lease.property.owner.email}</p>
+                        {/* Mention Mandataire (Cohérence avec locataire) */}
+                        {lease.property.agency && (
+                            <p className="text-xs mt-0.5 text-slate-600">Représenté par son mandataire : <strong>L'Agence {lease.property.agency.name}</strong></p>
+                        )}
                         <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Bailleur".</p>
                     </div>
 
@@ -154,10 +188,8 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :
                 </p>
 
-                {/* 3. CLAUSES OBLIGATOIRES (VERSION "BLINDÉE") */}
+                {/* 3. CLAUSES OBLIGATOIRES (12 ARTICLES) */}
                 <div className="space-y-4 font-serif text-[10px] text-slate-800 mb-8">
-                    
-                    {/* Colonnes pour optimiser l'espace si besoin, ici on reste en liste lisible */}
                     
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5">Article 1 : Désignation des Lieux</h3>
@@ -260,7 +292,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     </div>
                 </div>
 
-                {/* 4. SIGNATURES AVEC AUDIT TRAIL (VRAIES DONNÉES) */}
+                {/* 4. SIGNATURES AVEC AUDIT TRAIL (LOGIQUE INTELLIGENTE IDENTIQUE) */}
                 <div className="mt-auto pt-4 border-t-2 border-black font-sans">
                     <p className="mb-6 text-xs text-right italic font-serif">
                         Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>, en deux exemplaires originaux.
@@ -268,37 +300,42 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     
                     <div className="flex justify-between gap-6 mt-4">
                         
-                        {/* === CADRE TECHNIQUE : BAILLEUR (MOI) === */}
+                        {/* === CADRE TECHNIQUE : BAILLEUR (Auto-adaptatif Mandat/Direct) === */}
                         <div className="w-1/2">
-                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Bailleur (Signature)</p>
+                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Bailleur (ou son Mandataire)</p>
                             
-                            {isCompleted && ownerProof ? (
-                                <div className="border-2 border-emerald-600 p-3 rounded-sm bg-white text-left">
-                                    <p className="text-emerald-600 font-bold text-sm uppercase mb-3">
-                                        SIGNÉ ÉLECTRONIQUEMENT
+                            {bailleurProof ? (
+                                <div className={`border-2 p-3 rounded-sm bg-white text-left ${isMandateSignature ? 'border-purple-600' : 'border-emerald-600'}`}>
+                                    <p className={`${isMandateSignature ? 'text-purple-600' : 'text-emerald-600'} font-bold text-sm uppercase mb-3`}>
+                                        {isMandateSignature ? "SIGNÉ PAR MANDAT (P/O)" : "SIGNÉ ÉLECTRONIQUEMENT"}
                                     </p>
                                     <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
+                                        
+                                        {isMandateSignature && (
+                                            <p className="font-bold text-black">POUR: AGENCE {agencyName?.toUpperCase()}</p>
+                                        )}
+                                        
                                         <p>
-                                            <span className="text-emerald-700 font-bold mr-2">Signataire:</span> 
-                                            {ownerName.toUpperCase()}
+                                            <span className="font-bold mr-2">Signataire:</span> 
+                                            {bailleurSignerName?.toUpperCase()}
                                         </p>
                                         <p>
-                                            <span className="text-emerald-700 font-bold mr-2">Date:</span> 
-                                            {formatAuditDate(new Date(ownerProof.signedAt))}
+                                            <span className="font-bold mr-2">Date:</span> 
+                                            {formatAuditDate(new Date(bailleurProof.signedAt))}
                                         </p>
                                         <p>
-                                            <span className="text-emerald-700 font-bold mr-2">IP:</span> 
-                                            {ownerProof.ipAddress}
+                                            <span className="font-bold mr-2">IP:</span> 
+                                            {bailleurProof.ipAddress}
                                         </p>
                                         <p className="truncate">
-                                            <span className="text-emerald-700 font-bold mr-2">Preuve ID:</span> 
-                                            {ownerProof.id.split('-')[0].toUpperCase()}...
+                                            <span className="font-bold mr-2">Preuve ID:</span> 
+                                            {bailleurProof.id.split('-')[0].toUpperCase()}...
                                         </p>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                                    <p className="text-[9px] text-slate-400 italic">En attente de votre signature</p>
+                                    <p className="text-[9px] text-slate-400 italic">En attente de signature</p>
                                 </div>
                             )}
                         </div>
@@ -344,7 +381,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                 {/* Footer Légal */}
                 <div className="mt-8 pt-2 border-t border-slate-200 text-center">
                     <p className="text-[8px] text-slate-400 font-mono">
-                        Document généré et sécurisé par ImmoFacile.ci • Hash: {lease.id} • Page 1/1
+                        Document certifié par ImmoFacile.ci • Audit ID: {lease.id} • Page 1/1
                     </p>
                 </div>
 

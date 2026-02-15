@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import QRCode from "qrcode"; // 📦 NÉCESSAIRE : npm install qrcode
 
-// ✅ Type de données enrichi pour inclure les signatures et métadonnées
+// ✅ Type de données enrichi
 type LeaseWithDetails = Prisma.LeaseGetPayload<{
   include: {
     property: {
       include: { owner: true }
     };
     tenant: true;
-    signatures: true; // Indispensable pour l'IP et le Hash
+    signatures: true;
   }
 }>;
 
@@ -42,16 +43,15 @@ export async function GET(
 
     if (!lease) return NextResponse.json({ error: "Contrat introuvable" }, { status: 404 });
 
-    // 2. Sécurité : Vérification des droits d'accès
+    // 2. Sécurité
     const isOwner = lease.property.owner.id === userId;
     const isTenant = lease.tenant.id === userId;
-    // On autorise aussi les admins si nécessaire (à ajouter ici selon votre logique role)
     
     if (!isOwner && !isTenant) {
         return NextResponse.json({ error: "Accès refusé au document." }, { status: 403 });
     }
 
-    // 3. Génération du PDF "Bank-Grade"
+    // 3. Génération du PDF "Bank-Grade" AVEC QR CODE
     const pdfBuffer = await generateFullLegalLease(lease);
 
     const safeTitle = (lease.property.title || "Bail").replace(/[^a-z0-9]/gi, '_').substring(0, 30);
@@ -59,7 +59,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Bail_Conforme_${safeTitle}.pdf"`,
+        "Content-Disposition": `inline; filename="Bail_Certifie_${safeTitle}.pdf"`,
       },
     });
 
@@ -89,9 +89,20 @@ const formatDateTime = (date: Date | string | null) => {
 
 // --- MOTEUR DE GÉNÉRATION COMPLET ---
 function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     
-    const MARGIN = 40; // Marge plus standard pour un contrat
+    // ⚡️ GÉNÉRATION DU QR CODE EN BUFFER AVANT DE COMMENCER LE PDF
+    let qrBuffer: Buffer | null = null;
+    try {
+        const complianceUrl = `https://immofacile.ci/compliance/${lease.id}`;
+        // On génère une Data URL puis on la convertit en Buffer pour PDFKit
+        const qrDataUrl = await QRCode.toDataURL(complianceUrl, { margin: 1, width: 100 });
+        qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+    } catch (e) {
+        console.error("Erreur génération QR PDF:", e);
+    }
+
+    const MARGIN = 40;
     const doc = new PDFDocument({ 
         margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: MARGIN }, 
         size: 'A4',
@@ -105,12 +116,32 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
 
     const width = doc.page.width - (MARGIN * 2);
     
-    // --- EN-TÊTE JURIDIQUE ---
-    doc.font('Times-Bold').fontSize(16).text("CONTRAT DE BAIL À USAGE D'HABITATION", { align: 'center' });
-    doc.moveDown(0.5);
-    doc.font('Times-Italic').fontSize(10).text("Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.", { align: 'center' });
+    // --- EN-TÊTE JURIDIQUE AVEC QR CODE ---
+    
+    // 1. Titre (Décalé vers la gauche pour laisser place au QR)
+    const titleWidth = width - 80; // On laisse 80px pour le QR
+    doc.font('Times-Bold').fontSize(16).text("CONTRAT DE BAIL À USAGE D'HABITATION", MARGIN, MARGIN, { width: titleWidth, align: 'left' });
     
     doc.moveDown(0.5);
+    doc.font('Times-Italic').fontSize(9).text("Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.", { width: titleWidth, align: 'left' });
+
+    // 2. Injection du QR Code (En haut à droite)
+    if (qrBuffer) {
+        const qrSize = 65;
+        const qrX = doc.page.width - MARGIN - qrSize;
+        const qrY = MARGIN - 5; // Un peu plus haut pour aligner
+        
+        doc.image(qrBuffer, qrX, qrY, { width: qrSize });
+        
+        // Petit texte "AUTH" sous le QR
+        doc.font('Courier-Bold').fontSize(6).fillColor('#64748B')
+           .text(`AUTH: ${lease.id.substring(0,6).toUpperCase()}`, qrX, qrY + qrSize + 2, { width: qrSize, align: 'center' });
+        
+        // Reset couleur noire
+        doc.fillColor('black');
+    }
+    
+    doc.moveDown(1.5);
     const yLine = doc.y;
     doc.moveTo(MARGIN, yLine).lineTo(doc.page.width - MARGIN, yLine).stroke();
     doc.moveDown(1);
@@ -135,14 +166,15 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     doc.font('Times-Bold').text("IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :", { align: 'center' });
     doc.moveDown(1);
 
-    // --- FONCTION D'ÉCRITURE DES ARTICLES ---
+    // --- CORPS DU CONTRAT (Articles) ---
     const writeArticle = (num: number, title: string, content: string) => {
+        // Protection saut de page orphelin
+        if (doc.y > doc.page.height - 100) doc.addPage();
+        
         doc.font('Times-Bold').fontSize(10).text(`ARTICLE ${num}: ${title}`);
         doc.font('Times-Roman').fontSize(10).text(content, { align: 'justify' });
         doc.moveDown(0.8);
     };
-
-    // --- CORPS DU CONTRAT (12 Articles Conformes au PDF) ---
 
     writeArticle(1, "DÉSIGNATION DES LIEUX", 
         `Le Bailleur donne en location au Preneur, qui accepte, les locaux situés à : ${lease.property.address}, ${lease.property.commune}. \n` +
@@ -199,56 +231,53 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     doc.moveDown(1);
 
     // --- ZONE DE SIGNATURE SÉCURISÉE ---
-    
-    // On s'assure qu'on ne coupe pas la zone de signature
     if (doc.y > doc.page.height - 150) doc.addPage();
-
     const signY = doc.y;
     
-    // Titres
+    // En-têtes signatures
     doc.font('Times-Bold').fontSize(10).text("LE BAILLEUR", MARGIN, signY);
     doc.text("LE PRENEUR (LU ET APPROUVÉ)", 300, signY);
 
-    // Recherche de la preuve de signature
-    // On suppose ici que la dernière signature est la bonne ou on cherche celle du locataire
-    const tenantSignature = lease.signatures.find(s => s.signerId === lease.tenant.id) || lease.signatures[0];
-    const isSigned = !!tenantSignature;
+    // Récupération intelligente de la signature (comme dans page.tsx)
+    const tenantSignature = lease.signatures.find(s => s.signerId === lease.tenant.id);
+    const ownerSignature = lease.signatures.find(s => s.signerId === lease.property.ownerId) || lease.signatures.find(s => s.signerId !== lease.tenant.id);
 
-    // Dessin du cadre de signature "PRENEUR"
+    // Dessin cadre BAILLEUR (Nouveau)
+    doc.rect(MARGIN, signY + 15, 200, 80).strokeColor(ownerSignature ? '#16A34A' : '#CBD5E1').stroke();
+    if (ownerSignature) {
+         doc.fillColor('#16A34A').font('Times-Bold').fontSize(9).text("SIGNÉ ÉLECTRONIQUEMENT", MARGIN + 10, signY + 25);
+         doc.fillColor('black').font('Times-Roman').fontSize(8);
+         doc.text(`Par : ${ownerSignature.signerId === lease.property.ownerId ? lease.property.owner.name : "MANDATAIRE"}`, MARGIN + 10, signY + 40);
+         doc.text(`Date : ${formatDateTime(ownerSignature.signedAt)}`, MARGIN + 10, signY + 50);
+    }
+
+    // Dessin cadre PRENEUR (Existant amélioré)
     const boxX = 300;
     const boxY = signY + 15;
-    const boxW = 200;
-    const boxH = 80;
+    doc.rect(boxX, boxY, 200, 80).strokeColor(tenantSignature ? '#2563EB' : '#CBD5E1').stroke();
 
-    doc.rect(boxX, boxY, boxW, boxH).strokeColor(isSigned ? '#16A34A' : '#CBD5E1').lineWidth(1).stroke(); // Vert si signé, Gris sinon
-
-    if (isSigned) {
-        // --- AFFICHAGE DES MÉTADONNÉES DE SÉCURITÉ (Comme le PDF) ---
+    if (tenantSignature) {
         const textX = boxX + 10;
         let textY = boxY + 10;
-
-        doc.fillColor('#16A34A').font('Times-Bold').fontSize(10).text("SIGNÉ ÉLECTRONIQUEMENT", textX, textY);
+        doc.fillColor('#2563EB').font('Times-Bold').fontSize(10).text("SIGNÉ ÉLECTRONIQUEMENT", textX, textY);
         textY += 15;
-        
-        doc.fillColor('#000000').font('Times-Roman').fontSize(8);
+        doc.fillColor('black').font('Times-Roman').fontSize(8);
         doc.text(`Signataire : ${lease.tenant.name?.toUpperCase()}`, textX, textY);
         textY += 10;
         doc.text(`Date : ${formatDateTime(tenantSignature.signedAt)}`, textX, textY);
         textY += 10;
         doc.text(`IP : ${tenantSignature.ipAddress}`, textX, textY);
         textY += 10;
-        // User Agent tronqué pour faire "Drone Th..." style ou propre
-        const device = tenantSignature.userAgent ? tenantSignature.userAgent.substring(0, 25) + "..." : "Device inconnu";
-        doc.text(`Device : ${device}`, textX, textY);
+        doc.text(`ID Preuve : ${tenantSignature.id.split('-')[0].toUpperCase()}`, textX, textY);
     } else {
         doc.fillColor('#94A3B8').font('Times-Italic').fontSize(9)
-           .text("(En attente de signature)", boxX, boxY + 35, { width: boxW, align: 'center' });
+           .text("(En attente de signature)", boxX, boxY + 35, { width: 200, align: 'center' });
     }
 
-    // Bas de page technique
+    // Footer
     const bottomY = doc.page.height - 40;
     doc.fontSize(7).fillColor('#64748B').text(
-        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.documentHash || "En attente"} | Page 1/1`,
+        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.id} | Page 1/1`,
         MARGIN,
         bottomY,
         { align: 'center', width }
