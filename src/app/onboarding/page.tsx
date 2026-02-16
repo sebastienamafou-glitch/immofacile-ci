@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Building2, Key, Briefcase, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle2, Building2, Key, Briefcase, Loader2, ArrowRight, Palmtree } from "lucide-react"; // Ajout Palmtree
 import { cn } from "@/lib/utils"; 
+import { setUserRole } from "@/actions/onboarding"; // ✅ Import Server Action
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -16,47 +17,34 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      // 1. Mise à jour en base de données
-      const res = await fetch("/api/user/role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: selectedRole }),
-      });
+      // ✅ APPEL SERVER ACTION
+      const result = await setUserRole(selectedRole);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur lors de la sauvegarde");
+      if (!result.success) {
+        throw new Error(result.error);
       }
 
       toast.success("Profil configuré ! Redirection...");
       
-      // 2. FORCER LE RAFRAÎCHISSEMENT DE LA SESSION
-      // C'est l'étape cruciale qui manquait : on dit à Next.js de relire les cookies
+      // Forcer le rafraîchissement
       router.refresh(); 
 
-      // 3. Redirection avec un petit délai pour laisser le temps au cookie de s'écrire
-      setTimeout(() => {
-          if (selectedRole === "AGENT") window.location.href = "/dashboard/agent";
-          else if (selectedRole === "OWNER") window.location.href = "/dashboard/owner";
-          else window.location.href = "/dashboard/tenant";
-      }, 1000);
+      // Redirection
+      if (result.redirectUrl) {
+          window.location.href = result.redirectUrl;
+      }
 
     } catch (error: any) {
-      console.error(error);
       toast.error(error.message || "Une erreur est survenue.");
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-slate-200">
+    <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-slate-200 font-sans">
       
-      {/* HEADER AVEC LOGO CORRIGÉ */}
-      <div className="text-center mb-12 space-y-4 max-w-2xl flex flex-col items-center">
-        {/* Correction ici : flex flex-col items-center pour un centrage parfait */}
-        <div className="flex flex-col items-center justify-center p-4 rounded-3xl bg-orange-500/10 mb-4 animate-in fade-in zoom-in duration-500 border border-orange-500/20 shadow-lg shadow-orange-500/10">
-             <img src="/logo.png" alt="Logo" className="h-12 w-auto mb-2" onError={(e) => e.currentTarget.style.display='none'} /> 
+      <div className="text-center mb-10 space-y-4 max-w-2xl flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="flex flex-col items-center justify-center p-4 rounded-3xl bg-orange-500/10 mb-2 border border-orange-500/20 shadow-lg shadow-orange-500/10">
              <div className="text-orange-500 font-black text-2xl tracking-tighter uppercase">IMMOFACILE</div>
         </div>
         
@@ -66,81 +54,61 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      {/* CHOIX DU RÔLE */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mb-12">
+      {/* GRILLE DES RÔLES (Maintenant avec 4 choix) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-7xl mb-12">
         
-        {/* CARTE 1 : LOCATAIRE */}
-        <div 
-            onClick={() => setSelectedRole("TENANT")}
-            className={cn(
-                "relative group cursor-pointer rounded-3xl border-2 p-8 transition-all duration-300 flex flex-col items-center text-center gap-4 hover:scale-[1.02]",
-                selectedRole === "TENANT" 
-                    ? "bg-blue-600/10 border-blue-500 shadow-2xl shadow-blue-900/20" 
-                    : "bg-slate-900 border-slate-800 hover:border-slate-600"
-            )}
-        >
-            {selectedRole === "TENANT" && <div className="absolute top-4 right-4 text-blue-500 animate-in zoom-in"><CheckCircle2 className="w-6 h-6 fill-blue-500/20" /></div>}
-            
-            <div className={`p-4 rounded-2xl ${selectedRole === "TENANT" ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400"} transition-colors`}>
-                <Key className="w-8 h-8" />
-            </div>
-            <div>
-                <h3 className="text-xl font-bold text-white mb-2">Je cherche un logement</h3>
-                <p className="text-sm text-slate-400">Trouvez la maison de vos rêves, déposez votre dossier et payez votre loyer en ligne.</p>
-            </div>
-        </div>
+        {/* 1. VOYAGEUR (Guest) - NOUVEAU */}
+        <RoleCard 
+            id="GUEST"
+            title="Voyageur"
+            desc="Je veux réserver des séjours uniques (Akwaba)."
+            icon={Palmtree}
+            colorClass="cyan"
+            selected={selectedRole === "GUEST"}
+            onClick={setSelectedRole}
+        />
 
-        {/* CARTE 2 : PROPRIÉTAIRE */}
-        <div 
-            onClick={() => setSelectedRole("OWNER")}
-            className={cn(
-                "relative group cursor-pointer rounded-3xl border-2 p-8 transition-all duration-300 flex flex-col items-center text-center gap-4 hover:scale-[1.02]",
-                selectedRole === "OWNER" 
-                    ? "bg-orange-600/10 border-orange-500 shadow-2xl shadow-orange-900/20" 
-                    : "bg-slate-900 border-slate-800 hover:border-slate-600"
-            )}
-        >
-            {selectedRole === "OWNER" && <div className="absolute top-4 right-4 text-orange-500 animate-in zoom-in"><CheckCircle2 className="w-6 h-6 fill-orange-500/20" /></div>}
-            
-            <div className={`p-4 rounded-2xl ${selectedRole === "OWNER" ? "bg-orange-500 text-white" : "bg-slate-800 text-slate-400"} transition-colors`}>
-                <Building2 className="w-8 h-8" />
-            </div>
-            <div>
-                <h3 className="text-xl font-bold text-white mb-2">Je suis Propriétaire</h3>
-                <p className="text-sm text-slate-400">Gérez vos biens, encaissez les loyers automatiquement et suivez vos finances.</p>
-            </div>
-        </div>
+        {/* 2. LOCATAIRE */}
+        <RoleCard 
+            id="TENANT"
+            title="Locataire"
+            desc="Je cherche un logement longue durée à louer."
+            icon={Key}
+            colorClass="blue"
+            selected={selectedRole === "TENANT"}
+            onClick={setSelectedRole}
+        />
 
-        {/* CARTE 3 : AGENT */}
-        <div 
-            onClick={() => setSelectedRole("AGENT")}
-            className={cn(
-                "relative group cursor-pointer rounded-3xl border-2 p-8 transition-all duration-300 flex flex-col items-center text-center gap-4 hover:scale-[1.02]",
-                selectedRole === "AGENT" 
-                    ? "bg-emerald-600/10 border-emerald-500 shadow-2xl shadow-emerald-900/20" 
-                    : "bg-slate-900 border-slate-800 hover:border-slate-600"
-            )}
-        >
-            {selectedRole === "AGENT" && <div className="absolute top-4 right-4 text-emerald-500 animate-in zoom-in"><CheckCircle2 className="w-6 h-6 fill-emerald-500/20" /></div>}
-            
-            <div className={`p-4 rounded-2xl ${selectedRole === "AGENT" ? "bg-emerald-500 text-white" : "bg-slate-800 text-slate-400"} transition-colors`}>
-                <Briefcase className="w-8 h-8" />
-            </div>
-            <div>
-                <h3 className="text-xl font-bold text-white mb-2">Je suis Agent Immo</h3>
-                <p className="text-sm text-slate-400">Trouvez des missions, réalisez des visites et gagnez des commissions.</p>
-            </div>
-        </div>
+        {/* 3. PROPRIÉTAIRE */}
+        <RoleCard 
+            id="OWNER"
+            title="Propriétaire"
+            desc="Je veux gérer mes biens et encaisser mes loyers."
+            icon={Building2}
+            colorClass="orange"
+            selected={selectedRole === "OWNER"}
+            onClick={setSelectedRole}
+        />
+
+        {/* 4. AGENT */}
+        <RoleCard 
+            id="AGENT"
+            title="Agent Immo"
+            desc="Je suis un professionnel de l'immobilier."
+            icon={Briefcase}
+            colorClass="emerald"
+            selected={selectedRole === "AGENT"}
+            onClick={setSelectedRole}
+        />
 
       </div>
 
-      {/* BOUTON ACTION */}
       <button
         onClick={handleConfirm}
         disabled={!selectedRole || loading}
         className={`
             group relative overflow-hidden rounded-full py-4 px-12 font-bold text-lg transition-all duration-300
-            ${selectedRole ? "bg-white text-black hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"}
+            ${selectedRole ? "bg-white text-black hover:scale-105 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]" : "bg-slate-800 text-slate-500 cursor-not-allowed"}
         `}
       >
         <span className="relative z-10 flex items-center gap-2">
@@ -151,4 +119,37 @@ export default function OnboardingPage() {
 
     </div>
   );
+}
+
+// Petit composant pour éviter la répétition du code
+function RoleCard({ id, title, desc, icon: Icon, colorClass, selected, onClick }: any) {
+    const colors: any = {
+        cyan: { bg: "bg-cyan-600/10", border: "border-cyan-500", text: "text-cyan-500", fill: "fill-cyan-500/20", shadow: "shadow-cyan-900/20", bgIcon: "bg-cyan-500" },
+        blue: { bg: "bg-blue-600/10", border: "border-blue-500", text: "text-blue-500", fill: "fill-blue-500/20", shadow: "shadow-blue-900/20", bgIcon: "bg-blue-500" },
+        orange: { bg: "bg-orange-600/10", border: "border-orange-500", text: "text-orange-500", fill: "fill-orange-500/20", shadow: "shadow-orange-900/20", bgIcon: "bg-orange-500" },
+        emerald: { bg: "bg-emerald-600/10", border: "border-emerald-500", text: "text-emerald-500", fill: "fill-emerald-500/20", shadow: "shadow-emerald-900/20", bgIcon: "bg-emerald-500" },
+    };
+    const theme = colors[colorClass];
+
+    return (
+        <div 
+            onClick={() => onClick(id)}
+            className={cn(
+                "relative group cursor-pointer rounded-3xl border-2 p-6 transition-all duration-300 flex flex-col items-center text-center gap-4 hover:scale-[1.02]",
+                selected 
+                    ? `${theme.bg} ${theme.border} shadow-2xl ${theme.shadow}` 
+                    : "bg-slate-900 border-slate-800 hover:border-slate-600"
+            )}
+        >
+            {selected && <div className={`absolute top-4 right-4 ${theme.text} animate-in zoom-in`}><CheckCircle2 className={`w-6 h-6 ${theme.fill}`} /></div>}
+            
+            <div className={`p-4 rounded-2xl ${selected ? `${theme.bgIcon} text-white` : "bg-slate-800 text-slate-400"} transition-colors`}>
+                <Icon className="w-8 h-8" />
+            </div>
+            <div>
+                <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+            </div>
+        </div>
+    );
 }

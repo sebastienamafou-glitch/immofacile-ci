@@ -6,7 +6,8 @@ import { MapPin, Calendar, CreditCard, ChevronRight, CheckCircle2, Clock, XCircl
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { BookingStatus } from "@prisma/client"; // Import depuis Prisma généré
+import { BookingStatus } from "@prisma/client"; 
+import ReviewModal from "@/components/guest/ReviewModal"; // ✅ Import du composant de notation
 
 // Définition du type basé sur la requête Prisma
 interface BookingHistoryCardProps {
@@ -80,7 +81,7 @@ export default function BookingHistoryCard({ booking }: BookingHistoryCardProps)
                 </p>
             </div>
             
-            {/* BADGE STATUT MOBILE (Hidden on desktop if needed, or kept) */}
+            {/* BADGE STATUT */}
             <Badge variant="outline" className={`${statusConfig.color} flex items-center gap-1.5`}>
                 <StatusIcon size={12} /> {statusConfig.label}
             </Badge>
@@ -111,11 +112,21 @@ export default function BookingHistoryCard({ booking }: BookingHistoryCardProps)
             </Button>
          </Link>
          
-         <Link href={`/dashboard/guest/listings/${booking.listing.id}`} className="w-full">
+         <Link href={`/akwaba/${booking.listing.id}`} className="w-full">
             <Button className="w-full bg-slate-800 hover:bg-slate-700 text-white gap-2">
                 Voir le logement <ChevronRight size={14} />
             </Button>
          </Link>
+
+         {/* ✅ BOUTON DE NOTATION (Visible uniquement si le séjour est terminé) */}
+         {booking.status === 'COMPLETED' && (
+            <div className="w-full">
+                <ReviewModal 
+                    listingId={booking.listing.id} 
+                    listingTitle={booking.listing.title} 
+                />
+            </div>
+         )}
       </div>
 
     </div>

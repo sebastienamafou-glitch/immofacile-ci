@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ Correction : Import de l'auth officielle
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { 
@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import CancelTripButton from "@/components/guest/CancelTripButton"; // ✅ Nouvel import
 
 // Configuration visuelle des statuts
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -20,17 +21,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 
 export default async function GuestTripsPage() {
   // 1. SÉCURITÉ : Qui est connecté ?
-  const headersList = headers();
-  const userEmail = headersList.get("x-user-email");
+  const session = await auth(); // ✅ Correction : On récupère la session
+  const userEmail = session?.user?.email;
   
-  // 🔒 SÉCURITÉ STRICTE : Si pas d'email (Middleware a bloqué ou pas passé), on éjecte vers le login
+  // 🔒 SÉCURITÉ STRICTE : Si pas d'email, on éjecte vers le login
   if (!userEmail) {
     return redirect("/login?callbackUrl=/dashboard/guest/trips");
   }
 
+  // ✅ Correction : userEmail est garanti d'être défini ici
   const user = await prisma.user.findUnique({ where: { email: userEmail } });
 
-  // Cas rare : Email dans header mais utilisateur supprimé de la DB
+  // Cas rare : Email dans session mais utilisateur supprimé de la DB
   if (!user) {
     return redirect("/login");
   }
@@ -45,7 +47,7 @@ export default async function GuestTripsPage() {
             title: true,
             city: true,
             images: true,
-            address: true
+            // address: true // ⚠️ Vérifiez que 'address' est bien dans votre modèle Listing (souvent c'est juste city/neighborhood)
         }
       }
     },
@@ -83,6 +85,7 @@ export default async function GuestTripsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {bookings.map((booking) => {
                 // Gestion sécurisée du statut (fallback si statut inconnu)
+                // @ts-ignore - Pour éviter les erreurs de typage strict sur les clés dynamiques
                 const statusInfo = STATUS_CONFIG[booking.status] || STATUS_CONFIG.PENDING;
                 const StatusIcon = statusInfo.icon;
                 
@@ -138,12 +141,14 @@ export default async function GuestTripsPage() {
                             </div>
                         </CardContent>
 
-                        <CardFooter className="p-5 pt-0">
+                        <CardFooter className="p-5 pt-0 flex flex-col gap-2">
                             <Link href={`/akwaba/${booking.listing.id}`} className="w-full">
                                 <Button variant="outline" className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900">
                                     Voir l'annonce <ArrowRight className="w-4 h-4 ml-2 opacity-50" />
                                 </Button>
                             </Link>
+                            {/* ✅ AJOUT DU BOUTON D'ANNULATION */}
+                            <CancelTripButton bookingId={booking.id} status={booking.status} />
                         </CardFooter>
                     </Card>
                 );

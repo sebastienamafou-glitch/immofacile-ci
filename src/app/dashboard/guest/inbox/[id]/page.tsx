@@ -1,10 +1,11 @@
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ Import Auth
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ChatWindow from "@/components/guest/ChatWindow";
-import { MapPin, Calendar, ArrowLeft, AlertCircle } from "lucide-react";
+import { MapPin, ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 export const dynamic = 'force-dynamic';
 
@@ -13,14 +14,18 @@ interface PageProps {
 }
 
 export default async function ConversationPage({ params }: PageProps) {
-  // 1. Récupération User
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. Récupération Session Sécurisée
+  const session = await auth();
+  const userEmail = session?.user?.email;
+
+  if (!userEmail) {
+    redirect("/login?callbackUrl=/dashboard/guest/inbox");
+  }
 
   const currentUser = await prisma.user.findUnique({ where: { email: userEmail } });
   if (!currentUser) redirect("/login");
 
-  // 2. Récupération Conversation
+  // 2. Récupération Conversation avec les relations du Schema
   const conversation = await prisma.conversation.findUnique({
     where: { id: params.id },
     include: {
@@ -33,13 +38,12 @@ export default async function ConversationPage({ params }: PageProps) {
     }
   });
 
-  // 3. Sécurité (Est-ce que je suis autorisé ?)
+  // 3. Gestion des erreurs et de la sécurité
   if (!conversation) {
     return <div className="p-10 text-white">Conversation introuvable.</div>;
   }
 
-  // ✅ CORRECTIF DE SÉCURITÉ : VÉRIFICATION DES PARTICIPANTS
-  // TypeScript est content car on gère le cas où c'est null
+  // Dans votre schema, guest et host sont optionnels (User?). On doit gérer le cas null.
   if (!conversation.guest || !conversation.host) {
       return (
         <div className="p-10 flex flex-col items-center justify-center text-slate-400 h-[50vh]">
@@ -49,6 +53,7 @@ export default async function ConversationPage({ params }: PageProps) {
       );
   }
   
+  // Vérification stricte des droits d'accès
   const isGuest = conversation.guest.id === currentUser.id;
   const isHost = conversation.host.id === currentUser.id;
 
@@ -56,7 +61,7 @@ export default async function ConversationPage({ params }: PageProps) {
     return <div className="p-10 text-red-500">Accès non autorisé à cette conversation.</div>;
   }
 
-  // Déterminer qui est "l'autre"
+  // Déterminer qui est l'interlocuteur
   const otherUser = isGuest ? conversation.host : conversation.guest;
 
   return (
@@ -69,13 +74,26 @@ export default async function ConversationPage({ params }: PageProps) {
                 <ArrowLeft size={18} /> Retour
             </Button>
         </Link>
+        
+        {/* Affichage du bien lié (Si présent dans la conversation) */}
         {conversation.listing && (
             <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 pr-4 rounded-lg overflow-hidden">
-                {conversation.listing.images[0] && (
-                    <img src={conversation.listing.images[0]} alt="Bien" className="w-12 h-12 object-cover" />
-                )}
+                <div className="w-12 h-12 relative bg-slate-800">
+                    {conversation.listing.images && conversation.listing.images[0] ? (
+                        <Image 
+                            src={conversation.listing.images[0]} 
+                            alt="Bien" 
+                            fill
+                            className="object-cover" 
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-slate-700" />
+                    )}
+                </div>
                 <div>
-                    <h3 className="text-white text-sm font-bold truncate max-w-[200px]">{conversation.listing.title}</h3>
+                    <h3 className="text-white text-sm font-bold truncate max-w-[200px]">
+                        {conversation.listing.title}
+                    </h3>
                     <p className="text-slate-500 text-xs flex items-center gap-1">
                         <MapPin size={10} /> {conversation.listing.city}
                     </p>
@@ -95,22 +113,27 @@ export default async function ConversationPage({ params }: PageProps) {
             />
         </div>
 
-        {/* SIDEBAR INFO (Optionnel : Détails Résa) */}
+        {/* SIDEBAR INFO HÔTE */}
         <div className="hidden lg:block space-y-4">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">À propos de l'hôte</h4>
+                <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
+                    À propos de {isGuest ? "l'hôte" : "l'invité"}
+                </h4>
                 <div className="flex flex-col items-center text-center">
-                    <img 
-                        src={otherUser.image || "https://ui-avatars.com/api/?background=random"} 
-                        className="w-20 h-20 rounded-full mb-3 border-4 border-slate-800"
-                        alt="Avatar"
-                    />
+                    <div className="w-20 h-20 relative mb-3">
+                        <Image 
+                            src={otherUser.image || "https://ui-avatars.com/api/?background=random"} 
+                            fill
+                            className="rounded-full border-4 border-slate-800 object-cover"
+                            alt="Avatar"
+                        />
+                    </div>
                     <p className="text-white font-bold text-lg">{otherUser.name}</p>
                     <p className="text-slate-500 text-sm">Membre ImmoFacile</p>
                     
                     <div className="mt-6 w-full pt-6 border-t border-slate-800 flex justify-between text-sm">
                          <span className="text-slate-400">Réponse moy.</span>
-                         <span className="text-white">1 heure</span>
+                         <span className="text-white">~1 heure</span>
                     </div>
                 </div>
             </div>

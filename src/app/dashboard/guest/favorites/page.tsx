@@ -1,17 +1,26 @@
 import Link from "next/link";
 import Image from "next/image";
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ On utilise l'auth officielle
 import { prisma } from "@/lib/prisma";
 import { Heart, MapPin, Star, ArrowRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
 
 export default async function GuestFavoritesPage() {
-  // 1. Récupération User
-  const userEmail = headers().get("x-user-email");
+  // 1. Récupération sécurisée de la session
+  const session = await auth();
+  const userEmail = session?.user?.email;
+
+  // Sécurité : Si pas connecté, on redirige au lieu de faire planter Prisma
+  if (!userEmail) {
+    redirect("/login?callbackUrl=/dashboard/guest/favorites");
+  }
+
+  // 2. Requête Base de données
   const user = await prisma.user.findUnique({ 
-    where: { email: userEmail || undefined },
+    where: { email: userEmail }, // ✅ Ici userEmail est garanti d'être un string
     include: { 
         wishlists: {
             include: {
@@ -65,7 +74,7 @@ export default async function GuestFavoritesPage() {
                                 <div className="w-full h-full flex items-center justify-center text-slate-600">No Image</div>
                             )}
                             <div className="absolute top-3 right-3">
-                                {/* Bouton Supprimer (Simulé pour l'instant, nécessiterait une Server Action) */}
+                                {/* Bouton Supprimer (Simulé pour l'instant) */}
                                 <button className="p-2 bg-black/50 backdrop-blur rounded-full text-white hover:bg-red-500 transition">
                                     <Trash2 className="w-4 h-4" />
                                 </button>

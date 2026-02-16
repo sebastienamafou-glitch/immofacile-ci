@@ -1,6 +1,4 @@
 "use client";
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation"; 
@@ -23,7 +21,7 @@ export default function LeasesListPage() {
 
   const fetchLeases = useCallback(async () => {
     try {
-      // ✅ APPEL SÉCURISÉ : Le cookie fait tout le travail
+      // ✅ APPEL API SÉCURISÉ
       const res = await api.get('/owner/leases');
       
       if (res.data.success) {

@@ -22,6 +22,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    // ✅ AJOUT DE LA PERMISSION SVG ICI
+    dangerouslyAllowSVG: true, 
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
         protocol: "https",
@@ -29,7 +32,6 @@ const nextConfig = {
       },
     ],
   },
-  // ❌ J'AI SUPPRIMÉ LE BLOC REDIRECTS ICI POUR ÉVITER LE CONFLIT
 
   async headers() {
     return [

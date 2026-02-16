@@ -1,7 +1,7 @@
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ Import Auth officielle
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { CalendarDays, MapPin, AlertCircle } from "lucide-react";
+import { CalendarDays, MapPin } from "lucide-react";
 import BookingHistoryCard from "@/components/guest/BookingHistoryCard";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -9,14 +9,26 @@ import Link from "next/link";
 export const dynamic = 'force-dynamic';
 
 export default async function GuestHistoryPage() {
-  // 1. SÉCURITÉ : Récupération Session
-  const userEmail = headers().get("x-user-email");
-  if (!userEmail) redirect("/login");
+  // 1. SÉCURITÉ : Récupération Session via NextAuth v5
+  const session = await auth();
+  const userEmail = session?.user?.email;
 
-  const user = await prisma.user.findUnique({ where: { email: userEmail } });
-  if (!user) redirect("/login");
+  // Si pas de session, on redirige proprement
+  if (!userEmail) {
+    redirect("/login?callbackUrl=/dashboard/guest/history");
+  }
 
-  // 2. DATA FETCHING : Récupération optimisée des réservations
+  // 2. Récupération de l'utilisateur en base
+  const user = await prisma.user.findUnique({ 
+    where: { email: userEmail } 
+  });
+
+  // Cas limite : Session active mais user supprimé
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 3. DATA FETCHING : Récupération optimisée des réservations
   const bookings = await prisma.booking.findMany({
     where: { guestId: user.id },
     include: {
@@ -37,7 +49,7 @@ export default async function GuestHistoryPage() {
   });
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -56,11 +68,11 @@ export default async function GuestHistoryPage() {
         <div className="flex flex-col items-center justify-center p-12 border border-dashed border-slate-800 rounded-3xl bg-slate-900/50 text-center">
             <MapPin className="w-12 h-12 text-slate-600 mb-4" />
             <h3 className="text-xl font-bold text-white">Aucun voyage pour le moment</h3>
-            <p className="text-slate-400 mb-6 max-w-md">
+            <p className="text-slate-400 mb-6 max-w-md mx-auto">
                 Vous n'avez pas encore effectué de réservation. Explorez nos logements pour votre prochaine aventure !
             </p>
-            <Link href="/dashboard/guest">
-                <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold">
+            <Link href="/akwaba">
+                <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold px-8 py-6 text-lg rounded-xl">
                     Explorer les logements
                 </Button>
             </Link>

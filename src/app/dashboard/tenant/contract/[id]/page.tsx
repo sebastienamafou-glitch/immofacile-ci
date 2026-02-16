@@ -3,8 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import ContractActions from "@/components/tenant/contract-actions";
-// ✅ CORRECTION : Utilisation de Canvas pour que le QR s'affiche sur le PDF
-import { QRCodeCanvas } from "qrcode.react"; 
+import ClientQRCode from "@/components/shared/ClientQRCode"; 
 import { ShieldCheck, ArrowLeft, Building2 } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
@@ -123,7 +122,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     <div className="flex flex-col items-center gap-1">
                          <div className="border border-slate-800 p-1">
                             {/* ✅ QR CODE CANVAS : Visible à l'impression PDF */}
-                            <QRCodeCanvas 
+                            <ClientQRCode 
                                 value={`https://immofacile.ci/compliance/${lease.id}`} 
                                 size={65}
                                 level={"H"} // Haute correction d'erreur

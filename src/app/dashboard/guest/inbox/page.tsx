@@ -1,19 +1,29 @@
 import Link from "next/link";
-import { headers } from "next/headers";
+import { auth } from "@/auth"; // ✅ Utilisation de l'auth officielle
 import { prisma } from "@/lib/prisma";
 import { MessageCircle, User, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { redirect } from "next/navigation";
+import Image from "next/image";
 
 export const dynamic = 'force-dynamic';
 
 export default async function GuestInboxPage() {
-  const userEmail = headers().get("x-user-email");
-  const user = await prisma.user.findUnique({ where: { email: userEmail || undefined } });
+  // 1. Récupération Session (Correction du bug headers)
+  const session = await auth();
+  const userEmail = session?.user?.email;
+
+  if (!userEmail) {
+    redirect("/login?callbackUrl=/dashboard/guest/inbox");
+  }
+
+  const user = await prisma.user.findUnique({ where: { email: userEmail } });
 
   if (!user) return null;
 
-  // Récupérer les conversations où je suis le Guest
+  // 2. Récupération des conversations
+  // Selon le schema, guestId est optionnel mais ici on cherche celles où on est Guest
   const conversations = await prisma.conversation.findMany({
     where: { guestId: user.id },
     include: {
@@ -52,13 +62,17 @@ export default async function GuestInboxPage() {
                      className="block bg-slate-900 border border-slate-800 p-4 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition group"
                    >
                        <div className="flex items-center gap-4">
-                           {/* Avatar Host - ✅ CORRECTIF DE SÉCURITÉ ICI */}
-                           <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center shrink-0 border border-slate-600 overflow-hidden">
+                           {/* Avatar Host */}
+                           <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center shrink-0 border border-slate-600 overflow-hidden relative">
                                {conv.host?.image ? (
-                                   <img src={conv.host.image} alt="Avatar" className="w-full h-full object-cover"/>
+                                   <Image 
+                                      src={conv.host.image} 
+                                      alt="Avatar" 
+                                      fill 
+                                      className="object-cover"
+                                   />
                                ) : (
                                    <span className="font-bold text-white text-lg">
-                                       {/* On vérifie si conv.host existe avant d'accéder au nom */}
                                        {conv.host?.name ? conv.host.name[0] : <User className="w-6 h-6 text-slate-400"/>}
                                    </span>
                                )}
@@ -67,7 +81,6 @@ export default async function GuestInboxPage() {
                            {/* Contenu */}
                            <div className="flex-1 min-w-0">
                                <div className="flex justify-between items-baseline mb-1">
-                                   {/* ✅ CORRECTIF DE SÉCURITÉ ICI AUSSI */}
                                    <h4 className="text-white font-bold truncate">
                                        {conv.host?.name || "Utilisateur inconnu"} 
                                        <span className="text-slate-500 font-normal text-sm ml-2">• {conv.listing?.title || "Annonce"}</span>
