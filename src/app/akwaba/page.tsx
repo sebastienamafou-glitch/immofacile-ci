@@ -2,12 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import PublicSearchBar from "@/components/akwaba/PublicSearchBar";
-import { Star, MapPin, Heart, UserCircle, Sparkles } from "lucide-react";
+import { Star, MapPin, Heart, UserCircle, Sparkles, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/auth";
 import { Metadata } from "next";
 import { searchListings } from "@/actions/listings"; // ✅ On utilise l'action centralisée
+
 
 export const revalidate = 60;
 
@@ -48,6 +49,19 @@ export default async function AkwabaPublicPage({ searchParams }: SearchPageProps
       
       {/* NAVBAR */}
       <nav className="fixed top-0 w-full z-50 px-6 py-4 flex justify-between items-center bg-[#0B1120]/60 backdrop-blur-md border-b border-white/5">
+      {/* BLOC GAUCHE : BOUTON + LOGO */}
+  <div className="flex items-center gap-6">
+    {/* 1. Nouveau bouton inséré ici */}
+    <Link href="/">
+      <Button variant="ghost" className="text-slate-400 hover:text-white group p-0 hover:bg-transparent flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center group-hover:border-orange-500/50 group-hover:bg-orange-500/10 transition-all">
+          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+        </div>
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] hidden md:inline">
+          Quitter l'espace
+        </span>
+      </Button>
+    </Link>
         <div className="text-white font-black text-2xl tracking-tighter flex items-center gap-2">
             IMMO<span className="text-orange-500 font-extrabold">FACILE</span>
             <Badge variant="outline" className="text-[10px] border-orange-500/50 text-orange-500 ml-2">AKWABA</Badge>
@@ -70,6 +84,7 @@ export default async function AkwabaPublicPage({ searchParams }: SearchPageProps
                 </Link>
             )}
         </div>
+    </div>
       </nav>
 
       {/* HERO SECTION */}
