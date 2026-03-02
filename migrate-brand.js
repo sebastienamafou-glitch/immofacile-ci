@@ -4,18 +4,18 @@ const path = require('path');
 // CONFIGURATION DU REMPLACEMENT
 const REPLACEMENTS = [
   // 1. La Marque (Casse respectée)
-  { from: /ImmoFacile/g, to: 'Babimmo' },
-  { from: /immofacile/g, to: 'babimmo' },
-  { from: /IMMOFACILE/g, to: 'BABIMMO' },
+  { from: /Babimmo/g, to: 'Babimmo' },
+  { from: /babimmo/g, to: 'babimmo' },
+  { from: /BABIMMO/g, to: 'BABIMMO' },
   
   // 2. Les Domaines & Mails
-  { from: /immofacile\.ci/g, to: 'babimmo.ci' },
+  { from: /babimmo\.ci/g, to: 'babimmo.ci' },
   { from: /contact@webappci\.com/g, to: 'contact@babimmo.ci' }, // [cite: 59, 106]
   
   // 3. Le Numéro Français (CRITIQUE) -> À remplacer par un placeholder local
   // Le numéro +33 07 83... identifié dans tes docs [cite: 60, 106]
   { from: /\+33\s?0?7\s?83\s?97\s?41\s?75/g, to: '+225 07 00 00 00 00' },
-  { from: /\+330783974175/g, to: '+2250700000000' },
+  { from: /\+225 07 00 00 00 00/g, to: '+2250700000000' },
 ];
 
 // DOSSIERS À IGNORER

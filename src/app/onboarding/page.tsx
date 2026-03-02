@@ -45,7 +45,7 @@ export default function OnboardingPage() {
       
       <div className="text-center mb-10 space-y-4 max-w-2xl flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="flex flex-col items-center justify-center p-4 rounded-3xl bg-orange-500/10 mb-2 border border-orange-500/20 shadow-lg shadow-orange-500/10">
-             <div className="text-orange-500 font-black text-2xl tracking-tighter uppercase">IMMOFACILE</div>
+             <div className="text-orange-500 font-black text-2xl tracking-tighter uppercase">BABIMMO</div>
         </div>
         
         <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">Bienvenue à bord ! 🚀</h1>

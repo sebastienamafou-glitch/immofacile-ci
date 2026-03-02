@@ -119,7 +119,7 @@ function LoginForm() {
         {/* HEADER LOGO */}
         <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
             <Link href="/" className="relative w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-4 overflow-hidden border-2 border-white/10 hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" title="Retour à l'accueil">
-                <Image src="/logo.png" alt="Logo ImmoFacile" width={80} height={80} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
+                <Image src="/logo.png" alt="Logo Babimmo" width={80} height={80} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
             </Link>
             <h1 className="text-3xl font-black text-white tracking-tight text-center">
                 Espace <span className="text-orange-500 italic">CLIENT</span>
@@ -140,7 +140,7 @@ function LoginForm() {
                             required
                             autoFocus
                             type="text"
-                            placeholder="Ex: koffi@immofacile.ci"
+                            placeholder="Ex: koffi@babimmo.ci"
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-12"
                             value={formData.identifier}
                             onChange={e => setFormData({...formData, identifier: e.target.value})}

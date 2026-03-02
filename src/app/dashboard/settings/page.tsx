@@ -206,7 +206,7 @@ export default function SettingsPage() {
                                     const url = URL.createObjectURL(blob);
                                     const a = document.createElement("a");
                                     a.href = url;
-                                    a.download = `immofacile-data-${Date.now()}.json`;
+                                    a.download = `babimmo-data-${Date.now()}.json`;
                                     document.body.appendChild(a);
                                     a.click();
                                     document.body.removeChild(a);

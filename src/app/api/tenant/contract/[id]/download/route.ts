@@ -99,7 +99,7 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     let qrBuffer: Buffer | null = null;
     try {
         // L'URL que l'on scanne pour vérifier le document
-        const complianceUrl = `https://immofacile.ci/compliance/${lease.id}`;
+        const complianceUrl = `https://babimmo.ci/compliance/${lease.id}`;
         const qrDataUrl = await QRCode.toDataURL(complianceUrl, { margin: 1, width: 100 });
         qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
     } catch (e) {
@@ -237,7 +237,7 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     // Footer avec HASH ID (Plus robuste)
     const bottomY = doc.page.height - 40;
     doc.fontSize(7).fillColor('#64748B').text(
-        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.id} | Page 1/1`,
+        `Document généré et sécurisé par Babimmo.ci | Hash: ${lease.id} | Page 1/1`,
         MARGIN,
         bottomY,
         { align: 'center', width }

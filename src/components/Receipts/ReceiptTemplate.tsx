@@ -45,7 +45,7 @@ export default function ReceiptTemplate({ data }: { data: ReceiptData }) {
       {/* --- 0. FILIGRANE DE SÉCURITÉ (BACKGROUND) --- */}
       <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none flex items-center justify-center overflow-hidden">
         <div className="rotate-45 transform scale-150 whitespace-nowrap text-9xl font-black text-slate-900 select-none">
-          IMMOFACILE ORIGINAL • CERTIFIÉ • PAYÉ • IMMOFACILE ORIGINAL • CERTIFIÉ • PAYÉ
+          BABIMMO ORIGINAL • CERTIFIÉ • PAYÉ • BABIMMO ORIGINAL • CERTIFIÉ • PAYÉ
         </div>
       </div>
 
@@ -176,7 +176,7 @@ export default function ReceiptTemplate({ data }: { data: ReceiptData }) {
                     <div className="absolute inset-2 border border-blue-900 rounded-full"></div>
                     <ShieldCheck className="w-8 h-8 mb-1" />
                     <p className="text-lg font-black uppercase tracking-wider">PAYÉ</p>
-                    <p className="text-[8px] font-bold text-center uppercase">Certifié conforme<br/>ImmoFacile CI</p>
+                    <p className="text-[8px] font-bold text-center uppercase">Certifié conforme<br/>Babimmo CI</p>
                     <p className="text-[9px] font-mono mt-1 font-bold">{data.payment.paymentDate}</p>
                  </div>
                  {/* Signature Simulée */}
@@ -197,14 +197,14 @@ export default function ReceiptTemplate({ data }: { data: ReceiptData }) {
                     <div className="text-[8px] text-slate-500 leading-tight">
                         <p className="font-bold text-slate-900 mb-0.5">VÉRIFICATION D'AUTHENTICITÉ</p>
                         <p>Scannez ce code pour vérifier la validité</p>
-                        <p>de ce document sur immofacile.ci/verify</p>
+                        <p>de ce document sur babimmo.ci/verify</p>
                         <p className="font-mono mt-0.5 select-all">ID: {data.receiptId}</p>
                     </div>
                 </div>
 
                 <div className="text-right text-[8px] text-slate-400 max-w-xs">
                     <p>{data.legalFooter}</p>
-                    <p className="mt-1">Généré par la plateforme ImmoFacile • {new Date().getFullYear()}</p>
+                    <p className="mt-1">Généré par la plateforme Babimmo • {new Date().getFullYear()}</p>
                 </div>
             </div>
             

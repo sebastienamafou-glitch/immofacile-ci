@@ -3,32 +3,33 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import ContractActions from "@/components/tenant/contract-actions";
+import NoticeButton from "@/components/tenant/NoticeButton";
 import ClientQRCode from "@/components/shared/ClientQRCode"; 
-import { ShieldCheck, ArrowLeft, Building2 } from "lucide-react";
+import { 
+  ShieldCheck, ArrowLeft, Scale, Building2 
+} from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = 'force-dynamic';
 
 export default async function TenantContractPage({ params }: { params: { id: string } }) {
-  const { id } = await params; // Accès asynchrone aux params (Next.js 15)
+  const { id } = await params;
 
-  // 1. SÉCURITÉ & SESSION
   const session = await auth();
-  
-  // Vérification stricte
   if (!session?.user?.id) return redirect("/auth/login");
   const userId = session.user.id;
+  const user = session.user;
 
-  // 2. RÉCUPÉRATION DES DONNÉES (SCHEMA STRICT)
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
         property: {
             include: {
                 owner: { select: { id: true, name: true, email: true, phone: true } },
-                agency: true // Inclusion de l'agence pour affichage du mandat
+                agency: true 
             }
         },
-        // Relation 'signatures' conforme au schema.prisma
         signatures: { 
             include: { 
                 signer: { select: { id: true, name: true } } 
@@ -37,33 +38,22 @@ export default async function TenantContractPage({ params }: { params: { id: str
     }
   });
 
-  // 3. VÉRIFICATIONS D'ACCÈS
   if (!lease) return notFound();
   if (lease.tenantId !== userId) return redirect("/dashboard/tenant");
 
-  const user = session.user;
   const isTenantSigned = lease.signatureStatus !== 'PENDING';
   
-  // 4. LOGIQUE INTELLIGENTE DE DÉTECTION DES SIGNATAIRES
-  
-  // A. Trouver la signature du Locataire (Moi)
   const tenantProof = lease.signatures.find(p => p.signerId === lease.tenantId);
-  
-  // B. Trouver la signature du "Bailleur" (Celui qui n'est pas le locataire)
   const bailleurProof = lease.signatures.find(p => p.signerId !== lease.tenantId);
 
-  // C. Détection : Est-ce une signature par Mandat ?
-  // Si l'ID du signataire bailleur est DIFFERENT de l'ID du propriétaire => C'est un Agent/Agence
   const isMandateSignature = bailleurProof && bailleurProof.signerId !== lease.property.owner.id;
 
-  // D. Préparation des variables d'affichage
   const ownerName = lease.property.owner.name || "LE PROPRIÉTAIRE";
+  const tenantName = user.name || "LE LOCATAIRE";
   const agencyName = lease.property.agency?.name;
   
-  // Nom à afficher dans le cadre : Soit l'Agent (si mandat), soit le Proprio
   const bailleurSignerName = isMandateSignature ? bailleurProof?.signer.name : ownerName;
 
-  // 5. FORMATAGE DES DONNÉES
   const startDate = lease.startDate ? new Date(lease.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long'}) : "....................";
   
   const formatAuditDate = (date: Date) => {
@@ -74,44 +64,73 @@ export default async function TenantContractPage({ params }: { params: { id: str
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20 print:bg-white print:pb-0">
+    <div className="min-h-screen bg-slate-50 font-sans pb-20 print:bg-white print:pb-0">
         
-        {/* HEADER DASHBOARD (Caché à l'impression) */}
-        <div className="bg-[#0B1120] text-white pt-8 pb-12 px-4 lg:px-8 print:hidden">
-            <div className="max-w-5xl mx-auto">
-                <Link href="/dashboard/tenant" className="inline-flex items-center text-slate-400 hover:text-white mb-6 transition-colors text-sm font-medium">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Retour au tableau de bord
-                </Link>
-
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div>
-                        <h1 className="text-3xl font-black flex items-center gap-3 mb-2">
-                            <ShieldCheck className={`w-8 h-8 ${isTenantSigned ? 'text-emerald-500' : 'text-orange-500'}`} /> 
-                            <span>Contrat de Bail</span>
-                        </h1>
-                        <p className="text-slate-400 flex items-center gap-2">
-                            <Building2 className="w-4 h-4" /> 
-                            {lease.property.title}
+        <div className="bg-white border-b border-slate-200 py-6 px-8 mb-8 print:hidden">
+            <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                     <Link href="/dashboard/tenant" className="text-slate-400 hover:text-slate-800 text-sm flex items-center gap-1 mb-2">
+                        <ArrowLeft className="w-3 h-3"/> Retour au tableau de bord
+                     </Link>
+                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <Scale className="w-6 h-6 text-slate-800"/>
+                        Bail d'Habitation
+                     </h1>
+                     <div className="flex items-center gap-2 mt-1">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isTenantSigned ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {isTenantSigned ? 'SIGNÉ PAR VOUS' : 'EN ATTENTE DE VOTRE SIGNATURE'}
+                        </span>
+                        <p className="text-slate-500 text-sm flex items-center gap-1">
+                            <Building2 className="w-3 h-3"/> {lease.property.title}
                         </p>
-                    </div>
+                     </div>
+                </div>
 
-                    <div>
-                        {/* Le bouton "SIGNER" s'affichera ici grâce à ce composant */}
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="gap-2">
+                                <ShieldCheck className="w-4 h-4 text-blue-500"/> Certificat
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-4 bg-white">
+                             <div className="flex flex-col items-center">
+                                <ClientQRCode 
+                                    value={`https://babimmo.ci/compliance/${lease.id}`} 
+                                    size={120} 
+                                    level={"H"}
+                                />
+                                <p className="text-[10px] text-slate-400 mt-2 font-mono">SCAN ME</p>
+                             </div>
+                        </PopoverContent>
+                    </Popover>
+
+                    {!isTenantSigned && (
                         <ContractActions 
                             leaseId={lease.id} 
                             isSigned={isTenantSigned} 
                             userName={user.name || "Locataire"}
                         />
-                    </div>
+                    )}
+
+                    {isTenantSigned && lease.status === 'ACTIVE' && (
+                        <div className="bg-white border border-slate-200 p-1.5 rounded-lg flex items-center shadow-sm">
+                            <NoticeButton leaseId={lease.id} tenantId={user.id} />
+                        </div>
+                    )}
+
+                    {lease.status === 'IN_NOTICE' && (
+                        <div className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg border border-orange-200 text-sm font-bold flex items-center gap-2 shadow-sm">
+                            🚨 PRÉAVIS EN COURS
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
 
-        {/* --- DOCUMENT OFFICIEL --- */}
-        <div className="flex justify-center -mt-8 px-4 print:mt-0 print:px-0 print:block">
-            <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl rounded-sm border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
+        <div className="flex justify-center px-4 print:px-0 print:block">
+            <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
                 
-                {/* 1. EN-TÊTE LEGAL */}
                 <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
                     <div className="flex-1 pr-4"> 
                         <h1 className="text-2xl font-serif font-black uppercase tracking-wide mb-2">Contrat de Bail <br/>à Usage d'Habitation</h1>
@@ -121,11 +140,10 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                     <div className="flex flex-col items-center gap-1">
                          <div className="border border-slate-800 p-1">
-                            {/* ✅ QR CODE CANVAS : Visible à l'impression PDF */}
                             <ClientQRCode 
-                                value={`https://immofacile.ci/compliance/${lease.id}`} 
+                                value={`https://babimmo.ci/compliance/${lease.id}`} 
                                 size={65}
-                                level={"H"} // Haute correction d'erreur
+                                level={"H"}
                                 marginSize={1}
                             />
                          </div>
@@ -133,13 +151,11 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                 </div>
 
-                {/* 2. LES PARTIES */}
                 <div className="mb-8 font-serif text-sm">
                     <p className="font-bold text-base border-b border-black mb-4 pb-1 uppercase">ENTRE LES SOUSSIGNÉS :</p>
                     
                     <div className="mb-4 pl-4 border-l-2 border-slate-200">
                         <p><strong>LE BAILLEUR :</strong> {ownerName.toUpperCase()}</p>
-                        {/* Mention Mandataire si applicable */}
                         {lease.property.agency && (
                             <p className="text-xs mt-0.5 text-slate-600">Représenté par son mandataire : <strong>L'Agence {lease.property.agency.name}</strong></p>
                         )}
@@ -147,7 +163,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
 
                     <div className="pl-4 border-l-2 border-slate-200">
-                        <p><strong>LE PRENEUR :</strong> {user.name?.toUpperCase() || "LE LOCATAIRE"}</p>
+                        <p><strong>LE PRENEUR :</strong> {tenantName.toUpperCase()}</p>
                         <p>Contact : {user.email}</p>
                         <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Preneur".</p>
                     </div>
@@ -157,7 +173,6 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :
                 </p>
 
-                {/* 3. CLAUSES OBLIGATOIRES (12 ARTICLES COMPLETS) */}
                 <div className="space-y-4 font-serif text-[10px] text-slate-800 mb-8">
                     
                     <div>
@@ -261,7 +276,6 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                 </div>
 
-                {/* 4. SIGNATURES AVEC AUDIT TRAIL (LOGIQUE INTELLIGENTE) */}
                 <div className="mt-auto pt-4 border-t-2 border-black font-sans">
                     <p className="mb-6 text-xs text-right italic font-serif">
                         Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>, en deux exemplaires originaux.
@@ -269,25 +283,19 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     
                     <div className="flex justify-between gap-6 mt-4">
                         
-                        {/* === CADRE TECHNIQUE : BAILLEUR (Auto-adaptatif Mandat/Direct) === */}
                         <div className="w-1/2">
                             <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Bailleur (ou son Mandataire)</p>
                             
                             {bailleurProof ? (
                                 <div className={`border-2 p-3 rounded-sm bg-white text-left ${isMandateSignature ? 'border-purple-600' : 'border-emerald-600'}`}>
-                                    {/* TITRE DU CADRE */}
                                     <p className={`${isMandateSignature ? 'text-purple-600' : 'text-emerald-600'} font-bold text-sm uppercase mb-3`}>
                                         {isMandateSignature ? "SIGNÉ PAR MANDAT (P/O)" : "SIGNÉ ÉLECTRONIQUEMENT"}
                                     </p>
                                     
-                                    {/* DÉTAILS TECHNIQUES */}
                                     <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
-                                        
-                                        {/* Si Mandat : On affiche POUR QUI on signe */}
                                         {isMandateSignature && (
                                             <p className="font-bold text-black">POUR: AGENCE {agencyName?.toUpperCase()}</p>
                                         )}
-                                        
                                         <p>
                                             <span className="font-bold mr-2">Signataire:</span> 
                                             {bailleurSignerName?.toUpperCase()}
@@ -313,7 +321,6 @@ export default async function TenantContractPage({ params }: { params: { id: str
                             )}
                         </div>
 
-                        {/* === CADRE TECHNIQUE : PRENEUR (MOI) === */}
                         <div className="w-1/2">
                             <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Preneur (Lu et approuvé)</p>
                             
@@ -325,7 +332,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                                     <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
                                         <p>
                                             <span className="text-blue-700 font-bold mr-2">Signataire:</span> 
-                                            {user.name?.toUpperCase() || "LOCATAIRE"}
+                                            {tenantName.toUpperCase()}
                                         </p>
                                         <p>
                                             <span className="text-blue-700 font-bold mr-2">Date:</span> 
@@ -343,7 +350,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                                 </div>
                             ) : (
                                 <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                                    <p className="text-[9px] text-slate-400 italic">Zone de signature</p>
+                                    <p className="text-[9px] text-slate-400 italic">En attente du locataire</p>
                                 </div>
                             )}
                         </div>
@@ -351,10 +358,9 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                 </div>
                 
-                {/* Footer Légal */}
                 <div className="mt-8 pt-2 border-t border-slate-200 text-center">
                     <p className="text-[8px] text-slate-400 font-mono">
-                        Document certifié par ImmoFacile.ci • Audit ID: {lease.id} • Page 1/1
+                        Document certifié par Babimmo.ci • Audit ID: {lease.id} • Page 1/1
                     </p>
                 </div>
 

@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = "superadmin@immofacile.ci";
+  const email = "superadmin@babimmo.ci";
   const password = "admin123"; 
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -18,7 +18,7 @@ async function main() {
     },
     create: {
       email,
-      name: "Direction ImmoFacile",
+      name: "Direction Babimmo",
       password: hashedPassword,
       role: "SUPER_ADMIN", 
       isVerified: true,

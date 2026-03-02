@@ -78,7 +78,7 @@ export default function CreateAgentModal() {
                 <label className="text-xs font-bold text-slate-500 uppercase">Email professionnel</label>
                 <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                    <Input name="email" type="email" placeholder="jean@immofacile.ci" required className="pl-9 bg-slate-900 border-slate-800" value={formData.email} onChange={handleChange} />
+                    <Input name="email" type="email" placeholder="jean@babimmo.ci" required className="pl-9 bg-slate-900 border-slate-800" value={formData.email} onChange={handleChange} />
                 </div>
             </div>
 

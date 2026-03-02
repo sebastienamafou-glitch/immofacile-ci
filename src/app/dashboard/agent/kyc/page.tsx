@@ -204,13 +204,13 @@ export default function AgentKYCPage() {
                             className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500/50 cursor-pointer" 
                         />
                         <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
-                            Je certifie l'exactitude des informations. J'autorise <span className="text-white font-bold">ImmoFacile</span> à stocker mon numéro de carte de manière chiffrée (AES-256).
+                            Je certifie l'exactitude des informations. J'autorise <span className="text-white font-bold">Babimmo</span> à stocker mon numéro de carte de manière chiffrée (AES-256).
                         </label>
                     </div>
 
                     {/* ZONE D'UPLOAD */}
                     <CldUploadWidget 
-                        uploadPreset="immofacile_kyc"
+                        uploadPreset="babimmo_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf", "webp"] }}
                     >

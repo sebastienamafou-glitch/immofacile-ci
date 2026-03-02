@@ -90,7 +90,7 @@ function generateCompliancePDF(lease: any): Promise<Buffer> {
     // -- HEADER --
     doc.rect(0, 0, 595, 120).fill('#0B1120');
     doc.font('Helvetica-Bold').fontSize(24).fillColor('#F59E0B').text("CERTIFICAT DE CONFORMITÉ", 50, 45);
-    doc.font('Helvetica').fontSize(10).fillColor('#94A3B8').text("INFRASTRUCTURE IMMOFACILE • LOI 2019-576", 50, 75);
+    doc.font('Helvetica').fontSize(10).fillColor('#94A3B8').text("INFRASTRUCTURE BABIMMO • LOI 2019-576", 50, 75);
     doc.font('Courier').fontSize(10).fillColor('#FFFFFF').text(`REF: ${lease.id.toUpperCase()}`, 50, 90, { align: 'right', width: 495 });
 
     // -- INFO BIEN --
@@ -152,7 +152,7 @@ function generateCompliancePDF(lease: any): Promise<Buffer> {
     // -- FOOTER --
     doc.text("", 50, 750); 
     doc.font('Helvetica-Bold').fontSize(8).fillColor('#94A3B8')
-       .text("DOCUMENT GÉNÉRÉ AUTOMATIQUEMENT PAR LA PLATEFORME IMMOFACILE.", { align: 'center' });
+       .text("DOCUMENT GÉNÉRÉ AUTOMATIQUEMENT PAR LA PLATEFORME BABIMMO.", { align: 'center' });
     doc.font('Helvetica').fontSize(7)
        .text(`ID Unique: ${lease.id} • Date: ${new Date().toLocaleDateString()}`, { align: 'center' });
 

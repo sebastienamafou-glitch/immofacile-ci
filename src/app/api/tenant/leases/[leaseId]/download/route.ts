@@ -247,7 +247,7 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     // Bas de page technique
     const bottomY = doc.page.height - 40;
     doc.fontSize(7).fillColor('#64748B').text(
-        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.documentHash || "En attente"} | Page 1/1`,
+        `Document généré et sécurisé par Babimmo.ci | Hash: ${lease.documentHash || "En attente"} | Page 1/1`,
         MARGIN,
         bottomY,
         { align: 'center', width }

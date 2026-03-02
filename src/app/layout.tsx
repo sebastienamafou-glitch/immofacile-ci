@@ -27,13 +27,13 @@ export const viewport: Viewport = {
 // ✅ Modification Sentry : On passe de const metadata à generateMetadata()
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: "ImmoFacile C.I",
+    title: "Babimmo C.I",
     description: "Gestion immobilière intelligente en Côte d'Ivoire",
     manifest: '/manifest.json',
     appleWebApp: {
       capable: true,
       statusBarStyle: 'black-translucent',
-      title: "ImmoFacile",
+      title: "Babimmo",
     },
     // ✅ AJOUT : Vérification Google Search Console
     verification: {

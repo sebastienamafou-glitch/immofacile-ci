@@ -104,7 +104,7 @@ export default async function CompliancePage({ params }: PageProps) {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-wide">CERTIFICAT DE CONFORMITÉ</h1>
-              <p className="text-xs text-slate-400 uppercase tracking-widest">Infrastructure ImmoFacile • RCI</p>
+              <p className="text-xs text-slate-400 uppercase tracking-widest">Infrastructure Babimmo • RCI</p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -228,7 +228,7 @@ export default async function CompliancePage({ params }: PageProps) {
         {/* FOOTER */}
         <div className="bg-slate-50 p-4 border-t border-slate-200 text-center flex flex-col items-center">
             <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">
-                Document certifié par ImmoFacile
+                Document certifié par Babimmo
             </p>
              <div className="text-[9px] text-slate-300 font-mono">
                 ID Unique: {lease.id}

@@ -40,7 +40,7 @@ export default function ImageUpload({ defaultImages = [], maxFiles = 5 }: ImageU
         formData.append("api_key", process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY!); // Vérifiez que cette var est dans le .env
         formData.append("timestamp", timestamp.toString());
         formData.append("signature", signature);
-        // formData.append("folder", "immofacile_listings"); // Optionnel : organiser dans un dossier
+        // formData.append("folder", "babimmo_listings"); // Optionnel : organiser dans un dossier
 
         // C. Envoyer à Cloudinary
         const response = await fetch(

@@ -28,7 +28,7 @@ export default function DocumentViewerPage() {
             title: "Règlement de Copropriété", 
             type: "PDF CERTIFIÉ", 
             date: "01/01/2024",
-            author: "Syndic ImmoFacile",
+            author: "Syndic Babimmo",
             content: "Ceci est un aperçu générique du document..." 
         });
         setLoading(false);

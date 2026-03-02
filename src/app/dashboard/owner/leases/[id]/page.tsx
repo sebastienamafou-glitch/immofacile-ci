@@ -1,11 +1,13 @@
-"use client";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import OwnerContractActions from "@/components/owner/owner-contract-actions";
-// ✅ CORRECTION : Utilisation de Canvas pour le PDF (comme chez le locataire)
-import { QRCodeCanvas } from "qrcode.react"; 
+import { acknowledgeNoticeAction } from "@/actions/lease.actions";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { revalidatePath } from "next/cache";
+import ClientQRCode from "@/components/shared/ClientQRCode"; 
+import RefundDepositModal from "@/components/owner/RefundDepositModal";
 import { 
   ShieldCheck, ArrowLeft, Printer, Scale, Building2 
 } from "lucide-react";
@@ -118,9 +120,9 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-4 bg-white">
                              <div className="flex flex-col items-center">
-                                {/* QR Code Canvas pour l'UI Web */}
-                                <QRCodeCanvas 
-                                    value={`https://immofacile.ci/compliance/${lease.id}`} 
+                                {/* ✅ CORRECTION : ClientQRCode */}
+                                <ClientQRCode 
+                                    value={`https://babimmo.ci/compliance/${lease.id}`} 
                                     size={120} 
                                     level={"H"}
                                 />
@@ -138,6 +140,61 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
             </div>
         </div>
 
+        {/* === ALERTE PRÉAVIS (Si statut IN_NOTICE) === */}
+        {lease.status === "IN_NOTICE" && (
+            <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div className="flex items-start gap-4">
+                        <div className="bg-red-100 p-2 rounded-full">
+                            <AlertTriangle className="w-6 h-6 text-red-600" />
+                        </div>
+                        <div>
+                            <h3 className="text-red-900 font-bold text-lg">Préavis de départ reçu</h3>
+                            <p className="text-red-700 text-sm mt-1">
+                                Le locataire a signifié son intention de quitter les lieux le : 
+                                <strong className="ml-1 text-red-900">
+                                    {lease.plannedDepartureDate ? new Date(lease.plannedDepartureDate).toLocaleDateString('fr-FR', { dateStyle: 'long' }) : "Date non précisée"}
+                                </strong>.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION === */}
+                    {lease.status === "TERMINATED" && (
+                        <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
+                            <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                                <div>
+                                    <h3 className="text-slate-900 font-bold text-lg">Bail terminé</h3>
+                                    <p className="text-slate-500 text-sm mt-1">
+                                        Ce contrat est clôturé. Vous pouvez maintenant procéder à la restitution de la caution sur le portefeuille du locataire.
+                                     </p>
+                                 </div>
+                    
+                                 <RefundDepositModal 
+                                     leaseId={lease.id}
+                                     tenantName={tenantName}
+                                     depositAmount={lease.depositAmount}
+                                     ownerId={session.user.id}
+                                 />
+                             </div>
+                         </div>
+                    )}
+                    
+                    {/* Action form pour valider le départ */}
+                    <form action={async () => {
+                        "use server";
+                        await acknowledgeNoticeAction(lease.id, session.user.id);
+                        revalidatePath(`/dashboard/owner/leases/${lease.id}`);
+                    }}>
+                        <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold gap-2">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Acter le départ (Libérer le bien)
+                        </Button>
+                    </form>
+                </div>
+            </div>
+        )}
+
         {/* --- DOCUMENT OFFICIEL (IDENTIQUE AU LOCATAIRE) --- */}
         <div className="flex justify-center px-4 print:px-0 print:block">
             <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
@@ -152,9 +209,9 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     </div>
                     <div className="flex flex-col items-center gap-1">
                          <div className="border border-slate-800 p-1">
-                            {/* ✅ QR CODE CANVAS : Visible à l'impression PDF */}
-                            <QRCodeCanvas 
-                                value={`https://immofacile.ci/compliance/${lease.id}`} 
+                            {/* ✅ CORRECTION : ClientQRCode */}
+                            <ClientQRCode 
+                                value={`https://babimmo.ci/compliance/${lease.id}`} 
                                 size={65}
                                 level={"H"}
                                 marginSize={1}
@@ -382,7 +439,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                 {/* Footer Légal */}
                 <div className="mt-8 pt-2 border-t border-slate-200 text-center">
                     <p className="text-[8px] text-slate-400 font-mono">
-                        Document certifié par ImmoFacile.ci • Audit ID: {lease.id} • Page 1/1
+                        Document certifié par Babimmo.ci • Audit ID: {lease.id} • Page 1/1
                     </p>
                 </div>
 

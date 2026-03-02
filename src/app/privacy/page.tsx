@@ -40,7 +40,7 @@ export default function PrivacyPage() {
 
         <div className="max-w-4xl mx-auto px-6 relative z-10 text-center flex flex-col items-center">
             <div className="mb-8 p-3 bg-white/5 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-sm">
-                <Image src="/logo.png" alt="Logo ImmoFacile" width={80} height={80} className="object-contain" />
+                <Image src="/logo.png" alt="Logo Babimmo" width={80} height={80} className="object-contain" />
             </div>
 
             <h1 className="text-4xl md:text-6xl font-black mb-6 tracking-tight leading-tight">
@@ -133,7 +133,7 @@ export default function PrivacyPage() {
                         <h2 className="text-2xl font-black text-slate-900">3. Audit & Intégrité des Données</h2>
                     </div>
                     <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-                        Pour garantir une sécurité maximale, ImmoFacile utilise un mécanisme d'<strong>Audit Trail</strong> (Piste d'audit).
+                        Pour garantir une sécurité maximale, Babimmo utilise un mécanisme d'<strong>Audit Trail</strong> (Piste d'audit).
                     </p>
                     <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 font-mono text-xs text-blue-400">
                         <p className="flex items-center gap-2 mb-2"><History size={14} /> // Sécurité immuable</p>
@@ -154,8 +154,8 @@ export default function PrivacyPage() {
                     </p>
                     <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-center">
                         <p className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-widest">Délégué à la Protection (DPO)</p>
-                        <a href="mailto:privacy@immofacile.ci" className="text-blue-600 font-black hover:underline text-lg flex items-center justify-center gap-2">
-                            <Mail className="w-5 h-5" /> privacy@immofacile.ci
+                        <a href="mailto:privacy@babimmo.ci" className="text-blue-600 font-black hover:underline text-lg flex items-center justify-center gap-2">
+                            <Mail className="w-5 h-5" /> privacy@babimmo.ci
                         </a>
                     </div>
                 </article>

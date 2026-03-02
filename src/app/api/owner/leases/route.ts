@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs"; 
+
 export const dynamic = 'force-dynamic';
 
 // ============================================================================
-// GET : Lister les baux
+// GET : Lister les baux (VOTRE CODE ORIGINAL INTACT)
 // ============================================================================
 export async function GET(request: Request) {
   try {
@@ -57,11 +57,11 @@ export async function GET(request: Request) {
 }
 
 // ============================================================================
-// POST : Créer un bail
+// POST : Créer un bail (AVEC LE BOUCLIER LOI N° 2019-576)
 // ============================================================================
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ : Auth v5 (Remplacement header)
+    // 1. SÉCURITÉ : Auth v5
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
@@ -75,8 +75,22 @@ export async function POST(request: Request) {
 
     const rent = Number(body.rent);
     const deposit = Number(body.deposit || 0);
+    const advance = Number(body.advance || 0); // ✅ Capture de l'avance
 
-    // 2. VÉRIFICATION PROPRIÉTÉ
+    // 🛑 2. BOUCLIER JURIDIQUE BACKEND : LOI N° 2019-576 🛑
+    if (deposit > rent * 2) {
+        return NextResponse.json({ 
+            error: "Violation de la Loi n° 2019-576 : Le dépôt de garantie ne peut excéder 2 mois de loyer." 
+        }, { status: 400 });
+    }
+
+    if (advance > rent * 2) {
+        return NextResponse.json({ 
+            error: "Violation de la Loi n° 2019-576 : L'avance sur loyer ne peut excéder 2 mois." 
+        }, { status: 400 });
+    }
+
+    // 3. VÉRIFICATION PROPRIÉTÉ
     const property = await prisma.property.findUnique({
         where: { id: body.propertyId }
     });
@@ -86,7 +100,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Vous n'êtes pas le propriétaire." }, { status: 403 });
     }
 
-    // 3. GESTION LOCATAIRE (Upsert-like logic)
+    // 4. GESTION LOCATAIRE (Upsert-like logic)
     let tenant = await prisma.user.findUnique({ where: { email: body.tenantEmail } });
 
     if (tenant && !["TENANT", "GUEST"].includes(tenant.role)) {
@@ -112,7 +126,6 @@ export async function POST(request: Request) {
                     role: "TENANT",
                     phone: body.tenantPhone || undefined,
                     
-                    // ✅ CORRECTION STRUCTURELLE (Le coeur du problème)
                     kyc: {
                         create: {
                             status: "PENDING",
@@ -134,7 +147,7 @@ export async function POST(request: Request) {
         }
     }
 
-    // 4. VÉRIFICATION VACANCE
+    // 5. VÉRIFICATION VACANCE
     const activeLease = await prisma.lease.findFirst({
         where: { propertyId: property.id, isActive: true }
     });
@@ -143,13 +156,14 @@ export async function POST(request: Request) {
          return NextResponse.json({ error: "Bien déjà loué !" }, { status: 409 });
     }
 
-    // 5. CRÉATION BAIL
+    // 6. CRÉATION BAIL
     const newLease = await prisma.lease.create({
         data: {
             startDate: new Date(body.startDate),
             endDate: body.endDate ? new Date(body.endDate) : null,
             monthlyRent: rent,
             depositAmount: deposit,
+            advanceAmount: advance, // ✅ Enregistrement en base de données
             status: "PENDING",
             isActive: false, 
             signatureStatus: "PENDING",

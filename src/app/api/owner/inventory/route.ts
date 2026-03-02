@@ -15,7 +15,7 @@ cloudinary.config({
 export const dynamic = 'force-dynamic';
 
 // --- HELPER : UPLOAD CLOUDINARY ---
-async function uploadToCloudinary(file: File | null, folder: string = "immofacile/inventory") {
+async function uploadToCloudinary(file: File | null, folder: string = "babimmo/inventory") {
   if (!file || file.size === 0) return null;
 
   const arrayBuffer = await file.arrayBuffer();

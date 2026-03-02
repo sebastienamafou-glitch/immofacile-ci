@@ -3,10 +3,16 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { Loader2, ArrowLeft, Smartphone, ShieldCheck, CheckCircle2, FileText } from "lucide-react";
+import { Loader2, ArrowLeft, Smartphone, ShieldCheck, CheckCircle2, FileText, Banknote } from "lucide-react";
 import Swal from "sweetalert2";
 import Link from "next/link";
-import { toast } from "sonner"; // J'ai ajouté le toast pour une meilleure UX
+import { toast } from "sonner";
+
+interface LeaseInfo {
+  id: string;
+  monthlyRent: number;
+  property: { title: string };
+}
 
 function PaymentContent() {
   const router = useRouter();
@@ -18,84 +24,86 @@ function PaymentContent() {
 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [lease, setLease] = useState<any>(null);
+  const [lease, setLease] = useState<LeaseInfo | null>(null);
   const [provider, setProvider] = useState("WAVE");
   const [phone, setPhone] = useState("");
-  // ✅ NOUVEAU : On stocke l'email de l'utilisateur
   const [userEmail, setUserEmail] = useState("");
 
   const isFee = paramType?.includes('FRAIS');
+  const isTopUp = paramType === 'TOPUP';
   const amountToPay = paramAmount ? parseInt(paramAmount) : (lease?.monthlyRent || 0);
-  const pageTitle = isFee ? "Frais de Dossier" : "Paiement de Loyer";
+  
+  const pageTitle = isTopUp ? "Rechargement Portefeuille" : isFee ? "Frais de Dossier" : "Paiement de Loyer";
 
   useEffect(() => {
     const fetchLeaseInfo = async () => {
       try {
-        // 1. SÉCURITÉ : On récupère l'utilisateur
         const storedUser = localStorage.getItem("immouser");
         if (!storedUser) {
             router.push("/login");
             return;
         }
         const currentUser = JSON.parse(storedUser);
-        setUserEmail(currentUser.email); // On garde l'email pour plus tard
+        setUserEmail(currentUser.email);
 
-        // 2. APPEL API AVEC HEADERS
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email } // ✅ C'est la ligne magique !
-        });
+        if (!isTopUp) {
+            const res = await api.get('/tenant/dashboard', {
+                headers: { 'x-user-email': currentUser.email }
+            });
 
-        if (res.data.success && res.data.lease) {
-            setLease(res.data.lease);
-            if(res.data.user?.phone) setPhone(res.data.user.phone);
-        } else {
-             // Si pas de bail, on redirige gentiment
-             toast.error("Aucun bail actif trouvé.");
-             router.push('/dashboard/tenant');
+            if (res.data.success && res.data.lease) {
+                setLease(res.data.lease);
+                if(res.data.user?.phone) setPhone(res.data.user.phone);
+            } else {
+                 toast.error("Aucun bail actif trouvé.");
+                 router.push('/dashboard/tenant');
+            }
         }
       } catch (error) {
-        console.error("Erreur chargement bail:", error);
+        console.error("Erreur chargement:", error);
         toast.error("Erreur de connexion.");
       } finally {
         setLoading(false);
       }
     };
     fetchLeaseInfo();
-  }, [router]);
+  }, [router, isTopUp]);
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (amountToPay <= 0) return toast.error("Montant invalide.");
     setProcessing(true);
 
     try {
-      const endpoint = isFee ? '/tenant/pay-fees' : '/tenant/pay-rent';
+      const endpoint = isTopUp ? '/tenant/topup' : isFee ? '/tenant/pay-fees' : '/tenant/pay-rent';
       
       const res = await api.post(endpoint, {
-        leaseId: lease.id,
+        leaseId: lease?.id,
         paymentId: paramId, 
         amount: amountToPay,
         provider: provider,
         phone: phone
       }, {
-        // ✅ IMPORTANT : On passe aussi le header ici pour le POST
         headers: { 'x-user-email': userEmail } 
       });
 
       if (res.data.success) {
         await Swal.fire({
             icon: 'success',
-            title: 'Paiement Réussi !',
-            text: isFee ? 'Vos frais ont été réglés.' : 'Votre quittance a été générée.',
+            title: 'Opération Initiée',
+            text: isTopUp ? 'Veuillez confirmer le rechargement sur votre téléphone.' : 'Veuillez confirmer le paiement sur votre téléphone.',
             confirmButtonColor: '#F59E0B',
             background: '#0B1120', color: '#fff'
         });
         router.push('/dashboard/tenant/payments'); 
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+         // @ts-ignore - Gestion de l'erreur Axios
+         const errorMsg = error.response?.data?.error || 'Une erreur est survenue.';
          Swal.fire({
             icon: 'error',
-            title: 'Échec du paiement',
-            text: error.response?.data?.error || 'Une erreur est survenue.',
+            title: 'Échec de l\'opération',
+            text: errorMsg,
             background: '#0B1120', color: '#fff'
          });
     } finally {
@@ -112,9 +120,8 @@ function PaymentContent() {
 
   return (
     <div className="w-full max-w-lg bg-[#0F172A] border border-white/5 rounded-[2.5rem] shadow-2xl relative z-10">
-        
         <div className="p-8 pb-4">
-            <Link href="/dashboard/tenant" className="text-slate-500 hover:text-white flex items-center gap-2 mb-8 text-[10px] transition-all font-black uppercase tracking-[0.2em] group">
+            <Link href={isTopUp ? "/dashboard/tenant/payments" : "/dashboard/tenant"} className="text-slate-500 hover:text-white flex items-center gap-2 mb-8 text-[10px] transition-all font-black uppercase tracking-[0.2em] group">
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Annuler
             </Link>
             
@@ -124,7 +131,7 @@ function PaymentContent() {
                     <p className="text-slate-500 text-xs mt-1 font-medium">Référence : <span className="font-mono text-slate-400">#{paramType || `LOY-${new Date().getMonth()+1}`}</span></p>
                 </div>
                 <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shadow-lg shadow-orange-500/5">
-                    {isFee ? <FileText className="w-7 h-7 text-orange-500" /> : <ShieldCheck className="w-7 h-7 text-orange-500" />}
+                    {isTopUp ? <Banknote className="w-7 h-7 text-orange-500" /> : isFee ? <FileText className="w-7 h-7 text-orange-500" /> : <ShieldCheck className="w-7 h-7 text-orange-500" />}
                 </div>
             </div>
         </div>
@@ -135,7 +142,7 @@ function PaymentContent() {
                 <div className="flex justify-between items-end relative z-10">
                     <div>
                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-2">Total à payer</p>
-                        <p className="text-xs text-orange-500/80 font-bold mb-1">{lease?.property?.title}</p>
+                        <p className="text-xs text-orange-500/80 font-bold mb-1">{isTopUp ? "Approvisionnement" : lease?.property?.title}</p>
                     </div>
                     <div className="text-right">
                         <p className="text-4xl font-black text-white tracking-tighter">
@@ -220,7 +227,7 @@ function PaymentContent() {
 
 export default function PaymentPageWrapper() {
   return (
-    <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 md:p-8 flex items-center justify-center font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B1120] text-slate-200 p-4 md:p-8 flex items-center justify-center font-sans relative overflow-hidden">
       <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/5 blur-[120px] rounded-full"></div>
       

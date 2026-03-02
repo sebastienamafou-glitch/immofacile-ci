@@ -226,7 +226,7 @@ export default function AgencyKYCPage() {
 
                     {/* 4. ZONE D'UPLOAD */}
                     <CldUploadWidget 
-                        uploadPreset="immofacile_kyc"
+                        uploadPreset="babimmo_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["pdf", "jpg", "png"] }}
                     >

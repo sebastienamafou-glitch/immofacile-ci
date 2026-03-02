@@ -93,7 +93,7 @@ export default function RehousingPage() {
                 <div className="space-y-4">
                     {vacantProperties.map((prop: any) => {
                         // Message WhatsApp pré-rédigé (Le Hack ultime)
-                        const waMessage = `Bonjour ${tenant.name}, merci pour votre sérieux.\n\nSuite à votre départ, j'ai le plaisir de vous offrir le *Pass Relogement ImmoFacile*.\n\nJ'ai un autre bien disponible tout de suite : *${prop.title} à ${prop.commune}* (+${prop.price.toLocaleString('fr-FR')} FCFA).\n\nComme je connais votre dossier, *aucuns frais d'agence supplémentaires* si vous le prenez.\nIntéressé par une visite ?`;
+                        const waMessage = `Bonjour ${tenant.name}, merci pour votre sérieux.\n\nSuite à votre départ, j'ai le plaisir de vous offrir le *Pass Relogement Babimmo*.\n\nJ'ai un autre bien disponible tout de suite : *${prop.title} à ${prop.commune}* (+${prop.price.toLocaleString('fr-FR')} FCFA).\n\nComme je connais votre dossier, *aucuns frais d'agence supplémentaires* si vous le prenez.\nIntéressé par une visite ?`;
                         const waLink = createWhatsAppLink(tenant.phone, waMessage);
 
                         return (

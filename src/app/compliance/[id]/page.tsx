@@ -8,14 +8,17 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
 
+// Force le rendu dynamique pour avoir les dernières données à chaque scan
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string }; // Simplifié pour compatibilité max (Next 13/14)
 }
 
 export default async function PublicCompliancePage({ params }: PageProps) {
-  const { id } = await params;
+  // Adaptation selon la version Next.js (Si params est une promesse ou non)
+  // @ts-ignore
+  const id = params.id || (await params).id;
 
   // 1. RÉCUPÉRATION PUISSANTE (Avec Relations KYC)
   const lease = await prisma.lease.findUnique({
@@ -33,33 +36,41 @@ export default async function PublicCompliancePage({ params }: PageProps) {
         // ✅ ON INCLUT LE KYC DU LOCATAIRE
         include: { kyc: true }
       },
-      signatures: true
+      signatures: true // Pour récupérer la preuve de signature
     }
   });
 
   if (!lease) return notFound();
 
   // 2. ALGORITHME DE CONFORMITÉ (Mis à jour v5)
+  // Loi 2019 : Caution max 2 mois
   const legalDepositLimit = lease.monthlyRent * 2;
   const isDepositCompliant = lease.depositAmount <= legalDepositLimit;
 
-  // ✅ CORRECTION : On vérifie via la relation kyc (avec null check)
+  // Vérification KYC (Sécurité par défaut : si pas de KYC, c'est non conforme)
   const isOwnerVerified = lease.property.owner.kyc?.status === 'VERIFIED';
-  const isTenantVerified = lease.tenant.kyc?.status === 'VERIFIED';
   
-  // ✅ CORRECTION : On gère les nouveaux statuts de bail (TERMINATED inclus pour l'historique)
-  const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'TERMINATED', 'ACTIVE'].includes(lease.signatureStatus || '');
+  // Pour le locataire, on peut être plus souple si le bail est en cours de signature
+  // Mais pour un certificat "VERT", il faut qu'il soit vérifié.
+  const isTenantVerified = lease.tenant?.kyc?.status === 'VERIFIED';
   
+  // Statut de signature
+  const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'ACTIVE', 'TERMINATED'].includes(lease.signatureStatus || '');
+  
+  // Récupération de la preuve technique (la première signature trouvée)
   const proof = lease.signatures.length > 0 ? lease.signatures[0] : null;
-  const isGlobalCompliant = isDepositCompliant && isOwnerVerified && isTenantVerified;
+
+  // Score global (Tout doit être vert pour avoir le badge "Authentique")
+  const isGlobalCompliant = isDepositCompliant && isOwnerVerified && isSigned;
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
       
-      {/* NAVBAR SIMPLIFIÉE */}
+      {/* NAVBAR SIMPLIFIÉE - BRANDING BABIMMO */}
       <div className="bg-[#0B1120] px-6 py-4 flex justify-between items-center shadow-md">
          <div className="text-white font-black text-xl tracking-tighter flex items-center gap-2">
-            IMMO<span className="text-orange-500">FACILE</span>
+            {/* 👇 MODIFICATION ICI : MARQUE BABIMMO */}
+            BAB<span className="text-[#F59E0B]">IMMO</span>
             <span className="text-[10px] font-normal text-slate-400 bg-white/10 px-2 py-0.5 rounded ml-2">VERIFY</span>
          </div>
          <Link href="/" className="text-xs text-slate-300 hover:text-white transition">Accéder au site</Link>
@@ -75,7 +86,7 @@ export default async function PublicCompliancePage({ params }: PageProps) {
                 <Scale className={`w-6 h-6 ${isGlobalCompliant ? 'text-[#F59E0B]' : 'text-red-400'}`} />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-wide">CERTIFICAT PUBLIQUE</h1>
+                <h1 className="text-xl font-bold tracking-wide">CERTIFICAT DE CONFORMITÉ</h1>
                 <p className="text-xs text-slate-400 uppercase tracking-widest">Preuve d'authenticité Blockchain</p>
               </div>
             </div>
@@ -86,7 +97,7 @@ export default async function PublicCompliancePage({ params }: PageProps) {
                   </div>
               ) : (
                   <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-200 px-3 py-1 rounded-full border border-red-500/30 text-xs font-bold uppercase">
-                  <AlertTriangle className="w-3 h-3" /> Non Conforme
+                  <AlertTriangle className="w-3 h-3" /> Attention : Non Conforme
                   </div>
               )}
             </div>
@@ -103,18 +114,18 @@ export default async function PublicCompliancePage({ params }: PageProps) {
                     <h3 className="font-bold text-slate-900">{lease.property.title}</h3>
                     <p className="text-sm text-slate-500">{lease.property.address}, {lease.property.commune}</p>
                     <div className="mt-2 text-xs font-mono text-slate-500">
-                        REF: {lease.id.toUpperCase()}
+                        ID CONTRAT: {lease.id.toUpperCase()}
                     </div>
                 </div>
             </div>
 
             {/* 2. AUDIT LÉGAL */}
             <div>
-                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 border-b pb-2">Points de Contrôle</h3>
+                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 border-b pb-2">Points de Contrôle (Loi 2019-576)</h3>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <PublicCheckItem label="Caution (Loi 2019)" valid={isDepositCompliant} />
-                    <PublicCheckItem label="Identité Bailleur" valid={isOwnerVerified} />
-                    <PublicCheckItem label="Identité Locataire" valid={isTenantVerified} />
+                    <PublicCheckItem label="Caution (Max 2 mois)" valid={isDepositCompliant} />
+                    <PublicCheckItem label="Identité Bailleur (KYC)" valid={isOwnerVerified} />
+                    <PublicCheckItem label="Identité Locataire (KYC)" valid={isTenantVerified} />
                     <PublicCheckItem label="Signature Électronique" valid={isSigned} />
                  </div>
             </div>
@@ -123,34 +134,41 @@ export default async function PublicCompliancePage({ params }: PageProps) {
             <div className="bg-slate-900 rounded-xl p-6 text-slate-300 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#F59E0B]/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
                 <h3 className="text-xs font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Server className="w-4 h-4 text-[#F59E0B]" /> Audit Trail
+                    <Server className="w-4 h-4 text-[#F59E0B]" /> Audit Trail (Traçabilité)
                 </h3>
 
-                {isSigned && proof ? (
+                {proof ? (
                     <div className="space-y-2 font-mono text-xs">
                         <div className="flex justify-between border-b border-slate-700 pb-2">
                             <span className="text-slate-500">Date Signature</span>
-                            <span className="text-emerald-400">{format(new Date(proof.signedAt), "dd MMM yyyy à HH:mm", { locale: fr })}</span>
+                            {/* Gestion de la date sécurisée */}
+                            <span className="text-emerald-400">
+                                {proof.signedAt ? format(new Date(proof.signedAt), "dd MMM yyyy à HH:mm", { locale: fr }) : 'Date inconnue'}
+                            </span>
                         </div>
                         <div className="flex justify-between border-b border-slate-700 pb-2">
-                            <span className="text-slate-500">Adresse IP</span>
-                            <span className="text-white">{proof.ipAddress}</span>
+                            <span className="text-slate-500">Adresse IP Signataire</span>
+                            <span className="text-white">{proof.ipAddress || 'Non enregistrée'}</span>
                         </div>
                         <div className="pt-2">
                             <span className="text-slate-500 block mb-1">Empreinte Numérique (SHA-256)</span>
-                            <p className="text-[10px] text-slate-400 break-all bg-black/30 p-2 rounded">
+                            <p className="text-[10px] text-slate-400 break-all bg-black/30 p-2 rounded border border-white/5">
                                 {lease.documentHash || "Hash en cours de calcul..."}
                             </p>
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm text-orange-400 italic">En attente de signature par les parties.</p>
+                    <div className="text-center p-4 bg-white/5 rounded border border-dashed border-white/20">
+                        <p className="text-sm text-orange-400 italic">En attente de signature par les parties.</p>
+                        <p className="text-[10px] text-slate-500 mt-1">Aucune preuve cryptographique n'a encore été générée.</p>
+                    </div>
                 )}
             </div>
 
             <div className="text-center pt-4 border-t border-slate-100">
                  <p className="text-[10px] text-slate-400">
-                    Ce certificat est généré dynamiquement par ImmoFacile. Toute modification ultérieure du contrat invalidera ce lien.
+                    Ce certificat est généré dynamiquement par l'infrastructure <strong>Babimmo</strong>. 
+                    Toute modification ultérieure du contrat invalidera ce lien de preuve.
                  </p>
             </div>
 

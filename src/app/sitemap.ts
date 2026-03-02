@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { prisma } from "@/lib/prisma"; // 👈 Vérifiez que ce chemin vers votre instance Prisma est correct
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.immofacile.ci';
+  const baseUrl = 'https://www.babimmo.ci';
 
   // 1. Récupérer toutes les propriétés (Longue Durée) actives
   // Si votre modèle s'appelle différemment (ex: Property), adaptez ici.

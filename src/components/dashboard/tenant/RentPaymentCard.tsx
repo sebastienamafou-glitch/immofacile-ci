@@ -1,24 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Calendar, Loader2, AlertTriangle } from "lucide-react";
+import { Clock, Calendar, Loader2, AlertTriangle, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { initiatePayment } from "@/lib/api";
-// ✅ IMPORT DU TYPE SSOT
 import { TenantLeaseData } from "@/lib/types/tenant";
 
 interface RentPaymentCardProps {
-  lease: TenantLeaseData; // Typage strict : on attend un bail complet
+  lease: TenantLeaseData;
   userPhone: string | null;
 }
 
 export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardProps) {
   const [isPaying, setIsPaying] = useState(false);
 
-  // Sécurité : Si le bail n'est pas actif, on ne peut pas payer
-  const canPay = lease.isActive || lease.status === 'ACTIVE';
+  // 1. LOGIQUE MÉTIER : Détection du type de paiement
+  const isInitialPayment = lease.status === 'PENDING';
+  const canPay = lease.status === 'ACTIVE' || isInitialPayment;
+
+  // 2. CALCUL DU MONTANT : Caution + Avance (si initial), sinon Loyer mensuel
+  const amountToPay = isInitialPayment 
+    ? (lease.depositAmount || 0) + (lease.advanceAmount || 0) 
+    : lease.monthlyRent;
 
   const handlePayRent = async () => {
     if (!userPhone) {
@@ -28,10 +33,14 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
 
     setIsPaying(true); 
     try {
+        // Génération d'une clé unique pour éviter les doubles facturations
+        const idempotencyKey = crypto.randomUUID();
+
         const result = await initiatePayment({
-            type: 'RENT',                 
+            type: isInitialPayment ? 'DEPOSIT' : 'RENT',                 
             referenceId: lease.id,   
-            phone: userPhone        
+            phone: userPhone,
+            idempotencyKey: idempotencyKey // <-- Ajout de la clé requise
         });
 
         if (result.success && result.paymentUrl) {
@@ -40,7 +49,7 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
         } else {
             throw new Error("Erreur initialisation paiement");
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         toast.error("Impossible d'initialiser le paiement.");
     } finally {
         setIsPaying(false); 
@@ -53,14 +62,17 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
             <div className="flex flex-col gap-8 md:flex-row md:items-center justify-between">
                 <div>
                     <div className="flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-4">
-                        <Clock className="w-4 h-4 text-orange-500" /> Prochaine Échéance
+                        {isInitialPayment ? (
+                            <><Key className="w-4 h-4 text-orange-500" /> Droits d'entrée (Caution + Avance)</>
+                        ) : (
+                            <><Clock className="w-4 h-4 text-orange-500" /> Prochaine Échéance</>
+                        )}
                     </div>
                     <h2 className="text-5xl font-black tracking-tighter text-white flex items-baseline gap-2">
-                        {lease.monthlyRent.toLocaleString()} 
+                        {amountToPay.toLocaleString()} 
                         <span className="text-xl font-bold uppercase text-slate-600">CFA</span>
                     </h2>
                     
-                    {/* Badge dynamique selon le statut */}
                     {canPay ? (
                         <div className="flex items-center gap-2 mt-4 text-[11px] font-black text-emerald-400 bg-emerald-500/10 w-fit px-4 py-1.5 rounded-full border border-emerald-500/10 uppercase tracking-widest">
                             <Calendar className="w-3.5 h-3.5" /> Paiement ouvert
@@ -83,7 +95,7 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
                         }`}
                     >
                         {isPaying ? <Loader2 className="animate-spin mr-2" /> : null}
-                        {isPaying ? "Connexion..." : (canPay ? "Payer le loyer" : "Dossier en cours")}
+                        {isPaying ? "Connexion..." : (isInitialPayment ? "Payer mon entrée" : "Payer le loyer")}
                     </Button>
                 </div>
             </div>

@@ -68,7 +68,7 @@ export default function MyAgencyPage() {
                 </div>
                 <h1 className="text-3xl font-black text-white mb-4 text-center">Déléguez votre gestion</h1>
                 <p className="text-slate-400 mb-10 text-center text-sm leading-relaxed">
-                    Vous travaillez avec une agence partenaire <strong>ImmoFacile</strong> ? 
+                    Vous travaillez avec une agence partenaire <strong>Babimmo</strong> ? 
                     Entrez leur code unique pour synchroniser vos biens et suivre vos revenus en temps réel.
                 </p>
 

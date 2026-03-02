@@ -147,7 +147,7 @@ export default function TenantKYCPage() {
                 <Shield className={`w-8 h-8 ${activeTab === 'IDENTITY' ? 'text-blue-500' : 'text-slate-600'}`} />
                 <div className="text-center">
                     <span className="font-bold text-sm block">IDENTITÉ (KYC)</span>
-                    <span className="text-[10px] opacity-60">Visible par ImmoFacile (Admin)</span>
+                    <span className="text-[10px] opacity-60">Visible par Babimmo (Admin)</span>
                 </div>
             </button>
 
@@ -252,13 +252,13 @@ export default function TenantKYCPage() {
                             />
                             <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
                                 Je certifie que les informations fournies sont exactes. 
-                                J'accepte qu'ImmoFacile vérifie mon identité pour sécuriser les locations.
+                                J'accepte qu'Babimmo vérifie mon identité pour sécuriser les locations.
                             </label>
                         </div>
 
                         {/* 4. UPLOAD */}
                         <CldUploadWidget 
-                            uploadPreset="immofacile_kyc"
+                            uploadPreset="babimmo_kyc"
                             onSuccess={handleKycSuccess}
                             options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                         >

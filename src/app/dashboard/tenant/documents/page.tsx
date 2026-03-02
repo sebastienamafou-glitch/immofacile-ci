@@ -116,13 +116,17 @@ export default function TenantDocumentsPage() {
                                 </p>
                             </div>
                         </div>
-                        {/* Lien vers le téléchargement PDF */}
-                        <Button 
-                            onClick={() => window.open(`/api/owner/leases/${lease.id}/download`, '_blank')}
-                            className="bg-slate-800 hover:bg-slate-700 text-white border border-white/10 px-6 py-6 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-3"
-                        >
-                            <Download className="w-4 h-4" /> Télécharger PDF
-                        </Button>
+                        
+                        {/* ✅ BOUTON CORRIGÉ : Redirige vers la vue détaillée d'impression au lieu de l'API PDFKit */}
+                        <Link href={`/dashboard/tenant/contract/${lease.id}`}>
+                            <Button 
+                                className="bg-slate-800 hover:bg-slate-700 text-white border border-white/10 px-6 py-6 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-3 transition-all hover:scale-105"
+                            >
+                                <Eye className="w-4 h-4 text-emerald-500" /> 
+                                Voir & Imprimer
+                            </Button>
+                        </Link>
+                        
                     </div>
                 </div>
             </div>

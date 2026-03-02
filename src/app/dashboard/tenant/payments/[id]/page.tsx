@@ -100,7 +100,7 @@ export default function PaymentReceiptPage() {
                         <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
                             <Building2 className="w-5 h-5 text-white" />
                         </div>
-                        <span className="font-black italic text-xl tracking-tighter">IMMOFACILE</span>
+                        <span className="font-black italic text-xl tracking-tighter">BABIMMO</span>
                     </div>
                     <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">Reçu de paiement numérique</p>
                 </div>
@@ -178,7 +178,7 @@ export default function PaymentReceiptPage() {
             {/* Footer Ticket */}
             <div className="mt-12 text-center">
                 <Receipt className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Document certifié par ImmoFacile CI</p>
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Document certifié par Babimmo CI</p>
                 <p className="text-[9px] text-slate-300 font-mono mt-1 break-all">ID: {payment.id} • HASH: {payment.reference}</p>
             </div>
         </div>

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     if (nights < 1) return NextResponse.json({ error: "Minimum 1 nuit" }, { status: 400 });
 
     const subTotal = listing.pricePerNight * nights; // Part Propriétaire
-    const platformFee = Math.round(subTotal * 0.10); // 10% ImmoFacile
+    const platformFee = Math.round(subTotal * 0.10); // 10% Babimmo
     const totalAmount = subTotal + platformFee;      // Ce que paie le client
 
     // 5. GESTION DU GUEST (Find or Create)

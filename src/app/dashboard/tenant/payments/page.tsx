@@ -3,12 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Loader2, Receipt, Download, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, Receipt, Calendar, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+// Best Practice : Typage strict pour éviter le 'any'
+interface PaymentItem {
+  id: string;
+  amount: number;
+  date: string;
+  type: string;
+  status: string;
+  method?: string;
+}
+
 export default function TenantPaymentsHistoryPage() {
-  const [payments, setPayments] = useState<any[]>([]);
+  const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -41,11 +51,6 @@ export default function TenantPaymentsHistoryPage() {
 
     fetchPayments();
   }, [router]);
-
-  const handleDownload = (id: string) => {
-      toast.info("Téléchargement du reçu en cours...");
-      // Ici vous pourrez brancher la génération PDF plus tard
-  };
 
   if (loading) return <div className="min-h-screen bg-[#060B18] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div>;
 
@@ -84,13 +89,18 @@ export default function TenantPaymentsHistoryPage() {
                                     <p className="text-xl font-black text-white font-mono">{p.amount.toLocaleString()} F</p>
                                     <p className="text-[10px] text-slate-500 uppercase tracking-wider">{p.method || "MOBILE MONEY"}</p>
                                 </div>
-                                <Button 
-                                    onClick={() => handleDownload(p.id)} 
-                                    variant="outline" 
-                                    className="border-slate-700 hover:bg-slate-800 text-slate-300 h-10 w-10 p-0 rounded-xl"
-                                >
-                                    <Download className="w-4 h-4" />
-                                </Button>
+                                
+                                {/* On affiche le bouton de quittance UNIQUEMENT si le paiement est un succès */}
+                                {(p.status === 'PAID' || p.status === 'SUCCESS') && (
+                                    <Button 
+                                        onClick={() => router.push(`/dashboard/tenant/receipts/${p.id}`)} 
+                                        variant="outline" 
+                                        className="border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-orange-500 h-10 w-10 p-0 rounded-xl transition-colors"
+                                        title="Voir la quittance"
+                                    >
+                                        <Receipt className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     ))}

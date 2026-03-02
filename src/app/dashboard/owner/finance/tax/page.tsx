@@ -174,7 +174,7 @@ export default function TaxSummaryPage() {
 
         {/* FOOTER DOCUMENT */}
         <div className="mt-auto pt-8 border-t border-slate-200 text-center text-[10px] text-slate-400 uppercase tracking-wider">
-            <p>Document généré automatiquement par la plateforme ImmoFacile CI.</p>
+            <p>Document généré automatiquement par la plateforme Babimmo CI.</p>
             <p>Ce rapport est fourni à titre indicatif pour votre déclaration fiscale. Vérifiez les montants avec vos relevés bancaires.</p>
         </div>
 

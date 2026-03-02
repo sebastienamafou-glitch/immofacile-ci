@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     // Email Technique (si absent)
     const emailToUse = body.email && body.email.trim() !== "" 
         ? body.email 
-        : `artisan-${body.phone.replace(/\s/g, '')}@immofacile.pro`;
+        : `artisan-${body.phone.replace(/\s/g, '')}@babimmo.pro`;
 
     // CRÉATION ATOMIQUE (USER + FINANCE + KYC)
     const newArtisan = await prisma.user.create({

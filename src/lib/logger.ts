@@ -41,7 +41,7 @@ interface LogOptions {
 export async function logActivity({ action, entityId, entityType, metadata, userId }: LogOptions) {
   try {
     let actorId = userId;
-    let actorEmail = "system@immofacile.com";
+    let actorEmail = "system@babimmo.com";
 
     // Si pas d'ID fourni, on regarde la session
     if (!actorId) {

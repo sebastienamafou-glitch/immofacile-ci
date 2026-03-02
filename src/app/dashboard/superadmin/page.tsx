@@ -257,7 +257,7 @@ export default function WarRoomDashboard() {
                     <Server className="text-white w-5 h-5" />
                 </div>
                 <div>
-                    <h1 className="font-black text-white text-lg tracking-tight uppercase">ImmoFacile <span className="text-orange-500">War Room</span></h1>
+                    <h1 className="font-black text-white text-lg tracking-tight uppercase">Babimmo <span className="text-orange-500">War Room</span></h1>
                     <div className="flex items-center gap-2">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

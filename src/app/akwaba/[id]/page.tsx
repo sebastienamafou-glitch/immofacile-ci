@@ -360,7 +360,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
                         {nights > 0 ? (session ? "Réserver maintenant" : "Connectez-vous pour réserver") : "Vérifier disponibilité"}
                     </button>
                     <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-slate-500">
-                        <ShieldCheck className="w-3 h-3" /> Paiement sécurisé par ImmoFacile
+                        <ShieldCheck className="w-3 h-3" /> Paiement sécurisé par Babimmo
                     </div>
                 </div>
             </div>

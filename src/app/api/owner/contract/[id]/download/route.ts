@@ -149,7 +149,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
     
     // Si actif, on simule une signature propriétaire
     if (lease.status === 'ACTIVE') {
-        doc.font('Courier').fontSize(8).fillColor('green').text("[ VALIDÉ PAR IMMOFACILE ]", 90, signY + 45);
+        doc.font('Courier').fontSize(8).fillColor('green').text("[ VALIDÉ PAR BABIMMO ]", 90, signY + 45);
     } else {
         doc.font('Times-Italic').fontSize(8).fillColor('#999').text("(Signature en attente)", 110, signY + 45);
     }
@@ -172,7 +172,7 @@ function generateLeasePDF(lease: any): Promise<Buffer> {
 
     // Footer technique
     doc.fontSize(7).fillColor('#999').font('Courier')
-       .text(`Document généré par ImmoFacile - Ref: ${lease.id} - Page 1/1`, 50, 800, { align: 'center' });
+       .text(`Document généré par Babimmo - Ref: ${lease.id} - Page 1/1`, 50, 800, { align: 'center' });
 
     doc.end();
   });

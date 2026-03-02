@@ -52,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     {/* Assurez-vous d'avoir un logo ou mettez une div de couleur */}
                     <Image src="/logo.png" alt="Logo" fill className="object-contain" />
                  </div>
-                 <span className="font-bold text-white tracking-tight">IMMOFACILE</span>
+                 <span className="font-bold text-white tracking-tight">BABIMMO</span>
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400 hover:text-white transition">
                 <X size={20} />
@@ -72,9 +72,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0B1120]/80 backdrop-blur-xl sticky top-0 z-30">
             <Link href="/dashboard/owner" className="flex items-center gap-2">
               <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10">
-                <Image src="/logo.png" alt="ImmoFacile" fill className="object-cover" />
+                <Image src="/logo.png" alt="Babimmo" fill className="object-cover" />
               </div>
-              <span className="font-bold text-sm tracking-tight text-white">ImmoFacile</span>
+              <span className="font-bold text-sm tracking-tight text-white">Babimmo</span>
             </Link>
 
             <button 

@@ -33,8 +33,8 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
       const formData = new FormData();
       formData.append("file", file);
       // ✅ LA CLÉ DU SUCCÈS : Utiliser le preset "Unsigned" configuré à l'étape 1
-      formData.append("upload_preset", "immofacile_preset"); 
-      formData.append("folder", "immofacile_listings");
+      formData.append("upload_preset", "babimmo_preset"); 
+      formData.append("folder", "babimmo_listings");
 
       try {
         const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {

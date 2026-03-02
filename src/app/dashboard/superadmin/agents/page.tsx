@@ -196,7 +196,7 @@ export default function AgentsPage() {
                                 <Input 
                                     required type="email" 
                                     className="pl-9 bg-[#020617] border-white/10 text-white focus:border-blue-500"
-                                    placeholder="marc@immofacile.ci"
+                                    placeholder="marc@babimmo.ci"
                                     value={formData.email}
                                     onChange={e => setFormData({...formData, email: e.target.value})}
                                 />

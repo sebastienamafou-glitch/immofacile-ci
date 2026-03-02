@@ -20,7 +20,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   const params = await searchParams;
   const location = params.city || "Côte d'Ivoire";
   return {
-    title: `Séjours d'exception à ${location} | ImmoFacile Akwaba`,
+    title: `Séjours d'exception à ${location} | Babimmo Akwaba`,
     description: "Réservez les meilleures villas et studios sécurisés pour vos vacances ou voyages d'affaires."
   };
 }
@@ -63,7 +63,7 @@ export default async function AkwabaPublicPage({ searchParams }: SearchPageProps
       </Button>
     </Link>
         <div className="text-white font-black text-2xl tracking-tighter flex items-center gap-2">
-            IMMO<span className="text-orange-500 font-extrabold">FACILE</span>
+            BABI<span className="text-orange-500 font-extrabold">IMMO</span>
             <Badge variant="outline" className="text-[10px] border-orange-500/50 text-orange-500 ml-2">AKWABA</Badge>
         </div>
         <div className="flex items-center gap-4">

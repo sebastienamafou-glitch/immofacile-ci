@@ -191,12 +191,12 @@ export default function ArtisanKYCPage() {
                         />
                         <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
                             Je certifie sur l'honneur que mon entreprise est à jour de ses cotisations et assurances. 
-                            J'autorise <span className="text-white font-bold">ImmoFacile</span> à chiffrer et vérifier ces pièces.
+                            J'autorise <span className="text-white font-bold">Babimmo</span> à chiffrer et vérifier ces pièces.
                         </label>
                     </div>
 
                     <CldUploadWidget 
-                        uploadPreset="immofacile_kyc"
+                        uploadPreset="babimmo_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                     >

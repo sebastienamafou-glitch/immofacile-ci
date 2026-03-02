@@ -49,7 +49,7 @@ export default function TermsPage() {
             <div className="mb-8 p-3 bg-white/5 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-sm">
                 <Image 
                     src="/logo.png" 
-                    alt="Logo ImmoFacile" 
+                    alt="Logo Babimmo" 
                     width={80} 
                     height={80} 
                     className="object-contain"
@@ -60,7 +60,7 @@ export default function TermsPage() {
                 Mentions Légales <span className="text-orange-500">&</span> CGU
             </h1>
             <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                Le cadre de confiance d'ImmoFacile V5. Transparence totale sur nos services, vos droits et nos obligations techniques.
+                Le cadre de confiance d'Babimmo V5. Transparence totale sur nos services, vos droits et nos obligations techniques.
             </p>
             
             <div className="mt-10 inline-flex items-center gap-3 bg-white/5 px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 text-slate-300">
@@ -135,8 +135,8 @@ export default function TermsPage() {
                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-3">Support Technique</p>
                             <div className="space-y-3">
-                                <a href="mailto:support@immofacile.ci" className="inline-flex items-center gap-2 text-orange-600 font-bold hover:underline">
-                                    <Mail className="w-4 h-4" /> support@immofacile.ci
+                                <a href="mailto:support@babimmo.ci" className="inline-flex items-center gap-2 text-orange-600 font-bold hover:underline">
+                                    <Mail className="w-4 h-4" /> support@babimmo.ci
                                 </a>
                             </div>
                         </div>
@@ -152,7 +152,7 @@ export default function TermsPage() {
                         <h2 className="text-2xl font-black text-slate-900">2. Description du Service</h2>
                     </div>
                     <p className="text-slate-600 leading-relaxed mb-6 text-justify">
-                        La plateforme <strong>ImmoFacile V5</strong> est un logiciel de gestion locative et immobilière en mode SaaS. 
+                        La plateforme <strong>Babimmo V5</strong> est un logiciel de gestion locative et immobilière en mode SaaS. 
                         Elle permet d'automatiser le cycle de vie du bail, de la prospection à l'encaissement final.
                     </p>
                     <div className="bg-orange-50 border-l-4 border-orange-500 p-5 rounded-r-xl">
@@ -256,7 +256,7 @@ export default function TermsPage() {
                 className="opacity-80" 
             />
             <p className="text-xs font-medium text-slate-500">
-                © {new Date().getFullYear()} WebappCi SARL - Solution ImmoFacile V5
+                © {new Date().getFullYear()} WebappCi SARL - Solution Babimmo V5
             </p>
          </div>
       </footer>

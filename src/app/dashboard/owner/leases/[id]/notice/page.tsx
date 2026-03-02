@@ -102,7 +102,7 @@ export default function FormalNoticePage() {
 
             <p>
                 Agissant pour le compte de votre Propriétaire, <strong>{ownerName}</strong>, 
-                via la plateforme de gestion agréée <strong>ImmoFacile CI</strong>.
+                via la plateforme de gestion agréée <strong>Babimmo CI</strong>.
             </p>
 
             <p>
@@ -145,7 +145,7 @@ export default function FormalNoticePage() {
                     <div className="absolute inset-0 border border-blue-900/20 m-1 print:border-black/20"></div>
                     ACTE SIGNIFIÉ<br/>
                     PAR VOIE ÉLECTRONIQUE<br/>
-                    CERTIFIÉ IMMOFACILE<br/>
+                    CERTIFIÉ BABIMMO<br/>
                     {new Date().toLocaleDateString()}
                 </div>
             </div>
@@ -153,7 +153,7 @@ export default function FormalNoticePage() {
 
         {/* FOOTER TECH */}
         <div className="absolute bottom-8 left-0 w-full text-center text-[7pt] text-gray-400 print:text-black">
-            Document généré automatiquement via API ImmoFacile - Réf Dossier: {id.split('-')[0].toUpperCase()}
+            Document généré automatiquement via API Babimmo - Réf Dossier: {id.split('-')[0].toUpperCase()}
         </div>
 
       </div>

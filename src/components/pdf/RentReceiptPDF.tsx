@@ -294,7 +294,7 @@ export const RentReceiptPDF = ({ data }: { data: any }) => (
       
       {/* 1. FILIGRANE */}
       <View style={styles.watermarkContainer}>
-         <Text style={styles.watermarkText}>ORIGINAL  IMMOFACILE</Text>
+         <Text style={styles.watermarkText}>ORIGINAL  BABIMMO</Text>
       </View>
 
       {/* 2. EN-TÊTE */}
@@ -397,7 +397,7 @@ export const RentReceiptPDF = ({ data }: { data: any }) => (
          <View style={styles.stampContainer}>
              <Text style={styles.stampTitle}>PAYÉ</Text>
              <Text style={styles.stampSub}>Certifié Conforme</Text>
-             <Text style={[styles.stampSub, { marginTop: 2 }]}>ImmoFacile CI</Text>
+             <Text style={[styles.stampSub, { marginTop: 2 }]}>Babimmo CI</Text>
              <Text style={[styles.stampSub, { fontSize: 6, marginTop: 4 }]}>{data.date}</Text>
          </View>
       </View>
@@ -405,7 +405,7 @@ export const RentReceiptPDF = ({ data }: { data: any }) => (
       {/* 8. FOOTER TECHNIQUE */}
       <View style={styles.footer}>
          <Text style={styles.footerText}>
-            Document généré électroniquement par ImmoFacile • ID Transaction : {data.reference} • Valeur juridique probante
+            Document généré électroniquement par Babimmo • ID Transaction : {data.reference} • Valeur juridique probante
          </Text>
       </View>
 

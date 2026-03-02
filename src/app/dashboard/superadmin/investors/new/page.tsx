@@ -48,7 +48,7 @@ export default function NewInvestorPage() {
 
   const copyToClipboard = () => {
     if(!createdCredentials) return;
-    const text = `Bienvenue chez ImmoFacile Invest.\nVoici vos accès :\nEmail: ${createdCredentials.email}\nMot de passe: ${createdCredentials.password}\n\nConnectez-vous sur : https://immofacile.ci/login`;
+    const text = `Bienvenue chez Babimmo Invest.\nVoici vos accès :\nEmail: ${createdCredentials.email}\nMot de passe: ${createdCredentials.password}\n\nConnectez-vous sur : https://babimmo.ci/login`;
     navigator.clipboard.writeText(text);
     toast.success("Identifiants copiés !");
   };

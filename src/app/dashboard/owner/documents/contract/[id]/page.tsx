@@ -293,7 +293,7 @@ export default function ContractPage({ params }: PageProps) {
             
             <div className="mt-12 text-center">
                  <p className="text-[9px] text-slate-400 flex items-center justify-center gap-1">
-                    <FileText className="w-3 h-3"/> Document sécurisé par la plateforme ImmoFacile
+                    <FileText className="w-3 h-3"/> Document sécurisé par la plateforme Babimmo
                  </p>
             </div>
         </div>

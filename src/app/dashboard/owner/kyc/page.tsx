@@ -183,13 +183,13 @@ export default function OwnerKYCPage() {
                         />
                         <label htmlFor="kyc-consent" className="text-xs text-slate-400 cursor-pointer select-none leading-relaxed">
                             Je certifie sur l'honneur que les informations sont exactes. 
-                            J'autorise <span className="text-white font-bold">ImmoFacile</span> à traiter ces données.
+                            J'autorise <span className="text-white font-bold">Babimmo</span> à traiter ces données.
                         </label>
                     </div>
 
                     {/* 4. ZONE D'UPLOAD (Active uniquement si tout est rempli) */}
                     <CldUploadWidget 
-                        uploadPreset="immofacile_kyc"
+                        uploadPreset="babimmo_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                     >

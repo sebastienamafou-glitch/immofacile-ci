@@ -13,10 +13,10 @@ import { Button } from "@/components/ui/button";
 // 1. GÉNÉRATION DES MÉTADONNÉES SEO
 export async function generateMetadata({ params }: { params: { id: string } }) {
     const property = await prisma.property.findUnique({ where: { id: params.id } });
-    if (!property) return { title: "Bien introuvable - ImmoFacile" };
+    if (!property) return { title: "Bien introuvable - Babimmo" };
     
     return {
-        title: `${property.title} à louer - ImmoFacile`,
+        title: `${property.title} à louer - Babimmo`,
         description: `${property.type} de ${property.bedrooms} pièces à ${property.commune}. Loyer : ${property.price.toLocaleString()} FCFA.`,
         openGraph: {
             images: property.images[0] ? [property.images[0]] : [],

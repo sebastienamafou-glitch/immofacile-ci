@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const slug = params.slug;
   const agency = await prisma.agency.findUnique({ where: { slug } });
   return {
-    title: agency ? `${agency.name} - Vitrine ImmoFacile` : "Agence Introuvable",
+    title: agency ? `${agency.name} - Vitrine Babimmo` : "Agence Introuvable",
     description: `Découvrez les biens immobiliers de ${agency?.name || "l'agence"}.`
   };
 }
@@ -88,7 +88,7 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
                             </a>
                         )}
                         <span className="flex items-center gap-2">
-                             <Globe size={18} /> {agency.slug}.immofacile.ci
+                             <Globe size={18} /> {agency.slug}.babimmo.ci
                         </span>
                     </div>
                 </div>

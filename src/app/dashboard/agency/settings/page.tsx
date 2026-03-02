@@ -61,7 +61,7 @@ export default async function AgencySettingsPage() {
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 {admin.agency.isActive 
                     ? "Votre agence est pleinement opérationnelle. Vos annonces sont visibles sur la marketplace." 
-                    : "Votre dossier est en cours de validation par l'équipe ImmoFacile. Certaines fonctionnalités sont restreintes."}
+                    : "Votre dossier est en cours de validation par l'équipe Babimmo. Certaines fonctionnalités sont restreintes."}
             </p>
         </div>
       </div>

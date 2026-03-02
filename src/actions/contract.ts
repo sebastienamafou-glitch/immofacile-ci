@@ -114,7 +114,7 @@ export async function signContract(contractId: string, otp: string) {
     provider: "Twilio_Mock"
   });
 
-  // Mise à jour du contrat + Nettoyage OTP
+  // Mise à jour du contrat + Nettoyage OTP + TRAÇABILITÉ AUDIT
   await prisma.$transaction([
     prisma.investmentContract.update({
       where: { id: contractId },
@@ -126,6 +126,16 @@ export async function signContract(contractId: string, otp: string) {
     }),
     prisma.verificationToken.deleteMany({
       where: { identifier }
+    }),
+    // ✅ AJOUT DE LA LIGNE D'AUDIT POUR LE SUPER ADMIN
+    prisma.auditLog.create({
+      data: {
+        action: "INVESTMENT_CONTRACT_SIGNED",
+        entityId: contractId,
+        entityType: "INVESTMENT_CONTRACT", // ou 'CONTRACT' selon votre schema Prisma
+        userId: session.user.id,
+        metadata: { ip, method: "OTP_SMS" }
+      }
     })
   ]);
 

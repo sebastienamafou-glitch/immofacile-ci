@@ -21,7 +21,7 @@ async function uploadToCloudinary(file: File | null) {
 
   return new Promise<string>((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: "immofacile/incidents" },
+      { folder: "babimmo/incidents" },
       (error, result) => {
         if (error) { console.error("Cloudinary Error:", error); resolve(""); } 
         else { resolve(result?.secure_url || ""); }

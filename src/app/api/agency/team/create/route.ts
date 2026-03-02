@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     }
 
     // 4. CRÉATION SÉCURISÉE (Multi-Tenant & Relationnelle)
-    const hashedPassword = await hash("ImmoFacile2025!", 10); 
+    const hashedPassword = await hash("Babimmo2025!", 10); 
 
     const newAgent = await prisma.user.create({
       data: {

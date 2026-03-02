@@ -170,7 +170,7 @@ export default function ResetPasswordPage() {
           </div>
           <CardTitle className="text-2xl font-black tracking-tight">Réinitialisation</CardTitle>
           <CardDescription className="text-slate-400 font-medium">
-            Créez un nouveau mot de passe pour <br/>votre compte <span className="text-orange-500 font-bold">ImmoFacile</span>.
+            Créez un nouveau mot de passe pour <br/>votre compte <span className="text-orange-500 font-bold">Babimmo</span>.
           </CardDescription>
         </CardHeader>
         

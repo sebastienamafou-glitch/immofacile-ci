@@ -61,7 +61,18 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
                 updatedAt: new Date()
             }
         });
-    });
+
+        // D. TRAÇABILITÉ : Ajout au registre d'audit pour le Super Admin
+        await tx.auditLog.create({
+            data: {
+                action: "LEASE_SIGNED_BY_OWNER",
+                entityId: leaseId,
+                entityType: "LEASE",
+                userId: ownerId,
+                metadata: { ip, ownerEmail, documentType: "LEASE_AGREEMENT" }
+            }
+        });
+    }); // <-- Fin de la transaction
 
     revalidatePath(`/dashboard/owner/leases/${leaseId}`);
     return { success: true };

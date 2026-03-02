@@ -100,54 +100,6 @@ export default function TenantDashboard() {
     );
   }
 
-  // --- ÉTAT : CANDIDATURE EN ATTENTE (PENDING) ---
-  if (data.lease.status === 'PENDING') {
-      return (
-        <main className="min-h-screen bg-[#060B18] p-6 flex flex-col items-center justify-center text-slate-300 font-sans">
-            <div className="bg-slate-900 border border-blue-500/20 p-8 rounded-[2rem] max-w-xl w-full relative overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-700">
-                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none"><FileText size={200}/></div>
-                
-                <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 inline-block border border-blue-500/20">
-                    Dossier en analyse
-                </span>
-                
-                <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Candidature transmise 🚀</h1>
-                <p className="text-slate-400 mb-8">
-                    Pour le bien : <strong className="text-white">{data.lease.property.title}</strong>
-                </p>
-
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4 p-5 bg-slate-950/50 rounded-2xl border border-emerald-500/20 shadow-lg">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                             <CheckCircle2 className="w-5 h-5"/>
-                        </div>
-                        <div>
-                             <p className="text-white font-bold text-sm">Dossier Complet</p>
-                             <p className="text-[10px] text-slate-500">Transmis au propriétaire.</p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 p-5 bg-slate-950/30 rounded-2xl border border-white/5 opacity-70">
-                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
-                             <Clock className="w-5 h-5"/>
-                        </div>
-                        <div>
-                             <p className="text-slate-300 font-bold text-sm">Validation en cours</p>
-                             <p className="text-[10px] text-slate-600">Réponse sous 24-48h.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-10 pt-6 border-t border-white/5 text-center">
-                    <Link href="/properties">
-                        <Button variant="link" className="text-orange-500 text-xs">Retourner aux annonces</Button>
-                    </Link>
-                </div>
-            </div>
-        </main>
-      );
-  }
-
   // --- ÉTAT : LOCATAIRE ACTIF (DASHBOARD COMPLET) ---
   const { lease, user, incidents } = data;
   const property = lease.property;

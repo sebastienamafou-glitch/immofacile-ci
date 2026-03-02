@@ -201,7 +201,7 @@ export default function InvestorContractPage({ params }: PageProps) {
 
         {/* FOOTER */}
         <div className="absolute bottom-8 left-0 w-full text-center text-[8pt] text-slate-400">
-            Document généré et sécurisé par ImmoFacile Blockchain - Page 1/1
+            Document généré et sécurisé par Babimmo Blockchain - Page 1/1
         </div>
       </div>
 

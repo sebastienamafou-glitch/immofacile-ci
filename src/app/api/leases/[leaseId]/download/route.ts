@@ -94,7 +94,7 @@ export async function GET(
 
     // BAILLEUR
     addParagraph(`Le BAILLEUR : ${lease.property.owner?.name || "N/A"}`, 11, "bold");
-    addParagraph(`Représenté par la plateforme ImmoFacile.`, 10, "normal");
+    addParagraph(`Représenté par la plateforme Babimmo.`, 10, "normal");
     y += 2;
     doc.text("D'une part,", margin, y);
     y += 8;

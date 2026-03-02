@@ -70,7 +70,7 @@ export async function deleteUserAccount() {
             where: { id: userId },
             data: {
                 name: "Utilisateur Supprimé",
-                email: `deleted_${userId}_${timestamp}@immofacile.deleted`, // Contourne l'unicité
+                email: `deleted_${userId}_${timestamp}@babimmo.deleted`, // Contourne l'unicité
                 phone: `del_${userId}_${timestamp}`, // Contourne l'unicité
                 image: null,
                 password: null, // Empêche toute connexion future

@@ -1,6 +1,6 @@
 export const FINANCE_RULES = {
   TENANT_FIXED_FEE: 20000,        // Frais dossier Locataire (FCFA)
-  PLATFORM_COMMISSION_RATE: 0.05, // 5% pour ImmoFacile
+  PLATFORM_COMMISSION_RATE: 0.05, // 5% pour Babimmo
   AGENT_COMMISSION_RATE: 0.05,    // 5% pour l'Agent
   CURRENCY: 'XOF'
 };

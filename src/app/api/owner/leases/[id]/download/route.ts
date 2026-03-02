@@ -92,12 +92,14 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     
     // ⚡️ GÉNÉRATION DU QR CODE EN BUFFER AVANT DE COMMENCER LE PDF
-    let qrBuffer: Buffer | null = null;
+    let qrBuffer: ArrayBuffer | null = null;
     try {
-        const complianceUrl = `https://immofacile.ci/compliance/${lease.id}`;
-        // On génère une Data URL puis on la convertit en Buffer pour PDFKit
+        const complianceUrl = `https://babimmo.ci/compliance/${lease.id}`;
         const qrDataUrl = await QRCode.toDataURL(complianceUrl, { margin: 1, width: 100 });
-        qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+        
+        // 🛠️ LA CORRECTION EST ICI : Conversion en ArrayBuffer pur pour la version standalone
+        const nodeBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
+        qrBuffer = nodeBuffer.buffer.slice(nodeBuffer.byteOffset, nodeBuffer.byteOffset + nodeBuffer.byteLength);
     } catch (e) {
         console.error("Erreur génération QR PDF:", e);
     }
@@ -140,7 +142,7 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
         // Reset couleur noire
         doc.fillColor('black');
     }
-    
+    doc.x = MARGIN;
     doc.moveDown(1.5);
     const yLine = doc.y;
     doc.moveTo(MARGIN, yLine).lineTo(doc.page.width - MARGIN, yLine).stroke();
@@ -277,7 +279,7 @@ function generateFullLegalLease(lease: LeaseWithDetails): Promise<Buffer> {
     // Footer
     const bottomY = doc.page.height - 40;
     doc.fontSize(7).fillColor('#64748B').text(
-        `Document généré et sécurisé par Immofacile.ci | Hash: ${lease.id} | Page 1/1`,
+        `Document généré et sécurisé par Babimmo.ci | Hash: ${lease.id} | Page 1/1`,
         MARGIN,
         bottomY,
         { align: 'center', width }

@@ -140,7 +140,7 @@ export default async function PropertyFlyerPage({ params }: { params: { id: stri
                         <User className="w-5 h-5"/> {property.owner?.name || "Agence"}
                     </div>
                     <div className="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest">
-                        <Globe className="w-4 h-4"/> immofacile.ci
+                        <Globe className="w-4 h-4"/> babimmo.ci
                     </div>
                 </div>
             </div>

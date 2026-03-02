@@ -42,7 +42,7 @@ export const generateInvestmentContract = (user: any, contractData: any) => {
     subject: `Investissement Immobilier - Réf: ${contractId}`,
     author: OWNER_FALLBACK.COMPANY_NAME,
     keywords: `contrat, ${contractId}, legal, ohada`,
-    creator: `ImmoFacile Engine v${OWNER_FALLBACK.ENGINE_VERSION}`
+    creator: `Babimmo Engine v${OWNER_FALLBACK.ENGINE_VERSION}`
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -108,7 +108,7 @@ export const generateInvestmentContract = (user: any, contractData: any) => {
   const articles = [
       {
           title: "ARTICLE 1 : OBJET DU CONTRAT",
-          content: `Le présent contrat a pour objet de formaliser l'apport financier de l'Investisseur au développement de la plateforme immobilière "ImmoFacile". L'Investisseur souscrit au pack "${packName}" pour un montant ferme et définitif de ${formatMoney(amount)}.`
+          content: `Le présent contrat a pour objet de formaliser l'apport financier de l'Investisseur au développement de la plateforme immobilière "Babimmo". L'Investisseur souscrit au pack "${packName}" pour un montant ferme et définitif de ${formatMoney(amount)}.`
       },
       {
           title: "ARTICLE 2 : DESTINATION DES FONDS",
@@ -159,7 +159,7 @@ export const generateInvestmentContract = (user: any, contractData: any) => {
   
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(245, 158, 11); // Orange ImmoFacile
+  doc.setTextColor(245, 158, 11); // Orange Babimmo
   doc.text("CLÔTURE ET SIGNATURES", margin + 5, yPos + 10);
 
   // Bloc Entreprise

@@ -47,6 +47,7 @@ model User {
 
   // --- Module Investisseur ---
   isBacker   Boolean @default(false)
+  isPremium  Boolean @default(false)
   backerTier String? // "SUPPORTER", "AMBASSADEUR", "VISIONNAIRE"
 
   // --- Relations NextAuth ---
@@ -58,6 +59,8 @@ model User {
   leases           Lease[]    @relation("LeaseTenant")
   leasesManaged    Lease[]    @relation("LeaseAgent")
   missionsAccepted Mission[]  @relation("AgentMissions")
+
+  walletBalance Float    @default(0)
 
   leads               Lead[]
   incidentsReported   Incident[]           @relation("IncidentReporter")
@@ -258,6 +261,7 @@ model Lease {
   endDate       DateTime?
   monthlyRent   Int
   depositAmount Int
+  advanceAmount Int?
   status        LeaseStatus @default(PENDING)
   isActive      Boolean     @default(false)
 
@@ -282,6 +286,9 @@ model Lease {
   updatedAt DateTime @updatedAt
 
   agencyCommissionRate Float?
+
+  noticeGivenAt        DateTime? // Date exacte du clic (Preuve légale)
+  plannedDepartureDate DateTime? // Date de départ prévue/calculée
 }
 
 model Inventory {
@@ -748,6 +755,7 @@ enum Role {
   AGENT
   ARTISAN
   INVESTOR
+  AMBASSADOR
 }
 
 enum VerificationStatus {
@@ -775,6 +783,7 @@ enum PropertyType {
 enum LeaseStatus {
   PENDING
   ACTIVE
+  IN_NOTICE
   TERMINATED
   CANCELLED
 }

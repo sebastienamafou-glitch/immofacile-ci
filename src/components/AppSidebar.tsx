@@ -1,5 +1,5 @@
 "use client";
-
+import { signOut } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -131,17 +131,14 @@ export function AppSidebar({ className }: { className?: string }) {
     checkAuth();
   }, [router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('token');
     localStorage.removeItem('immouser');
-    // Suppression cookies (Best practice)
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    router.push('/login');
+    await signOut({ callbackUrl: '/login' });
   };
 
   const getRootPath = () => {
     if (!user) return "/login";
-    // Mapping des dashboards par défaut selon le rôle
     switch (user.role) {
         case 'SUPER_ADMIN': return "/dashboard/superadmin";
         case 'AGENT': return "/dashboard/agent";
@@ -187,7 +184,7 @@ export function AppSidebar({ className }: { className?: string }) {
             </div>   
             <div className="flex flex-col">
               <span className="text-base font-black tracking-tight leading-none uppercase italic text-white">
-                IMMO<span className="text-orange-500">FACILE</span>
+                BAB<span className="text-orange-500">IMMO</span>
               </span>
               <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase mt-1 group-hover:text-orange-400 transition-colors">
                 {user.role} SPACE

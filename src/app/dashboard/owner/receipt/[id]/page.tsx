@@ -63,7 +63,7 @@ export default function ReceiptPage() {
     },
 
     owner: {
-      name: payment.lease?.property?.owner?.name || "Propriétaire (Client ImmoFacile)", 
+      name: payment.lease?.property?.owner?.name || "Propriétaire (Client Babimmo)", 
       address: payment.lease?.property?.owner?.address || "Adresse postale du propriétaire"
     },
 
@@ -83,7 +83,7 @@ export default function ReceiptPage() {
       paymentDate: new Date(payment.createdAt || Date.now()).toLocaleDateString('fr-FR')
     },
 
-    legalFooter: "Ce document est une quittance de loyer générée automatiquement par la plateforme ImmoFacile. Elle atteste du paiement reçu par le propriétaire via nos services de cantonnement sécurisé."
+    legalFooter: "Ce document est une quittance de loyer générée automatiquement par la plateforme Babimmo. Elle atteste du paiement reçu par le propriétaire via nos services de cantonnement sécurisé."
     // Note : J'ai retiré 'techProvider' car il n'est pas dans l'interface stricte du Template
   };
 
@@ -109,7 +109,7 @@ export default function ReceiptPage() {
       <ReceiptTemplate data={receiptData} />
       
       <p className="text-center text-[10px] text-slate-600 mt-8 print:hidden">
-        Propulsé par WebappCi &bull; ImmoFacile 
+        Propulsé par WebappCi &bull; Babimmo 
       </p>
 
     </div>

@@ -20,7 +20,7 @@ export default function InvestorDashboardDemo() {
       {/* --- SIDEBAR --- */}
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 -translate-x-full border-r border-gray-200 bg-white transition-transform md:translate-x-0">
         <div className="flex h-16 items-center border-b border-gray-100 px-6">
-          <span className="text-2xl font-bold text-orange-600">ImmoFacile</span>
+          <span className="text-2xl font-bold text-orange-600">Babimmo</span>
         </div>
         <div className="overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
@@ -62,7 +62,7 @@ export default function InvestorDashboardDemo() {
               </div>
               <div>
                 <p className="text-sm font-semibold">Prestige Capital</p>
-                <p className="text-xs text-slate-500">Géré par ImmoFacile</p>
+                <p className="text-xs text-slate-500">Géré par Babimmo</p>
               </div>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function InvestorDashboardDemo() {
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Vue d'ensemble</h1>
-              <p className="text-sm text-slate-500">Bienvenue sur votre espace de pilotage ImmoFacile.</p>
+              <p className="text-sm text-slate-500">Bienvenue sur votre espace de pilotage Babimmo.</p>
             </div>
             <div className="flex gap-2">
               <button className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-900/10 hover:bg-gray-50">

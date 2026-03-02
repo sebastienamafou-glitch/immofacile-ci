@@ -54,7 +54,7 @@ export default function FormalNoticePage() {
         {/* --- 1. EN-TÊTE --- */}
         <div className="flex justify-between items-start border-b-2 border-black pb-8 mb-12">
           <div className="space-y-1">
-            <h2 className="font-black text-xl uppercase tracking-tighter">ImmoFacile</h2>
+            <h2 className="font-black text-xl uppercase tracking-tighter">Babimmo</h2>
             <div className="text-[12px] text-slate-600 leading-tight">
                 <p className="font-bold text-black uppercase">{data.property.owner.name}</p>
                 <p>{data.property.owner.address || "Abidjan, Côte d'Ivoire"}</p>
@@ -132,7 +132,7 @@ export default function FormalNoticePage() {
         {/* --- 5. SIGNATURES --- */}
         <div className="mt-20 flex justify-between items-start">
             <div className="text-[10px] text-slate-400">
-                Document certifié par la plateforme ImmoFacile<br/>
+                Document certifié par la plateforme Babimmo<br/>
                 ID Transaction : {data.id.substring(0, 12)}<br/>
                 Horodatage : {new Date().toLocaleTimeString()}
             </div>
@@ -140,14 +140,14 @@ export default function FormalNoticePage() {
                 <p className="font-bold text-xs uppercase underline">Signature du Bailleur / Mandataire</p>
                 {/* Emplacement cachet fictif */}
                 <div className="w-32 h-32 border-2 border-blue-700/20 rounded-full flex items-center justify-center text-blue-700/20 -rotate-12 font-black text-[10px] uppercase border-dashed">
-                    Cachet ImmoFacile
+                    Cachet Babimmo
                 </div>
             </div>
         </div>
 
         {/* FOOTER BAS DE PAGE (Print uniquement) */}
         <div className="absolute bottom-8 left-0 w-full text-center text-[9px] text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4 hidden print:block">
-            ImmoFacile - Solution de Gestion Immobilière Connectée - www.immofacile.ci
+            Babimmo - Solution de Gestion Immobilière Connectée - www.babimmo.ci
         </div>
       </div>
     </div>

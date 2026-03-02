@@ -53,7 +53,7 @@ export default function KycForm() {
           <label className="block text-sm font-semibold text-gray-700 mb-2">Votre Pièce (Recto/Verso)</label>
           
           <CldUploadWidget 
-            uploadPreset="immofacile_kyc" // ⚠️ Mettez le nom de votre preset 'Unsigned' ici
+            uploadPreset="babimmo_kyc" // ⚠️ Mettez le nom de votre preset 'Unsigned' ici
             onSuccess={(result: any) => {
                 console.log("Upload succès:", result.info);
                 setUploadedUrl(result.info.secure_url); // On capture l'URL

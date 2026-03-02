@@ -65,7 +65,7 @@ const wrapHtml = (content: string, title: string) => `
       ${content}
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} ImmoFacile. Tous droits réservés.</p>
+      <p>© ${new Date().getFullYear()} Babimmo. Tous droits réservés.</p>
       <p>Abidjan, Côte d'Ivoire</p>
     </div>
   </div>
@@ -83,7 +83,7 @@ interface EmailParams {
 async function sendEmail({ to, subject, html, attachments }: EmailParams) {
   try {
     const info = await transporter.sendMail({
-      from: `"ImmoFacile" <${process.env.SMTP_FROM}>`,
+      from: `"Babimmo" <${process.env.SMTP_FROM}>`,
       to,
       subject,
       html,
@@ -156,7 +156,7 @@ export async function sendCredentialsEmail_LEGACY_UNSAFE(email: string, name: st
   
     return sendEmail({
       to: email,
-      subject: "Vos accès temporaires ImmoFacile",
+      subject: "Vos accès temporaires Babimmo",
       html: wrapHtml(content, "Bienvenue"),
     });
 }
@@ -174,7 +174,7 @@ export async function sendPaymentReceiptWithPdf(
     <p>Bonjour ${safeName},</p>
     <p>Nous confirmons la bonne réception de votre paiement (Réf: <strong>${safeRef}</strong>).</p>
     <p>Vous trouverez votre quittance certifiée en pièce jointe de cet email.</p>
-    <p>Cordialement,<br>L'équipe ImmoFacile.</p>
+    <p>Cordialement,<br>L'équipe Babimmo.</p>
   `;
 
   return sendEmail({

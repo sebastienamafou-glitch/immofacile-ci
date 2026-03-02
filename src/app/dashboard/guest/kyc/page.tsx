@@ -216,7 +216,7 @@ export default function GuestKYCPage() {
                     </div>
 
                     <CldUploadWidget 
-                        uploadPreset="immofacile_kyc"
+                        uploadPreset="babimmo_kyc"
                         onSuccess={handleKycSuccess}
                         options={{ maxFiles: 1, sources: ['local', 'camera'], clientAllowedFormats: ["png", "jpg", "pdf"] }}
                     >

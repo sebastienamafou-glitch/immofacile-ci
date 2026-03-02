@@ -39,7 +39,7 @@ export default function DashboardLayout({
                 <div className="relative w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden">
                     <Image src="/logo.png" alt="Logo" width={32} height={32} className="object-contain p-0.5" />
                 </div>
-                <span className="font-bold text-white tracking-tight">ImmoFacile</span>
+                <span className="font-bold text-white tracking-tight">Babimmo</span>
             </Link>
 
             <div className="flex items-center gap-4">

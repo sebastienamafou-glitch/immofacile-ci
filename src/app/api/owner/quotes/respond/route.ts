@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
-// 🛡️ NORMES FINANCIÈRES (Rapport Immofacile)
+// 🛡️ NORMES FINANCIÈRES 
 const FINANCE_RULES = {
   PLATFORM_FEE_RATE: 0.05, // 5% de frais de service sur travaux
   TVA_RATE: 0.18,          // TVA UEMOA

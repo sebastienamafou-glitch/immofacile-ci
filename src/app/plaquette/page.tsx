@@ -110,11 +110,11 @@ export default function PlaquettePage() {
 
         </div>
 
-        {/* L'EXEMPLE IMMOFACILE */}
+        {/* L'EXEMPLE BABIMMO */}
         <div className="bg-slate-900 text-white rounded-xl p-6 mb-10 flex items-center justify-between relative overflow-hidden">
           <div className="relative z-10 w-3/4">
             <h4 className="text-orange-500 font-bold uppercase text-[9px] tracking-widest mb-1">Référence Majeure</h4>
-            <h3 className="text-xl font-bold mb-2">Projet IMMOFACILE</h3>
+            <h3 className="text-xl font-bold mb-2">Projet BABIMMO</h3>
             <p className="text-slate-400 text-xs leading-relaxed">
               Infrastructure garantissant par le code le respect de la Loi n° 2019-576. 
               Un modèle de Tiers de Confiance Numérique souverain en zone UEMOA.
@@ -138,9 +138,9 @@ export default function PlaquettePage() {
             </div>
           </div>
           <div className="text-right space-y-0.5 text-xs font-medium">
-            <p className="text-orange-600 flex items-center justify-end gap-1"><Phone size={12}/> +33 07 83 97 41 75</p>
-            <p className="text-slate-800">contact@webappci.com</p>
-            <p className="text-slate-400 text-[10px] italic">https://www.immofacile.ci</p>
+            <p className="text-orange-600 flex items-center justify-end gap-1"><Phone size={12}/> +225 07 00 00 00 00</p>
+            <p className="text-slate-800">contact@babimmo.ci</p>
+            <p className="text-slate-400 text-[10px] italic">https://www.babimmo.ci</p>
           </div>
         </footer>
 

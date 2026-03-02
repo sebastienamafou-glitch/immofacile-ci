@@ -11,8 +11,8 @@ const QUOTE_DATA = {
   issuer: {
     name: "WEBAPPCI SARL",
     address: "Abidjan, Cocody",
-    phone: "+33 7 83 97 41 75",
-    email: "contact@webappci.com",
+    phone: "+225 07 00 00 00 00",
+    email: "contact@babimmo.ci",
     website: "www.webappci.com",
     logoText: "WA" // Ou une image
   },
@@ -213,7 +213,7 @@ export default function QuotePage() {
         </div>
 
         <footer className="mt-16 text-center text-[10px] text-slate-400">
-            <p>WEBAPPCI SARL - Abidjan Cocody - Tél : +33 7 83 97 41 75</p>
+            <p>WEBAPPCI SARL - Abidjan Cocody - Tél : +225 07 00 00 00 00</p>
             <p>Ce devis est valable 30 jours. Merci de votre confiance.</p>
         </footer>
 

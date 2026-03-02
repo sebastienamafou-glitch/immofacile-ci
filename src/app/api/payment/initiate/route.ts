@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     if (type === 'TOPUP') {
         // La validation Zod a déjà garanti que manualAmount existe et est > 100
         amountToPay = manualAmount!; 
-        description = "Rechargement Wallet ImmoFacile";
+        description = "Rechargement Wallet Babimmo";
         breakdown.amountOwner = amountToPay; // Pour un topup, "Owner" = l'utilisateur lui-même
     }
 

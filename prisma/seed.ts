@@ -69,7 +69,7 @@ async function main() {
   // 3. CRÉATION DES UTILISATEURS
   // ==========================================
   const usersData = [
-    { email: 'superadmin@immofacile.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null, tier: 3 },
+    { email: 'superadmin@babimmo.ci', name: 'Dieu (Super Admin)', role: Role.SUPER_ADMIN, agencyId: null, tier: 3 },
     { email: 'directeur@immoprestige.ci', name: 'M. le Directeur', role: Role.AGENCY_ADMIN, agencyId: agency.id, tier: 2 },
     { email: 'agent@immoprestige.ci', name: 'Alexandre Agent', role: Role.AGENT, jobTitle: 'Négociateur Immobilier', agencyId: agency.id, tier: 2 },
     { email: 'proprio.agence@gmail.com', name: 'Pierre Propriétaire (Géré)', role: Role.OWNER, agencyId: agency.id, tier: 2 },
@@ -157,8 +157,9 @@ async function main() {
           endDate: new Date('2025-01-01'),
           monthlyRent: 1500000,
           depositAmount: 3000000,
-          status: LeaseStatus.ACTIVE,
-          isActive: true,
+          advanceAmount: 3000000, // <--- Ajoutez l'avance !
+          status: LeaseStatus.PENDING, // <--- Changez en PENDING !
+          isActive: false, // <--- Mettez à false
           propertyId: property.id,
           tenantId: tenant.id,
           contractUrl: 'https://example.com/contract.pdf',

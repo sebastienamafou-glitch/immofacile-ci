@@ -11,29 +11,29 @@ export const {
   auth,
   signIn,
   signOut,
-  // ❌ J'ai retiré "update" ici, car il n'existe pas côté serveur
 } = NextAuth({
+  // @ts-ignore - Nécessaire car PrismaAdapter v5 a un conflit de type interne connu avec NextAuth v5
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   ...authConfig,
   providers: [
     Credentials({
       async authorize(credentials) {
-        // ... (votre code de connexion existant, ne changez rien)
-        console.log("🔍 [AUTH] Tentative de connexion...");
         const parsedCredentials = z
           .object({ identifier: z.string(), password: z.string().min(6) })
           .safeParse(credentials);
 
         if (parsedCredentials.success) {
           const { identifier, password } = parsedCredentials.data;
+          
+          // Recherche par email ou par téléphone [cite: 2, 3]
           const user = await prisma.user.findFirst({
             where: { OR: [{ email: identifier }, { phone: identifier }] }
           });
 
-          if (!user) return null;
+          if (!user || !user.password) return null;
 
-          const passwordsMatch = await bcrypt.compare(password, user.password || "");
+          const passwordsMatch = await bcrypt.compare(password, user.password);
           if (passwordsMatch) return user;
         }
         return null;
@@ -41,30 +41,30 @@ export const {
     }),
   ],
   callbacks: {
-    // ✅ On garde cette logique, c'est elle qui fait le travail !
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
-        // @ts-ignore
         token.role = user.role;
+        token.agencyId = user.agencyId; // ✅ Sécurisé par l'augmentation de module 
       }
 
-      // C'est ICI que la magie opère quand le client appelle update()
-      if (trigger === "update" && session?.role) {
-        console.log("🔄 [JWT] Mise à jour du Rôle vers :", session.role);
-        token.role = session.role;
+      // Mise à jour dynamique via session [cite: 82]
+      if (trigger === "update") {
+        if (session?.role) token.role = session.role;
+        if (session?.agencyId) token.agencyId = session.agencyId;
       }
 
       return token;
     },
+
     async session({ session, token }) {
       if (token?.sub && session.user) {
         session.user.id = token.sub;
-        // @ts-ignore
-        session.user.role = token.role as string;
+        session.user.role = token.role;
+        session.user.agencyId = token.agencyId; // ✅ Injecté proprement sans 'any'
       }
       return session;
     }
   },
-  debug: true, 
+  debug: process.env.NODE_ENV === "development",
 })

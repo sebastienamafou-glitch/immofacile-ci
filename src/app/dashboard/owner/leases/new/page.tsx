@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Building2, UserPlus, Calendar, Wallet } from "lucide-react";
+import { Loader2, ArrowLeft, Building2, UserPlus, Calendar, Wallet, Info } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Property } from "@prisma/client";
 
-// On importe le composant que vous m'avez donné plus tôt
 import { TenantCredentialsModal } from "@/components/TenantCredentialsModal";
 
 export default function NewLeasePage() {
@@ -24,25 +23,23 @@ export default function NewLeasePage() {
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [tenantEmail, setTenantEmail] = useState("");
   const [tenantName, setTenantName] = useState(""); 
-  const [tenantPhone, setTenantPhone] = useState(""); // Ajout utile
+  const [tenantPhone, setTenantPhone] = useState(""); 
   const [rent, setRent] = useState("");
-  const [deposit, setDeposit] = useState("");
   const [startDate, setStartDate] = useState("");
+
+  // Nouveaux States pour respecter la Loi n° 2019-576
+  const [depositMonths, setDepositMonths] = useState("2");
+  const [advanceMonths, setAdvanceMonths] = useState("2");
 
   // Modal States
   const [showCredentials, setShowCredentials] = useState(false);
   const [newCredentials, setNewCredentials] = useState({ name: "", phone: "", password: "" });
 
-  // 1. Charger les propriétés DISPONIBLES
   useEffect(() => {
     const loadProperties = async () => {
         try {
-            // ✅ ZERO TRUST : Pas de headers manuels
             const res = await api.get('/owner/properties');
-            
             if (res.data.success) {
-                // Filtrage côté client pour double sécurité (l'API le fait peut-être déjà)
-                // On cast en 'any' car le type Prisma standard n'a pas 'isAvailable' (ajouté par l'API)
                 const availableProps = res.data.properties.filter((p: any) => p.isAvailable);
                 setProperties(availableProps);
             }
@@ -54,36 +51,51 @@ export default function NewLeasePage() {
     loadProperties();
   }, []);
 
-  // 2. Soumission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const numRent = Number(rent);
+    const numDepositMonths = Number(depositMonths);
+    const numAdvanceMonths = Number(advanceMonths);
+    
+    // 🛑 VÉRIFICATION JURIDIQUE : LOI N° 2019-576 🛑
+    if (numDepositMonths > 2 || numAdvanceMonths > 2) {
+        toast.error(
+            "Limites légales dépassées", 
+            { description: "La loi limite la caution à 2 mois et l'avance à 2 mois maximum." }
+        );
+        return; 
+    }
+
     setLoading(true);
 
     try {
-        // ✅ ZERO TRUST : Authentification par Cookie uniquement
+        // Calcul du dépôt de garantie réel à envoyer à l'API (en FCFA)
+        const totalDeposit = numRent * numDepositMonths;
+        const totalAdvance = numRent * numAdvanceMonths;
+
         const res = await api.post('/owner/leases', {
             propertyId: selectedPropertyId,
             tenantEmail,
             tenantName,
             tenantPhone,
-            rent: Number(rent),
-            deposit: Number(deposit),
+            rent: numRent,
+            deposit: totalDeposit,
+            advance: totalAdvance, // Assurez-vous que votre API accepte ce nouveau champ si nécessaire
             startDate
         });
 
         if (res.data.success) {
             toast.success("Bail créé avec succès !");
             
-            // Si l'API nous renvoie des identifiants (Nouveau User), on ouvre la modale
             if (res.data.credentials) {
                 setNewCredentials({
                     name: tenantName || "Locataire",
-                    phone: tenantEmail, // L'identifiant de connexion (souvent email ou tel)
+                    phone: tenantEmail, 
                     password: res.data.credentials.password
                 });
                 setShowCredentials(true);
             } else {
-                // Sinon redirection classique
                 router.push(`/dashboard/owner/leases/${res.data.lease.id}`);
             }
         }
@@ -98,6 +110,12 @@ export default function NewLeasePage() {
       setShowCredentials(false);
       router.push('/dashboard/owner/leases');
   };
+
+  // Calculs dynamiques pour l'affichage
+  const currentRent = Number(rent) || 0;
+  const calculatedDeposit = currentRent * Number(depositMonths);
+  const calculatedAdvance = currentRent * Number(advanceMonths);
+  const totalToPay = calculatedDeposit + calculatedAdvance;
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans flex flex-col items-center justify-center">
@@ -114,7 +132,7 @@ export default function NewLeasePage() {
                         <Building2 className="text-[#F59E0B] w-6 h-6" /> Nouveau Contrat de Bail
                     </CardTitle>
                     <p className="text-slate-400 text-sm">
-                        Liez un bien à un locataire. Si le locataire n'existe pas, un compte sécurisé sera créé.
+                        Liez un bien à un locataire. Le contrat respectera automatiquement la Loi n° 2019-576.
                     </p>
                 </CardHeader>
                 <CardContent>
@@ -133,7 +151,6 @@ export default function NewLeasePage() {
                                     value={selectedPropertyId}
                                     onChange={(e) => {
                                         setSelectedPropertyId(e.target.value);
-                                        // Auto-fill loyer
                                         const p = properties.find(prop => prop.id === e.target.value);
                                         if(p) setRent(p.price.toString());
                                     }}
@@ -145,11 +162,6 @@ export default function NewLeasePage() {
                                         </option>
                                     ))}
                                 </select>
-                                {properties.length === 0 && (
-                                    <p className="text-xs text-orange-400 mt-2 flex items-center gap-1">
-                                        ⚠️ Aucun bien vacant. Ajoutez une propriété ou libérez un bail.
-                                    </p>
-                                )}
                             </div>
                         </div>
 
@@ -185,10 +197,16 @@ export default function NewLeasePage() {
 
                         {/* 3. TERMES DU CONTRAT */}
                         <div className="bg-slate-950/50 p-6 rounded-xl border border-slate-800 space-y-4">
-                             <h3 className="font-bold text-white flex items-center gap-2 text-sm uppercase tracking-wider">
-                                <Wallet className="w-4 h-4 text-slate-500"/> Conditions Financières
-                            </h3>
-                            <div className="grid md:grid-cols-3 gap-6">
+                             <div className="flex justify-between items-center">
+                                 <h3 className="font-bold text-white flex items-center gap-2 text-sm uppercase tracking-wider">
+                                    <Wallet className="w-4 h-4 text-slate-500"/> Conditions Financières
+                                </h3>
+                                <div className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded border border-emerald-400/20">
+                                    <Info className="w-3 h-3"/> Conforme Loi 2019-576
+                                </div>
+                             </div>
+
+                            <div className="grid md:grid-cols-2 gap-6 mb-6">
                                 <div className="space-y-2">
                                     <Label className="text-slate-300 text-xs uppercase font-bold">Loyer Mensuel <span className="text-red-500">*</span></Label>
                                     <div className="relative">
@@ -196,24 +214,11 @@ export default function NewLeasePage() {
                                             type="number" 
                                             required 
                                             min="0"
-                                            className="bg-[#0B1120] border-slate-700 text-emerald-400 font-bold pl-8"
+                                            className="bg-[#0B1120] border-slate-700 text-emerald-400 font-bold pl-8 text-lg"
                                             value={rent}
                                             onChange={(e) => setRent(e.target.value)}
                                         />
-                                        <span className="absolute left-3 top-2.5 text-slate-500 font-bold">F</span>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-slate-300 text-xs uppercase font-bold">Caution / Avance</Label>
-                                    <div className="relative">
-                                        <Input 
-                                            type="number" 
-                                            min="0"
-                                            className="bg-[#0B1120] border-slate-700 text-white pl-8"
-                                            value={deposit}
-                                            onChange={(e) => setDeposit(e.target.value)}
-                                        />
-                                        <span className="absolute left-3 top-2.5 text-slate-500 font-bold">F</span>
+                                        <span className="absolute left-3 top-3 text-slate-500 font-bold">F</span>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -222,14 +227,49 @@ export default function NewLeasePage() {
                                         <Input 
                                             type="date" 
                                             required
-                                            className="bg-[#0B1120] border-slate-700 text-white pl-10"
+                                            className="bg-[#0B1120] border-slate-700 text-white pl-10 text-lg"
                                             value={startDate}
                                             onChange={(e) => setStartDate(e.target.value)}
                                         />
-                                        <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-500 pointer-events-none" />
+                                        <Calendar className="absolute left-3 top-3 w-5 h-5 text-slate-500 pointer-events-none" />
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="grid md:grid-cols-2 gap-6 bg-[#0B1120] p-4 rounded-lg border border-slate-800">
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300 text-xs uppercase font-bold">Dépôt de garantie (Mois)</Label>
+                                    <select 
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none"
+                                        value={depositMonths}
+                                        onChange={(e) => setDepositMonths(e.target.value)}
+                                    >
+                                        <option value="0">Aucune caution (0 mois)</option>
+                                        <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
+                                        <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-slate-300 text-xs uppercase font-bold">Avance sur loyer (Mois)</Label>
+                                    <select 
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none"
+                                        value={advanceMonths}
+                                        onChange={(e) => setAdvanceMonths(e.target.value)}
+                                    >
+                                        <option value="0">Aucune avance (0 mois)</option>
+                                        <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
+                                        <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Récapitulatif Total */}
+                            {currentRent > 0 && (
+                                <div className="mt-4 flex justify-between items-center bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                                    <span className="text-sm font-bold text-slate-300">Total à payer à la signature :</span>
+                                    <span className="text-xl font-black text-white">{totalToPay.toLocaleString()} FCFA</span>
+                                </div>
+                            )}
                         </div>
 
                         <Button 
@@ -244,12 +284,11 @@ export default function NewLeasePage() {
             </Card>
         </div>
 
-        {/* MODALE DE SUCCÈS (Identifiants) */}
         <TenantCredentialsModal 
             isOpen={showCredentials}
             onClose={handleCloseModal}
             tenantName={newCredentials.name}
-            tenantPhone={newCredentials.phone} // On utilise l'email ou phone comme login
+            tenantPhone={newCredentials.phone} 
             tempPass={newCredentials.password}
         />
     </div>

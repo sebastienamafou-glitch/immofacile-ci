@@ -157,7 +157,7 @@ export default function AkwabaSignupPage() {
               </Link>
             </p>
             <p className="mt-8 text-xs text-slate-500">
-                © 2024 Akwaba by ImmoFacile. <br/> Voyagez autrement.
+                © 2024 Akwaba by Babimmo. <br/> Voyagez autrement.
             </p>
           </div>
         </div>

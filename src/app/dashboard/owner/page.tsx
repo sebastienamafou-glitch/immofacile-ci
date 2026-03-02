@@ -42,7 +42,7 @@ const PremiumLoader = () => (
             <div className="w-12 h-12 border-4 border-slate-800 rounded-full"></div>
             <div className="w-12 h-12 border-4 border-t-orange-500 rounded-full animate-spin absolute top-0 left-0"></div>
         </div>
-        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest animate-pulse">Chargement ImmoFacile...</p>
+        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest animate-pulse">Chargement Babimmo...</p>
     </div>
 );
 
@@ -235,7 +235,7 @@ function OwnerDashboardContent() {
                 Bonjour, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">{user?.name || 'Propriétaire'}</span> 👋
             </h1>
             <p className="text-slate-400 mt-2 text-sm">
-                Aperçu global de votre écosystème <span className="text-white font-bold">ImmoFacile</span> & <span className="text-purple-400 font-bold">Akwaba</span>.
+                Aperçu global de votre écosystème <span className="text-white font-bold">Babimmo</span> & <span className="text-purple-400 font-bold">Akwaba</span>.
             </p>
         </div>
 

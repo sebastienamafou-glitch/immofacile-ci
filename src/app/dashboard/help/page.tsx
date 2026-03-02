@@ -91,7 +91,7 @@ export default function HelpPage() {
                 </div>
 
                 <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight leading-tight">
-                    Centre d'Aide <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">ImmoFacile</span>
+                    Centre d'Aide <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">Babimmo</span>
                 </h1>
                 
                 <p className="text-slate-400 text-lg mb-10 max-w-xl mx-auto leading-relaxed">
@@ -223,7 +223,7 @@ export default function HelpPage() {
                         <p className="text-green-100/80 text-sm font-medium mb-6">Réponse instantanée via WhatsApp.</p>
                         
                         <a 
-                            href="https://wa.me/22507070707?text=Bonjour%20ImmoFacile" 
+                            href="https://wa.me/22507070707?text=Bonjour%20Babimmo" 
                             target="_blank" 
                             className="w-full bg-white text-[#075E54] font-bold py-3.5 rounded-xl hover:bg-green-50 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95"
                         >

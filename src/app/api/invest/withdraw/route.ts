@@ -35,7 +35,7 @@ async function processGatewayPayout(provider: string, phone: string, amount: num
   try {
     if (provider === 'WAVE') {
         const res = await axios.post(GATEWAY_CONFIG.WAVE_URL, {
-            amount, currency: "XOF", recipient: phone, description: "Retrait ImmoFacile"
+            amount, currency: "XOF", recipient: phone, description: "Retrait Babimmo"
         }, {
             headers: { 
                 'Authorization': `Bearer ${GATEWAY_CONFIG.WAVE_TOKEN}`,

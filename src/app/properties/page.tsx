@@ -88,10 +88,10 @@ export default function PropertiesPage() {
             {/* LOGO */}
             <Link href="/" className="flex items-center gap-2 group">
                 <div className="relative w-10 h-10 transition-transform group-hover:scale-105">
-                   <Image src="/logo.png" alt="ImmoFacile" width={40} height={40} className="object-contain" priority />
+                   <Image src="/logo.png" alt="Babimmo" width={40} height={40} className="object-contain" priority />
                 </div>
                 <span className="font-black text-xl tracking-tight text-[#0B1120] hidden md:block">
-                    ImmoFacile<span className="text-orange-500">.CI</span>
+                    Babimmo<span className="text-orange-500">.CI</span>
                 </span>
             </Link>
 
@@ -224,7 +224,7 @@ export default function PropertiesPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 border-b border-slate-200 pb-4 gap-4">
                     <div>
                         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">{safeProperties.length} Résultats</h2>
-                        <p className="text-slate-500 text-sm mt-1">Biens en gestion exclusive ImmoFacile</p>
+                        <p className="text-slate-500 text-sm mt-1">Biens en gestion exclusive Babimmo</p>
                     </div>
                 </div>
 
@@ -317,7 +317,7 @@ export default function PropertiesPage() {
       <footer className="bg-[#0B1120] text-slate-400 py-12 border-t border-slate-800">
          <div className="max-w-7xl mx-auto px-4 text-center">
              <Image src="/logo.png" alt="Logo" width={30} height={30} className="mx-auto mb-4 opacity-50 grayscale" />
-             <p className="text-xs font-medium text-slate-500">&copy; {new Date().getFullYear()} ImmoFacile CI. Gestion Locative & Réservations.</p>
+             <p className="text-xs font-medium text-slate-500">&copy; {new Date().getFullYear()} Babimmo CI. Gestion Locative & Réservations.</p>
          </div>
       </footer>
 

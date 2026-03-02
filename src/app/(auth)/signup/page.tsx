@@ -222,11 +222,11 @@ export default function SignupPage() {
                 <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
                     {/* ✅ LOGO CLIQUABLE & ANIMÉ */}
                     <Link href="/" className="relative w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-4 overflow-hidden border border-white/10 hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" title="Retour à l'accueil">
-                        <Image src="/logo.png" alt="Logo ImmoFacile" width={64} height={64} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
+                        <Image src="/logo.png" alt="Logo Babimmo" width={64} height={64} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
                     </Link>
                     
                     <h1 className="text-3xl font-black text-white tracking-tight text-center">
-                        Rejoindre <span className="text-orange-500 italic">IMMOFACILE</span>
+                        Rejoindre <span className="text-orange-500 italic">BABIMMO</span>
                     </h1>
                 </div>
                 

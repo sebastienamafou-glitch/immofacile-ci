@@ -129,7 +129,7 @@ export default async function ConversationPage({ params }: PageProps) {
                         />
                     </div>
                     <p className="text-white font-bold text-lg">{otherUser.name}</p>
-                    <p className="text-slate-500 text-sm">Membre ImmoFacile</p>
+                    <p className="text-slate-500 text-sm">Membre Babimmo</p>
                     
                     <div className="mt-6 w-full pt-6 border-t border-slate-800 flex justify-between text-sm">
                          <span className="text-slate-400">Réponse moy.</span>
@@ -139,7 +139,7 @@ export default async function ConversationPage({ params }: PageProps) {
             </div>
 
             <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-orange-200 text-xs leading-relaxed">
-                <p>🔒 Pour votre sécurité, ne communiquez jamais vos informations personnelles ou bancaires en dehors de la plateforme ImmoFacile.</p>
+                <p>🔒 Pour votre sécurité, ne communiquez jamais vos informations personnelles ou bancaires en dehors de la plateforme Babimmo.</p>
             </div>
         </div>
       </div>

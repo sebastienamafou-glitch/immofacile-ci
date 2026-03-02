@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'ImmoFacile - Gestion Immobilière',
-    short_name: 'ImmoFacile',
+    name: 'Babimmo - Gestion Immobilière',
+    short_name: 'Babimmo',
     description: "Plateforme intelligente pour propriétaires et locataires en Côte d'Ivoire.",
     start_url: '/',
     display: 'standalone',

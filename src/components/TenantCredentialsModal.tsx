@@ -15,10 +15,10 @@ interface TenantCredentialsModalProps {
 export function TenantCredentialsModal({ isOpen, onClose, tenantName, tenantPhone, tempPass }: TenantCredentialsModalProps) {
   const [copied, setCopied] = useState(false);
   
-  const loginUrl = "https://immofacile.ci/login"; // URL de votre site en prod
+  const loginUrl = "https://babimmo.ci/login"; // URL de votre site en prod
   
   // Le message pré-rédigé pour le locataire
-  const message = `Bonjour ${tenantName} 👋,\n\nBienvenue dans votre nouvel appartement !\n\nVoici vos accès pour payer votre loyer et retrouver votre bail sur ImmoFacile :\n\n🔗 Lien : ${loginUrl}\n📱 Identifiant : ${tenantPhone}\n🔑 Mot de passe provisoire : ${tempPass}\n\nÀ très vite !`;
+  const message = `Bonjour ${tenantName} 👋,\n\nBienvenue dans votre nouvel appartement !\n\nVoici vos accès pour payer votre loyer et retrouver votre bail sur Babimmo :\n\n🔗 Lien : ${loginUrl}\n📱 Identifiant : ${tenantPhone}\n🔑 Mot de passe provisoire : ${tempPass}\n\nÀ très vite !`;
 
   const waLink = createWhatsAppLink(tenantPhone, message);
 
