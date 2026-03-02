@@ -8,32 +8,32 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import Link from "next/link";
 
-// Force le rendu dynamique pour avoir les dernières données à chaque scan
 export const dynamic = 'force-dynamic';
 
+// 1. Typage officiel robuste pour les versions récentes de Next.js
 interface PageProps {
-  params: { id: string }; // Simplifié pour compatibilité max (Next 13/14)
+  params: Promise<{ id: string }>;
 }
 
-export default async function PublicCompliancePage({ params }: PageProps) {
-  // Adaptation selon la version Next.js (Si params est une promesse ou non)
-  // @ts-ignore
-  const id = params.id || (await params).id;
+export default async function PublicCompliancePage(props: PageProps) {
+  // 2. Déballage sécurisé (Fix de l'erreur Serveur 500)
+  const params = await props.params;
+  const id = params?.id;
 
-  // 1. RÉCUPÉRATION PUISSANTE (Avec Relations KYC)
+  if (!id) return notFound();
+
+  // 3. RÉCUPÉRATION PUISSANTE (Avec Relations KYC)
   const lease = await prisma.lease.findUnique({
-    where: { id: id },
+    where: { id },
     include: {
       property: {
         include: { 
             owner: {
-                // ✅ ON INCLUT LE KYC DU PROPRIO
                 include: { kyc: true }
             } 
         }
       },
       tenant: {
-        // ✅ ON INCLUT LE KYC DU LOCATAIRE
         include: { kyc: true }
       },
       signatures: true // Pour récupérer la preuve de signature
@@ -42,25 +42,20 @@ export default async function PublicCompliancePage({ params }: PageProps) {
 
   if (!lease) return notFound();
 
-  // 2. ALGORITHME DE CONFORMITÉ (Mis à jour v5)
-  // Loi 2019 : Caution max 2 mois
-  const legalDepositLimit = lease.monthlyRent * 2;
-  const isDepositCompliant = lease.depositAmount <= legalDepositLimit;
+// 4. ALGORITHME DE CONFORMITÉ (Sécurisé contre les données nulles)
+  const monthlyRent = lease?.monthlyRent || 0;
+  const depositAmount = lease?.depositAmount || 0;
+  const legalDepositLimit = monthlyRent * 2;
+  const isDepositCompliant = depositAmount > 0 && depositAmount <= legalDepositLimit;
 
-  // Vérification KYC (Sécurité par défaut : si pas de KYC, c'est non conforme)
-  const isOwnerVerified = lease.property.owner.kyc?.status === 'VERIFIED';
+  // Sécurisation extrême avec ?. partout
+  const isOwnerVerified = lease?.property?.owner?.kyc?.status === 'VERIFIED';
+  const isTenantVerified = lease?.tenant?.kyc?.status === 'VERIFIED';
   
-  // Pour le locataire, on peut être plus souple si le bail est en cours de signature
-  // Mais pour un certificat "VERT", il faut qu'il soit vérifié.
-  const isTenantVerified = lease.tenant?.kyc?.status === 'VERIFIED';
+  const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'ACTIVE', 'TERMINATED'].includes(lease?.signatureStatus || '');
   
-  // Statut de signature
-  const isSigned = ['COMPLETED', 'SIGNED_TENANT', 'ACTIVE', 'TERMINATED'].includes(lease.signatureStatus || '');
-  
-  // Récupération de la preuve technique (la première signature trouvée)
-  const proof = lease.signatures.length > 0 ? lease.signatures[0] : null;
+  const proof = (lease?.signatures && lease.signatures.length > 0) ? lease.signatures[0] : null;
 
-  // Score global (Tout doit être vert pour avoir le badge "Authentique")
   const isGlobalCompliant = isDepositCompliant && isOwnerVerified && isSigned;
 
   return (
@@ -69,7 +64,6 @@ export default async function PublicCompliancePage({ params }: PageProps) {
       {/* NAVBAR SIMPLIFIÉE - BRANDING BABIMMO */}
       <div className="bg-[#0B1120] px-6 py-4 flex justify-between items-center shadow-md">
          <div className="text-white font-black text-xl tracking-tighter flex items-center gap-2">
-            {/* 👇 MODIFICATION ICI : MARQUE BABIMMO */}
             BAB<span className="text-[#F59E0B]">IMMO</span>
             <span className="text-[10px] font-normal text-slate-400 bg-white/10 px-2 py-0.5 rounded ml-2">VERIFY</span>
          </div>
@@ -87,7 +81,7 @@ export default async function PublicCompliancePage({ params }: PageProps) {
               </div>
               <div>
                 <h1 className="text-xl font-bold tracking-wide">CERTIFICAT DE CONFORMITÉ</h1>
-                <p className="text-xs text-slate-400 uppercase tracking-widest">Preuve d'authenticité Blockchain</p>
+                <p className="text-xs text-slate-400 uppercase tracking-widest">Preuve d'authenticité Légale</p>
               </div>
             </div>
             <div className="mt-4 md:mt-0">
@@ -141,7 +135,6 @@ export default async function PublicCompliancePage({ params }: PageProps) {
                     <div className="space-y-2 font-mono text-xs">
                         <div className="flex justify-between border-b border-slate-700 pb-2">
                             <span className="text-slate-500">Date Signature</span>
-                            {/* Gestion de la date sécurisée */}
                             <span className="text-emerald-400">
                                 {proof.signedAt ? format(new Date(proof.signedAt), "dd MMM yyyy à HH:mm", { locale: fr }) : 'Date inconnue'}
                             </span>
