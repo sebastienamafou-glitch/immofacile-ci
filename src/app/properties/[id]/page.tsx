@@ -62,7 +62,7 @@ export default async function PublicPropertyPage(props: PageProps) {
   const isLoggedIn = !!session?.user;
   const isGhost = property.owner?.kyc?.status !== 'VERIFIED';
   const hasMultipleImages = property.images && property.images.length > 1;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.babimmo.ci";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.immofacile.ci";
   const propertyUrl = `${appUrl}/properties/${property.id}`;
   const whatsappShareMessage = encodeURIComponent(`Découvre ce bien sur Babimmo : ${property.title} à ${property.price.toLocaleString()} FCFA.\n\nVoir les détails et photos ici : ${propertyUrl}`);
 
