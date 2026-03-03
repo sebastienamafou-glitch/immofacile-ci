@@ -227,7 +227,7 @@ export default async function PublicPropertyPage(props: PageProps) {
                     <Sparkles className="w-5 h-5 text-orange-500" /> À propos de ce bien
                 </h3>
                 {/* whitespace-pre-wrap permet de garder les retours à la ligne du post Facebook original ! */}
-                <p className="text-slate-600 leading-relaxed text-base md:text-lg whitespace-pre-wrap font-medium">
+                <p className="text-slate-600 leading-relaxed text-base md:text-lg whitespace-pre-wrap font-medium break-words">
                     {property.description || "Aucune description détaillée n'a été fournie pour ce bien."}
                 </p>
             </div>
