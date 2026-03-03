@@ -44,7 +44,8 @@ const PUBLIC_ROUTES = [
   '/forgot-password', 
   '/reset-password',
   '/api/webhooks/cinetpay', 
-  '/api/webhooks/stripe'
+  '/api/webhooks/stripe',
+  '/api/public'
 ];
 
 // @ts-ignore

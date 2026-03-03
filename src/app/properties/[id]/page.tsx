@@ -62,6 +62,9 @@ export default async function PublicPropertyPage(props: PageProps) {
   const isLoggedIn = !!session?.user;
   const isGhost = property.owner?.kyc?.status !== 'VERIFIED';
   const hasMultipleImages = property.images && property.images.length > 1;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.babimmo.ci";
+  const propertyUrl = `${appUrl}/properties/${property.id}`;
+  const whatsappShareMessage = encodeURIComponent(`Découvre ce bien sur Babimmo : ${property.title} à ${property.price.toLocaleString()} FCFA.\n\nVoir les détails et photos ici : ${propertyUrl}`);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24 selection:bg-orange-100 selection:text-orange-600">
@@ -108,11 +111,14 @@ export default async function PublicPropertyPage(props: PageProps) {
             </Link>
          </div>
 
+         {/* Actions (Partager / Favoris) */}
          <div className="w-1/3 flex justify-end gap-2 pointer-events-auto">
-            <Button size="icon" variant="outline" className="rounded-full bg-white/80 backdrop-blur-md shadow-lg border-white/40 h-10 w-10 hover:bg-white transition">
-                <Share2 className="w-4 h-4 text-slate-900" />
-            </Button>
-            <Button size="icon" variant="outline" className="rounded-full bg-white/80 backdrop-blur-md shadow-lg border-white/40 h-10 w-10 hover:bg-white transition">
+            <a href={`https://wa.me/?text=${whatsappShareMessage}`} target="_blank" rel="noopener noreferrer" title="Partager sur WhatsApp">
+                <Button size="icon" variant="outline" className="rounded-full bg-white/80 backdrop-blur-md shadow-lg border-white/40 h-10 w-10 hover:bg-[#25D366] hover:border-[#25D366] transition group">
+                    <Share2 className="w-4 h-4 text-slate-900 group-hover:text-white" />
+                </Button>
+            </a>
+            <Button size="icon" variant="outline" className="rounded-full bg-white/80 backdrop-blur-md shadow-lg border-white/40 h-10 w-10 hover:bg-white transition hover:text-red-500">
                 <Heart className="w-4 h-4 text-slate-900" />
             </Button>
          </div>
