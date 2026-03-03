@@ -9,26 +9,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, User, Mail, Phone, Lock, Eye, EyeOff, Building2, Home } from "lucide-react";
+import { 
+    Loader2, ShieldCheck, User, Mail, Phone, Lock, 
+    Eye, EyeOff, Building2, Home 
+} from "lucide-react";
 import { cn } from "@/lib/utils"; 
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
+  const claimId = searchParams.get('claim'); // 🔥 LE HACK : Détection du bien revendiqué
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   
-  // ✅ NOUVEAU : État pour le rôle
-  // Si on vient d'une annonce, on force TENANT, sinon par défaut TENANT (plus sûr que OWNER)
-  const [role, setRole] = useState<"TENANT" | "OWNER">("TENANT");
+  // ✅ RÔLE : Intègre TENANT, OWNER et AGENT
+  const [role, setRole] = useState<"TENANT" | "OWNER" | "AGENT">("TENANT");
 
-  // Si redirectUrl existe, on force le rôle Locataire dès le chargement
+  // Aiguillage automatique : On force le rôle selon l'URL
   useEffect(() => {
     if (redirectUrl) setRole("TENANT");
-  }, [redirectUrl]);
+    if (claimId) setRole("AGENT"); // Si revendication, on le passe en Démarcheur/Agent
+  }, [redirectUrl, claimId]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -47,9 +51,10 @@ function SignupForm() {
 
     setLoading(true);
     try {
-      await api.post('/auth/signup', {
+      await api.post('/auth/register', { 
           ...formData,
-          role: role // ✅ On utilise le rôle choisi par l'utilisateur
+          role: role,
+          claim: claimId // 🔥 Envoi du paramètre claim au backend
       });
 
       toast.success("Compte créé avec succès !");
@@ -71,8 +76,8 @@ function SignupForm() {
     <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
             <form onSubmit={handleSubmit} className="space-y-4">
                 
-                {/* --- SÉLECTEUR DE RÔLE (Affiché uniquement si pas de redirection) --- */}
-                {!redirectUrl && (
+                {/* --- SÉLECTEUR DE RÔLE (Masqué si redirection ou revendication) --- */}
+                {!redirectUrl && !claimId && (
                     <div className="grid grid-cols-2 gap-3 mb-4 p-1 bg-black/40 rounded-xl">
                         <button
                             type="button"
@@ -101,7 +106,18 @@ function SignupForm() {
                     </div>
                 )}
 
-                {/* --- Message Spécial si on vient d'une annonce --- */}
+                {/* --- Message Spécial : Revendication (Démarcheur) --- */}
+                {claimId && (
+                    <div className="bg-orange-500/20 border border-orange-500/30 p-3 rounded-xl mb-4 text-center">
+                        <p className="text-orange-200 text-xs font-bold flex items-center justify-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-orange-400" />
+                            Revendication de l'annonce
+                        </p>
+                        <p className="text-[10px] text-orange-300 mt-1">Créez votre compte Agent pour recevoir les locataires.</p>
+                    </div>
+                )}
+
+                {/* --- Message Spécial : Locataire --- */}
                 {redirectUrl && (
                     <div className="bg-blue-500/20 border border-blue-500/30 p-3 rounded-xl mb-4 text-center">
                         <p className="text-blue-200 text-xs font-bold flex items-center justify-center gap-2">
@@ -117,7 +133,7 @@ function SignupForm() {
                         <User className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
                         <Input 
                             required 
-                            placeholder={role === "OWNER" ? "Ex: SCI Immo ou Jean Kouassi" : "Ex: Kouassi Jean"} 
+                            placeholder={role === "OWNER" ? "Ex: SCI Immo" : role === "AGENT" ? "Ex: Agence Express ou Jean" : "Ex: Kouassi Jean"} 
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-11"
                             value={formData.name}
                             onChange={e => setFormData({...formData, name: e.target.value})}
@@ -195,7 +211,7 @@ function SignupForm() {
                     disabled={loading} 
                     className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-bold h-12 rounded-xl mt-4 shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-95"
                 >
-                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : `Créer mon Compte ${role === 'OWNER' ? 'Propriétaire' : ''}`}
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : `Créer mon Compte ${role === 'OWNER' ? 'Propriétaire' : role === 'AGENT' ? 'Agent' : ''}`}
                 </Button>
 
             </form>
@@ -220,7 +236,6 @@ export default function SignupPage() {
 
             <div className="relative z-10 w-full max-w-md px-4 py-8">
                 <div className="flex flex-col items-center mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-                    {/* ✅ LOGO CLIQUABLE & ANIMÉ */}
                     <Link href="/" className="relative w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-4 overflow-hidden border border-white/10 hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer group" title="Retour à l'accueil">
                         <Image src="/logo.png" alt="Logo Babimmo" width={64} height={64} className="object-contain p-2 group-hover:rotate-3 transition-transform duration-500" />
                     </Link>

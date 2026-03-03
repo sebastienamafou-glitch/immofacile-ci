@@ -6,7 +6,8 @@ import { logActivity } from "@/lib/logger";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, phone, password, name, role } = body;
+    // 🔥 Extraction de claim ajoutée
+    const { email, phone, password, name, role, claim } = body;
 
     // 1. Validation de base
     if ((!email && !phone) || !password) {
@@ -72,7 +73,31 @@ export async function POST(request: Request) {
       }
     });
 
-    // ✅ 5. AUDIT SUCCÈS : Appel corrigé avec syntaxe Objet {}
+    // ✅ 5. LE GROWTH HACK : ASSIGNATION DE LA PROPRIÉTÉ À L'AGENT
+    if (claim && typeof claim === 'string') {
+        try {
+            const propertyExists = await prisma.property.findUnique({ where: { id: claim } });
+            
+            if (propertyExists) {
+                // On met à jour agentId (Pas ownerId !) pour protéger légalement les paiements
+                await prisma.property.update({
+                    where: { id: claim },
+                    data: { agentId: newUser.id }
+                });
+
+                await logActivity({
+                    action: "PROPERTY_CLAIMED" as any, 
+                    entityType: "PROPERTY", 
+                    userId: newUser.id,
+                    metadata: { propertyId: claim, assignedAs: "AGENT" }
+                });
+            }
+        } catch (claimError) {
+            console.error("Erreur silencieuse lors de la revendication:", claimError);
+        }
+    }
+
+    // ✅ 6. AUDIT SUCCÈS : Appel corrigé avec syntaxe Objet {}
     await logActivity({
         action: "NEW_USER_REGISTERED" as any, 
         entityType: "AUTH", 
@@ -84,7 +109,7 @@ export async function POST(request: Request) {
         }
     });
 
-    // 6. Nettoyage réponse
+    // 7. Nettoyage réponse
     // @ts-ignore
     const { password: _, ...userSafe } = newUser;
 

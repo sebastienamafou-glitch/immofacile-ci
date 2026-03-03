@@ -51,8 +51,13 @@ const PUBLIC_ROUTES = [
 export default auth(async (req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
+  
+  // Extraction des données de session
   // @ts-ignore
   const userRole = req.auth?.user?.role; 
+  // @ts-ignore
+  const userAgencyId = req.auth?.user?.agencyId; 
+
   const path = nextUrl.pathname;
 
   // ============================================================
@@ -86,15 +91,25 @@ export default auth(async (req) => {
   );
 
   // ============================================================
-  // 🧭 AIGUILLEUR INTELLIGENT APRÈS CONNEXION (BEST PRACTICE)
+  // 🧭 AIGUILLEUR INTELLIGENT APRÈS CONNEXION
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
-      // Si l'utilisateur est DÉJÀ connecté et tente d'aller sur /login ou l'accueil
       if (isLoggedIn && (path === '/login' || path === '/')) {
           if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/admin", nextUrl));
-          if (userRole === 'AGENCY_ADMIN' || userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
+          if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
+          
+          // 🔥 NOUVEAU : Logique de routage des Agents
+          if (userRole === 'AGENT') {
+              if (userAgencyId) {
+                  return NextResponse.redirect(new URL("/dashboard/agency", nextUrl)); // Agent en agence
+              } else {
+                  return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); // Agent indépendant (Démarcheur)
+              }
+          }
+          
           if (userRole === 'OWNER') return NextResponse.redirect(new URL("/dashboard/owner", nextUrl));
           if (userRole === 'TENANT') return NextResponse.redirect(new URL("/dashboard/tenant", nextUrl));
+          
           return NextResponse.redirect(new URL("/dashboard", nextUrl));
       }
       return NextResponse.next();
@@ -110,15 +125,30 @@ export default auth(async (req) => {
   // 🛡️ SÉCURITÉ : CLOISONNEMENT STRICT DES DASHBOARDS
   // ============================================================
   if (isLoggedIn && userRole) {
+    
+    // Sécurité Super Admin
     if (path.startsWith('/dashboard/admin') && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
-    if (path.startsWith('/dashboard/agency') && userRole !== 'AGENCY_ADMIN' && userRole !== 'AGENT' && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+
+    // 🔥 Sécurité Agence (Accessible par AGENCY_ADMIN, ou AGENT rattaché)
+    if (path.startsWith('/dashboard/agency')) {
+        const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN' || (userRole === 'AGENT' && !!userAgencyId);
+        if (!canAccessAgency) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
+
+    // 🔥 Sécurité Agent Indépendant
+    if (path.startsWith('/dashboard/agent')) {
+        const canAccessAgent = userRole === 'SUPER_ADMIN' || (userRole === 'AGENT' && !userAgencyId);
+        if (!canAccessAgent) return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+
+    // Sécurité Propriétaire
     if (path.startsWith('/dashboard/owner') && userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
+
+    // Sécurité Locataire
     if (path.startsWith('/dashboard/tenant') && userRole !== 'TENANT' && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }

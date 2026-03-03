@@ -56,6 +56,7 @@ model User {
 
   // --- Relations Métier ---
   propertiesOwned  Property[] @relation("PropertyOwner")
+  propertiesManaged Property[] @relation("PropertyAgent") 
   leases           Lease[]    @relation("LeaseTenant")
   leasesManaged    Lease[]    @relation("LeaseAgent")
   missionsAccepted Mission[]  @relation("AgentMissions")
@@ -230,6 +231,8 @@ model Property {
 
   ownerId String
   owner   User   @relation("PropertyOwner", fields: [ownerId], references: [id])
+  agentId String?
+  agent   User?  @relation("PropertyAgent", fields: [agentId], references: [id])
 
   leases      Lease[]
   incidents   Incident[]
