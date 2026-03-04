@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { ImagePlus, X, Loader2 } from "lucide-react";
-import Image from "next/image";
-import { toast } from "sonner"; // Ajout pour le feedback utilisateur
+import { toast } from "sonner"; 
 
 interface ImageUploadProps {
   value: string[];
@@ -20,10 +19,13 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
 
     setLoading(true);
     const newUrls: string[] = [];
+    
+    // 🔥 On récupère proprement les variables Vercel
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET; 
 
-    if (!cloudName) {
-        toast.error("Configuration Cloudinary manquante (CLOUD_NAME).");
+    if (!cloudName || !uploadPreset) {
+        toast.error("Configuration Cloudinary manquante sur Vercel.");
         setLoading(false);
         return;
     }
@@ -32,8 +34,7 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
     for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append("file", file);
-      // ✅ LA CLÉ DU SUCCÈS : Utiliser le preset "Unsigned" configuré à l'étape 1
-      formData.append("upload_preset", "babimmo_preset"); 
+      formData.append("upload_preset", uploadPreset); // Injection dynamique du preset
       formData.append("folder", "babimmo_listings");
 
       try {
@@ -48,7 +49,7 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
             newUrls.push(data.secure_url);
         } else {
             console.error("Erreur Cloudinary:", data);
-            toast.error("Échec de l'upload d'une image.");
+            toast.error(data.error?.message || "Échec de l'upload d'une image.");
         }
       } catch (err) {
         console.error("Erreur réseau:", err);
@@ -56,7 +57,7 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
       }
     }
 
-    // Mise à jour de l'état parent avec les nouvelles URLs + les anciennes
+    // Mise à jour de l'état parent
     onChange([...value, ...newUrls]);
     setLoading(false);
   };
@@ -75,7 +76,6 @@ export default function ImageUpload({ value, onChange, onRemove }: ImageUploadPr
                 <X size={14} />
               </button>
             </div>
-            {/* On utilise img standard si le domaine n'est pas configuré dans next.config.js, sinon Image */}
             <img 
               className="w-full h-full object-cover" 
               alt="Aperçu du bien" 

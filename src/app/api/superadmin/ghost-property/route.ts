@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { v2 as cloudinary } from "cloudinary";
 
 export const dynamic = 'force-dynamic';
+
+// Configuration de Cloudinary
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req: Request) {
   try {
@@ -50,6 +58,29 @@ export async function POST(req: Request) {
         finalDescription += `\n\n---\nLien d'origine (Archives Babimmo) : ${fbLink}`;
     }
 
+    // ==========================================
+    // 🔥 LE FILTRE D'IMMORTALITÉ CLOUDINARY
+    // ==========================================
+    const permanentImageUrls = [];
+    
+    if (Array.isArray(images)) {
+        for (const imageUrl of images) {
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+                try {
+                    // Cloudinary aspire la photo FB et l'héberge chez toi à vie
+                    const uploadResponse = await cloudinary.uploader.upload(imageUrl, {
+                        folder: "babimmo/ghosts",
+                    });
+                    permanentImageUrls.push(uploadResponse.secure_url);
+                } catch (imgError) {
+                    console.error("Erreur d'aspiration Cloudinary :", imgError);
+                    // Si Facebook bloque l'aspiration, on garde le lien temporaire en secours
+                    permanentImageUrls.push(imageUrl);
+                }
+            }
+        }
+    }
+
     // 4. CRÉATION DU BIEN EXPRESS AVEC TOUTES LES INFOS
     const property = await prisma.property.create({
         data: {
@@ -61,7 +92,7 @@ export async function POST(req: Request) {
             bedrooms: parseInt(bedrooms, 10) || 1,
             bathrooms: parseInt(bathrooms, 10) || 1,
             description: finalDescription,
-            images: Array.isArray(images) ? images : [], // Accepte désormais les tableaux multiples
+            images: permanentImageUrls, // ✅ On injecte les liens immortels ici !
             isPublished: true,
             isAvailable: true,
             ownerId: ghostOwner.id
