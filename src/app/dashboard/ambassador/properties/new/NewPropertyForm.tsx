@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, UploadCloud, X } from "lucide-react";
+import { Loader2, UploadCloud, X, CheckCircle, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { PropertyType } from "@prisma/client";
+import Link from "next/link";
 
 interface PropertyFormData {
   title: string;
@@ -19,17 +20,22 @@ interface PropertyFormData {
   images: string[];
 }
 
+const INITIAL_FORM_STATE: PropertyFormData = {
+    title: "", description: "", address: "", commune: "", price: "", 
+    type: "APPARTEMENT", bedrooms: "", bathrooms: "", surface: "", images: []
+};
+
 export default function NewPropertyForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  const [formData, setFormData] = useState<PropertyFormData>({
-    title: "", description: "", address: "", commune: "", price: "", 
-    type: "APPARTEMENT", bedrooms: "", bathrooms: "", surface: "", images: []
-  });
+  // Nouveaux états pour le Growth Hacking
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [createdPropertyId, setCreatedPropertyId] = useState("");
 
-  // Gestion simplifiée Cloudinary (Utilise ton upload_preset public pour les biens)
+  const [formData, setFormData] = useState<PropertyFormData>(INITIAL_FORM_STATE);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -42,7 +48,7 @@ export default function NewPropertyForm() {
       for (const file of Array.from(files)) {
         const uploadData = new FormData();
         uploadData.append("file", file);
-        uploadData.append("upload_preset", "babimmo_properties"); // Modifie si besoin
+        uploadData.append("upload_preset", "babimmo_properties");
 
         const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
           method: "POST", body: uploadData,
@@ -80,12 +86,13 @@ export default function NewPropertyForm() {
 
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.propertyId) {
         toast.success("Annonce publiée avec succès !");
-        router.push("/dashboard/ambassador/properties");
+        setCreatedPropertyId(data.propertyId);
+        setIsSuccess(true); // Bloque la redirection et affiche l'écran de succès
         router.refresh();
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || "Erreur lors de la création");
       }
     } catch (error) {
         if (error instanceof Error) toast.error(error.message);
@@ -95,6 +102,70 @@ export default function NewPropertyForm() {
     }
   };
 
+  // Logique pour copier le message d'approche
+  const handleCopyMessage = () => {
+    const propertyUrl = `${window.location.origin}/properties/${createdPropertyId}`;
+    const locationInfo = formData.address ? `${formData.commune} (${formData.address})` : formData.commune;
+    
+    const message = `Bonjour, j'ai vu votre annonce pour "${formData.title}" à ${locationInfo}. Pour vous aider à trouver un locataire plus vite et sécuriser vos loyers, je l'ai mise en valeur sur Babimmo. \n\nRegardez le résultat ici : ${propertyUrl}\n\nDites-moi ce que vous en pensez !`;
+    
+    navigator.clipboard.writeText(message);
+    toast.success("Message copié ! Vous pouvez le coller sur Facebook/WhatsApp.");
+  };
+
+  // Réinitialiser le formulaire pour enchaîner
+  const handleReset = () => {
+      setFormData(INITIAL_FORM_STATE);
+      setCreatedPropertyId("");
+      setIsSuccess(false);
+  };
+
+  // 🟢 ÉCRAN DE SUCCÈS (Le Growth Hack)
+  if (isSuccess) {
+      return (
+          <div className="flex flex-col items-center justify-center py-10 text-center animate-in fade-in zoom-in duration-300">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-sm">
+                  <CheckCircle className="w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-2">Annonce en ligne !</h2>
+              <p className="text-slate-500 mb-8 max-w-md">L'annonce est prête. Copiez le message ci-dessous et envoyez-le au propriétaire sur Facebook ou WhatsApp.</p>
+
+              <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-6 text-left relative">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap font-medium">
+                      Bonjour, j'ai vu votre annonce pour "{formData.title}" à {formData.address ? `${formData.commune} (${formData.address})` : formData.commune}. Pour vous aider à trouver un locataire plus vite et sécuriser vos loyers, je l'ai mise en valeur sur Babimmo.
+                      <br/><br/>
+                      Regardez le résultat ici : <br/>
+                      <span className="text-orange-500 font-bold break-all">{window.location.origin}/properties/{createdPropertyId}</span>
+                      <br/><br/>
+                      Dites-moi ce que vous en pensez !
+                  </p>
+                  
+                  <button 
+                      onClick={handleCopyMessage}
+                      className="mt-6 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                  >
+                      <Copy className="w-4 h-4" /> Copier le message
+                  </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 w-full">
+                  <Link href={`/properties/${createdPropertyId}`} target="_blank" className="flex-1">
+                      <button className="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition shadow-sm">
+                          <ExternalLink className="w-4 h-4" /> Voir l'annonce
+                      </button>
+                  </Link>
+                  <button 
+                      onClick={handleReset}
+                      className="flex-1 bg-orange-50 text-orange-600 hover:bg-orange-100 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                  >
+                      <RefreshCw className="w-4 h-4" /> Nouvelle annonce
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
+  // 🟡 FORMULAIRE CLASSIQUE
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -160,8 +231,8 @@ export default function NewPropertyForm() {
         </div>
       </div>
 
-      <button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-4 rounded-xl transition flex justify-center items-center gap-2">
-        {loading ? <Loader2 className="animate-spin w-5 h-5" /> : "Publier l'annonce"}
+      <button type="submit" disabled={loading} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black px-6 py-4 rounded-xl transition flex justify-center items-center gap-2 shadow-[0_0_20px_rgba(15,23,42,0.2)]">
+        {loading ? <Loader2 className="animate-spin w-5 h-5" /> : "Publier et générer le message"}
       </button>
     </form>
   );
