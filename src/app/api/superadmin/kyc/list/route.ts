@@ -1,29 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-// 👇 IMPORT DE SÉCURITÉ (Indispensable)
 import { decrypt } from "@/lib/crypto";
+// 👇 IMPORT POUR GÉNÉRER LES LIENS S3 TEMPORAIRES
+import { getPresignedViewUrl } from "@/lib/s3";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
-    // 1. SÉCURITÉ : AUTHENTIFICATION & RÔLE
     const session = await auth();
     
-    // On vérifie que l'user est connecté ET qu'il est SUPER_ADMIN
-    // (Pour l'audit : on pourrait aussi vérifier en DB, mais la session est OK ici)
     if (!session || !session.user?.id || session.user.role !== "SUPER_ADMIN") {
         return NextResponse.json({ error: "Accès refusé : Réservé au Super Admin" }, { status: 403 });
     }
 
-    // 2. RÉCUPÉRATION DES DOSSIERS
-    // On ne prend que les users qui ont une entrée dans la table UserKYC
     const users = await prisma.user.findMany({
       where: {
-        kyc: {
-            isNot: null // Filtre : Seulement ceux qui ont soumis un dossier
-        }
+        kyc: { isNot: null }
       },
       select: {
         id: true,
@@ -33,41 +27,63 @@ export async function GET(req: Request) {
         kyc: {
             select: {
                 status: true,
-                documents: true, // Array de strings (URLs Cloudinary/Blob)
+                documents: true, // Ceci contient la clé S3 chiffrée (ex: private/users/...)
                 rejectionReason: true,
                 updatedAt: true,
-                idType: true,    // ✅ AJOUT : Type de pièce (CNI, Passeport)
-                idNumber: true   // ✅ AJOUT : Le numéro chiffré
+                idType: true,
+                idNumber: true
             }
         }
       },
-      orderBy: {
-        kyc: {
-            updatedAt: 'desc' // Les modifications récentes en haut
-        }
-      }
+      orderBy: { kyc: { updatedAt: 'desc' } }
     });
 
-    // 3. DÉCHIFFREMENT (TRANSFORMATION DES DONNÉES)
-    // On ne peut pas envoyer "iv:a9f8..." au frontend, on doit le rendre lisible
-    const formattedUsers = users.map(user => {
-        // Si le numéro existe, on le déchiffre. Sinon, on met un placeholder.
-        const encryptedNumber = user.kyc?.idNumber;
-        const readableIdNumber = encryptedNumber ? decrypt(encryptedNumber) : "Non renseigné";
+    // 3. TRANSFORMATION (Déchiffrement + URL S3)
+    // On utilise Promise.all car getPresignedViewUrl est asynchrone
+    const formattedUsers = await Promise.all(users.map(async (user) => {
+        
+        let readableIdNumber = "Non renseigné";
+        if (user.kyc?.idNumber) {
+            try { readableIdNumber = decrypt(user.kyc.idNumber); } catch (e) {}
+        }
+
+        // 🔥 TRANSFORMATION DE LA CLÉ S3 EN URL VISIBLE 🔥
+        let documentUrls: string[] = [];
+        if (user.kyc?.documents && user.kyc.documents.length > 0) {
+            // On prend la dernière clé envoyée
+            const fileKey = user.kyc.documents[user.kyc.documents.length - 1];
+            try {
+                // Si c'est déjà une URL (ex: Cloudinary ancien format), on la garde
+                if (fileKey.startsWith('http')) {
+                    documentUrls = [fileKey];
+                } else {
+                    // Sinon, on génère l'URL signée S3 (valide quelques minutes)
+                    const signedUrl = await getPresignedViewUrl(fileKey);
+                    documentUrls = [signedUrl];
+                }
+            } catch (error) {
+                console.error("Erreur génération URL S3 pour:", fileKey);
+            }
+        }
 
         return {
             ...user,
             kyc: user.kyc ? {
                 ...user.kyc,
-                idNumber: readableIdNumber // ✅ Le numéro est maintenant lisible pour l'admin
+                idNumber: readableIdNumber,
+                documents: documentUrls // On remplace la clé par l'URL signée !
             } : null
         };
-    });
+    }));
 
     return NextResponse.json({ success: true, users: formattedUsers });
 
-  } catch (error: any) {
-    console.error("🔥 Erreur API KYC List:", error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+        console.error("🔥 Erreur API KYC List:", error.message);
+    } else {
+        console.error("🔥 Erreur API KYC List inconnue");
+    }
     return NextResponse.json({ error: "Erreur serveur lors du chargement des dossiers" }, { status: 500 });
   }
 }

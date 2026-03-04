@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Home, MapPin, Eye, ExternalLink, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import BackButton from "@/components/shared/BackButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +22,11 @@ export default async function AmbassadorPropertiesPage() {
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto">
       
-      {/* HEADER MODIFIÉ AVEC LE BOUTON D'AJOUT */}
+      {/* HEADER AVEC BOUTON RETOUR ET AJOUT */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tight">
+          <BackButton /> {/* ✅ Intégré ici proprement */}
+          <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tight mt-2">
             <Home className="text-orange-500 w-8 h-8" />
             Mes Biens Revendiqués
           </h1>

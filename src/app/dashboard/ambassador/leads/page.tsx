@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Users, Phone, CalendarDays, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-
+import BackButton from "@/components/shared/BackButton"; 
 export const dynamic = 'force-dynamic';
 
 export default async function AmbassadorLeadsPage() {
@@ -19,7 +19,8 @@ export default async function AmbassadorLeadsPage() {
   return (
     <div className="p-6 md:p-10 max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tight">
+        <BackButton /> {/* ✅ Ajouté juste ici */}
+        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3 tracking-tight mt-2">
           <Users className="text-orange-500 w-8 h-8" />
           Prospects Locataires
         </h1>
