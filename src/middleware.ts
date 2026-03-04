@@ -95,18 +95,18 @@ export default auth(async (req) => {
   // 🧭 AIGUILLEUR INTELLIGENT APRÈS CONNEXION
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
-      if (isLoggedIn && (path === '/login' || path === '/')) {
+      // 🔥 CORRECTION ICI : On agit uniquement sur /login, on laisse l'accueil (/) libre
+      if (isLoggedIn && path === '/login') {
           if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/admin", nextUrl));
           if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
-          
-          // 🔥 Logique de routage : Agents SaaS vs Ambassadeurs (Growth Hack)
           if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); 
           if (userRole === 'AMBASSADOR') return NextResponse.redirect(new URL("/dashboard/ambassador", nextUrl));
-          
           if (userRole === 'OWNER') return NextResponse.redirect(new URL("/dashboard/owner", nextUrl));
           if (userRole === 'TENANT') return NextResponse.redirect(new URL("/dashboard/tenant", nextUrl));
           
-          return NextResponse.redirect(new URL("/dashboard", nextUrl));
+          // 🔥 NOUVEAU FALLBACK : Redirection vers l'accueil au lieu de /dashboard
+          // pour casser la boucle infinie si le rôle est 'GUEST' ou introuvable
+          return NextResponse.redirect(new URL("/", nextUrl));
       }
       return NextResponse.next();
   }
@@ -122,35 +122,29 @@ export default auth(async (req) => {
   // ============================================================
   if (isLoggedIn && userRole) {
     
-    // Sécurité Super Admin
     if (path.startsWith('/dashboard/admin') && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // 🔥 Sécurité Agence Principale
     if (path.startsWith('/dashboard/agency')) {
         const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN';
         if (!canAccessAgency) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // 🔥 Sécurité Agent SaaS (Collaborateur d'une agence)
     if (path.startsWith('/dashboard/agent')) {
         const canAccessAgent = userRole === 'SUPER_ADMIN' || userRole === 'AGENT';
         if (!canAccessAgent) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // 🔥 Sécurité Ambassadeur (Démarcheur indépendant FB)
     if (path.startsWith('/dashboard/ambassador')) {
         const canAccessAmbassador = userRole === 'SUPER_ADMIN' || userRole === 'AMBASSADOR';
         if (!canAccessAmbassador) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // Sécurité Propriétaire
     if (path.startsWith('/dashboard/owner') && userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // Sécurité Locataire
     if (path.startsWith('/dashboard/tenant') && userRole !== 'TENANT' && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
