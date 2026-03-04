@@ -171,12 +171,13 @@ export default function NewPropertyForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-bold text-slate-700">Titre de l'annonce *</label>
-          <input type="text" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" placeholder="Ex: Magnifique Villa 4 pièces..." />
+          {/* ✅ Ajout de text-slate-900 et placeholder:text-slate-400 */}
+          <input type="text" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 outline-none" placeholder="Ex: Magnifique Villa 4 pièces..." />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Type de bien *</label>
-          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as PropertyType})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none">
+          <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as PropertyType})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:border-orange-500 outline-none">
             {["APPARTEMENT", "VILLA", "STUDIO", "MAGASIN", "BUREAU", "TERRAIN"].map(t => (
                 <option key={t} value={t}>{t}</option>
             ))}
@@ -185,33 +186,33 @@ export default function NewPropertyForm() {
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Loyer mensuel (FCFA) *</label>
-          <input type="number" required min="0" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" />
+          <input type="number" required min="0" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:border-orange-500 outline-none" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Commune *</label>
-          <input type="text" required value={formData.commune} onChange={e => setFormData({...formData, commune: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" placeholder="Ex: Cocody" />
+          <input type="text" required value={formData.commune} onChange={e => setFormData({...formData, commune: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 outline-none" placeholder="Ex: Cocody" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Adresse exacte / Quartier</label>
-          <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" />
+          <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 outline-none" placeholder="Ex: Rue des Jardins" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Chambres</label>
-          <input type="number" min="0" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" />
+          <input type="number" min="0" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:border-orange-500 outline-none" />
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Douches / Salles de bain</label>
-          <input type="number" min="0" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none" />
+          <input type="number" min="0" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 focus:border-orange-500 outline-none" />
         </div>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-bold text-slate-700">Description détaillée</label>
-        <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none resize-none" />
+        <textarea rows={4} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 outline-none resize-none" placeholder="Décrivez les atouts du bien..." />
       </div>
 
       {/* Upload Images */}
