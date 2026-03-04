@@ -39,6 +39,13 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: FileText, label: "Mon bilan", href: "/dashboard/owner/finance/tax" },
   
   ],
+  AMBASSADOR: [
+    { icon: LayoutDashboard, label: "Mon Tableau de bord", href: "/dashboard/ambassador" },
+    { icon: Key, label: "Biens Revendiqués", href: "/dashboard/ambassador/properties" },
+    { icon: Users, label: "Prospects Locataires", href: "/dashboard/ambassador/leads" },
+    { icon: ShieldCheck, label: "Certification Profil", href: "/dashboard/ambassador/kyc" },
+  ],
+  
   TENANT: [
     { icon: LayoutDashboard, label: "Mon Espace", href: "/dashboard/tenant" },
     { icon: Receipt, label: "Mes Paiements", href: "/dashboard/tenant/payments" },
