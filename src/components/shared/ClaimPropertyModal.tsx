@@ -33,16 +33,26 @@ export default function ClaimPropertyModal({ isOpen, onClose, propertyId, viewsC
     setLoading(true);
 
     try {
-        const res = await api.post('/public/claim-property', { ...formData, propertyId });
+        // Remplacement de api.post par fetch natif (aucun import requis)
+        const res = await fetch('/api/public/claim-property', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...formData, propertyId })
+        });
         
-        if (res.data.success) {
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
             toast.success("Annonce récupérée ! Connectez-vous avec votre numéro.");
             onClose();
             // Optionnel: rediriger vers la page de connexion
-            // router.push('/login'); 
+            // window.location.href = '/login';
+        } else {
+            toast.error(data.error || "Erreur côté serveur.");
         }
-    } catch (error: any) {
-        toast.error(error.response?.data?.error || "Une erreur est survenue.");
+    } catch (error) {
+        toast.error("Impossible de joindre le serveur.");
+        console.error("Erreur réseau:", error);
     } finally {
         setLoading(false);
     }
