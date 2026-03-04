@@ -32,6 +32,7 @@ export default async function DashboardDispatcher() {
     case "ARTISAN": return redirect("/dashboard/artisan");
     case "GUEST": return redirect("/dashboard/guest");
     case "INVESTOR": return redirect("/invest/dashboard"); 
+    case "AMBASSADOR": return redirect("/dashboard/ambassador"); // ✅ Ajout strict
     default: return redirect("/");
   }
 }

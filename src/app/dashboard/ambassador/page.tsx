@@ -22,7 +22,7 @@ export default async function AmbassadorDashboard() {
       propertiesOwned: {
         take: 5,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, title: true, price: true, isPublished: true, views: true } // Ajoute 'views' à ton schema plus tard si tu veux tracker les vues
+        select: { id: true, title: true, price: true, isPublished: true, views: true } 
       }
     }
   });

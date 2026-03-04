@@ -229,6 +229,7 @@ model Property {
   images      String[]
   isPublished Boolean      @default(true)
   isAvailable Boolean      @default(true)
+  views       Int          @default(0) // ✅ LE NOUVEAU CHAMP
 
   ownerId String
   owner   User   @relation("PropertyOwner", fields: [ownerId], references: [id])
