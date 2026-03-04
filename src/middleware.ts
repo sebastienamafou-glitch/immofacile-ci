@@ -99,14 +99,9 @@ export default auth(async (req) => {
           if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/admin", nextUrl));
           if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
           
-          // 🔥 NOUVEAU : Logique de routage des Agents
-          if (userRole === 'AGENT') {
-              if (userAgencyId) {
-                  return NextResponse.redirect(new URL("/dashboard/agency", nextUrl)); // Agent en agence
-              } else {
-                  return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); // Agent indépendant (Démarcheur)
-              }
-          }
+          // 🔥 Logique de routage : Agents SaaS vs Ambassadeurs (Growth Hack)
+          if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); 
+          if (userRole === 'AMBASSADOR') return NextResponse.redirect(new URL("/dashboard/ambassador", nextUrl));
           
           if (userRole === 'OWNER') return NextResponse.redirect(new URL("/dashboard/owner", nextUrl));
           if (userRole === 'TENANT') return NextResponse.redirect(new URL("/dashboard/tenant", nextUrl));
@@ -132,16 +127,22 @@ export default auth(async (req) => {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // 🔥 Sécurité Agence (Accessible par AGENCY_ADMIN, ou AGENT rattaché)
+    // 🔥 Sécurité Agence Principale
     if (path.startsWith('/dashboard/agency')) {
-        const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN' || (userRole === 'AGENT' && !!userAgencyId);
+        const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN';
         if (!canAccessAgency) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    // 🔥 Sécurité Agent Indépendant
+    // 🔥 Sécurité Agent SaaS (Collaborateur d'une agence)
     if (path.startsWith('/dashboard/agent')) {
-        const canAccessAgent = userRole === 'SUPER_ADMIN' || (userRole === 'AGENT' && !userAgencyId);
+        const canAccessAgent = userRole === 'SUPER_ADMIN' || userRole === 'AGENT';
         if (!canAccessAgent) return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+
+    // 🔥 Sécurité Ambassadeur (Démarcheur indépendant FB)
+    if (path.startsWith('/dashboard/ambassador')) {
+        const canAccessAmbassador = userRole === 'SUPER_ADMIN' || userRole === 'AMBASSADOR';
+        if (!canAccessAmbassador) return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
     // Sécurité Propriétaire

@@ -39,14 +39,14 @@ export async function POST(request: Request) {
     // 3. Hashage Mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Sécurité Rôles
-    const allowedPublicRoles = ["OWNER", "TENANT", "AGENT", "ARTISAN", "GUEST", "INVESTOR"]; 
+    // Sécurité Rôles : On bloque l'inscription publique des vrais AGENT SaaS
+    const allowedPublicRoles = ["OWNER", "TENANT", "AMBASSADOR", "ARTISAN", "GUEST", "INVESTOR"]; 
     let userRole = "TENANT"; 
     
     if (role && allowedPublicRoles.includes(role)) {
         userRole = role;
     }
-
+    
     // 4. CRÉATION ATOMIQUE (USER + FINANCE + KYC)
     const newUser = await prisma.user.create({
       data: {
@@ -73,23 +73,23 @@ export async function POST(request: Request) {
       }
     });
 
-    // ✅ 5. LE GROWTH HACK : ASSIGNATION DE LA PROPRIÉTÉ À L'AGENT
+    // ✅ 5. LE GROWTH HACK : ASSIGNATION DE LA PROPRIÉTÉ À L'AMBASSADEUR
     if (claim && typeof claim === 'string') {
         try {
             const propertyExists = await prisma.property.findUnique({ where: { id: claim } });
             
             if (propertyExists) {
-                // On met à jour agentId (Pas ownerId !) pour protéger légalement les paiements
+                // On transfère officiellement la propriété de la Ghost Machine vers le nouveau compte
                 await prisma.property.update({
                     where: { id: claim },
-                    data: { agentId: newUser.id }
+                    data: { ownerId: newUser.id }
                 });
 
                 await logActivity({
                     action: "PROPERTY_CLAIMED" as any, 
                     entityType: "PROPERTY", 
                     userId: newUser.id,
-                    metadata: { propertyId: claim, assignedAs: "AGENT" }
+                    metadata: { propertyId: claim, assignedAs: "AMBASSADOR_OWNER" }
                 });
             }
         } catch (claimError) {

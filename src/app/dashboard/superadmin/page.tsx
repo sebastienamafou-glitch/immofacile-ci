@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api";
+import { Suspense } from "react";
 
 // Import des futurs sous-composants (à créer à l'étape suivante)
 import HeaderWarRoom from "@/components/dashboard/superadmin/HeaderWarRoom";
@@ -85,9 +86,10 @@ export default function WarRoomDashboard() {
 
                 {/* MODULES AUTONOMES */}
                 <CreditGuichet owners={data.lists.owners} />
-                <GhostGenerator />
+                <Suspense fallback={<div className="p-8 text-center text-orange-500 bg-slate-900 rounded-3xl animate-pulse font-bold">Initialisation de l'Aspirateur...</div>}></Suspense>
+                    <GhostGenerator />
+                </Suspense>    
 
-            </div>
 
             {/* COLONNE DROITE (ACTION RAPIDE) */}
             <div className="space-y-6">

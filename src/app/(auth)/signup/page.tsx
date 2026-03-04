@@ -25,13 +25,13 @@ function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   
-  // ✅ RÔLE : Intègre TENANT, OWNER et AGENT
-  const [role, setRole] = useState<"TENANT" | "OWNER" | "AGENT">("TENANT");
+  // ✅ RÔLE : Intègre TENANT, OWNER et AMBASSADOR
+  const [role, setRole] = useState<"TENANT" | "OWNER" | "AMBASSADOR">("TENANT");
 
   // Aiguillage automatique : On force le rôle selon l'URL
   useEffect(() => {
     if (redirectUrl) setRole("TENANT");
-    if (claimId) setRole("AGENT"); // Si revendication, on le passe en Démarcheur/Agent
+    if (claimId) setRole("AMBASSADOR"); // Si revendication, on le passe en Ambassadeur (Démarcheur)
   }, [redirectUrl, claimId]);
 
   const [formData, setFormData] = useState({
@@ -133,7 +133,7 @@ function SignupForm() {
                         <User className="absolute left-3 top-3 w-4 h-4 text-slate-500 group-focus-within:text-orange-500 transition-colors" />
                         <Input 
                             required 
-                            placeholder={role === "OWNER" ? "Ex: SCI Immo" : role === "AGENT" ? "Ex: Agence Express ou Jean" : "Ex: Kouassi Jean"} 
+                            placeholder={role === "OWNER" ? "Ex: SCI Immo" : role === "AMBASSADOR" ? "Ex: Agence Express ou Jean" : "Ex: Kouassi Jean"} 
                             className="pl-10 bg-black/40 border-slate-700 text-white focus:border-orange-500 focus:ring-orange-500/20 rounded-xl h-11"
                             value={formData.name}
                             onChange={e => setFormData({...formData, name: e.target.value})}
@@ -211,7 +211,7 @@ function SignupForm() {
                     disabled={loading} 
                     className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-bold h-12 rounded-xl mt-4 shadow-lg shadow-orange-500/20 transition-all hover:scale-[1.02] active:scale-95"
                 >
-                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : `Créer mon Compte ${role === 'OWNER' ? 'Propriétaire' : role === 'AGENT' ? 'Agent' : ''}`}
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : `Créer mon Compte ${role === 'OWNER' ? 'Propriétaire' : role === 'AMBASSADOR' ? 'Partenaire' : ''}`}
                 </Button>
 
             </form>

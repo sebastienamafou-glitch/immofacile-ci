@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 import { Loader2, FileText, Send, Plus, Trash2, BedDouble, Bath, Building2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useSearchParams } from "next/navigation"; 
 
 export default function GhostGenerator() {
+  const searchParams = useSearchParams(); 
   const [ghostData, setGhostData] = useState({ 
       title: '', 
       price: '', 
@@ -19,6 +21,18 @@ export default function GhostGenerator() {
   });
   
   const [isSubmittingGhost, setIsSubmittingGhost] = useState(false);
+  useEffect(() => {
+      const fbLinkParam = searchParams.get('fbLink');
+      const descParam = searchParams.get('desc');
+      
+      if (fbLinkParam || descParam) {
+          setGhostData(prev => ({
+              ...prev,
+              fbLink: fbLinkParam || prev.fbLink,
+              description: descParam || prev.description
+          }));
+      }
+  }, [searchParams]);
 
   // Gestion des champs d'images dynamiques
   const handleImageChange = (index: number, value: string) => {
