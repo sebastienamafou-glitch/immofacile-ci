@@ -79,9 +79,11 @@ export default auth(async (req) => {
   const isStatic = path.startsWith("/_next") || path.includes(".");
   
   if (ratelimit && !isStatic) {
-    const isSensitive = path.startsWith("/api") || path.startsWith("/login") || path.startsWith("/register");
+    // 🔥 CORRECTION : On cible uniquement les entrées d'authentification pour éviter le brute-force.
+    // On libère les routes /api internes pour laisser le dashboard respirer.
+    const isSensitive = path === "/login" || path === "/register" || path === "/forgot-password";
     if (isSensitive) {
-      const { success } = await ratelimit.limit(`ratelimit_middleware_${ip}`);
+      const { success } = await ratelimit.limit(`ratelimit_auth_${ip}`);
       if (!success) return new NextResponse("Trop de requêtes.", { status: 429 });
     }
   }

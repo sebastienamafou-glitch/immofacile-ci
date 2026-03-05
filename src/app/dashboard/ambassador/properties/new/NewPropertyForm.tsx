@@ -164,7 +164,7 @@ export default function NewPropertyForm() {
           </div>
       );
   }
-
+  
   // 🟡 FORMULAIRE CLASSIQUE
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
