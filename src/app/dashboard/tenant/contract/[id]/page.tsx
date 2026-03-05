@@ -96,7 +96,7 @@ export default async function TenantContractPage({ params }: { params: { id: str
                         <PopoverContent className="w-auto p-4 bg-white">
                              <div className="flex flex-col items-center">
                                 <ClientQRCode 
-                                    value={`https://babimmo.ci/compliance/${lease.id}`} 
+                                    value={`https://immofacile.ci/compliance/${lease.id}`} 
                                     size={120} 
                                     level={"H"}
                                 />
@@ -128,52 +128,70 @@ export default async function TenantContractPage({ params }: { params: { id: str
             </div>
         </div>
 
+        {/* --- DOCUMENT OFFICIEL (OPTIMISÉ 1 PAGE - FORCE BRUTE) --- */}
+        <style dangerouslySetInnerHTML={{__html: `
+            @media print {
+                @page { margin: 5mm; size: A4 portrait; }
+                body { 
+                    -webkit-print-color-adjust: exact; 
+                    print-color-adjust: exact; 
+                    -webkit-text-size-adjust: none !important; 
+                }
+                #printable-contract { 
+                    zoom: 0.88; /* Dézoom de 12% pour garantir que tout rentre */
+                } 
+            }
+        `}} />
+
         <div className="flex justify-center px-4 print:px-0 print:block">
-            <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed">
+            <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] print:p-[5mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed print:leading-[1.1] relative flex flex-col">
                 
-                <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
+                {/* 1. EN-TÊTE LEGAL */}
+                <div className="flex justify-between items-start border-b-2 border-black pb-6 print:pb-2 mb-8 print:mb-2">
                     <div className="flex-1 pr-4"> 
-                        <h1 className="text-2xl font-serif font-black uppercase tracking-wide mb-2">Contrat de Bail <br/>à Usage d'Habitation</h1>
-                        <p className="text-[10px] italic text-slate-500 font-serif">
+                        <h1 className="text-2xl print:text-lg font-serif font-black uppercase tracking-wide mb-2 print:mb-0.5">Contrat de Bail <br/>à Usage d'Habitation</h1>
+                        <p className="text-[10px] print:text-[8px] italic text-slate-500 font-serif">
                             Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.
                         </p>
                     </div>
                     <div className="flex flex-col items-center gap-1">
-                         <div className="border border-slate-800 p-1">
+                         <div className="border border-slate-800 p-1 print:p-0.5">
                             <ClientQRCode 
-                                value={`https://babimmo.ci/compliance/${lease.id}`} 
+                                value={`https://immofacile.ci/compliance/${lease.id}`} 
                                 size={65}
                                 level={"H"}
                                 marginSize={1}
                             />
                          </div>
-                         <span className="text-[8px] font-mono font-bold text-slate-400">AUTH: {lease.id.substring(0,6).toUpperCase()}</span>
+                         <span className="text-[8px] print:text-[6px] font-mono font-bold text-slate-400">AUTH: {lease.id.substring(0,6).toUpperCase()}</span>
                     </div>
                 </div>
 
-                <div className="mb-8 font-serif text-sm">
-                    <p className="font-bold text-base border-b border-black mb-4 pb-1 uppercase">ENTRE LES SOUSSIGNÉS :</p>
+                {/* 2. LES PARTIES */}
+                <div className="mb-8 print:mb-2 font-serif text-sm print:text-[10px]">
+                    <p className="font-bold text-base print:text-xs border-b border-black mb-4 print:mb-1 pb-1 uppercase">ENTRE LES SOUSSIGNÉS :</p>
                     
-                    <div className="mb-4 pl-4 border-l-2 border-slate-200">
+                    <div className="mb-4 print:mb-1 pl-4 border-l-2 border-slate-200">
                         <p><strong>LE BAILLEUR :</strong> {ownerName.toUpperCase()}</p>
                         {lease.property.agency && (
-                            <p className="text-xs mt-0.5 text-slate-600">Représenté par son mandataire : <strong>L'Agence {lease.property.agency.name}</strong></p>
+                            <p className="text-xs print:text-[8px] mt-0.5 text-slate-600">Représenté par son mandataire : <strong>L'Agence {lease.property.agency.name}</strong></p>
                         )}
-                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Bailleur".</p>
+                        <p className="text-xs print:text-[8px] text-slate-500 mt-1 print:mt-0 italic">Ci-après dénommé "Le Bailleur".</p>
                     </div>
 
                     <div className="pl-4 border-l-2 border-slate-200">
                         <p><strong>LE PRENEUR :</strong> {tenantName.toUpperCase()}</p>
                         <p>Contact : {user.email}</p>
-                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Preneur".</p>
+                        <p className="text-xs print:text-[8px] text-slate-500 mt-1 print:mt-0 italic">Ci-après dénommé "Le Preneur".</p>
                     </div>
                 </div>
 
-                <p className="font-serif text-center font-bold text-sm italic mb-6">
+                <p className="font-serif text-center font-bold text-sm print:text-[10px] italic mb-6 print:mb-2">
                     IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :
                 </p>
 
-                <div className="space-y-4 font-serif text-[10px] text-slate-800 mb-8">
+                {/* 3. CLAUSES OBLIGATOIRES (12 ARTICLES) */}
+                <div className="space-y-4 print:space-y-1 font-serif text-[10px] print:text-[8.5px] text-slate-800 mb-8 print:mb-2 flex-1">
                     
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5">Article 1 : Désignation des Lieux</h3>
@@ -192,10 +210,10 @@ export default async function TenantContractPage({ params }: { params: { id: str
                         </p>
                     </div>
 
-                    <div className="bg-slate-50 p-2 -mx-2 border-l-4 border-slate-300">
+                    <div className="bg-slate-50 print:bg-transparent print:border-l-2 p-2 print:p-0.5 print:-mx-0.5 -mx-2 border-l-4 border-slate-300">
                         <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer et Dépôt de Garantie</h3>
-                        <p className="mb-1">
-                            Loyer mensuel : <strong className="text-sm mx-1">{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.
+                        <p className="mb-1 print:mb-0">
+                            Loyer mensuel : <strong className="text-sm print:text-[9px] mx-1">{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.
                         </p>
                         <p>
                             Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. 
@@ -276,81 +294,84 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                 </div>
 
-                <div className="mt-auto pt-4 border-t-2 border-black font-sans">
-                    <p className="mb-6 text-xs text-right italic font-serif">
+                {/* 4. SIGNATURES AVEC AUDIT TRAIL */}
+                <div className="mt-auto pt-4 print:pt-1 border-t-2 border-black font-sans shrink-0">
+                    <p className="mb-6 print:mb-1 text-xs print:text-[8px] text-right italic font-serif">
                         Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>, en deux exemplaires originaux.
                     </p>
                     
-                    <div className="flex justify-between gap-6 mt-4">
+                    <div className="flex justify-between gap-6 print:gap-2 mt-4 print:mt-1">
                         
+                        {/* BAILLEUR */}
                         <div className="w-1/2">
-                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Bailleur (ou son Mandataire)</p>
+                            <p className="text-[10px] print:text-[8px] font-bold uppercase mb-2 print:mb-0.5 underline font-serif">Le Bailleur (ou son Mandataire)</p>
                             
                             {bailleurProof ? (
-                                <div className={`border-2 p-3 rounded-sm bg-white text-left ${isMandateSignature ? 'border-purple-600' : 'border-emerald-600'}`}>
-                                    <p className={`${isMandateSignature ? 'text-purple-600' : 'text-emerald-600'} font-bold text-sm uppercase mb-3`}>
+                                <div className={`border-2 p-3 print:p-1 rounded-sm bg-white text-left ${isMandateSignature ? 'border-purple-600' : 'border-emerald-600'}`}>
+                                    <p className={`${isMandateSignature ? 'text-purple-600' : 'text-emerald-600'} font-bold text-sm print:text-[7px] uppercase mb-3 print:mb-0.5`}>
                                         {isMandateSignature ? "SIGNÉ PAR MANDAT (P/O)" : "SIGNÉ ÉLECTRONIQUEMENT"}
                                     </p>
                                     
-                                    <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
+                                    <div className="font-mono text-[9px] print:text-[6px] text-slate-500 space-y-1.5 print:space-y-0 leading-tight">
                                         {isMandateSignature && (
                                             <p className="font-bold text-black">POUR: AGENCE {agencyName?.toUpperCase()}</p>
                                         )}
                                         <p>
-                                            <span className="font-bold mr-2">Signataire:</span> 
+                                            <span className="font-bold mr-2 print:mr-1">Signataire:</span> 
                                             {bailleurSignerName?.toUpperCase()}
                                         </p>
                                         <p>
-                                            <span className="font-bold mr-2">Date:</span> 
+                                            <span className="font-bold mr-2 print:mr-1">Date:</span> 
                                             {formatAuditDate(new Date(bailleurProof.signedAt))}
                                         </p>
                                         <p>
-                                            <span className="font-bold mr-2">IP:</span> 
+                                            <span className="font-bold mr-2 print:mr-1">IP:</span> 
                                             {bailleurProof.ipAddress}
                                         </p>
                                         <p className="truncate">
-                                            <span className="font-bold mr-2">Preuve ID:</span> 
+                                            <span className="font-bold mr-2 print:mr-1">Preuve ID:</span> 
                                             {bailleurProof.id.split('-')[0].toUpperCase()}...
                                         </p>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                                    <p className="text-[9px] text-slate-400 italic">En attente de signature</p>
+                                <div className="h-32 print:h-12 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50 print:bg-transparent">
+                                    <p className="text-[9px] print:text-[7px] text-slate-400 italic">En attente de signature</p>
                                 </div>
                             )}
                         </div>
 
+                        {/* PRENEUR */}
                         <div className="w-1/2">
-                            <p className="text-[10px] font-bold uppercase mb-2 underline font-serif">Le Preneur (Lu et approuvé)</p>
+                            <p className="text-[10px] print:text-[8px] font-bold uppercase mb-2 print:mb-0.5 underline font-serif">Le Preneur (Lu et approuvé)</p>
                             
                             {isTenantSigned && tenantProof ? (
-                                <div className="border-2 border-blue-600 p-3 rounded-sm bg-white text-left">
-                                    <p className="text-blue-600 font-bold text-sm uppercase mb-3">
+                                <div className="border-2 border-blue-600 p-3 print:p-1 rounded-sm bg-white text-left">
+                                    <p className="text-blue-600 font-bold text-sm print:text-[7px] uppercase mb-3 print:mb-0.5">
                                         SIGNÉ ÉLECTRONIQUEMENT
                                     </p>
-                                    <div className="font-mono text-[9px] text-slate-500 space-y-1.5 leading-tight">
+                                    <div className="font-mono text-[9px] print:text-[6px] text-slate-500 space-y-1.5 print:space-y-0 leading-tight">
                                         <p>
-                                            <span className="text-blue-700 font-bold mr-2">Signataire:</span> 
+                                            <span className="text-blue-700 font-bold mr-2 print:mr-1">Signataire:</span> 
                                             {tenantName.toUpperCase()}
                                         </p>
                                         <p>
-                                            <span className="text-blue-700 font-bold mr-2">Date:</span> 
+                                            <span className="text-blue-700 font-bold mr-2 print:mr-1">Date:</span> 
                                             {formatAuditDate(new Date(tenantProof.signedAt))}
                                         </p>
                                         <p>
-                                            <span className="text-blue-700 font-bold mr-2">IP:</span> 
+                                            <span className="text-blue-700 font-bold mr-2 print:mr-1">IP:</span> 
                                             {tenantProof.ipAddress}
                                         </p>
                                         <p className="truncate">
-                                            <span className="text-blue-700 font-bold mr-2">Preuve ID:</span> 
+                                            <span className="text-blue-700 font-bold mr-2 print:mr-1">Preuve ID:</span> 
                                             {tenantProof.id.split('-')[0].toUpperCase()}...
                                         </p>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="h-32 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                                    <p className="text-[9px] text-slate-400 italic">En attente du locataire</p>
+                                <div className="h-32 print:h-12 border border-dashed border-slate-300 flex items-center justify-center bg-slate-50 print:bg-transparent">
+                                    <p className="text-[9px] print:text-[7px] text-slate-400 italic">En attente du locataire</p>
                                 </div>
                             )}
                         </div>
@@ -358,8 +379,9 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
                 </div>
                 
-                <div className="mt-8 pt-2 border-t border-slate-200 text-center">
-                    <p className="text-[8px] text-slate-400 font-mono">
+                {/* Footer Légal */}
+                <div className="mt-8 print:mt-2 pt-2 print:pt-1 border-t border-slate-200 text-center shrink-0">
+                    <p className="text-[8px] print:text-[6px] text-slate-400 font-mono">
                         Document certifié par Babimmo.ci • Audit ID: {lease.id} • Page 1/1
                     </p>
                 </div>
