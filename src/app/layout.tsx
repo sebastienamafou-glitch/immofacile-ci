@@ -5,6 +5,7 @@ import "./globals.css";
 import { Toaster } from "sonner"; 
 import { Providers } from "@/components/Providers";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { GoogleAnalytics } from '@next/third-parties/google'; // ✅ Import Google Analytics
 
 const fontSans = Inter({
   variable: "--font-geist-sans",
@@ -60,6 +61,9 @@ export default function RootLayout({
           {children}
           <Toaster position="top-right" richColors theme="dark" closeButton />
         </Providers>
+        
+        {/* ✅ Injection du script Google Analytics */}
+        <GoogleAnalytics gaId="G-36JC3KB6E5" />
       </body>
     </html>
   );
