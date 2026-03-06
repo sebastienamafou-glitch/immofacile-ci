@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import EditPropertyForm from "./EditPropertyForm";
 import { Settings2 } from "lucide-react";
-import BackButton from "@/components/shared/BackButton"; // ✅ Notre nouveau composant
+import BackButton from "@/components/shared/BackButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +16,26 @@ export default async function EditPropertyPage(props: PageProps) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // Sécurité : On s'assure que le bien appartient bien à cet ambassadeur
-  const property = await prisma.property.findFirst({
+  // 1. TENTATIVE LONGUE DURÉE : Chercher dans la table Property
+  let propertyData: Record<string, unknown> | null = await prisma.property.findFirst({
     where: { 
         id: params.id,
         ownerId: session.user.id 
     }
-  });
+  }) as Record<string, unknown> | null;
 
-  if (!property) redirect("/dashboard/ambassador/properties");
+  // 2. TENTATIVE COURTE DURÉE : Si introuvable, chercher dans la table Listing (Akwaba)
+  if (!propertyData) {
+      propertyData = await prisma.listing.findFirst({
+          where: {
+              id: params.id,
+              hostId: session.user.id
+          }
+      }) as Record<string, unknown> | null;
+  }
+
+  // 3. SI VRAIMENT INTROUVABLE -> Rejet de sécurité
+  if (!propertyData) redirect("/dashboard/ambassador/properties");
 
   return (
     <div className="p-6 md:p-10 max-w-4xl mx-auto">
@@ -38,8 +49,8 @@ export default async function EditPropertyPage(props: PageProps) {
       </div>
       
       <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-        {/* On passe les données existantes au formulaire client */}
-        <EditPropertyForm initialData={property} propertyId={property.id} />
+        {/* On passe les données au formulaire client qui s'adaptera tout seul */}
+        <EditPropertyForm initialData={propertyData} propertyId={params.id} />
       </div>
     </div>
   );
