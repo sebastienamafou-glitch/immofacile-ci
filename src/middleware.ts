@@ -23,8 +23,7 @@ const { auth } = NextAuth(authConfig);
 // ✅ LISTE COMPLÈTE DES ROUTES PUBLIQUES
 const PUBLIC_ROUTES = [
   '/', 
-  '/login', 
-  '/register', 
+  '/login',  
   '/signup', 
   '/auth/error',
   '/agency', 
@@ -45,7 +44,8 @@ const PUBLIC_ROUTES = [
   '/reset-password',
   '/api/webhooks/cinetpay', 
   '/api/webhooks/stripe',
-  '/api/public'
+  '/api/public',
+  '/api/signup'
 ];
 
 // @ts-ignore

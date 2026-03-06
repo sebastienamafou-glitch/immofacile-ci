@@ -59,7 +59,7 @@ function SignupForm() {
     setLoading(true);
     try {
       // 🔥 CORRECTION ICI : Appel vers /register (hors de la zone NextAuth)
-      await api.post('/register', { 
+      await api.post('/signup', { 
           ...formData,
           role: role,
           claim: claimId 
