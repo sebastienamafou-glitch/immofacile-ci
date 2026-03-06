@@ -6,6 +6,13 @@ import { Loader2, UploadCloud, X, CheckCircle, Copy, ExternalLink, RefreshCw, Ca
 import { toast } from "sonner";
 import { PropertyType } from "@prisma/client";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+// Chargement dynamique de la carte pour éviter le crash SSR de Leaflet
+const LocationPicker = dynamic(() => import("@/components/akwaba/LocationPicker"), { 
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full bg-slate-100 animate-pulse rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 text-sm font-bold">Chargement de la carte...</div>
+});
 
 interface PropertyFormData {
   rentalMode: "LONG_TERM" | "SHORT_TERM";
@@ -19,12 +26,15 @@ interface PropertyFormData {
   bathrooms: number | "";
   surface: number | "";
   images: string[];
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const INITIAL_FORM_STATE: PropertyFormData = {
     rentalMode: "LONG_TERM",
     title: "", description: "", address: "", commune: "", price: "", 
-    type: "APPARTEMENT", bedrooms: "", bathrooms: "", surface: "", images: []
+    type: "APPARTEMENT", bedrooms: "", bathrooms: "", surface: "", images: [],
+    latitude: null, longitude: null
 };
 
 export default function NewPropertyForm() {
@@ -133,7 +143,6 @@ export default function NewPropertyForm() {
       setIsSuccess(false);
   };
 
-  // 🟢 ÉCRAN DE SUCCÈS
   if (isSuccess) {
       const propertyUrl = createdMode === "SHORT_TERM" ? `${window.location.origin}/akwaba/${createdPropertyId}` : `${window.location.origin}/properties/${createdPropertyId}`;
       
@@ -175,11 +184,8 @@ export default function NewPropertyForm() {
       );
   }
   
-  // 🟡 FORMULAIRE CLASSIQUE
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      
-      {/* SÉLECTEUR DE MODE DE LOCATION */}
       <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
         <button 
             type="button" 
@@ -227,6 +233,15 @@ export default function NewPropertyForm() {
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Adresse exacte / Quartier</label>
           <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-500 outline-none" placeholder="Ex: Rue des Jardins" />
+        </div>
+
+        {/* 🗺️ AJOUT DE LA CARTE ICI */}
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-bold text-slate-700">Localisation GPS (Cliquez sur la carte)</label>
+          <LocationPicker 
+            position={formData.latitude !== null && formData.longitude !== null ? { lat: formData.latitude, lng: formData.longitude } : null} 
+            onChange={(pos) => setFormData({...formData, latitude: pos.lat, longitude: pos.lng})} 
+          />
         </div>
 
         <div className="space-y-2">

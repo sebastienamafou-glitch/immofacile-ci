@@ -13,6 +13,13 @@ import { Loader2, ArrowLeft, Home, MapPin, Banknote, ImageIcon, Bed, Bath, Ruler
 import Link from "next/link";
 import { toast } from "sonner";
 import ImageUpload from "@/components/shared/ImageUpload";
+import dynamic from "next/dynamic";
+
+// 🗺️ Chargement dynamique de la carte pour éviter le crash SSR de Leaflet
+const LocationPicker = dynamic(() => import("@/components/akwaba/LocationPicker"), { 
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full bg-slate-900 animate-pulse rounded-xl border border-slate-800 flex items-center justify-center text-slate-500 text-sm font-bold">Chargement de la carte...</div>
+});
 
 export default function AddPropertyPage() {
   const router = useRouter();
@@ -28,7 +35,9 @@ export default function AddPropertyPage() {
     bedrooms: "1",
     bathrooms: "1",
     surface: "",
-    description: ""
+    description: "",
+    latitude: null as number | null,
+    longitude: null as number | null
   });
 
   const handleChange = (e: any) => {
@@ -61,18 +70,16 @@ export default function AddPropertyPage() {
           images: images
       };
 
-      // ✅ APPEL SÉCURISÉ : Plus aucun header manuel. 
-      // Le cookie HttpOnly géré par le navigateur authentifie la requête.
+      // ✅ APPEL SÉCURISÉ
       const res = await api.post('/owner/properties', payload);
       
       if (res.data.success) {
         toast.success("Bien publié avec succès !");
-        router.refresh(); // Rafraîchit les Server Components
-        router.push('/dashboard/owner/properties'); // Redirection vers la liste
+        router.refresh(); 
+        router.push('/dashboard/owner/properties'); 
       }
     } catch (error: any) {
       console.error(error);
-      // Gestion des erreurs (401, 403, 500)
       if (error.response?.status === 401) {
           toast.error("Session expirée. Veuillez vous reconnecter.");
           router.push('/login');
@@ -192,6 +199,17 @@ export default function AddPropertyPage() {
                             <div className="relative">
                                 <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                                 <Input id="address" placeholder="Rue, Quartier, Repère..." className="pl-10 bg-slate-950 border-slate-700 text-white focus:border-[#F59E0B]" value={formData.address} onChange={handleChange} required />
+                            </div>
+                        </div>
+
+                        {/* 🗺️ AJOUT DE LA CARTE ICI */}
+                        <div className="space-y-2">
+                            <Label className="text-white font-semibold">Localisation GPS (Cliquez pour placer le bien sur la carte Akwaba)</Label>
+                            <div className="rounded-xl overflow-hidden border border-slate-800">
+                                <LocationPicker 
+                                    position={formData.latitude !== null && formData.longitude !== null ? { lat: formData.latitude, lng: formData.longitude } : null} 
+                                    onChange={(pos) => setFormData({...formData, latitude: pos.lat, longitude: pos.lng})} 
+                                />
                             </div>
                         </div>
 

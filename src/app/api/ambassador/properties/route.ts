@@ -13,7 +13,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { 
         rentalMode, // "LONG_TERM" | "SHORT_TERM"
-        title, description, address, commune, price, type, bedrooms, bathrooms, surface, images 
+        title, description, address, commune, price, type, bedrooms, bathrooms, surface, images,
+        latitude, longitude // 📍 NOUVEAUX CHAMPS GPS
     } = body;
 
     if (!title || !price || !commune || !type || !rentalMode) {
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
                 bedrooms: Number(bedrooms || 1),
                 bathrooms: Number(bathrooms || 1),
                 images: images || [],
+                latitude: latitude ? Number(latitude) : null, // 📍 SAUVEGARDE GPS
+                longitude: longitude ? Number(longitude) : null, // 📍 SAUVEGARDE GPS
                 hostId: session.user.id,
                 isPublished: true,
                 amenities: ["Climatisation", "Wi-Fi", "TV"], // Équipements par défaut
@@ -53,6 +56,8 @@ export async function POST(req: Request) {
                 bathrooms: Number(bathrooms || 0),
                 surface: surface ? Number(surface) : null,
                 images: images || [],
+                latitude: latitude ? Number(latitude) : null, // 📍 SAUVEGARDE GPS
+                longitude: longitude ? Number(longitude) : null, // 📍 SAUVEGARDE GPS
                 ownerId: session.user.id,
                 isPublished: true, 
                 isAvailable: true

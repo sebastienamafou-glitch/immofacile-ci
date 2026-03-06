@@ -227,9 +227,11 @@ model Property {
   bathrooms   Int
   surface     Float?
   images      String[]
+  latitude    Float?
+  longitude   Float?
   isPublished Boolean      @default(true)
   isAvailable Boolean      @default(true)
-  views       Int          @default(0) // ✅ LE NOUVEAU CHAMP
+  views       Int          @default(0) // 
 
   ownerId String
   owner   User   @relation("PropertyOwner", fields: [ownerId], references: [id])

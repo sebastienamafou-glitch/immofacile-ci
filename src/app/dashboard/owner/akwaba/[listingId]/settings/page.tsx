@@ -15,8 +15,15 @@ import {
   Loader2, ArrowLeft, Save, Trash2, Wifi, Snowflake, Tv, Car, Utensils, Sparkles
 } from "lucide-react";
 import ImageUpload from "@/components/dashboard/shared/ImageUpload";
+import dynamic from "next/dynamic";
 
-// ✅ Typage Strict
+// 🗺️ Chargement dynamique de la carte
+const LocationPicker = dynamic(() => import("@/components/akwaba/LocationPicker"), { 
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full bg-slate-900 animate-pulse rounded-xl border border-slate-800 flex items-center justify-center text-slate-500 text-sm font-bold">Chargement de la carte...</div>
+});
+
+// ✅ Typage Strict (Ajout GPS)
 interface ListingData {
     title: string;
     description: string;
@@ -27,6 +34,8 @@ interface ListingData {
     images: string[];
     amenities: Record<string, boolean>; // JSON
     isPublished: boolean;
+    latitude: number | null;
+    longitude: number | null;
 }
 
 const AMENITIES_LIST = [
@@ -47,7 +56,8 @@ export default function EditListingPage({ params }: { params: { listingId: strin
   const [formData, setFormData] = useState<ListingData>({
     title: "", description: "", pricePerNight: "",
     address: "", city: "", neighborhood: "",
-    images: [], amenities: {}, isPublished: false
+    images: [], amenities: {}, isPublished: false,
+    latitude: null, longitude: null
   });
 
   // 1. Charger les données (Zero Trust)
@@ -60,7 +70,9 @@ export default function EditListingPage({ params }: { params: { listingId: strin
                 setFormData({
                     ...res.data,
                     pricePerNight: res.data.pricePerNight ? res.data.pricePerNight.toString() : "",
-                    amenities: res.data.amenities || {}
+                    amenities: res.data.amenities || {},
+                    latitude: res.data.latitude || null,
+                    longitude: res.data.longitude || null
                 });
             }
         } catch (error: any) {
@@ -79,7 +91,7 @@ export default function EditListingPage({ params }: { params: { listingId: strin
     e.preventDefault();
     setSaving(true);
     try {
-        // ✅ Appel sécurisé
+        // ✅ Appel sécurisé (On envoie aussi latitude et longitude)
         await api.put(`/owner/akwaba/listings/${params.listingId}`, formData);
         
         toast.success("Modifications enregistrées !");
@@ -211,6 +223,17 @@ export default function EditListingPage({ params }: { params: { listingId: strin
                             onChange={e => setFormData({...formData, description: e.target.value})} 
                             className="bg-slate-950 border-slate-800 text-white min-h-[150px] focus:border-orange-500 p-4 leading-relaxed"
                         />
+                    </div>
+
+                    {/* 🗺️ AJOUT DE LA CARTE ICI */}
+                    <div className="col-span-2 space-y-2 mt-4">
+                        <Label className="text-slate-400 font-bold uppercase text-xs">Localisation GPS (Cliquez pour ajuster)</Label>
+                        <div className="rounded-xl overflow-hidden border border-slate-800">
+                            <LocationPicker 
+                                position={formData.latitude !== null && formData.longitude !== null ? { lat: formData.latitude, lng: formData.longitude } : null} 
+                                onChange={(pos) => setFormData({...formData, latitude: pos.lat, longitude: pos.lng})} 
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

@@ -5,8 +5,13 @@ import { useRouter } from "next/navigation";
 import { Loader2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 import { PropertyType } from "@prisma/client";
+import dynamic from "next/dynamic";
 
-// Typage strict pour accepter soit une Property, soit un Listing
+const LocationPicker = dynamic(() => import("@/components/akwaba/LocationPicker"), { 
+    ssr: false,
+    loading: () => <div className="h-[300px] w-full bg-slate-100 animate-pulse rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 text-sm font-bold">Chargement de la carte...</div>
+});
+
 interface EditPropertyFormProps {
   initialData: Record<string, unknown>;
   propertyId: string;
@@ -17,7 +22,6 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  // 🎯 DÉTECTION DU MODE : Si on trouve 'pricePerNight' ou 'city', c'est un Court Séjour
   const isShortTerm = !!initialData.pricePerNight || !!initialData.city;
 
   const [formData, setFormData] = useState({
@@ -30,7 +34,9 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
     bedrooms: (initialData.bedrooms as number) || "",
     bathrooms: (initialData.bathrooms as number) || "",
     surface: (initialData.surface as number) || "",
-    images: (initialData.images as string[]) || []
+    images: (initialData.images as string[]) || [],
+    latitude: (initialData.latitude as number) || null,
+    longitude: (initialData.longitude as number) || null
   });
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +114,6 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       
-      {/* BADGE VISUEL */}
       <div className="flex justify-start mb-4">
         <span className={`text-xs font-bold px-3 py-1 rounded-full ${isShortTerm ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-600"}`}>
             {isShortTerm ? "Édition : Court Séjour (Akwaba)" : "Édition : Location Classique"}
@@ -121,7 +126,6 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
           <input type="text" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none text-slate-900" />
         </div>
 
-        {/* ON MASQUE LE TYPE SI C'EST UN COURT SÉJOUR */}
         {!isShortTerm && (
             <div className="space-y-2">
             <label className="text-sm font-bold text-slate-700">Type de bien *</label>
@@ -150,6 +154,15 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Adresse exacte</label>
           <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:border-orange-500 outline-none text-slate-900" />
+        </div>
+
+        {/* 🗺️ AJOUT DE LA CARTE ICI */}
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-bold text-slate-700">Localisation GPS (Cliquez sur la carte)</label>
+          <LocationPicker 
+            position={formData.latitude !== null && formData.longitude !== null ? { lat: formData.latitude, lng: formData.longitude } : null} 
+            onChange={(pos) => setFormData({...formData, latitude: pos.lat, longitude: pos.lng})} 
+          />
         </div>
 
         <div className="space-y-2">

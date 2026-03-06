@@ -13,7 +13,10 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     }
 
     const body = await req.json();
-    const { title, description, address, commune, price, type, bedrooms, bathrooms, surface, images } = body;
+    const { 
+        title, description, address, commune, price, type, bedrooms, bathrooms, surface, images,
+        latitude, longitude // 📍 NOUVEAUX CHAMPS GPS
+    } = body;
 
     // 1. TENTATIVE LONGUE DURÉE : Chercher dans la table Property
     const existingProperty = await prisma.property.findUnique({
@@ -37,7 +40,9 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
             bedrooms: Number(bedrooms || 0),
             bathrooms: Number(bathrooms || 0),
             surface: surface ? Number(surface) : null,
-            images: images || []
+            images: images || [],
+            latitude: latitude ? Number(latitude) : null, // 📍 MISE À JOUR GPS
+            longitude: longitude ? Number(longitude) : null // 📍 MISE À JOUR GPS
           }
         });
         
@@ -61,10 +66,12 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
                 description: description || "",
                 address: address || commune,
                 city: commune,
-                pricePerNight: Number(price), // On mappe le prix sur le loyer journalier
+                pricePerNight: Number(price),
                 bedrooms: Number(bedrooms || 1),
                 bathrooms: Number(bathrooms || 1),
-                images: images || []
+                images: images || [],
+                latitude: latitude ? Number(latitude) : null, // 📍 MISE À JOUR GPS
+                longitude: longitude ? Number(longitude) : null // 📍 MISE À JOUR GPS
             }
         });
 
