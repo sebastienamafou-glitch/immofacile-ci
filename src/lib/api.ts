@@ -21,23 +21,28 @@ api.interceptors.response.use(
     // 🛑 STOP BOUCLE INFINIE
     // Si l'erreur vient des notifications ou de l'auth elle-même, on ne fait rien.
     // On laisse le composant gérer l'erreur (ex: afficher 0 notifs) sans déconnecter.
-    if (originalRequest.url?.includes('/notifications') || originalRequest.url?.includes('/auth')) {
+    if (originalRequest?.url?.includes('/notifications') || originalRequest?.url?.includes('/auth')) {
         return Promise.reject(error);
     }
 
-    // Gestion standard des 401 pour les autres routes (ex: accès page admin)
+    // Gestion standard des 401 pour les autres routes (Token expiré / Non autorisé)
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         originalRequest._retry = true;
-        // On garde la déconnexion pour les vraies erreurs de session sur les pages principales
-        await signOut({ callbackUrl: '/login' });
+        
+        // 🔥 LE NETTOYAGE RADICAL EST ICI 🔥
+        // On détruit toutes les traces de l'ancienne session dans le navigateur
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Déconnexion NextAuth qui nettoie les cookies + Redirection
+        await signOut({ callbackUrl: '/login', redirect: true });
       }
     }
     return Promise.reject(error);
   }
 );
 
-// ... (Le reste des exports initiatePayment, etc. reste inchangé)
 export const getContractData = async (leaseId: string) => api.get(`/owner/contract/${leaseId}`);
 export const getReceiptData = async (paymentId: string) => api.get(`/owner/receipt/${paymentId}`);
 export const getFormalNoticeData = async (leaseId: string) => api.get(`/owner/formal-notice/${leaseId}`);
