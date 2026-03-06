@@ -41,19 +41,31 @@ export default function EditPropertyForm({ initialData, propertyId }: EditProper
       for (const file of Array.from(files)) {
         const uploadData = new FormData();
         uploadData.append("file", file);
-        uploadData.append("upload_preset", "babimmo_properties");
+        uploadData.append("upload_preset", "babimmo_preset");
 
         const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
           method: "POST", body: uploadData,
         });
+        
         const data = await res.json();
+        
+        // 🔥 L'AJOUT EST ICI : On force l'arrêt si Cloudinary renvoie une erreur (ex: 400)
+        if (!res.ok) {
+            throw new Error(data.error?.message || "Erreur de configuration Cloudinary");
+        }
+
         if (data.secure_url) uploadedUrls.push(data.secure_url);
       }
 
-      setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
-      toast.success(`${uploadedUrls.length} image(s) ajoutée(s)`, { id: toastId });
-    } catch (error) {
-      toast.error("Erreur lors de l'upload", { id: toastId });
+      if (uploadedUrls.length > 0) {
+          setFormData(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
+          toast.success(`${uploadedUrls.length} image(s) ajoutée(s)`, { id: toastId });
+      }
+      
+    } catch (error: unknown) {
+      // Affichage de la vraie raison du blocage
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      toast.error(`Échec : ${errorMessage}`, { id: toastId, duration: 5000 });
     } finally {
       setUploading(false);
     }
