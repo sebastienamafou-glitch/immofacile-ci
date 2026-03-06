@@ -15,23 +15,30 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils"; 
 
+// Typage strict pour l'erreur API
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
+
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
-  const claimId = searchParams.get('claim'); // 🔥 LE HACK : Détection du bien revendiqué
+  const claimId = searchParams.get('claim'); 
 
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   
-  // ✅ RÔLE : Intègre TENANT, OWNER et AMBASSADOR
   const [role, setRole] = useState<"TENANT" | "OWNER" | "AMBASSADOR">("TENANT");
 
-  // Aiguillage automatique : On force le rôle selon l'URL
   useEffect(() => {
     if (redirectUrl) setRole("TENANT");
-    if (claimId) setRole("AMBASSADOR"); // Si revendication, on le passe en Ambassadeur (Démarcheur)
+    if (claimId) setRole("AMBASSADOR"); 
   }, [redirectUrl, claimId]);
 
   const [formData, setFormData] = useState({
@@ -51,10 +58,11 @@ function SignupForm() {
 
     setLoading(true);
     try {
-      await api.post('/auth/register', { 
+      // 🔥 CORRECTION ICI : Appel vers /register (hors de la zone NextAuth)
+      await api.post('/register', { 
           ...formData,
           role: role,
-          claim: claimId // 🔥 Envoi du paramètre claim au backend
+          claim: claimId 
       });
 
       toast.success("Compte créé avec succès !");
@@ -65,8 +73,10 @@ function SignupForm() {
 
       router.push(nextStep);
 
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Erreur lors de l'inscription.");
+    } catch (error: unknown) {
+      // 🔥 BEST PRACTICE : Typage strict de l'erreur
+      const apiErr = error as ApiError;
+      toast.error(apiErr.response?.data?.error || "Erreur lors de l'inscription.");
     } finally {
       setLoading(false);
     }
@@ -76,7 +86,6 @@ function SignupForm() {
     <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
             <form onSubmit={handleSubmit} className="space-y-4">
                 
-                {/* --- SÉLECTEUR DE RÔLE (Masqué si redirection ou revendication) --- */}
                 {!redirectUrl && !claimId && (
                     <div className="grid grid-cols-2 gap-3 mb-4 p-1 bg-black/40 rounded-xl">
                         <button
@@ -106,7 +115,6 @@ function SignupForm() {
                     </div>
                 )}
 
-                {/* --- Message Spécial : Revendication (Démarcheur) --- */}
                 {claimId && (
                     <div className="bg-orange-500/20 border border-orange-500/30 p-3 rounded-xl mb-4 text-center">
                         <p className="text-orange-200 text-xs font-bold flex items-center justify-center gap-2">
@@ -117,7 +125,6 @@ function SignupForm() {
                     </div>
                 )}
 
-                {/* --- Message Spécial : Locataire --- */}
                 {redirectUrl && (
                     <div className="bg-blue-500/20 border border-blue-500/30 p-3 rounded-xl mb-4 text-center">
                         <p className="text-blue-200 text-xs font-bold flex items-center justify-center gap-2">
