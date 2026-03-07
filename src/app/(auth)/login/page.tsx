@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-// ✅ 1. IMPORT OFFICIEL NEXTAUTH + GETSESSION (Le Pont)
-import { signIn, getSession } from "next-auth/react";
+// ✅ SEUL L'IMPORT DE SIGNIN EST NÉCESSAIRE MAINTENANT
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,9 +27,8 @@ function LoginForm() {
     password: ""
   });
 
-  // --- NETTOYAGE AU DÉMARRAGE ---
+  // --- NETTOYAGE AU DÉMARRAGE (Garde-fou pour les anciennes sessions) ---
   useEffect(() => {
-    // On rase tout pour garantir une session propre au chargement
     Cookies.remove('token');
     localStorage.removeItem('token');
     localStorage.removeItem('immouser');
@@ -48,7 +47,7 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      // ✅ 2. AUTHENTIFICATION SÉCURISÉE (Côté Serveur)
+      // ✅ AUTHENTIFICATION 100% GÉRÉE PAR NEXT-AUTH
       const result = await signIn("credentials", {
         redirect: false,
         identifier: formData.identifier,
@@ -63,28 +62,15 @@ function LoginForm() {
       }
 
       if (result?.ok) {
-        // ✅ 3. LE PONT (BRIDGE) : SYNCHRONISATION FRONTEND
-        // On récupère la session fraîchement créée pour satisfaire le code Legacy (api.ts)
-        const session = await getSession();
+        // ❌ SUPPRESSION DU PONT LOCALSTORAGE ICI
         
-        if (session?.user) {
-            // A. On remplit 'immouser' pour l'affichage UI (Nom, Rôle...)
-            localStorage.setItem('immouser', JSON.stringify(session.user));
-            
-            // B. On met un token "Passe-partout" pour que les guards clients (api.ts) laissent passer
-            // (La vraie sécurité est gérée par le cookie HttpOnly invisible ici)
-            localStorage.setItem('token', 'secure-session-active'); 
-        }
-
         toast.success(`Connexion réussie !`);
 
-        // ✅ 4. REDIRECTION "MILITARY GRADE" (Zero Trust)
-        // On force le rechargement (window.location) pour valider les cookies côté serveur
+        // ✅ REDIRECTION DIRECTE : La page rechargera avec le nouveau cookie actif
         setTimeout(() => {
             const callbackUrl = searchParams.get('callbackUrl');
             const investType = searchParams.get('type');
 
-            // A. Cas Investisseur
             if (investType === 'investor') {
                 const packId = searchParams.get('pack');
                 const amount = searchParams.get('amount');
@@ -92,12 +78,9 @@ function LoginForm() {
                 return;
             }
 
-            // B. Cas Redirection URL spécifique
             if (callbackUrl) {
                 window.location.href = callbackUrl;
-            }
-            // C. Cas par défaut (Dashboard)
-            else {
+            } else {
                 window.location.href = '/dashboard';
             }
         }, 800);

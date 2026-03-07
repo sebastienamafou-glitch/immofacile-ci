@@ -1,9 +1,10 @@
 "use client";
-import { signOut } from "next-auth/react";
-import { useEffect, useState, useMemo } from "react";
+
+import { signOut, useSession } from "next-auth/react";
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Key, Users, Wallet, 
@@ -37,7 +38,6 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Hammer, label: "Maintenance", href: "/dashboard/owner/maintenance" },
     { icon: Wallet, label: "Mes Finances", href: "/dashboard/owner/finance" },
     { icon: FileText, label: "Mon bilan", href: "/dashboard/owner/finance/tax" },
-  
   ],
   AMBASSADOR: [
     { icon: LayoutDashboard, label: "Mon Tableau de bord", href: "/dashboard/ambassador" },
@@ -45,13 +45,11 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Users, label: "Prospects Locataires", href: "/dashboard/ambassador/leads" },
     { icon: ShieldCheck, label: "Certification Profil", href: "/dashboard/ambassador/kyc" },
   ],
-  
   TENANT: [
     { icon: LayoutDashboard, label: "Mon Espace", href: "/dashboard/tenant" },
     { icon: Receipt, label: "Mes Paiements", href: "/dashboard/tenant/payments" },
     { icon: FileText, label: "Mon Contrat", href: "/dashboard/tenant/contract" },
     { icon: Shield, label: "Signaler Incident", href: "/dashboard/tenant/incidents" },
- 
   ],
   AGENT: [
     { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/agent" }, 
@@ -59,14 +57,12 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: ClipboardCheck, label: "Dossiers Locataires", href: "/dashboard/agent/files" }, 
     { icon: Key, label: "Biens sous Gestion", href: "/dashboard/agent/properties" },
     { icon: Key, label: "Conciergerie", href: "/dashboard/agent/akwaba" },
- 
   ],
   ARTISAN: [
     { icon: LayoutDashboard, label: "Mes Missions", href: "/dashboard/artisan" },
     { icon: CalendarCheck, label: "Planning", href: "/dashboard/artisan/schedule" },
     { icon: Wallet, label: "Facturation", href: "/dashboard/artisan/finance" },
     { icon: Settings, label: "Disponibilité", href: "/dashboard/artisan/profile" },
-  
   ],
   SUPER_ADMIN: [
     { icon: Server, label: "Command Center", href: "/dashboard/superadmin" }, 
@@ -79,7 +75,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: ShieldCheck, label: "KYC & Sécurité", href: "/dashboard/superadmin/kyc" },
     { icon: ScrollText, label: "Journal d'Audit", href: "/dashboard/superadmin/logs" },
     { icon: Landmark, label: "Trésorerie", href: "/dashboard/superadmin/treasury" },
-     { icon: ShieldCheck, label: "Conformité & Juridique", href: "/dashboard/owner/compliance" },
+    { icon: ShieldCheck, label: "Conformité & Juridique", href: "/dashboard/owner/compliance" },
   ],
   AGENCY_ADMIN: [
     { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },
@@ -89,7 +85,6 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Palmtree, label: "Locations Saisonnières", href: "/dashboard/agency/listings" },
     { icon: Wallet, label: "Portefeuille", href: "/dashboard/agency/wallet" },
     { icon: Settings, label: "Paramètres Agence", href: "/dashboard/agency/settings" },
-   
   ],
   GUEST: [
     { icon: Compass, label: "Explorer", href: "/dashboard/guest" },
@@ -97,9 +92,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: Heart, label: "Favoris", href: "/dashboard/guest/favorites" },
     { icon: MessageCircle, label: "Messages", href: "/dashboard/guest/inbox" },
     { icon: FileText, label: "Historique", href: "/dashboard/guest/history" },
-    
   ],
-
   INVESTOR: [
     { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/investor" },
     { icon: FileSignature, label: "Mes Contrats", href: "/dashboard/investor/contract" },
@@ -110,43 +103,25 @@ const MENUS: Record<string, MenuItem[]> = {
 const COMMON_ITEMS: MenuItem[] = [
   { icon: LifeBuoy, label: "Centre d'aide", href: "/dashboard/help" },
   { icon: Settings, label: "Paramètres", href: "/dashboard/settings" },
-  
 ];
 
 export function AppSidebar({ className }: { className?: string }) {
   const pathname = usePathname();
-  const router = useRouter();
   
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // --- 1. SÉCURITÉ & CHARGEMENT ---
-  useEffect(() => {
-    // Vérification stricte
-    const checkAuth = () => {
-        try {
-            const storedUser = localStorage.getItem('immouser');
-            if (!storedUser) {
-                console.warn("⛔️ Accès refusé : Aucun utilisateur connecté.");
-                // Redirection forcée vers l'inscription/connexion
-                router.replace('/login'); 
-                return;
-            }
-            setUser(JSON.parse(storedUser));
-        } catch(e) {
-            console.error("Erreur lecture session", e);
-            router.replace('/login');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    checkAuth();
-  }, [router]);
+  // ✅ 1. SÉCURITÉ & CHARGEMENT GÉRÉS PAR NEXT-AUTH
+  const { data: session, status } = useSession();
+  
+  const isLoading = status === "loading";
+  // On caste 'any' ici temporairement si tes types Next-Auth ne sont pas encore étendus
+  const user = session?.user as any; 
 
   const handleLogout = async () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('immouser');
+    // Nettoyage de l'ancien système par précaution (pour les anciens utilisateurs)
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('immouser');
+        localStorage.removeItem('token');
+    }
+    // Déconnexion officielle via le cookie Next-Auth
     await signOut({ callbackUrl: '/login' });
   };
 
@@ -171,7 +146,6 @@ export function AppSidebar({ className }: { className?: string }) {
   }, [user]);
 
   // --- 2. UI : PROTECTION CONTRE LE FLASH ---
-  // Si on charge ou si pas d'user, on n'affiche PAS la vraie sidebar
   if (isLoading || !user) {
       return (
         <div className={cn("flex flex-col h-full bg-[#0B1120] text-white border-r border-slate-800 p-4", className)}>

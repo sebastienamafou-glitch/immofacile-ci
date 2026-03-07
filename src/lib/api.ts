@@ -1,6 +1,11 @@
 // Fichier : src/lib/api.ts
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { signOut } from 'next-auth/react';
+
+// Extension de l'interface pour inclure notre flag de retry personnalisé
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
 
 // 1. Instance API Standardisée
 export const api = axios.create({
@@ -9,33 +14,31 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 40000,
-  withCredentials: true, 
+  withCredentials: true, // Indispensable pour que le navigateur envoie le cookie Next-Auth automatiquement
 });
 
 // 2. Intercepteur de Réponse
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as CustomAxiosRequestConfig;
 
     // 🛑 STOP BOUCLE INFINIE
-    // Si l'erreur vient des notifications ou de l'auth elle-même, on ne fait rien.
-    // On laisse le composant gérer l'erreur (ex: afficher 0 notifs) sans déconnecter.
     if (originalRequest?.url?.includes('/notifications') || originalRequest?.url?.includes('/auth')) {
         return Promise.reject(error);
     }
 
-    // Gestion standard des 401 pour les autres routes (Token expiré / Non autorisé)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Gestion standard des 401 (Token expiré / Non autorisé)
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         originalRequest._retry = true;
         
-        // 🔥 LE NETTOYAGE RADICAL EST ICI 🔥
-        // On détruit toutes les traces de l'ancienne session dans le navigateur
-        localStorage.clear();
-        sessionStorage.clear();
+        // Nettoyage ciblé des anciens vestiges sans détruire tout le stockage du navigateur
+        localStorage.removeItem('immouser');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
 
-        // Déconnexion NextAuth qui nettoie les cookies + Redirection
+        // Déconnexion NextAuth (Nettoie le cookie HttpOnly côté serveur/client + Redirection)
         await signOut({ callbackUrl: '/login', redirect: true });
       }
     }
