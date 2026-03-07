@@ -98,18 +98,26 @@ export default auth(async (req) => {
   // 🧭 AIGUILLEUR INTELLIGENT APRÈS CONNEXION
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
-      // 🔥 CORRECTION ICI : On agit uniquement sur /login, on laisse l'accueil (/) libre
       if (isLoggedIn && path === '/login') {
-          if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/admin", nextUrl));
+          // ✅ Correction des chemins et ajout des rôles manquants
+          if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/superadmin", nextUrl)); 
           if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
           if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); 
           if (userRole === 'AMBASSADOR') return NextResponse.redirect(new URL("/dashboard/ambassador", nextUrl));
           if (userRole === 'OWNER') return NextResponse.redirect(new URL("/dashboard/owner", nextUrl));
           if (userRole === 'TENANT') return NextResponse.redirect(new URL("/dashboard/tenant", nextUrl));
+          if (userRole === 'INVESTOR') return NextResponse.redirect(new URL("/dashboard/investor", nextUrl));
+          if (userRole === 'ARTISAN') return NextResponse.redirect(new URL("/dashboard/artisan", nextUrl));
           
-          // 🔥 NOUVEAU FALLBACK : Redirection vers l'accueil au lieu de /dashboard
-          // pour casser la boucle infinie si le rôle est 'GUEST' ou introuvable
-          return NextResponse.redirect(new URL("/", nextUrl));
+          // 🔥 LA SOLUTION DÉFINITIVE EST ICI 🔥
+          // Si l'utilisateur a un vieux cookie corrompu (sans rôle), on le laisse 
+          // accéder à la page de login ! Il pourra ainsi se reconnecter et réparer son cookie.
+          if (!userRole) {
+              return NextResponse.next();
+          }
+
+          // Par défaut, si le rôle est valide mais non traité ci-dessus
+          return NextResponse.redirect(new URL("/dashboard", nextUrl));
       }
       return NextResponse.next();
   }
@@ -125,7 +133,8 @@ export default auth(async (req) => {
   // ============================================================
   if (isLoggedIn && userRole) {
     
-    if (path.startsWith('/dashboard/admin') && userRole !== 'SUPER_ADMIN') {
+    // ✅ Corrigé pour correspondre à ton système de routing
+    if (path.startsWith('/dashboard/superadmin') && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
