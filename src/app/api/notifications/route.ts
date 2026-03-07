@@ -13,21 +13,21 @@ export async function GET(req: Request) {
     const userId = session?.user?.id;
 
     if (!userId) {
-        // On renvoie un tableau vide pour ne pas faire crasher le front, 
-        // ou 401 si on veut être strict (mais géré par le front)
         return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
     try {
-        const notifications = await prisma.notification.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-            take: 20
-        });
-
-        const unreadCount = await prisma.notification.count({
-            where: { userId, isRead: false }
-        });
+        // 🔥 OPTIMISATION : Exécution en parallèle (Gain de temps massif)
+        const [notifications, unreadCount] = await Promise.all([
+            prisma.notification.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 20
+            }),
+            prisma.notification.count({
+                where: { userId, isRead: false }
+            })
+        ]);
 
         return NextResponse.json({ notifications, unreadCount });
     } catch (error) {

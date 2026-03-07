@@ -697,8 +697,9 @@ model Notification {
   isRead  Boolean @default(false)
   type    String  @default("INFO")
   link    String? // Lien de redirection
-
   createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([userId, isRead]) // Spécifique pour accélérer le "count" des non-lus
 }
 
 // ==========================================
