@@ -49,8 +49,11 @@ async function main() {
   // ==========================================
   // 2. CRÉATION DE L'AGENCE
   // ==========================================
-  const agency = await prisma.agency.create({
-    data: {
+  // On utilise upsert pour éviter les crashs si l'agence existe déjà malgré le clean
+  const agency = await prisma.agency.upsert({
+    where: { code: 'IMMO-PRESTIGE' },
+    update: {},
+    create: {
       name: 'Immo Prestige International',
       slug: 'immo-prestige',
       code: 'IMMO-PRESTIGE',
@@ -60,7 +63,8 @@ async function main() {
       isActive: true,
       taxId: 'CC-1234567-X',
       logoUrl: 'https://placehold.co/400x400/0f172a/white?text=IP',
-      walletBalance: 0
+      walletBalance: 0,
+      defaultCommissionRate: 0.10 // Ajouté car obligatoire dans ton schéma récent
     },
   });
   console.log(`🏢 Agence créée : ${agency.name}`);
@@ -77,6 +81,7 @@ async function main() {
     { email: 'locataire@gmail.com', name: 'Luc Locataire', role: Role.TENANT, jobTitle: 'Informaticien', income: 800000, agencyId: null, tier: 1 },
     { email: 'plombier@pro.ci', name: 'Mario Plombier', role: Role.ARTISAN, jobTitle: 'Plombier Certifié', phone: '+225 05050505', agencyId: null, tier: 2 },
     { email: 'investisseur@gmail.com', name: 'Ivan Investisseur', role: Role.INVESTOR, jobTitle: 'Business Angel', isBacker: true, backerTier: 'VISIONNAIRE', agencyId: null, tier: 3 },
+    { email: 'ambassadeur@gmail.com', name: 'Amine Ambassadeur', role: Role.AMBASSADOR, jobTitle: 'Apporteur d\'affaires', agencyId: null, tier: 1 }, // ✅ AJOUT DU RÔLE MANQUANT
     { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null, tier: 1 },
   ];
 
