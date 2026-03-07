@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// ✅ BONNE PRATIQUE : On enveloppe la route avec `auth`
+export const GET = auth(async (req) => {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
-    const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    const session = req.auth;
+
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
 
     // 2. VÉRIFICATION RÔLE & AGENCE (Via ID)
     const user = await prisma.user.findUnique({
@@ -62,7 +64,7 @@ const userId = session.user.id;
         }),
         // B. Longue Durée
         prisma.payment.aggregate({
-            _sum: { amountAgency: true }, // ✅ CORRECTION: On prend la part AGENCE, pas Agent
+            _sum: { amountAgency: true }, 
             where: {
                 lease: { property: { agencyId } },
                 status: 'SUCCESS',
@@ -133,4 +135,4 @@ const userId = session.user.id;
     console.error("Agency Stats Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

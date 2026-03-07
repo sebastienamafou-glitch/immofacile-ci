@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// ✅ BONNE PRATIQUE : On enveloppe la route avec le wrapper auth()
+export const GET = auth(async (req) => {
   try {
-    // 1. SÉCURITÉ BLINDÉE (Auth v5)
-    const session = await auth();
+    const session = req.auth;
     const userId = session?.user?.id;
     
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
@@ -42,7 +40,7 @@ export async function GET(request: Request) {
       platformRevenue,
       bookingRevenue,
       
-      // LISTES À TRAITER (Correction Schema ici)
+      // LISTES À TRAITER 
       kycPendingUsers,
       ownersRaw
     ] = await Promise.all([
@@ -73,31 +71,31 @@ export async function GET(request: Request) {
       prisma.payment.aggregate({ _sum: { amountPlatform: true }, where: { status: 'SUCCESS' } }),
       prisma.bookingPayment.aggregate({ _sum: { platformCommission: true }, where: { status: 'SUCCESS' } }),
 
-      // --- KYC EN ATTENTE (Correction : Filtrage via Relation) ---
+      // --- KYC EN ATTENTE ---
       prisma.user.findMany({
         where: { 
-            kyc: { status: "PENDING" } // ✅ On filtre dans la table liée
+            kyc: { status: "PENDING" } 
         },
         select: { 
             id: true, 
             name: true, 
             role: true, 
-            kyc: { select: { documents: true } } // ✅ On récupère les docs ici
+            kyc: { select: { documents: true } } 
         },
         take: 5, 
         orderBy: { createdAt: 'desc' }
       }),
 
-      // --- LISTE PROPRIÉTAIRES (Correction : Solde via Finance) ---
+      // --- LISTE PROPRIÉTAIRES ---
       prisma.user.findMany({
         where: { role: 'OWNER' },
         select: { 
             id: true, 
             name: true, 
-            finance: { select: { walletBalance: true } } // ✅ On récupère le solde ici
+            finance: { select: { walletBalance: true } } 
         },
         orderBy: { name: 'asc' },
-        take: 10 // On limite pour éviter de surcharger le dashboard
+        take: 10 
       })
     ]);
 
@@ -106,15 +104,13 @@ export async function GET(request: Request) {
     const revenueShortTerm = bookingRevenue._sum.platformCommission || 0;
     const totalRevenue = revenueLongTerm + revenueShortTerm;
 
-    // Aplatissage KYC
     const formattedKycs = kycPendingUsers.map(u => ({
         id: u.id,
         name: u.name || "Inconnu",
         role: u.role,
-        docUrl: u.kyc?.documents?.[0] || null // Premier document pour aperçu
+        docUrl: u.kyc?.documents?.[0] || null 
     }));
 
-    // Aplatissage Owners
     const formattedOwners = ownersRaw.map(o => ({
         id: o.id,
         name: o.name || "Propriétaire",
@@ -140,7 +136,7 @@ export async function GET(request: Request) {
         },
         ops: {
             incidentsCount: incidentsOpen,
-            kycCount: kycPendingUsers.length // Nombre récupéré de la requête liste (suffisant pour l'aperçu)
+            kycCount: kycPendingUsers.length 
         }
       },
       lists: {
@@ -159,4 +155,4 @@ export async function GET(request: Request) {
     console.error("War Room Error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

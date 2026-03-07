@@ -27,7 +27,7 @@ export default async function AmbassadorDashboard() {
     }
   });
 
-  if (!user || user.role !== "AMBASSADOR") redirect("/login");
+  if (!user || (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN")) redirect("/login");
 
   const isKycVerified = user.kyc?.status === "VERIFIED";
   const kycPending = user.kyc?.status === "PENDING";

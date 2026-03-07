@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// ✅ BONNE PRATIQUE : On enveloppe la route avec auth() pour la session v5
+export const GET = auth(async (req) => {
   try {
-    // 1. SÉCURITÉ : Session Serveur (v5)
-    const session = await auth();
+    const session = req.auth;
     const userId = session?.user?.id;
 
-    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    if (!userId) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    }
 
     const artisan = await prisma.user.findUnique({
       where: { id: userId },
@@ -21,14 +21,10 @@ export async function GET(request: Request) {
         name: true,
         email: true,
         role: true,
-        // walletBalance: true, // ❌ Supprimé
         isAvailable: true, 
-        
-        // ✅ CORRECTION SCHEMA : On passe par la relation Finance
         finance: {
             select: { walletBalance: true }
         },
-        
         incidentsAssigned: { 
           where: {
             status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] }
@@ -53,16 +49,15 @@ export async function GET(request: Request) {
       }
     });
 
-    if (!artisan || artisan.role !== "ARTISAN") {
-        return NextResponse.json({ error: "Accès réservé aux artisans." }, { status: 403 });
+    // Autorisation : Artisan ou Super Admin (pour maintenance)
+    if (!artisan || (artisan.role !== "ARTISAN" && artisan.role !== "SUPER_ADMIN")) {
+        return NextResponse.json({ error: "Accès réservé aux artisans partenaires." }, { status: 403 });
     }
 
-    // ✅ RECUPÉRATION SÉCURISÉE DU SOLDE
     const currentBalance = artisan.finance?.walletBalance || 0;
-
     const incidents = artisan.incidentsAssigned || [];
 
-    const formattedJobs = incidents.map((j: any) => ({
+    const formattedJobs = incidents.map((j) => ({
         id: j.id,
         title: j.title,
         description: j.description,
@@ -78,9 +73,10 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       user: {
+        id: artisan.id,
         name: artisan.name,
         email: artisan.email,
-        walletBalance: currentBalance, // ✅ Valeur mappée
+        walletBalance: currentBalance,
         isAvailable: artisan.isAvailable ?? true 
       },
       stats: {
@@ -92,7 +88,7 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error("Erreur Artisan Dashboard:", error);
+    console.error("🔥 Erreur Artisan Dashboard API:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-}
+});

@@ -1,33 +1,62 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-// ✅ IMPORT DU TYPE SSOT
 import { TenantDashboardResponse } from "@/lib/types/tenant";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// ✅ BONNE PRATIQUE : Utilisation du wrapper auth() pour l'injection de session
+export const GET = auth(async (req) => {
   try {
-    // -------------------------------------------------------------------------
-    // 1. SÉCURITÉ & AUTHENTIFICATION (Migration v5)
-    // -------------------------------------------------------------------------
-    const session = await auth();
-    const userEmail = session?.user?.email;
+    const session = req.auth;
+    const userId = session?.user?.id;
     
-    if (!userEmail) {
+    if (!userId) {
         return NextResponse.json(
             { error: "Accès refusé. Non authentifié." }, 
             { status: 401 }
         );
     }
 
-    // 2. RÉCUPÉRATION USER + FINANCE + KYC
+    // 1. RÉCUPÉRATION OPTIMISÉE (User + Finance + KYC + Bail + Incidents en 1 requête)
     const user = await prisma.user.findUnique({ 
-        where: { email: userEmail },
-        include: {
-            finance: { select: { walletBalance: true } }, // ✅ Relation Finance
-            kyc: { select: { status: true } }             // ✅ Relation KYC
+        where: { id: userId },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            finance: { select: { walletBalance: true } },
+            kyc: { select: { status: true } },
+            // Récupération du Bail actif ou en attente
+            leases: {
+                where: {
+                    status: { in: ['ACTIVE', 'PENDING'] }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                include: {
+                    property: {
+                        select: {
+                            id: true, title: true, address: true, commune: true,
+                            owner: { select: { name: true, email: true, phone: true } }
+                        }
+                    },
+                    payments: {
+                        take: 5,
+                        orderBy: { date: 'desc' }
+                    }
+                }
+            },
+            // Récupération des Incidents
+            incidentsReported: {
+                orderBy: { createdAt: 'desc' },
+                take: 3,
+                select: {
+                    id: true, title: true, status: true, createdAt: true
+                }
+            }
         }
     });
 
@@ -35,56 +64,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
     }
 
-    // -------------------------------------------------------------------------
-    // 3. RÉCUPÉRATION DES DONNÉES MÉTIER
-    // -------------------------------------------------------------------------
+    // 2. SÉCURITÉ : VÉRIFICATION DU RÔLE
+    if (user.role !== 'TENANT' && user.role !== 'SUPER_ADMIN') {
+        return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 });
+    }
     
-    // A. Récupération du Bail
-    const lease = await prisma.lease.findFirst({
-        where: {
-            tenantId: user.id, // 🔒 SÉCURITÉ : Cloisonnement strict
-            status: { in: ['ACTIVE', 'PENDING'] }
-        },
-        orderBy: { createdAt: 'desc' },
-        include: {
-            property: {
-                select: {
-                    id: true,
-                    title: true,
-                    address: true,
-                    commune: true,
-                    owner: {
-                        select: { name: true, email: true, phone: true }
-                    }
-                }
-            },
-            payments: {
-                take: 5,
-                orderBy: { date: 'desc' }
-            }
-        }
-    });
-
-    // B. Récupération des Incidents
-    const incidents = await prisma.incident.findMany({
-        where: { reporterId: user.id },
-        orderBy: { createdAt: 'desc' },
-        take: 3,
-        select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true
-        }
-    });
-
-    // -------------------------------------------------------------------------
-    // 4. CONSTRUCTION DE LA RÉPONSE
-    // -------------------------------------------------------------------------
-    
-    // Extraction sécurisée des données relationnelles
+    // 3. CONSTRUCTION DE LA RÉPONSE
     const kycStatus = user.kyc?.status || "PENDING";
     const walletBalance = user.finance?.walletBalance || 0;
+    const activeLease = user.leases[0] || null;
 
     const responseData: TenantDashboardResponse = {
         success: true,
@@ -93,14 +81,12 @@ export async function GET(request: Request) {
             name: user.name,
             email: user.email,
             phone: user.phone,
-            
-            // ✅ CORRECTION SCHEMA : On mappe les nouvelles sources
             walletBalance: walletBalance,
             isVerified: kycStatus === 'VERIFIED',
             kycStatus: kycStatus
         },
-        lease: lease, 
-        incidents: incidents
+        lease: activeLease as any, // Type casté nativement par Prisma vers ton interface
+        incidents: user.incidentsReported as any
     };
 
     return NextResponse.json(responseData);
@@ -112,4 +98,4 @@ export async function GET(request: Request) {
         { status: 500 }
     );
   }
-}
+});

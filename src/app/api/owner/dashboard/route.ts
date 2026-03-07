@@ -1,30 +1,27 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-
+import { auth } from "@/auth"; 
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+// ✅ BONNE PRATIQUE : On enveloppe la route API avec `auth` pour l'injection native de session
+export const GET = auth(async (req) => {
   try {
-    // 1. SÉCURITÉ : Vérification Session (Cookies) au lieu des Headers
-    const session = await auth();
+    const session = req.auth;
 
-    if (!session || !session.user || !session.user.id) {
+    if (!session?.user?.id) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
     const userId = session.user.id;
-    // @ts-ignore
-    const userRole = session.user.role; // Le rôle vient du token
+    const userRole = session.user.role; // Plus besoin de @ts-ignore !
 
-    // Vérification stricte du rôle (On laisse passer les Super Admin pour debug)
+    // Vérification stricte du rôle
     if (userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: "Accès refusé. Zone Propriétaire uniquement." }, { status: 403 });
     }
 
-    // 2. EXÉCUTION PARALLÈLE
+    // EXÉCUTION PARALLÈLE
     const [owner, artisansData] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
@@ -32,12 +29,10 @@ export async function GET(request: Request) {
                 id: true, 
                 name: true, 
                 email: true, 
-                // ✅ Relation Finance
+                role: true, // ✅ Nécessaire pour l'UI front-end
                 finance: {
                     select: { walletBalance: true }
                 },
-                
-                // Patrimoine
                 propertiesOwned: { 
                     orderBy: { createdAt: 'desc' },
                     select: {
@@ -57,8 +52,6 @@ export async function GET(request: Request) {
                         }
                     }
                 },
-
-                // Akwaba (Listings)
                 listings: {
                     select: {
                         id: true, title: true, pricePerNight: true, isPublished: true, images: true,
@@ -76,16 +69,12 @@ export async function GET(request: Request) {
                         }
                     }
                 },
-
-                // Transactions
                 transactions: {
                     take: 5, orderBy: { createdAt: 'desc' },
                     select: { id: true, amount: true, type: true, reason: true, createdAt: true }
                 }
             }
         }),
-
-        // Annuaire Artisans
         prisma.user.findMany({
             where: { role: 'ARTISAN', isActive: true },
             select: { id: true, name: true, jobTitle: true, phone: true },
@@ -95,11 +84,9 @@ export async function GET(request: Request) {
 
     if (!owner) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
 
-    // 3. CALCULS KPIs
+    // CALCULS KPIs
     const myProperties = owner.propertiesOwned || [];
     const myListings = owner.listings || [];
-
-    // ✅ RÉCUPÉRATION DU SOLDE (Sécurisée)
     const safeBalance = owner.finance?.walletBalance ?? 0;
 
     const monthlyIncome = myProperties.reduce((total, p) => {
@@ -113,11 +100,15 @@ export async function GET(request: Request) {
 
     const activeIncidentsCount = myProperties.reduce((sum, p) => sum + p.incidents.length, 0);
 
-    // 4. RÉPONSE JSON
+    // RÉPONSE JSON
     return NextResponse.json({
       success: true,
+      // ✅ CORRECTION : Objet user complet pour éviter les plantages React
       user: { 
-          name: owner.name, 
+          id: owner.id,
+          name: owner.name,
+          email: owner.email,
+          role: owner.role,
           walletBalance: safeBalance 
       },
       stats: {
@@ -139,4 +130,4 @@ export async function GET(request: Request) {
     console.error("🔥 CRASH API DASHBOARD:", error);
     return NextResponse.json({ error: "Erreur interne système" }, { status: 500 });
   }
-}
+});
