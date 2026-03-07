@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
@@ -15,23 +14,29 @@ const GATEWAY_CONFIG = {
   OM_TOKEN: process.env.OM_ACCESS_TOKEN
 };
 
-// PLAFONDS DE RETRAIT (Normes BCEAO/LBC-FT)
-const WITHDRAW_LIMITS = {
-  1: 0,          // Tier 1 (Non vérifié) : Retrait interdit
-  2: 500000,     // Tier 2 : 500k/mois
-  3: 10000000    // Tier 3 : 10M/mois
-};
-
 // Schéma de validation
 const withdrawSchema = z.object({
   amount: z.number().min(1000, "Minimum 1000 FCFA"),
   provider: z.enum(['WAVE', 'ORANGE_MONEY', 'MTN_MOMO']),
   phone: z.string().regex(/^(01|05|07)\d{8}$/, "Numéro invalide"),
-  idempotencyKey: z.string() // ✅ Clé client obligatoire
+  idempotencyKey: z.string()
 });
 
-// --- FONCTION GATEWAY (Isolée) ---
-async function processGatewayPayout(provider: string, phone: string, amount: number, ref: string) {
+// ✅ TYPAGE STRICT : Inférence du type depuis Zod
+type WithdrawRequest = z.infer<typeof withdrawSchema>;
+
+// ✅ TYPAGE STRICT : Résultat de la Gateway
+type GatewayResult = 
+  | { success: true; gwId: string }
+  | { success: false; error: string };
+
+// --- FONCTION GATEWAY (Isolée et typée) ---
+async function processGatewayPayout(
+    provider: WithdrawRequest['provider'], 
+    phone: string, 
+    amount: number, 
+    ref: string
+): Promise<GatewayResult> {
   try {
     if (provider === 'WAVE') {
         const res = await axios.post(GATEWAY_CONFIG.WAVE_URL, {
@@ -44,22 +49,26 @@ async function processGatewayPayout(provider: string, phone: string, amount: num
         });
         return { success: true, gwId: res.data.id };
     } 
-    // Ajouter OM/MTN ici...
-    return { success: true, gwId: `SIM-${Date.now()}` }; // Simulation pour dev
-  } catch (e: any) {
-    console.error(`[GATEWAY_FAIL] ${provider}`, e.response?.data || e.message);
-    return { success: false, error: e.message };
+    // Simulation pour OM/MTN en dev
+    return { success: true, gwId: `SIM-${Date.now()}` }; 
+  } catch (error: unknown) {
+    // ✅ FIN DU ANY : Typage strict de l'erreur Axios
+    const axiosError = error as AxiosError<{ error?: string }>;
+    const errorMessage = axiosError.response?.data?.error || axiosError.message || "Erreur Gateway inconnue";
+    
+    console.error(`[GATEWAY_FAIL] ${provider}`, errorMessage);
+    return { success: false, error: errorMessage };
   }
 }
 
 export async function POST(req: Request) {
   try {
-    // 1. 🔒 AUTHENTIFICATION FORTE
+    // 1. AUTHENTIFICATION FORTE
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Auth requise" }, { status: 401 });
 
-    // 2. 🛡️ VÉRIFICATION PROFIL (KYC & FINANCE)
+    // 2. VÉRIFICATION PROFIL (KYC & FINANCE)
     const user = await prisma.user.findUnique({
         where: { id: userId },
         include: { finance: true, kyc: true }
@@ -67,12 +76,11 @@ export async function POST(req: Request) {
 
     if (!user || !user.finance) return NextResponse.json({ error: "Compte non configuré" }, { status: 403 });
 
-    // Contrôle KYC
     if (user.kyc?.status !== 'VERIFIED') {
         return NextResponse.json({ error: "KYC requis pour retirer des fonds" }, { status: 403 });
     }
 
-    // 3. 🔍 VALIDATION ENTRÉES
+    // 3. VALIDATION ENTRÉES
     const body = await req.json();
     const validation = withdrawSchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: "Données invalides" }, { status: 400 });
@@ -90,9 +98,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Solde insuffisant" }, { status: 402 });
     }
 
-    // 4. 🚀 EXÉCUTION (PHASE 1 : DÉBIT PRÉVENTIF ATOMIQUE)
+    // 4. EXÉCUTION (PHASE 1 : DÉBIT PRÉVENTIF ATOMIQUE)
     const initResult = await prisma.$transaction(async (tx) => {
-        // Débit avec Verrouillage Optimiste
         const updatedFinance = await tx.userFinance.update({
             where: { userId: userId, version: user.finance!.version },
             data: { 
@@ -101,7 +108,6 @@ export async function POST(req: Request) {
             }
         });
 
-        // Audit Trail (PENDING)
         const txRecord = await tx.transaction.create({
             data: {
                 amount,
@@ -109,7 +115,7 @@ export async function POST(req: Request) {
                 balanceType: "WALLET",
                 reason: `Retrait ${provider} vers ${phone}`,
                 status: "PENDING",
-                reference: idempotencyKey, // Lien unique
+                reference: idempotencyKey,
                 userId: userId
             }
         });
@@ -117,12 +123,11 @@ export async function POST(req: Request) {
         return { finance: updatedFinance, tx: txRecord };
     });
 
-    // 5. 📡 APPEL GATEWAY (Hors Transaction DB pour ne pas bloquer)
+    // 5. APPEL GATEWAY
     const gatewayResult = await processGatewayPayout(provider, phone, amount, idempotencyKey);
 
-    // 6. 🏁 FINALISATION (PHASE 2)
+    // 6. FINALISATION (PHASE 2)
     if (gatewayResult.success) {
-        // SUCCÈS : On confirme juste le statut
         await prisma.transaction.update({
             where: { id: initResult.tx.id },
             data: { status: "SUCCESS" }
@@ -136,7 +141,6 @@ export async function POST(req: Request) {
     } else {
         // ÉCHEC : ROLLBACK (Remboursement)
         await prisma.$transaction(async (tx) => {
-            // Remboursement
             await tx.userFinance.update({
                 where: { userId: userId },
                 data: { 
@@ -144,7 +148,6 @@ export async function POST(req: Request) {
                     version: { increment: 1 }
                 }
             });
-            // Marquage FAILED
             await tx.transaction.update({
                 where: { id: initResult.tx.id },
                 data: { status: "FAILED", reason: `Echec Gateway: ${gatewayResult.error}` }
@@ -154,10 +157,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Echec opérateur, fonds remboursés." }, { status: 502 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) { 
     console.error("[WITHDRAW_ERROR]", error);
-    // Gestion Conflit Optimiste
-    if (error.code === 'P2025') return NextResponse.json({ error: "Conflit de transaction, réessayez." }, { status: 409 });
+    
+    
+    const prismaError = error as { code?: string };
+    if (prismaError.code === 'P2025') {
+        return NextResponse.json({ error: "Conflit de transaction, réessayez." }, { status: 409 });
+    }
     
     return NextResponse.json({ error: "Erreur technique" }, { status: 500 });
   }

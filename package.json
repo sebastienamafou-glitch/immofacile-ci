@@ -75,6 +75,7 @@
     "sonner": "^1.4.3",
     "sweetalert2": "^11.26.17",
     "sweetalert2-react-content": "^5.1.1",
+    "swr": "^2.4.1",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^13.0.0",

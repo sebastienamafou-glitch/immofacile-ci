@@ -1,13 +1,33 @@
 "use client";
 
 import { useState } from "react";
-// ✅ IMPORT DU CLIENT UUID
 import { v4 as uuidv4 } from 'uuid'; 
-import { api } from "@/lib/api"; // Assurez-vous que c'est votre client axios configuré
+import { api } from "@/lib/api"; 
 import { toast } from "sonner";
 import { 
   X, Wallet, ArrowRight, Loader2, Smartphone, ShieldCheck, AlertCircle 
 } from "lucide-react";
+
+// ✅ TYPAGE STRICT : Alignement avec l'Enum PaymentProvider du schema
+type MobileProvider = 'WAVE' | 'ORANGE_MONEY' | 'MTN_MOMO' | '';
+
+interface ProviderConfig {
+  id: MobileProvider;
+  name: string;
+  color: string;
+  border: string;
+  text: string;
+  hover: string;
+}
+
+// ✅ TYPAGE STRICT : L'erreur API
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
+}
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -16,7 +36,7 @@ interface WithdrawModalProps {
   onSuccess: () => void; 
 }
 
-const PROVIDERS = [
+const PROVIDERS: ProviderConfig[] = [
   { 
     id: 'WAVE', 
     name: 'Wave', 
@@ -46,7 +66,7 @@ const PROVIDERS = [
 export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess }: WithdrawModalProps) {
   const [amount, setAmount] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
-  const [provider, setProvider] = useState<string>("");
+  const [provider, setProvider] = useState<MobileProvider>("");
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -58,7 +78,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation stricte Front-end
     if (numericAmount <= 0) {
         toast.error("Le montant doit être positif.");
         return;
@@ -79,28 +98,28 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
     setLoading(true);
 
     try {
-        // ✅ GÉNÉRATION CLÉ UNIQUE (Idempotence)
         const idempotencyKey = uuidv4();
 
-        const res = await api.post('/invest/withdraw', { // Route API Backend
+        const res = await api.post('/invest/withdraw', {
             amount: numericAmount,
             provider,
             phone,
-            idempotencyKey // ✅ Indispensable pour votre Backend
+            idempotencyKey 
         });
 
         if (res.data.success) {
             toast.success("Retrait validé !", {
                 description: `Nouveau solde : ${res.data.balance.toLocaleString()} FCFA`
             });
-            onSuccess(); // Refresh dashboard
-            onClose();   // Fermer modal
+            onSuccess(); 
+            onClose();   
         }
-    } catch (error: any) {
+    } catch (error: unknown) { // ✅ REMPLACEMENT DU ANY PAR UNKNOWN
         console.error("Erreur retrait:", error);
         
-        // Gestion fine des erreurs Backend
-        const msg = error.response?.data?.error || "Erreur technique.";
+        // ✅ TYPAGE STRICT DE L'ERREUR
+        const apiErr = error as ApiError;
+        const msg = apiErr.response?.data?.error || "Erreur technique.";
         
         if (msg.includes("Solde")) toast.error("Fonds insuffisants.");
         else if (msg.includes("KYC")) toast.error("Vérification d'identité requise.");
@@ -114,6 +133,7 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
 
   const formatMoney = (val: number) => new Intl.NumberFormat('fr-FR').format(val);
 
+  // ... (Le Rendu (return) reste exactement identique à ton fichier actuel, je te l'épargne pour économiser les tokens !)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
@@ -121,7 +141,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
         onClick={(e) => e.stopPropagation()}
       >
         
-        {/* HEADER */}
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
             <div>
                 <h3 className="text-white font-bold text-lg">Retirer des Fonds</h3>
@@ -137,7 +156,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
             
-            {/* 1. COMPTEUR SOLDE */}
             <div className={`p-4 rounded-xl border transition-colors duration-300 ${isOverBalance ? 'bg-red-500/10 border-red-500/30' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
                 <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Solde Disponible</span>
@@ -153,7 +171,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                 )}
             </div>
 
-            {/* 2. CHOIX OPÉRATEUR */}
             <div className="space-y-3">
                 <label className="text-xs font-bold text-slate-400 uppercase">Opérateur</label>
                 <div className="grid grid-cols-3 gap-3">
@@ -177,7 +194,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                 </div>
             </div>
 
-            {/* 3. MONTANT & TÉLÉPHONE */}
             <div className="space-y-4">
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Montant à retirer</label>
@@ -205,7 +221,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                 </div>
             </div>
 
-            {/* 4. ACTION */}
             <div className="pt-2">
                 <div className="flex justify-between items-center text-xs text-slate-500 mb-4 px-1">
                     <span>Nouveau solde estimé :</span>
@@ -231,7 +246,6 @@ export default function WithdrawModal({ isOpen, onClose, userBalance, onSuccess 
                     )}
                 </button>
             </div>
-
         </form>
       </div>
     </div>

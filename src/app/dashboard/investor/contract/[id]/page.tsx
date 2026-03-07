@@ -14,7 +14,25 @@ import { getContractData, sendContractOtp, signContract } from "@/actions/contra
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
-// ✅ Définition des props pour récupérer l'ID dynamique
+// ✅ 1. TYPAGE STRICT DES RELATIONS (Basé sur schema.prisma : User + UserKYC)
+interface ContractUser {
+  name: string | null;
+  address: string | null;
+  idType?: string | null; // Provient de la relation UserKYC
+  idNumber?: string | null; // Provient de la relation UserKYC
+}
+
+// ✅ 2. TYPAGE STRICT DU CONTRAT (Basé sur schema.prisma : InvestmentContract)
+interface InvestmentContractData {
+  id: string;
+  status: string; // Ex: "PENDING", "ACTIVE"
+  date: string | Date; // Correspond au signedAt ou createdAt de ton API
+  amount: number;
+  packName: string | null;
+  user: ContractUser;
+}
+
+// ✅ 3. TYPAGE DES PROPS DE LA PAGE
 interface PageProps {
   params: {
     id: string;
@@ -23,68 +41,83 @@ interface PageProps {
 
 export default function InvestorContractPage({ params }: PageProps) {
   const router = useRouter();
-  
-  // ✅ On récupère l'ID directement depuis l'URL (ex: /contract/cm6...)
-  // Note : Dans Next.js App Router, params est passé en prop
   const contractId = params.id;
 
-  // États de données
+  // ✅ Remplacement de <any> par notre interface stricte
   const [loading, setLoading] = useState(true);
-  const [contractData, setContractData] = useState<any>(null);
+  const [contractData, setContractData] = useState<InvestmentContractData | null>(null);
   
   // États de signature
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
-  const [signStep, setSignStep] = useState(1);
+  const [signStep, setSignStep] = useState<1 | 2>(1); // Typage strict des étapes
   const [otp, setOtp] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 1. CHARGEMENT DES DONNÉES
+  // CHARGEMENT DES DONNÉES
   useEffect(() => {
     const loadData = async () => {
       if (!contractId) return;
 
-      const res = await getContractData(contractId);
-      
-      if (res.error) {
-        toast.error(res.error);
-        router.push("/dashboard/investor"); 
-      } else {
-        setContractData(res.contract);
+      try {
+        const res = await getContractData(contractId);
+        
+        if (res.error) {
+          toast.error(res.error);
+          router.push("/dashboard/investor"); 
+        } else if (res.contract) {
+          // L'API doit renvoyer un objet respectant InvestmentContractData
+          setContractData(res.contract as InvestmentContractData);
+        }
+      } catch (error) {
+        toast.error("Erreur de chargement du contrat.");
+        router.push("/dashboard/investor");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     loadData();
   }, [contractId, router]);
 
-  // 2. ENVOI OTP
+  // ENVOI OTP
   const handleSendCode = async () => {
     setIsProcessing(true);
-    const res = await sendContractOtp(contractId);
-    setIsProcessing(false);
-
-    if (res.success) {
-      setSignStep(2);
-      toast.success("Code de sécurité envoyé !");
-    } else {
-      toast.error(res.error || "Erreur d'envoi");
+    try {
+      const res = await sendContractOtp(contractId);
+      if (res.success) {
+        setSignStep(2);
+        toast.success("Code de sécurité envoyé !");
+      } else {
+        toast.error(res.error || "Erreur d'envoi");
+      }
+    } catch (error) {
+      toast.error("Erreur de communication avec le serveur.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // 3. VÉRIFICATION OTP
+  // VÉRIFICATION OTP
   const handleVerifyCode = async () => {
     setIsProcessing(true);
-    const res = await signContract(contractId, otp);
-    setIsProcessing(false);
-
-    if (res.success) {
-      setIsSignModalOpen(false);
-      // Mise à jour locale
-      setContractData((prev: any) => ({ ...prev, status: 'ACTIVE', date: new Date() }));
+    try {
+      const res = await signContract(contractId, otp);
       
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      toast.success("Contrat signé et validé sur la Blockchain.");
-    } else {
-      toast.error(res.error || "Code invalide");
+      if (res.success) {
+        setIsSignModalOpen(false);
+        // ✅ Mise à jour locale typée de manière sûre
+        setContractData((prev) => 
+          prev ? { ...prev, status: 'ACTIVE', date: new Date() } : null
+        );
+        
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        toast.success("Contrat signé et validé sur la Blockchain.");
+      } else {
+        toast.error(res.error || "Code invalide");
+      }
+    } catch (error) {
+       toast.error("Erreur lors de la signature.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -125,7 +158,7 @@ export default function InvestorContractPage({ params }: PageProps) {
         <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
             <div>
                 <h1 className="text-2xl font-black uppercase leading-none text-indigo-950">Protocole d'Accord</h1>
-                <p className="text-sm font-bold text-slate-600 mt-1 italic">PROGRAMME : {contractData.packName?.toUpperCase()}</p>
+                <p className="text-sm font-bold text-slate-600 mt-1 italic">PROGRAMME : {contractData.packName?.toUpperCase() || "STANDARD"}</p>
             </div>
             <div className="text-right">
                 <p className="text-xs font-bold uppercase">Réf : CTR-{contractId.slice(-8).toUpperCase()}</p>
@@ -133,7 +166,7 @@ export default function InvestorContractPage({ params }: PageProps) {
             </div>
         </div>
 
-        {/* SECTION 1 : LES PARTIES (DONNÉES RÉELLES) */}
+        {/* SECTION 1 : LES PARTIES */}
         <div className="grid grid-cols-2 border-2 border-black mb-8">
             <div className="border-r-2 border-black p-4 bg-slate-50">
                 <p className="text-[10px] font-bold uppercase underline mb-2">LA SOCIÉTÉ (ÉMETTEUR)</p>
@@ -145,12 +178,14 @@ export default function InvestorContractPage({ params }: PageProps) {
                 <p className="text-[10px] font-bold uppercase underline mb-2">L'INVESTISSEUR (SOUSCRIPTEUR)</p>
                 
                 <div className="mt-2">
-                    <p className="font-bold text-lg uppercase">{contractData.user.name}</p>
-                    <p className="text-[10pt]">{contractData.user.address}</p>
-                    <div className="mt-2 flex items-center gap-2 text-[9pt] bg-gray-100 w-fit px-2 py-1 rounded border border-gray-300">
-                         <span className="font-bold">{contractData.user.idType} :</span> 
-                         <span className="font-mono tracking-wider">{contractData.user.idNumber}</span>
-                    </div>
+                    <p className="font-bold text-lg uppercase">{contractData.user.name || "Non renseigné"}</p>
+                    <p className="text-[10pt]">{contractData.user.address || "Adresse non renseignée"}</p>
+                    {(contractData.user.idType || contractData.user.idNumber) && (
+                        <div className="mt-2 flex items-center gap-2 text-[9pt] bg-gray-100 w-fit px-2 py-1 rounded border border-gray-300">
+                            <span className="font-bold">{contractData.user.idType || "ID"} :</span> 
+                            <span className="font-mono tracking-wider">{contractData.user.idNumber || "N/A"}</span>
+                        </div>
+                    )}
                 </div>
                 
                 <div className="absolute top-4 right-4 opacity-50">
@@ -176,7 +211,6 @@ export default function InvestorContractPage({ params }: PageProps) {
         <div className="mt-20 flex justify-between gap-12 h-48 break-inside-avoid">
             <div className="flex-1 border-2 border-black p-4 relative">
                 <p className="font-bold text-[10px] underline uppercase">Pour WebappCi SARL</p>
-                {/* Placez ici une image de signature si vous en avez une */}
                 <div className="mt-8 font-script text-2xl text-slate-400 opacity-50 rotate-[-5deg]">Signature CEO</div>
             </div>
             
@@ -236,7 +270,7 @@ export default function InvestorContractPage({ params }: PageProps) {
                         <p className="font-bold mb-1">Résumé de l'engagement :</p>
                         <ul className="list-disc pl-4 space-y-1">
                             <li>Montant : {contractData.amount.toLocaleString()} FCFA</li>
-                            <li>Identité : {contractData.user.name} ({contractData.user.idNumber})</li>
+                            <li>Identité : {contractData.user.name || "N/A"} {contractData.user.idNumber ? `(${contractData.user.idNumber})` : ""}</li>
                         </ul>
                     </div>
                     <Button onClick={handleSendCode} disabled={isProcessing} className="w-full bg-indigo-950 hover:bg-indigo-900 text-white h-12">

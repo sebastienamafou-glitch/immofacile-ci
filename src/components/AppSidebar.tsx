@@ -99,6 +99,12 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: FileText, label: "Historique", href: "/dashboard/guest/history" },
     
   ],
+
+  INVESTOR: [
+    { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/investor" },
+    { icon: FileSignature, label: "Mes Contrats", href: "/dashboard/investor/contract" },
+    { icon: ShieldCheck, label: "Vérification KYC", href: "/dashboard/investor/kyc" },
+  ]
 };
 
 const COMMON_ITEMS: MenuItem[] = [
@@ -153,6 +159,7 @@ export function AppSidebar({ className }: { className?: string }) {
         case 'ARTISAN': return "/dashboard/artisan";
         case 'GUEST': return "/dashboard/guest";
         case 'AGENCY_ADMIN': return "/dashboard/agency";
+        case 'INVESTOR': return "/dashboard/investor"; 
         default: return "/dashboard/owner";
     }
   };

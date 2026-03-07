@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation'; // ✅ Pour rafraîchir les données après retrait
+import { useRouter } from 'next/navigation';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
@@ -10,37 +10,39 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// ✅ ON IMPORTE LES TYPES PRISMA DIRECTEMENT ICI
+import type { Transaction, InvestmentContract, VerificationStatus } from "@prisma/client";
+
 // ✅ IMPORTS DES MODULES
 import LogoutButton from './LogoutButton';
 import DocumentsCard from './DocumentsCard';
 import NewsFeed from './NewsFeed';
-import WithdrawModal from './WithdrawModal'; // ✅ Le nouveau module de retrait
+import WithdrawModal from './WithdrawModal';
 
-// Définition des types étendus pour TypeScript
-interface ExtendedUser {
+// ✅ ON DÉCLARE ET ON EXPORTE L'INTERFACE DIRECTEMENT ICI (Plus de bug de chemin)
+export interface InvestorDashboardData {
   id: string;
   name: string | null;
   email: string | null;
-  createdAt: Date;
   walletBalance: number;
-  backerTier: string | null;
-  transactions: any[];
-  investmentContracts: any[];
+  backerTier: string;
+  kycStatus: VerificationStatus | "UNINITIALIZED";
+  transactions: Transaction[];
+  investmentContracts: InvestmentContract[];
 }
 
 interface DashboardViewProps {
-  user: ExtendedUser;
+  user: InvestorDashboardData; 
 }
 
 export default function DashboardView({ user }: DashboardViewProps) {
   const router = useRouter();
   const [timeRange, setTimeRange] = useState<'6M' | '1Y'>('1Y');
   const [showNotifs, setShowNotifs] = useState(false);
-  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false); // ✅ État du modal retrait
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
 
   // --- 1. ALGORITHME DE CALCUL DU GRAPHIQUE ---
   const chartData = useMemo(() => {
-    // Si pas de transactions, on affiche une ligne plate
     if (!user.transactions || user.transactions.length === 0) {
         return [
             { date: 'Début', solde: 0 },
@@ -49,7 +51,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
 
     let runningBalance = 0;
-    // On doit trier les transactions par date croissante pour construire le graphique
+    // On doit cloner le tableau pour le trier sans muter les props
     const sortedTx = [...user.transactions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const data = sortedTx.map(tx => {
@@ -62,7 +64,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
         };
     });
 
-    // On ajoute le point actuel final si nécessaire
     if (data.length > 0) {
         data.push({
             date: 'Actuel',
@@ -81,7 +82,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
   };
 
   const handleWithdrawSuccess = () => {
-      // On rafraîchit les données serveur (Next.js Server Actions / ISR)
       router.refresh(); 
   };
 
@@ -98,28 +98,32 @@ export default function DashboardView({ user }: DashboardViewProps) {
              Bonjour, {user.name?.split(' ')[0] || 'Partenaire'}
            </h1>
            <p className="text-slate-500 text-sm mt-1">
-             Pack <span className="text-[#F59E0B] font-bold">{user.backerTier || 'Investisseur'}</span> • Membre depuis {new Date(user.createdAt).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})}
+             Pack <span className="text-[#F59E0B] font-bold">{user.backerTier}</span>
            </p>
         </div>
 
+        {/* Correction de la structure des boutons du Header */}
         <div className="flex items-center gap-3 flex-wrap">
+            
             {/* --- Notifications --- */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <div className="relative">
                 <button 
-                    onClick={() => setShowNotifs(!showNotifs)}
+                    onClick={(e) => { e.stopPropagation(); setShowNotifs(!showNotifs); }}
                     className="p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition relative group"
                 >
                     <Bell className={`w-5 h-5 ${showNotifs ? 'text-white' : 'text-slate-400'} group-hover:text-white transition`} />
-                    {/* Badge rouge si notifs (simulé) */}
                     <span className="absolute top-2 right-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                 </button>
                 
                 {/* Dropdown Menu */}
                 {showNotifs && (
-                    <div className="absolute right-0 top-full mt-4 w-80 bg-[#0B1120] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div 
+                        className="absolute right-0 top-full mt-4 w-80 bg-[#0B1120] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="p-4 border-b border-white/5 flex justify-between items-center">
                             <h4 className="font-bold text-white text-sm">Notifications</h4>
-                            <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-slate-500"/></button>
+                            <button onClick={() => setShowNotifs(false)}><X className="w-4 h-4 text-slate-500 hover:text-white"/></button>
                         </div>
                         <div className="p-2 max-h-64 overflow-y-auto space-y-1">
                             <div className="p-3 hover:bg-white/5 rounded-xl transition cursor-pointer flex gap-3">
@@ -136,7 +140,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                 )}
             </div>
 
-            {/* ✅ BOUTON RETIRER (NOUVEAU) */}
+            {/* BOUTON RETIRER */}
             <button 
                 onClick={() => setIsWithdrawOpen(true)}
                 className="px-5 py-3 bg-[#0B1120] border border-white/10 text-white font-bold rounded-xl hover:bg-white/5 transition flex items-center gap-2 text-sm"
@@ -183,7 +187,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
                         <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Valeur Projetée</p>
                     </div>
                     <p className="text-2xl font-black text-emerald-400 flex items-center gap-2">
-                        {(user.walletBalance * 1.15).toLocaleString('fr-FR')} <span className="text-[10px] bg-emerald-500/10 px-2 py-1 rounded-full text-emerald-500 font-bold">+15%</span>
+                        {((user.walletBalance || 0) * 1.15).toLocaleString('fr-FR')} <span className="text-[10px] bg-emerald-500/10 px-2 py-1 rounded-full text-emerald-500 font-bold">+15%</span>
                     </p>
                 </div>
 
@@ -259,8 +263,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
             {/* MODULE DOCUMENTS */}
             <div className="flex-1 min-h-[250px]">
                 <DocumentsCard 
-                    contracts={user.investmentContracts} 
-                    user={user} 
+                    contracts={user.investmentContracts as any} 
+                    user={user as any} 
                 />
             </div>
 
@@ -272,7 +276,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
 
       </div>
 
-      {/* ✅ MODAL DE RETRAIT (Invisible par défaut) */}
+      {/* ✅ MODAL DE RETRAIT */}
       <WithdrawModal 
         isOpen={isWithdrawOpen} 
         onClose={() => setIsWithdrawOpen(false)} 
