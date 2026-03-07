@@ -12,10 +12,10 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
-  // @ts-ignore - Nécessaire car PrismaAdapter v5 a un conflit de type interne connu avec NextAuth v5
+  // @ts-ignore
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  ...authConfig,
+  ...authConfig, // ✅ Il récupère les callbacks directement d'ici
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -26,7 +26,6 @@ export const {
         if (parsedCredentials.success) {
           const { identifier, password } = parsedCredentials.data;
           
-          // Recherche par email ou par téléphone [cite: 2, 3]
           const user = await prisma.user.findFirst({
             where: { OR: [{ email: identifier }, { phone: identifier }] }
           });
@@ -40,31 +39,5 @@ export const {
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      if (user) {
-        token.sub = user.id;
-        token.role = user.role;
-        token.agencyId = user.agencyId; // ✅ Sécurisé par l'augmentation de module 
-      }
-
-      // Mise à jour dynamique via session [cite: 82]
-      if (trigger === "update") {
-        if (session?.role) token.role = session.role;
-        if (session?.agencyId) token.agencyId = session.agencyId;
-      }
-
-      return token;
-    },
-
-    async session({ session, token }) {
-      if (token?.sub && session.user) {
-        session.user.id = token.sub;
-        session.user.role = token.role;
-        session.user.agencyId = token.agencyId; // ✅ Injecté proprement sans 'any'
-      }
-      return session;
-    }
-  },
   debug: process.env.NODE_ENV === "development",
 })

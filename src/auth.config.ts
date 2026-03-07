@@ -1,4 +1,4 @@
-import type { NextAuthConfig } from "next-auth"
+import type { NextAuthConfig } from "next-auth";
 
 export default {
   providers: [], 
@@ -7,10 +7,29 @@ export default {
   },
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
-      // ✅ ON AUTORISE TOUT ICI.
-      // Pourquoi ? Parce que c'est le fichier 'middleware.ts' qui fait déjà tout le travail de sécurité.
-      // Si on retourne 'false' ici, cela crée un conflit avec le middleware.
       return true; 
     },
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.sub = user.id;
+        // On respecte l'exigence de next-auth.d.ts : une string stricte avec un fallback
+        token.role = (user.role as string) || "GUEST";
+        token.agencyId = user.agencyId; 
+      }
+      
+      if (trigger === "update" && session) {
+        if (session.role) token.role = session.role as string;
+        if (session.agencyId !== undefined) token.agencyId = session.agencyId as string | null;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token?.sub && session.user) {
+        session.user.id = token.sub;
+        session.user.role = token.role as string; 
+        session.user.agencyId = token.agencyId as string | null | undefined; 
+      }
+      return session;
+    }
   },
-} satisfies NextAuthConfig
+} satisfies NextAuthConfig;
