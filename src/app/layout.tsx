@@ -7,6 +7,7 @@ import { Providers } from "@/components/Providers";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { GoogleAnalytics } from '@next/third-parties/google';
 import AuthSync from "@/components/shared/AuthSync"; 
+import CookieBanner from "@/components/shared/CookieBanner";
 
 const fontSans = Inter({
   variable: "--font-geist-sans",
@@ -60,7 +61,8 @@ export default function RootLayout({
           <Toaster position="top-right" richColors theme="dark" closeButton />
         </Providers>
         
-        <GoogleAnalytics gaId="G-36JC3KB6E5" />
+        {/* ✅ Remplacement par notre bannière RGPD */}
+        <CookieBanner />
       </body>
     </html>
   );

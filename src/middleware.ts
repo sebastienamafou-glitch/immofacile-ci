@@ -25,6 +25,7 @@ const PUBLIC_ROUTES = [
   '/', 
   '/login',  
   '/signup', 
+  '/ambassador-signup', 
   '/auth/error',
   '/agency', 
   '/owner', 
