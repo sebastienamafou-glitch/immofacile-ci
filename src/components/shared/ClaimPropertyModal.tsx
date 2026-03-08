@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { registerAndClaim } from "@/actions/register-claim";
 import { X, LockKeyhole, Phone, User, KeyRound, Loader2, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,26 +34,18 @@ export default function ClaimPropertyModal({ isOpen, onClose, propertyId, viewsC
     setLoading(true);
 
     try {
-        // Remplacement de api.post par fetch natif (aucun import requis)
-        const res = await fetch('/api/public/claim-property', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...formData, propertyId })
-        });
+        const result = await registerAndClaim({ ...formData, propertyId });
         
-        const data = await res.json();
-        
-        if (res.ok && data.success) {
-            toast.success("Annonce récupérée ! Connectez-vous avec votre numéro.");
+        if (result.success) {
+            toast.success("Compte créé avec succès !");
             onClose();
-            // Optionnel: rediriger vers la page de connexion
-            // window.location.href = '/login';
+            // Redirection vers la page de login pour qu'il saisisse son mot de passe
+            window.location.href = '/login?phone=' + formData.phone; 
         } else {
-            toast.error(data.error || "Erreur côté serveur.");
+            toast.error(result.error);
         }
     } catch (error) {
-        toast.error("Impossible de joindre le serveur.");
-        console.error("Erreur réseau:", error);
+        toast.error("Une erreur inattendue est survenue.");
     } finally {
         setLoading(false);
     }

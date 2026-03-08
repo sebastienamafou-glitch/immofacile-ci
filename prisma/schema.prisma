@@ -256,6 +256,12 @@ model Property {
   @@index([price])
   @@index([type])
   @@index([commune, price]) // Pour les recherches type "Villas à moins de X millions"
+
+  // --- Acquisition & SEO Programmatique ---
+  source      ListingSource @default(MANUAL)
+  originalUrl String?       @unique // Anti-doublon strict
+  isClaimed   Boolean       @default(true) // false pour les annonces aspirées
+  seoSlug     String?       @unique // ex: appartement-3-pieces-cocody-angre-ref123
 }
 
 // ==========================================
@@ -405,6 +411,12 @@ model Listing {
   @@index([city])
   @@index([pricePerNight])
   @@index([city, pricePerNight]) // Pour les recherches type "Studio à Abidjan à moins de 50k"
+
+  // --- Acquisition & SEO Programmatique ---
+  source      ListingSource @default(MANUAL)
+  originalUrl String?       @unique 
+  isClaimed   Boolean       @default(true) 
+  seoSlug     String?       @unique
 }
 
 model Booking {
@@ -849,4 +861,11 @@ enum MissionType {
   ETAT_DES_LIEUX_ENTREE
   ETAT_DES_LIEUX_SORTIE
   PHOTOS
+}
+
+enum ListingSource {
+  MANUAL
+  SCRAPER
+  MAKE_COM
+  API
 }

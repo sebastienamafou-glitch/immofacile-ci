@@ -32,7 +32,7 @@ export async function generateMetadata(props: PageProps) {
     if (!property) return { title: "Bien introuvable - Babimmo" };
     
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.immofacile.ci";
-    const isGhost = property.owner?.kyc?.status !== 'VERIFIED';
+    const isGhost = property.isClaimed === false;
 
     const ogUrl = new URL(`${appUrl}/api/og/property`);
     ogUrl.searchParams.set("title", property.title);
@@ -61,7 +61,7 @@ export default async function PublicPropertyPage(props: PageProps) {
   if (!property) return notFound();
 
   const isLoggedIn = !!session?.user;
-  const isGhost = property.owner?.kyc?.status !== 'VERIFIED';
+  const isGhost = property.isClaimed === false;
   const hasMultipleImages = property.images && property.images.length > 1;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.immofacile.ci";
   const propertyUrl = `${appUrl}/properties/${property.id}`;
@@ -76,7 +76,7 @@ export default async function PublicPropertyPage(props: PageProps) {
       </Suspense>
 
       {/* BANNIÈRE PRO AVEC MODALE INTÉGRÉE (GROWTH HACK) */}
-      {isGhost && <ClaimBanner propertyId={property.id} />}
+      {isGhost && <ClaimBanner propertyId={property.id} isLoggedIn={isLoggedIn} />}
 
       {/* HEADER NAVIGATION (VRAI GLASSMORPHISM + LOGO) */}
       <header className={`fixed top-0 left-0 w-full z-50 px-4 py-3 flex justify-between items-center pointer-events-none transition-all ${isGhost ? 'md:relative md:bg-transparent md:py-2' : ''}`}>

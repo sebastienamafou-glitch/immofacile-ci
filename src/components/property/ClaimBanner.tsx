@@ -1,14 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { useState, useTransition } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import ClaimPropertyModal from "@/components/shared/ClaimPropertyModal";
+import { claimScrapedProperty } from "@/actions/claim-property";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-export default function ClaimBanner({ propertyId }: { propertyId: string }) {
+interface ClaimBannerProps {
+  propertyId: string;
+  isLoggedIn: boolean; // ✅ Ajout du prop pour savoir si l'utilisateur est connecté
+}
+
+export default function ClaimBanner({ propertyId, isLoggedIn }: ClaimBannerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
   
   // Génère un faux nombre de vues entre 3 et 12 pour le FOMO
   const randomViews = Math.floor(Math.random() * 10) + 3;
+
+  const handleClaimClick = () => {
+    if (!isLoggedIn) {
+      // 1. Déconnecté : Ouvre la modale pour l'acquisition
+      setIsModalOpen(true);
+    } else {
+      // 2. Connecté : Lance directement l'action serveur en arrière-plan
+      startTransition(async () => {
+        const result = await claimScrapedProperty(propertyId);
+        
+        if (result.success) {
+          toast.success("Annonce récupérée avec succès !");
+          router.push("/dashboard/owner");
+        } else {
+          toast.error(result.error || "Une erreur est survenue.");
+        }
+      });
+    }
+  };
 
   return (
     <>
@@ -23,11 +52,12 @@ export default function ClaimBanner({ propertyId }: { propertyId: string }) {
           </div>
         </div>
         
-        {/* Le bouton ouvre désormais la modale au lieu de rediriger */}
         <button 
-          onClick={() => setIsModalOpen(true)}
-          className="w-full md:w-auto bg-orange-500 hover:bg-orange-400 text-[#0B1120] font-black px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide"
+          onClick={handleClaimClick}
+          disabled={isPending}
+          className="w-full md:w-auto bg-orange-500 hover:bg-orange-400 text-[#0B1120] font-black px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide disabled:opacity-70 disabled:hover:scale-100"
         >
+          {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           C'est mon annonce
         </button>
       </div>
