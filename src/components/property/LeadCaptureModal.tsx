@@ -52,15 +52,23 @@ export default function LeadCaptureModal({ isOpen, onClose, propertyId, property
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/90 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+    // 1. Z-index à 60, aligné en bas sur mobile (items-end), centré sur desktop (sm:items-center)
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#020617]/40 backdrop-blur-sm animate-in fade-in duration-200">
+      
+      // 2. Bords arrondis uniquement en haut sur mobile, slide depuis le bas, max-height pour scroller si l'écran est petit
+      <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto pb-6 sm:pb-0">
         
-        <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50">
+        {/* Petit trait gris en haut pour indiquer le "swipe" sur mobile */}
+        <div className="w-full flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+        </div>
+
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white">
             <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Home className="text-orange-500 w-5 h-5" />
                 Visiter ce bien
             </h3>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-900 transition bg-white hover:bg-slate-200 p-2 rounded-full shadow-sm">
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-900 transition bg-slate-50 hover:bg-slate-200 p-2 rounded-full shadow-sm">
                 <X className="w-5 h-5" />
             </button>
         </div>

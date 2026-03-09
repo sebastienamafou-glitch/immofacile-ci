@@ -80,8 +80,6 @@ export default auth(async (req) => {
   const isStatic = path.startsWith("/_next") || path.includes(".");
   
   if (ratelimit && !isStatic) {
-    // 🔥 CORRECTION : On cible uniquement les entrées d'authentification pour éviter le brute-force.
-    // On libère les routes /api internes pour laisser le dashboard respirer.
     const isSensitive = path === "/login" || path === "/register" || path === "/forgot-password";
     if (isSensitive) {
       const { success } = await ratelimit.limit(`ratelimit_auth_${ip}`);
@@ -99,7 +97,6 @@ export default auth(async (req) => {
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
       if (isLoggedIn && path === '/login') {
-          // ✅ Correction des chemins et ajout des rôles manquants
           if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/superadmin", nextUrl)); 
           if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
           if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); 
@@ -109,15 +106,13 @@ export default auth(async (req) => {
           if (userRole === 'INVESTOR') return NextResponse.redirect(new URL("/dashboard/investor", nextUrl));
           if (userRole === 'ARTISAN') return NextResponse.redirect(new URL("/dashboard/artisan", nextUrl));
           
-          // 🔥 LA SOLUTION DÉFINITIVE EST ICI 🔥
-          // Si l'utilisateur a un vieux cookie corrompu (sans rôle), on le laisse 
-          // accéder à la page de login ! Il pourra ainsi se reconnecter et réparer son cookie.
-          if (!userRole) {
+          // 🔥 Si le rôle est basique ("USER"), manquant ou "GUEST", on autorise l'accès 
+          // au login pour forcer une reconnexion et récupérer le nouveau rôle.
+          if (!userRole || userRole === 'USER' || userRole === 'GUEST') {
               return NextResponse.next();
           }
 
-          // Par défaut, si le rôle est valide mais non traité ci-dessus
-          return NextResponse.redirect(new URL("/dashboard", nextUrl));
+          return NextResponse.redirect(new URL("/login", nextUrl));
       }
       return NextResponse.next();
   }
@@ -133,32 +128,32 @@ export default auth(async (req) => {
   // ============================================================
   if (isLoggedIn && userRole) {
     
-    // ✅ Corrigé pour correspondre à ton système de routing
+    // 🔥 On remplace les redirections "/dashboard" par "/login" pour briser la boucle
     if (path.startsWith('/dashboard/superadmin') && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+       return NextResponse.redirect(new URL("/login", nextUrl));
     }
 
     if (path.startsWith('/dashboard/agency')) {
         const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN';
-        if (!canAccessAgency) return NextResponse.redirect(new URL("/dashboard", nextUrl));
+        if (!canAccessAgency) return NextResponse.redirect(new URL("/login", nextUrl));
     }
 
     if (path.startsWith('/dashboard/agent')) {
         const canAccessAgent = userRole === 'SUPER_ADMIN' || userRole === 'AGENT';
-        if (!canAccessAgent) return NextResponse.redirect(new URL("/dashboard", nextUrl));
+        if (!canAccessAgent) return NextResponse.redirect(new URL("/login", nextUrl));
     }
 
     if (path.startsWith('/dashboard/ambassador')) {
         const canAccessAmbassador = userRole === 'SUPER_ADMIN' || userRole === 'AMBASSADOR';
-        if (!canAccessAmbassador) return NextResponse.redirect(new URL("/dashboard", nextUrl));
+        if (!canAccessAmbassador) return NextResponse.redirect(new URL("/login", nextUrl));
     }
 
     if (path.startsWith('/dashboard/owner') && userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+       return NextResponse.redirect(new URL("/login", nextUrl));
     }
 
     if (path.startsWith('/dashboard/tenant') && userRole !== 'TENANT' && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+       return NextResponse.redirect(new URL("/login", nextUrl));
     }
   }
   
