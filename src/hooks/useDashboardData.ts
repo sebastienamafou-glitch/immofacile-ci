@@ -1,34 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api"; 
-import { DashboardData } from "@/types/dashboard"; 
+import type { DashboardResponse } from "@/schemas/dashboard.schema"; 
 
 export function useDashboardData() {
   const router = useRouter();
-  const [data, setData] = useState<DashboardData | any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
-      // 1. SÉCURITÉ : Récupération de l'utilisateur stocké
-      const storedUserRaw = localStorage.getItem("immouser");
+      setLoading(true);
       
-      if (!storedUserRaw) {
-        // Pas connecté ? On redirige et on stop
-        router.push("/login"); 
-        return;
-      }
-
-      const user = JSON.parse(storedUserRaw);
-
-      // 2. Appel API avec le HEADER D'AUTHENTIFICATION
-      // C'est ici que ça bloquait : on injecte l'email pour que le serveur nous reconnaisse
-      const res = await api.get('/owner/dashboard', {
-        headers: {
-            'x-user-email': user.email 
-        }
-      });
+      // L'instance 'api' transmet automatiquement les cookies de session.
+      const res = await api.get<DashboardResponse>('/owner/dashboard', { signal });
       
       if (res.data.success) {
         setData(res.data);
@@ -37,14 +23,21 @@ export function useDashboardData() {
         setError("Erreur API : Données non validées.");
       }
 
-    } catch (err: any) {
-      console.error("Erreur chargement dashboard:", err);
+    } catch (err: unknown) {
+      // Ignorer l'erreur si elle résulte de l'annulation de la requête (démontage UI)
+      if (err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError')) {
+        return;
+      }
+
+      console.error("[DASHBOARD_FETCH_ERROR]", err);
       
-      // Gestion spécifique : Si 401 (Non autorisé), on force la déconnexion
-      if (err.response?.status === 401) {
+      // Vérification sécurisée de la structure d'erreur (évite le 'any')
+      const errorResponse = (err as { response?: { status?: number, data?: { error?: string } } }).response;
+      
+      if (errorResponse?.status === 401 || errorResponse?.status === 403) {
          router.push("/login");
       } else {
-         setError(err.response?.data?.error || "Impossible de charger les données.");
+         setError(errorResponse?.data?.error || "Impossible de charger les données.");
       }
     } finally {
       setLoading(false);
@@ -52,8 +45,14 @@ export function useDashboardData() {
   }, [router]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    
+    // Transmission du signal pour l'annulation
+    fetchData(controller.signal);
+
+    // Fonction de nettoyage exécutée au démontage du composant
+    return () => controller.abort();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, error, refetch: () => fetchData() };
 }

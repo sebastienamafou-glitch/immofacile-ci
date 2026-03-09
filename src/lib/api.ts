@@ -28,20 +28,25 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 
-    // Gestion standard des 401 (Token expiré / Non autorisé)
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    // Gestion stricte des 401 (Token expiré) et 403 (Rôle non autorisé)
+    if (
+      (error.response?.status === 401 || error.response?.status === 403) && 
+      originalRequest && 
+      !originalRequest._retry
+    ) {
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         originalRequest._retry = true;
         
-        // Nettoyage ciblé des anciens vestiges sans détruire tout le stockage du navigateur
+        // Nettoyage ciblé des anciens vestiges
         localStorage.removeItem('immouser');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
 
-        // Déconnexion NextAuth (Nettoie le cookie HttpOnly côté serveur/client + Redirection)
+        // Déconnexion NextAuth et redirection forcée
         await signOut({ callbackUrl: '/login', redirect: true });
       }
     }
+    
     return Promise.reject(error);
   }
 );
