@@ -63,11 +63,14 @@ export default auth(async (req) => {
   const path = nextUrl.pathname;
 
   // ============================================================
-  // 🚨 RETOUR DE LA REDIRECTION 301 OBLIGATOIRE
+  // 🚨 RETOUR DE LA REDIRECTION 301 OBLIGATOIRE (Strict immofacile.ci)
   // ============================================================
   const host = req.headers.get("host");
-  if (host && host.includes("babimmo-ci.vercel.app")) {
-    const targetUrl = new URL(`https://www.babimmo.ci${path}`);
+  const isLocalhost = host?.includes("localhost") || host?.includes("127.0.0.1");
+  const isCanonical = host === "www.immofacile.ci";
+
+  if (host && !isLocalhost && !isCanonical) {
+    const targetUrl = new URL(`https://www.immofacile.ci${path}`);
     if (nextUrl.search) targetUrl.search = nextUrl.search;
     return NextResponse.redirect(targetUrl, 301);
   }
@@ -106,8 +109,6 @@ export default auth(async (req) => {
           if (userRole === 'INVESTOR') return NextResponse.redirect(new URL("/dashboard/investor", nextUrl));
           if (userRole === 'ARTISAN') return NextResponse.redirect(new URL("/dashboard/artisan", nextUrl));
           
-          // 🔥 Si le rôle est basique ("USER"), manquant ou "GUEST", on autorise l'accès 
-          // au login pour forcer une reconnexion et récupérer le nouveau rôle.
           if (!userRole || userRole === 'USER' || userRole === 'GUEST') {
               return NextResponse.next();
           }
@@ -128,7 +129,6 @@ export default auth(async (req) => {
   // ============================================================
   if (isLoggedIn && userRole) {
     
-    // 🔥 On remplace les redirections "/dashboard" par "/login" pour briser la boucle
     if (path.startsWith('/dashboard/superadmin') && userRole !== 'SUPER_ADMIN') {
        return NextResponse.redirect(new URL("/login", nextUrl));
     }

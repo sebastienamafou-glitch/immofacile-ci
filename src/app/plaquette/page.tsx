@@ -139,8 +139,8 @@ export default function PlaquettePage() {
           </div>
           <div className="text-right space-y-0.5 text-xs font-medium">
             <p className="text-orange-600 flex items-center justify-end gap-1"><Phone size={12}/> +225 07 00 00 00 00</p>
-            <p className="text-slate-800">contact@babimmo.ci</p>
-            <p className="text-slate-400 text-[10px] italic">https://www.babimmo.ci</p>
+            <p className="text-slate-800">contact@webappci.com</p>
+            <p className="text-slate-400 text-[10px] italic">https://www.immofacile.ci</p>
           </div>
         </footer>
 
