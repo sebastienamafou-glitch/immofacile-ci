@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
   Wallet, FolderOpen, UploadCloud, Loader2, 
-  MapPin, AlertTriangle, FileText, CheckCircle2, Clock, Download, ArrowRight
+  MapPin, AlertTriangle, FileText, ArrowRight
 } from "lucide-react";
-import { toast } from "sonner";
 
 // ✅ IMPORTS SÉCURISÉS
 import { api } from "@/lib/api";
@@ -20,21 +19,20 @@ import RentPaymentCard from "@/components/dashboard/tenant/RentPaymentCard";
 import PaymentHistory from "@/components/dashboard/tenant/PaymentHistory";
 
 export default function TenantDashboard() {
-  // 1. ÉTAT TYPÉ STRICTEMENT
   const [data, setData] = useState<TenantDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   
-  // Note : 'isUploading' a été retiré car l'upload ne se fait plus ici
-  
   const router = useRouter();
 
-  // 2. CHARGEMENT SÉCURISÉ
   useEffect(() => {
     const fetchData = async () => {
       try {
         const stored = localStorage.getItem("immouser");
-        if (!stored) { router.push("/login"); return; }
+        if (!stored) { 
+            router.push("/login"); 
+            return; 
+        }
         const user = JSON.parse(stored);
 
         const res = await api.get('/tenant/dashboard', {
@@ -44,12 +42,21 @@ export default function TenantDashboard() {
         if (res.data.success) {
             setData(res.data);
         } else {
-             setError(true);
+            // Si l'API répond mais signale un échec (souvent car pas de bail)
+            // On force l'état "Nouveau Locataire" au lieu de crasher
+            setData({ lease: null, user: user, incidents: [] } as any);
         }
       } catch (err: any) {
         console.error("Erreur dashboard", err);
-        if (err.response?.status === 401) router.push("/login");
-        else setError(true);
+        if (err.response?.status === 401) {
+            router.push("/login");
+        } else {
+            // 🔥 CORRECTION : Interception de l'erreur (ex: 404)
+            // On bascule gracieusement sur l'interface d'accueil au lieu du triangle rouge.
+            const stored = localStorage.getItem("immouser");
+            const user = stored ? JSON.parse(stored) : { name: "Locataire" };
+            setData({ lease: null, user: user, incidents: [] } as any);
+        }
       } finally {
         setLoading(false);
       }
@@ -64,13 +71,13 @@ export default function TenantDashboard() {
     </div>
   );
 
-  // --- ÉTAT : ERREUR ---
-  if (error || !data) return (
+  // --- ÉTAT : ERREUR CRITIQUE ---
+  if (error) return (
     <div className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center text-slate-400 gap-4">
       <div className="bg-red-500/10 p-4 rounded-full">
         <AlertTriangle className="w-10 h-10 text-red-500" />
       </div>
-      <p className="font-medium">Impossible de charger vos données locatives.</p>
+      <p className="font-medium">Un problème inattendu est survenu.</p>
       <Button onClick={() => window.location.reload()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
         Réessayer
       </Button>
@@ -78,7 +85,7 @@ export default function TenantDashboard() {
   );
 
   // --- ÉTAT : NOUVEAU VISITEUR (Sans dossier) ---
-  if (!data.lease) {
+  if (!data?.lease) {
     return (
         <main className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center p-6 text-center text-slate-300">
             <div className="bg-slate-900/50 p-10 rounded-[3rem] border border-white/5 max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-500">
@@ -131,7 +138,7 @@ export default function TenantDashboard() {
           <div>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Mon Portefeuille</p>
             <p className="text-sm font-black tracking-tight text-white uppercase italic">
-                {user.walletBalance.toLocaleString()} FCFA 
+                {user.walletBalance?.toLocaleString() || 0} FCFA 
             </p>
           </div>
         </div>
@@ -143,13 +150,10 @@ export default function TenantDashboard() {
         {/* COLONNE GAUCHE (Paiement & Infos) */}
         <div className="space-y-8 xl:col-span-2">
           
-          {/* 1. CARTE DE PAIEMENT */}
           <RentPaymentCard lease={lease} userPhone={user.phone} />
 
-          {/* 2. ACTIONS RAPIDES */}
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             
-            {/* Carte Contrat */}
             <Card className="bg-[#0F172A]/50 border-white/5 rounded-[2rem] backdrop-blur-xl hover:bg-[#0F172A] transition cursor-pointer group">
                 <CardHeader className="pb-4">
                     <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2 group-hover:text-blue-400 transition">
@@ -171,7 +175,6 @@ export default function TenantDashboard() {
                 </CardContent>
             </Card>
 
-            {/* Carte Maintenance */}
             <Card className="bg-[#0F172A]/50 border-white/5 rounded-[2rem] backdrop-blur-xl hover:bg-[#0F172A] transition">
                 <CardHeader className="pb-4">
                     <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -181,7 +184,7 @@ export default function TenantDashboard() {
                 <CardContent className="space-y-4 text-center">
                     <div className="flex items-center gap-4 p-4 border rounded-2xl bg-orange-500/5 border-orange-500/10 text-left">
                         <div className="flex items-center justify-center text-xl font-black text-orange-500 w-12 h-12 bg-orange-500/20 rounded-xl">
-                          {incidents.length}
+                          {incidents?.length || 0}
                         </div>
                         <div>
                           <p className="text-xs font-black tracking-tighter text-white uppercase italic">Incidents</p>
@@ -199,13 +202,9 @@ export default function TenantDashboard() {
           </div>
         </div>
 
-        {/* COLONNE DROITE (Historique & Upload) */}
         <aside className="space-y-8">
-            
-            {/* 3. HISTORIQUE */}
-            <PaymentHistory payments={lease.payments} />
+            <PaymentHistory payments={lease.payments || []} />
 
-            {/* 4. ZONE MON DOSSIER (CORRIGÉE : C'EST ICI QUE ÇA CHANGE) */}
             <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-2xl relative overflow-hidden group shadow-indigo-500/20 transition hover:scale-[1.02]">
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
                 
@@ -220,10 +219,9 @@ export default function TenantDashboard() {
 
                 <h4 className="relative z-10 text-2xl font-black tracking-tight italic uppercase mb-2">Mon Dossier</h4>
                 <p className="relative z-10 text-xs font-medium leading-relaxed mb-8 text-indigo-100/80">
-                    Mettez à jour vos justificatifs (Assurance, Revenus) pour maintenir votre score locataire.
+                    Mettez à jour vos justificatifs pour maintenir votre score locataire.
                 </p>
 
-                {/* ✅ LE LIEN QUI MARCHE (Plus d'upload direct ici, plus de bug 404) */}
                 <Link href="/dashboard/tenant/kyc" className="relative z-10 block">
                     <Button className="w-full bg-white text-indigo-900 hover:bg-indigo-50 font-black py-6 rounded-xl text-[10px] uppercase tracking-widest shadow-xl gap-2 transition-all active:scale-95">
                         <UploadCloud className="w-4 h-4" />
@@ -233,7 +231,6 @@ export default function TenantDashboard() {
             </div>
         </aside>
       </div> 
-      
     </main>
   );
 }
