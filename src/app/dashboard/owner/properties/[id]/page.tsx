@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation"; // ✅ useParams préféré
 import { api } from "@/lib/api";
+import type { Property, Lease, Incident, User as PrismaUser } from "@prisma/client";
 import { 
   Loader2, ArrowLeft, MapPin, Home, Bath, BedDouble, Ruler, 
   Wrench, Settings, X, ChevronLeft, ChevronRight, Save, Trash2, 
@@ -24,9 +25,6 @@ import { Badge } from "@/components/ui/badge";
 // Composants Métier
 import PublishAkwabaModal from "@/components/PublishAkwabaModal";
 
-// ✅ TYPES PRISMA OFFICIELS
-import { Property, Lease, Incident, User as PrismaUser } from "@prisma/client";
-
 // Extension du type pour inclure les relations
 interface PropertyWithDetails extends Property {
     leases: (Lease & { tenant: PrismaUser | null })[];
@@ -36,10 +34,11 @@ interface PropertyWithDetails extends Property {
 
 export default function PropertyDetailPage() {
   const params = useParams();
-  const id = params?.id as string; // Sécurisation ID
+  const id = params?.propertyId as string;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); 
   const [property, setProperty] = useState<PropertyWithDetails | null>(null);
   
   // Galerie Lightbox
@@ -117,7 +116,11 @@ export default function PropertyDetailPage() {
             toast.success("Bien supprimé.");
             router.push('/dashboard/owner/properties');
         } catch (error: any) {
-            toast.error(error.response?.data?.error || "Erreur suppression.");
+            console.error(error);
+            toast.error("Impossible de charger le bien.");
+            setError(error.response?.data?.error || "Le bien est introuvable ou vous n'y avez pas accès.");
+        } finally {
+            setLoading(false);
         }
     }
   };
@@ -155,7 +158,16 @@ export default function PropertyDetailPage() {
     setSelectedImageIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center bg-[#0B1120]"><Loader2 className="w-10 h-10 animate-spin text-[#F59E0B]" /></div>;
+  if (error) return (
+    <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-slate-400 gap-4">
+        <AlertTriangle className="w-12 h-12 text-red-500" />
+        <p className="font-bold text-white text-xl">{error}</p>
+        <Button onClick={() => router.push('/dashboard/owner/properties')} variant="outline" className="mt-4 border-slate-700 text-slate-300">
+            Retour aux propriétés
+        </Button>
+    </div>
+  );
+
   if (!property) return null;
 
   // Calculs d'état
