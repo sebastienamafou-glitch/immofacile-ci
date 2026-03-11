@@ -34,7 +34,7 @@ interface PropertyWithDetails extends Property {
 
 export default function PropertyDetailPage() {
   const params = useParams();
-  const id = params?.propertyId as string;
+  const id = params?.id as string;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
