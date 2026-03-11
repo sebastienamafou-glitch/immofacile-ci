@@ -83,7 +83,7 @@ export default function PropertyDetailPage() {
         } catch (error) {
             console.error(error);
             toast.error("Impossible de charger le bien.");
-            router.push('/dashboard/owner/properties');
+            
         } finally {
             setLoading(false);
         }
@@ -405,3 +405,4 @@ export default function PropertyDetailPage() {
     </div>
   );
 }
+ 
