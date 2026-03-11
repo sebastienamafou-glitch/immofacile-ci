@@ -40,7 +40,7 @@ export async function signInvestmentContract(signatureData: string | undefined) 
       }
     });
 
-    revalidatePath('/invest/dashboard');
+    revalidatePath('/investor/dashboard');
     
     return { success: true, contractId: newContract.id };
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { requireKyc } from "@/lib/gatekeeper"; // ✅ Import du Gatekeeper
+import { requireKyc } from "@/lib/gatekeeper"; 
 
 export const dynamic = 'force-dynamic';
 
@@ -10,12 +10,11 @@ export const dynamic = 'force-dynamic';
 // =========================================================
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> }
+  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte du nom de dossier
 ) {
   try {
     const { propertyId } = await params;
 
-    // ✅ SÉCURITÉ ZERO TRUST : Identification par ID
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = session.user.id;
@@ -23,7 +22,7 @@ export async function GET(
     const property = await prisma.property.findUnique({
       where: { 
         id: propertyId,
-        ownerId: userId // 🔒 Vérifie que l'ID correspond au propriétaire
+        ownerId: userId 
       },
       include: {
         leases: { 
@@ -38,12 +37,8 @@ export async function GET(
       return NextResponse.json({ error: "Bien introuvable ou accès refusé" }, { status: 404 });
     }
 
-    // Calcul disponibilité en temps réel
     const activeLease = property.leases.find(l => l.isActive);
-    const formattedProperty = {
-        ...property,
-        isAvailable: !activeLease
-    };
+    const formattedProperty = { ...property, isAvailable: !activeLease };
 
     return NextResponse.json({ success: true, property: formattedProperty });
 
@@ -54,38 +49,29 @@ export async function GET(
 }
 
 // =========================================================
-// 2. PUT : Modifier le bien (SÉCURISÉ 🛡️)
+// 2. PUT : Modifier le bien
 // =========================================================
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> }
+  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte
 ) {
   try {
     const { propertyId } = await params;
     
-    // A. Auth
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = session.user.id;
 
-    // B. Gatekeeper : Vérification KYC 🛑
     try {
         await requireKyc(userId);
     } catch (e) {
-        return NextResponse.json({ 
-            error: "Action refusée : Identité non vérifiée.",
-            code: "KYC_REQUIRED"
-        }, { status: 403 });
+        return NextResponse.json({ error: "Action refusée : Identité non vérifiée.", code: "KYC_REQUIRED" }, { status: 403 });
     }
 
-    // C. Update
     const body = await req.json();
 
     const updatedProperty = await prisma.property.update({
-      where: { 
-        id: propertyId,
-        ownerId: userId 
-      },
+      where: { id: propertyId, ownerId: userId },
       data: {
         title: body.title,
         price: Number(body.price),
@@ -101,52 +87,39 @@ export async function PUT(
 
   } catch (error) {
     console.error("Error UPDATE Property:", error);
-    return NextResponse.json({ error: "Impossible de modifier (Bien introuvable ou droits insuffisants)" }, { status: 500 });
+    return NextResponse.json({ error: "Impossible de modifier" }, { status: 500 });
   }
 }
 
 // =========================================================
-// 3. DELETE : Supprimer le bien (SÉCURISÉ 🛡️)
+// 3. DELETE : Supprimer le bien
 // =========================================================
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> }
+  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte
 ) {
   try {
     const { propertyId } = await params;
     
-    // A. Auth
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const userId = session.user.id;
 
-    // B. Gatekeeper : Vérification KYC 🛑
-    // Supprimer un bien est une action critique
     try {
         await requireKyc(userId);
     } catch (e) {
-        return NextResponse.json({ 
-            error: "Action refusée : Identité non vérifiée.",
-            code: "KYC_REQUIRED"
-        }, { status: 403 });
+        return NextResponse.json({ error: "Action refusée : Identité non vérifiée.", code: "KYC_REQUIRED" }, { status: 403 });
     }
 
-    // C. Vérification Métier : Baux actifs
     const property = await prisma.property.findUnique({
         where: { id: propertyId, ownerId: userId },
         include: { leases: { where: { isActive: true } } }
     });
 
     if (!property) return NextResponse.json({ error: "Bien introuvable" }, { status: 404 });
+    if (property.leases.length > 0) return NextResponse.json({ error: "Impossible de supprimer un bien avec un locataire en place." }, { status: 409 });
 
-    if (property.leases.length > 0) {
-        return NextResponse.json({ error: "Impossible de supprimer un bien avec un locataire en place." }, { status: 409 });
-    }
-
-    // D. Suppression
-    await prisma.property.delete({
-      where: { id: propertyId }
-    });
+    await prisma.property.delete({ where: { id: propertyId } });
 
     return NextResponse.json({ success: true, message: "Bien supprimé" });
 

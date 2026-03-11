@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import DashboardView from "@/components/invest/DashboardView";
+import DashboardView from "@/components/investor/DashboardView";
 // ✅ Importation des types générés automatiquement par Prisma
 import { Transaction, InvestmentContract, VerificationStatus } from "@prisma/client";
 
