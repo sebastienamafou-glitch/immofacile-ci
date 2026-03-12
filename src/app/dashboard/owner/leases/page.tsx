@@ -6,22 +6,30 @@ import { api } from "@/lib/api";
 import { Loader2, FileText, Plus, MapPin, Wallet, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Lease, Property, User } from "@prisma/client";
 
-// Type étendu pour l'affichage (Jointures)
-type LeaseWithDetails = Lease & {
-  property: Property;
-  tenant: User;
-};
+// ✅ DTO STRICT : Aligné sur la réponse de la méthode GET de l'API
+export interface DashboardLease {
+  id: string;
+  monthlyRent: number;
+  isActive: boolean;
+  status: string;
+  property: {
+    title: string;
+    commune: string | null;
+  } | null;
+  tenant: {
+    name: string | null;
+    email: string | null;
+  } | null;
+}
 
 export default function LeasesListPage() {
   const router = useRouter();
-  const [leases, setLeases] = useState<LeaseWithDetails[]>([]);
+  const [leases, setLeases] = useState<DashboardLease[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchLeases = useCallback(async () => {
     try {
-      // ✅ APPEL API SÉCURISÉ
       const res = await api.get('/owner/leases');
       
       if (res.data.success) {
@@ -29,10 +37,11 @@ export default function LeasesListPage() {
       } else {
          throw new Error(res.data.error);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      // Redirection si 401 (Session morte)
-      if (err.response?.status === 401) {
+      const axiosError = err as { response?: { status?: number } };
+      
+      if (axiosError.response?.status === 401) {
           router.push('/login');
       } else {
           toast.error("Erreur de chargement des contrats.");
@@ -97,6 +106,7 @@ export default function LeasesListPage() {
                         🏠
                     </div>
                     
+                    {/* Protection avec ?. contre les données nulles */}
                     <h3 className="font-bold text-lg text-white mb-1 truncate pr-20">{lease.property?.title || "Bien supprimé"}</h3>
                     <p className="text-slate-500 text-xs mb-6 flex items-center gap-1">
                         <MapPin className="w-3 h-3" /> {lease.property?.commune || "N/A"}
@@ -127,7 +137,6 @@ export default function LeasesListPage() {
            ))}
         </div>
       ) : (
-        /* Empty State */
         <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/20 text-center animate-in fade-in zoom-in-95 duration-500">
            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                 <AlertCircle className="w-8 h-8 text-slate-600" />
