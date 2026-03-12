@@ -483,6 +483,9 @@ model Payment {
 
   quoteId String? // Ajouté
   quote   Quote?  @relation(fields: [quoteId], references: [id])
+
+  userId  String?
+  user    User?   @relation(fields: [userId], references: [id])
 }
 
 model BookingPayment {

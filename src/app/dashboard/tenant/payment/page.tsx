@@ -27,7 +27,6 @@ function PaymentContent() {
   const [lease, setLease] = useState<LeaseInfo | null>(null);
   const [provider, setProvider] = useState("WAVE");
   const [phone, setPhone] = useState("");
-  const [userEmail, setUserEmail] = useState("");
 
   const isFee = paramType?.includes('FRAIS');
   const isTopUp = paramType === 'TOPUP';
@@ -38,18 +37,9 @@ function PaymentContent() {
   useEffect(() => {
     const fetchLeaseInfo = async () => {
       try {
-        const storedUser = localStorage.getItem("immouser");
-        if (!storedUser) {
-            router.push("/login");
-            return;
-        }
-        const currentUser = JSON.parse(storedUser);
-        setUserEmail(currentUser.email);
-
         if (!isTopUp) {
-            const res = await api.get('/tenant/dashboard', {
-                headers: { 'x-user-email': currentUser.email }
-            });
+            // ✅ CORRECTION : Plus aucun header 'x-user-email' ! Next-Auth gère via le cookie HTTP-Only.
+            const res = await api.get('/tenant/dashboard');
 
             if (res.data.success && res.data.lease) {
                 setLease(res.data.lease);
@@ -59,9 +49,13 @@ function PaymentContent() {
                  router.push('/dashboard/tenant');
             }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erreur chargement:", error);
-        toast.error("Erreur de connexion.");
+        if (error.response?.status === 401) {
+            router.push('/login');
+        } else {
+            toast.error("Erreur de connexion.");
+        }
       } finally {
         setLoading(false);
       }
@@ -77,14 +71,13 @@ function PaymentContent() {
     try {
       const endpoint = isTopUp ? '/tenant/topup' : isFee ? '/tenant/pay-fees' : '/tenant/pay-rent';
       
+      // ✅ CORRECTION : Requête propre, sans headers manuels.
       const res = await api.post(endpoint, {
         leaseId: lease?.id,
         paymentId: paramId, 
         amount: amountToPay,
         provider: provider,
         phone: phone
-      }, {
-        headers: { 'x-user-email': userEmail } 
       });
 
       if (res.data.success) {
@@ -97,8 +90,7 @@ function PaymentContent() {
         });
         router.push('/dashboard/tenant/payments'); 
       }
-    } catch (error: unknown) {
-         // @ts-ignore - Gestion de l'erreur Axios
+    } catch (error: any) {
          const errorMsg = error.response?.data?.error || 'Une erreur est survenue.';
          Swal.fire({
             icon: 'error',
@@ -106,6 +98,7 @@ function PaymentContent() {
             text: errorMsg,
             background: '#0B1120', color: '#fff'
          });
+         if (error.response?.status === 401) router.push('/login');
     } finally {
       setProcessing(false);
     }

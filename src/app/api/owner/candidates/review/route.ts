@@ -1,103 +1,100 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
+// ✅ 1. VALIDATEUR STRICT (ZOD)
+const reviewSchema = z.object({
+  leaseId: z.string().cuid("ID de bail invalide"),
+  decision: z.enum(['APPROVED', 'REJECTED'])
+});
 
 export async function POST(req: Request) {
   try {
-    // 1. AUTH ZERO TRUST (ID injecté par Middleware)
+    // 2. AUTH ZERO TRUST
     const session = await auth();
     const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION DES DONNÉES
+    // 3. SÉCURISATION DES ENTRÉES
     const body = await req.json();
-    const { leaseId, decision } = body; 
-
-    if (!leaseId || !['APPROVED', 'REJECTED'].includes(decision)) {
-        return NextResponse.json({ error: "Données invalides. Decision doit être APPROVED ou REJECTED." }, { status: 400 });
+    const validation = reviewSchema.safeParse(body);
+    
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides ou corrompues." }, { status: 400 });
     }
+    
+    const { leaseId, decision } = validation.data;
 
-    // 3. SÉCURITÉ : Le bail existe-t-il et appartient-il à ce propriétaire ?
-    // Optimisation : On vérifie directement le lien property.ownerId
+    // 4. VÉRIFICATION D'APPARTENANCE (Optimisée avec `select`)
     const lease = await prisma.lease.findUnique({
         where: { id: leaseId },
-        include: { property: true }
+        select: {
+            id: true,
+            propertyId: true,
+            property: { select: { ownerId: true } } // 🚀 Zéro over-fetching
+        }
     });
 
-    if (!lease) {
-        return NextResponse.json({ error: "Dossier introuvable." }, { status: 404 });
-    }
+    if (!lease) return NextResponse.json({ error: "Dossier introuvable." }, { status: 404 });
+    if (lease.property.ownerId !== userId) return NextResponse.json({ error: "Accès interdit." }, { status: 403 });
 
-    // VERROU CRITIQUE
-    if (lease.property.ownerId !== userId) {
-        return NextResponse.json({ error: "Accès interdit à ce dossier." }, { status: 403 });
-    }
-
-    // 4. LOGIQUE MÉTIER
+    // 5. LOGIQUE MÉTIER
 
     // --- CAS A : REFUS DU DOSSIER ---
     if (decision === 'REJECTED') {
-        const updatedLease = await prisma.lease.update({
+        await prisma.lease.update({
             where: { id: leaseId },
-            data: { 
-                status: 'CANCELLED',
-                isActive: false
-            }
+            data: { status: 'CANCELLED', isActive: false }
         });
 
-        return NextResponse.json({ 
-            success: true, 
-            message: "Candidature refusée.",
-            lease: updatedLease
-        });
+        return NextResponse.json({ success: true, message: "Candidature refusée." });
     } 
     
-    // --- CAS B : ACCEPTATION DU DOSSIER ---
+    // --- CAS B : ACCEPTATION DU DOSSIER (TRANSACTION BLINDÉE) ---
     if (decision === 'APPROVED') {
-        
-        // Vérification anti-doublon : Le bien est-il déjà occupé ?
-        // On cherche un AUTRE bail actif sur ce bien
-        const activeLease = await prisma.lease.findFirst({
-            where: { 
-                propertyId: lease.propertyId, 
-                isActive: true,
-                id: { not: leaseId } // Pas celui qu'on traite
+        try {
+            // L'utilisation du callback async(tx) garantit l'isolation
+            await prisma.$transaction(async (tx) => {
+                
+                // 1. Vérification anti-doublon *dans* la transaction
+                const activeLease = await tx.lease.findFirst({
+                    where: { 
+                        propertyId: lease.propertyId, 
+                        isActive: true,
+                        id: { not: leaseId } 
+                    },
+                    select: { id: true }
+                });
+
+                if (activeLease) throw new Error("ALREADY_OCCUPIED");
+
+                // 2. Activer ce bail
+                await tx.lease.update({
+                    where: { id: leaseId },
+                    data: {
+                        status: 'ACTIVE',
+                        isActive: true,
+                        signatureStatus: 'PENDING' 
+                    }
+                });
+
+                // 3. Verrouiller la propriété
+                await tx.property.update({
+                    where: { id: lease.propertyId },
+                    data: { isAvailable: false }
+                });
+            });
+            
+            return NextResponse.json({ success: true, message: "Candidature validée ! Le bien est maintenant occupé." });
+
+        } catch (error: any) {
+            if (error.message === "ALREADY_OCCUPIED") {
+                return NextResponse.json({ error: "Ce bien a déjà été attribué à un autre locataire." }, { status: 409 });
             }
-        });
-
-        if (activeLease) {
-            return NextResponse.json({ error: "Impossible d'accepter : Ce bien est déjà loué à quelqu'un d'autre." }, { status: 409 });
+            throw error; // Relance pour le catch global
         }
-
-        // TRANSACTION ATOMIQUE : On active le bail ET on verrouille le bien
-        await prisma.$transaction([
-            // 1. Activer ce bail
-            prisma.lease.update({
-                where: { id: leaseId },
-                data: {
-                    status: 'ACTIVE', // Le dossier est validé, le locataire est en place
-                    isActive: true,
-                    signatureStatus: 'PENDING' // Prêt pour signature
-                }
-            }),
-            // 2. Marquer la propriété comme occupée
-            prisma.property.update({
-                where: { id: lease.propertyId },
-                data: { isAvailable: false }
-            }),
-            // 3. (Optionnel) Rejeter automatiquement les autres candidats ?
-            // Pour l'instant on les laisse en PENDING, le propriétaire gérera.
-        ]);
-        
-        return NextResponse.json({ 
-            success: true, 
-            message: "Candidature validée ! Le bien est maintenant occupé.",
-        });
     }
-
-    return NextResponse.json({ error: "Action non gérée" }, { status: 400 });
 
   } catch (error) {
     console.error("🚨 Erreur Review Candidate:", error);

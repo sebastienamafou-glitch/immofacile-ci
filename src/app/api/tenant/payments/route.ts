@@ -8,36 +8,44 @@ export async function GET(request: Request) {
   try {
     // 1. SÉCURITÉ BLINDÉE (Auth v5)
     const session = await auth();
-    const userEmail = session?.user?.email;
+    const userId = session?.user?.id;
 
-    if (!userEmail) {
+    if (!userId) {
         return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // On ajoute la récupération du walletBalance pour le Dashboard
     const tenant = await prisma.user.findUnique({ 
-        where: { email: userEmail },
+        where: { id: userId },
         select: { id: true, role: true, walletBalance: true } 
     });
 
     if (!tenant || tenant.role !== "TENANT") {
-        return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 }); //
+        return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 });
     }
 
+    // 2. RÉCUPÉRATION DES PAIEMENTS ENRICHIS (Optimisé avec Select)
     // 2. RÉCUPÉRATION DES PAIEMENTS ENRICHIS
     const payments = await prisma.payment.findMany({
       where: {
-        lease: {
-            tenantId: tenant.id
-        }
+        OR: [
+            { lease: { tenantId: tenant.id } },
+            { userId: tenant.id } 
+        ]
       },
-      orderBy: { createdAt: 'desc' }, // Utilisation de createdAt au lieu de date pour la cohérence
-      include: {
+      orderBy: { date: 'desc' }, // ✅ CORRECTION : Utilisation de 'date'
+      select: { 
+        id: true,
+        amount: true,
+        date: true, // ✅ CORRECTION : Utilisation de 'date'
+        reference: true,
+        type: true,
+        status: true,
+        method: true,
         lease: {
             select: {
-                monthlyRent: true, // Requis pour la quittance
+                monthlyRent: true,
                 property: { select: { title: true, address: true } },
-                tenant: { select: { name: true } } // Requis pour la quittance
+                tenant: { select: { name: true } } 
             }
         }
       }
@@ -47,23 +55,23 @@ export async function GET(request: Request) {
     const formatted = payments.map(p => ({
         id: p.id,
         amount: p.amount,
-        createdAt: p.createdAt, 
-        reference: p.reference || `REF-${p.id.substring(0,8).toUpperCase()}`, // Génération d'une ref si manquante
+        createdAt: p.date, // ✅ CORRECTION : On mappe 'date' vers 'createdAt' pour le front
+        reference: p.reference || `REF-${p.id.substring(0,8).toUpperCase()}`, 
         type: p.type,
         status: p.status,
         method: p.method,
-        propertyTitle: p.lease?.property?.title || "Bail archivé/Inconnu", //
-        lease: p.lease // On passe l'objet lease complet pour le composant RentReceipt
+        propertyTitle: p.lease?.property?.title || "Rechargement Portefeuille", 
+        lease: p.lease 
     }));
 
     return NextResponse.json({ 
         success: true, 
         payments: formatted,
-        tenant: { walletBalance: tenant.walletBalance || 0 } // On renvoie le solde
+        tenant: { walletBalance: tenant.walletBalance || 0 } 
     });
 
   } catch (error) {
     console.error("Erreur Tenant Payments:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); //
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); 
   }
 }

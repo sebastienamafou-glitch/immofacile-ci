@@ -25,6 +25,7 @@ interface Candidate {
     email: string;
     walletBalance: number;
     kycStatus: string;
+    image?: string | null; // Alignement avec le backend
   };
   property: {
     id: string;
@@ -45,23 +46,20 @@ export default function CandidatesPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  // 1. CHARGEMENT SÉCURISÉ
+  // 1. CHARGEMENT SÉCURISÉ (Via Cookie Next-Auth automatique)
   const fetchCandidates = async () => {
-    const stored = localStorage.getItem("immouser");
-    if (!stored) { router.push('/login'); return; }
-    const user = JSON.parse(stored);
-
     try {
-        // ✅ AJOUT DU HEADER SECURITY
-        const res = await api.get('/owner/candidates', {
-            headers: { 'x-user-email': user.email }
-        });
+        const res = await api.get('/owner/candidates');
         if (res.data.success) {
             setCandidates(res.data.candidates);
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Erreur chargement candidats", error);
-        toast.error("Impossible de charger les candidatures.");
+        if (error.response?.status === 401) {
+            router.push('/login');
+        } else {
+            toast.error("Impossible de charger les candidatures.");
+        }
     } finally {
         setLoading(false);
     }
@@ -71,23 +69,16 @@ export default function CandidatesPage() {
     fetchCandidates();
   }, []);
 
-  // 2. ACTION SÉCURISÉE
+  // 2. ACTION SÉCURISÉE (Via Cookie Next-Auth automatique)
   const handleDecision = async (decision: 'APPROVED' | 'REJECTED') => {
     if (!selectedCandidate) return;
-    
-    const stored = localStorage.getItem("immouser");
-    if (!stored) return;
-    const user = JSON.parse(stored);
 
     setProcessing(true);
 
     try {
-        // ✅ AJOUT DU HEADER SECURITY
         await api.post('/owner/candidates/review', {
             leaseId: selectedCandidate.id,
             decision: decision
-        }, {
-            headers: { 'x-user-email': user.email }
         });
 
         if (decision === 'APPROVED') {
@@ -100,6 +91,7 @@ export default function CandidatesPage() {
         fetchCandidates(); // Recharger la liste
 
     } catch (error: any) {
+        if (error.response?.status === 401) router.push('/login');
         toast.error(error.response?.data?.error || "Une erreur est survenue.");
     } finally {
         setProcessing(false);
@@ -145,9 +137,13 @@ export default function CandidatesPage() {
                         
                         {/* GAUCHE : INFO CANDIDAT */}
                         <div className="flex items-center gap-4 flex-1">
-                            <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xl text-white">
-                                {candidate.tenant.name.charAt(0)}
-                            </div>
+                            {candidate.tenant.image ? (
+                                <img src={candidate.tenant.image} alt={candidate.tenant.name} className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
+                            ) : (
+                                <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xl text-white">
+                                    {candidate.tenant.name.charAt(0)}
+                                </div>
+                            )}
                             <div>
                                 <h3 className="font-bold text-white text-lg">{candidate.tenant.name}</h3>
                                 <p className="text-sm text-slate-400 flex items-center gap-2">
