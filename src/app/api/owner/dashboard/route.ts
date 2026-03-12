@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth"; 
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { DashboardResponseSchema } from "@/schemas/dashboard.schema"; // Assure-toi que le chemin correspond à ton architecture
+import { DashboardResponseSchema } from "@/schemas/dashboard.schema"; 
 
 export const dynamic = 'force-dynamic';
 
@@ -17,23 +17,25 @@ export const GET = auth(async (req) => {
     const userId = session.user.id;
     const userRole = session.user.role;
 
-    // Vérification stricte du rôle
     if (userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
         return NextResponse.json({ error: "Accès refusé. Zone Propriétaire uniquement." }, { status: 403 });
     }
 
-    // EXÉCUTION PARALLÈLE : Requêtes de données UI + Agrégations SQL
+    const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+
     const [
         ownerData, 
         artisansData, 
         totalMonthlyIncome, 
-        activeIncidentsAggregate
+        activeIncidentsAggregate,
+        creditsAggregate,
+        debitsAggregate
     ] = await Promise.all([
         prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true, name: true, email: true, role: true,
-                isVerified: true, // Exposition pour le bloc KYC Front-end
+                isVerified: true, 
                 finance: { select: { walletBalance: true } },
                 propertiesOwned: { 
                     orderBy: { createdAt: 'desc' },
@@ -45,10 +47,23 @@ export const GET = auth(async (req) => {
                             select: { leases: { where: { isActive: true } } }
                         },
                         leases: {
-                            where: { isActive: true }, 
                             select: {
-                                monthlyRent: true, isActive: true,
-                                tenant: { select: { name: true, phone: true, email: true } }
+                                id: true, // ✅ Ajouté pour DocumentsList/TenantsList
+                                monthlyRent: true, 
+                                isActive: true,
+                                startDate: true, // ✅ Ajouté pour l'affichage des dates
+                                tenant: { 
+                                    select: { 
+                                        id: true, name: true, phone: true, email: true,
+                                        isVerified: true,
+                                        kyc: { select: { status: true } } // ✅ Ajouté pour le badge vérifié
+                                    } 
+                                },
+                                payments: { // ✅ Ajouté pour les quittances PDF
+                                    orderBy: { date: 'desc' },
+                                    take: 1,
+                                    select: { id: true, amount: true, date: true, status: true }
+                                }
                             }
                         }
                     }
@@ -77,26 +92,25 @@ export const GET = auth(async (req) => {
             select: { id: true, name: true, jobTitle: true, phone: true },
             take: 5, orderBy: { name: 'asc' }
         }),
-        // Agrégation déportée au SGBD : Calcul de la somme des loyers actifs
         prisma.lease.aggregate({
-            where: { 
-                property: { ownerId: userId },
-                isActive: true 
-            },
+            where: { property: { ownerId: userId }, isActive: true },
             _sum: { monthlyRent: true }
         }),
-        // Agrégation déportée au SGBD : Comptage des incidents en cours
         prisma.incident.count({
-            where: {
-                property: { ownerId: userId },
-                status: { in: ['OPEN', 'IN_PROGRESS'] }
-            }
+            where: { property: { ownerId: userId }, status: { in: ['OPEN', 'IN_PROGRESS'] } }
+        }),
+        prisma.transaction.aggregate({
+            where: { userId: userId, type: 'CREDIT', createdAt: { gte: startOfYear } },
+            _sum: { amount: true }
+        }),
+        prisma.transaction.aggregate({
+            where: { userId: userId, type: 'DEBIT', createdAt: { gte: startOfYear } },
+            _sum: { amount: true }
         })
     ]);
 
     if (!ownerData) return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
 
-    // TRAITEMENT KPIs
     const myProperties = ownerData.propertiesOwned || [];
     const myListings = ownerData.listings || [];
     const safeBalance = ownerData.finance?.walletBalance ?? 0;
@@ -106,7 +120,10 @@ export const GET = auth(async (req) => {
         ? Math.round((occupiedCount / myProperties.length) * 100) 
         : 0;
 
-    // CONSTRUCTION DU PAYLOAD STRICT
+    const totalExpenses = debitsAggregate._sum.amount ?? 0;
+    const incomeYTD = creditsAggregate._sum.amount ?? 0;
+    const netIncomeYTD = incomeYTD - totalExpenses;
+
     const rawPayload = {
       success: true,
       user: { 
@@ -122,11 +139,19 @@ export const GET = auth(async (req) => {
         occupancyRate,
         monthlyIncome: totalMonthlyIncome._sum.monthlyRent ?? 0,
         activeIncidentsCount: activeIncidentsAggregate,
+        totalExpenses,
+        netIncomeYTD
       },
-      // Retrait propre de l'objet métier _count avant sérialisation
       properties: myProperties.map(({ _count, ...p }) => ({ 
           ...p, 
-          isAvailable: _count.leases === 0 
+          isAvailable: _count.leases === 0,
+          leases: p.leases.map(l => ({
+            ...l,
+            tenant: l.tenant ? {
+              ...l.tenant,
+              isVerified: l.tenant.kyc?.status === 'VERIFIED' || l.tenant.isVerified
+            } : null
+          }))
       })),
       listings: myListings,
       bookings: myListings.flatMap(l => l.bookings.map(b => ({ ...b, listing: { title: l.title } }))),
@@ -136,9 +161,7 @@ export const GET = auth(async (req) => {
       }))
     };
 
-    // VALIDATION ZOD
     const validatedPayload = DashboardResponseSchema.parse(rawPayload);
-
     return NextResponse.json(validatedPayload);
 
   } catch (error) {
@@ -146,7 +169,6 @@ export const GET = auth(async (req) => {
         console.error("[VALIDATION_ERROR]", error.format());
         return NextResponse.json({ error: "Structure de données invalide" }, { status: 500 });
     }
-    
     console.error("[GET_DASHBOARD_ERROR]", error);
     return NextResponse.json({ error: "Erreur interne système" }, { status: 500 });
   }

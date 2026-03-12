@@ -4,19 +4,26 @@ import Link from "next/link";
 import { MapPin, BedDouble, Bath, Ruler, ArrowRight, Image as ImageIcon, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-// ✅ IMPORT DU TYPE OFFICIEL (Source de vérité)
-import { Property } from "@prisma/client";
 
-// ✅ INTERFACE ÉTENDUE : On prend tout Prisma + les stats optionnelles
-// Cela permet d'accepter à la fois une Property simple ET une PropertyWithStats
-interface RichProperty extends Property {
-  activeLeaseCount?: number;
-  totalRentGenerated?: number;
+// ✅ DTO STRICT : Aligné sur la réponse de l'API (route.ts)
+export interface DashboardProperty {
+    id: string;
+    title: string;
+    address: string;
+    isPublished: boolean;
+    price: number;
+    commune: string | null;
+    images: string[];
+    bedrooms: number | null;
+    bathrooms: number | null;
+    surface: number | null;
+    type: string;
+    isAvailable: boolean;
 }
 
 interface PropertiesGridProps {
-  properties: RichProperty[]; // On accepte le format riche
-  onDelegate: (property: RichProperty) => void;
+  properties: DashboardProperty[];
+  onDelegate: (property: DashboardProperty) => void;
 }
 
 export default function PropertiesGrid({ properties, onDelegate }: PropertiesGridProps) {
@@ -35,7 +42,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
       {properties.map((property) => (
         <div key={property.id} className="group bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-600 transition-all duration-300 flex flex-col">
           
-          {/* --- IMAGE HEADER --- */}
           <Link href={`/dashboard/owner/properties/${property.id}`} className="block relative h-48 overflow-hidden bg-slate-800 cursor-pointer">
             {property.images && property.images.length > 0 ? (
                 <img 
@@ -50,7 +56,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
                 </div>
             )}
 
-            {/* Badges Statut */}
             <div className="absolute top-3 left-3 flex flex-col gap-2">
                 <Badge className={`${property.isAvailable ? 'bg-emerald-500' : 'bg-blue-600'} text-white border-none shadow-md`}>
                     {property.isAvailable ? 'DISPONIBLE' : 'LOUÉ'}
@@ -64,7 +69,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
             </div>
           </Link>
 
-          {/* --- CONTENU --- */}
           <div className="p-5 flex-1 flex flex-col">
             <div className="flex-1">
                 <Link href={`/dashboard/owner/properties/${property.id}`}>
@@ -78,7 +82,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
                     {property.commune || "Abidjan"}, {property.address || ""}
                 </div>
 
-                {/* Caractéristiques */}
                 <div className="flex items-center gap-4 text-slate-300 text-xs bg-slate-950/50 p-3 rounded-lg border border-slate-800/50">
                     <div className="flex items-center gap-1.5" title="Chambres">
                         <BedDouble className="w-4 h-4 text-slate-500" /> {property.bedrooms || 0}
@@ -98,7 +101,6 @@ export default function PropertiesGrid({ properties, onDelegate }: PropertiesGri
                 </div>
             </div>
 
-            {/* --- FOOTER ACTIONS --- */}
             <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
                 <Button 
                     onClick={() => onDelegate(property)}

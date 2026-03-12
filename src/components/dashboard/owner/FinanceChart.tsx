@@ -2,23 +2,27 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
-interface DashboardStats {
-  totalRent: number; // Modifié pour correspondre exactement à StatsOverview
-  totalExpenses: number; // Harmonisation des noms (totalExpenses vs totalExpensesMonth)
-  netIncomeYTD: number;  // Harmonisation
-  [key: string]: any;
+// ✅ Interface stricte et finalisée, alignée sur la nouvelle API (route.ts)
+export interface DashboardStats {
+  totalProperties: number;
+  occupancyRate: number;
+  monthlyIncome: number;
+  activeIncidentsCount: number;
+  totalExpenses: number;
+  netIncomeYTD: number;
 }
 
 export default function FinanceChart({ stats }: { stats: DashboardStats }) {
   
-  // Mapping sécurisé des props reçues depuis StatsOverview
+  // Mapping sécurisé : On utilise monthlyIncome au lieu de totalRent pour correspondre à l'API
   const data = [
-    { name: 'Revenus', amount: stats?.totalRent || 0, colorStart: '#4ade80', colorEnd: '#22c55e' },
-    { name: 'Dépenses', amount: stats?.totalExpenses || 0, colorStart: '#f87171', colorEnd: '#ef4444' }, // Modifié pour matcher la prop
-    { name: 'Résultat', amount: stats?.netIncomeYTD || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' }, // Modifié pour matcher la prop
+    { name: 'Revenus', amount: stats?.monthlyIncome || 0, colorStart: '#4ade80', colorEnd: '#22c55e' },
+    { name: 'Dépenses', amount: stats?.totalExpenses || 0, colorStart: '#f87171', colorEnd: '#ef4444' },
+    { name: 'Résultat', amount: stats?.netIncomeYTD || 0, colorStart: '#60a5fa', colorEnd: '#3b82f6' },
   ];
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Suppression de "any" en typant correctement les props du Tooltip Recharts
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-[#0B1120]/95 border border-slate-700 backdrop-blur-xl p-4 rounded-xl shadow-2xl z-50">
@@ -41,11 +45,11 @@ export default function FinanceChart({ stats }: { stats: DashboardStats }) {
                 <h3 className="text-white font-bold text-lg flex items-center gap-2">
                     📊 Trésorerie
                 </h3>
-                <p className="text-slate-500 text-xs">Entrées vs Sorties ce mois-ci</p>
+                <p className="text-slate-500 text-xs">Entrées vs Sorties (Annuel)</p>
             </div>
+            {/* Le select est statique pour l'instant */}
             <select className="bg-slate-800/50 text-xs font-bold text-slate-300 border border-slate-700 rounded-lg py-1.5 px-3 outline-none hover:bg-slate-800 transition cursor-pointer">
-                <option>Ce mois</option>
-                <option>Cette année</option>
+                <option>Année en cours</option>
             </select>
         </div>
         

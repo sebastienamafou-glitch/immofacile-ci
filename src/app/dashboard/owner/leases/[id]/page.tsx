@@ -160,7 +160,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     </div>
 
                     {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION === */}
-                    {lease.status === "TERMINATED" && (
+                    {lease.status === "IN_NOTICE" && (
                         <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
                             <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
                                 <div>
@@ -191,6 +191,27 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                             Acter le départ (Libérer le bien)
                         </Button>
                     </form>
+                </div>
+            </div>
+        )}
+
+        {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION (DÉSIMBRIQUÉ) === */}
+        {lease.status === "TERMINATED" && (
+            <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
+                <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div>
+                        <h3 className="text-slate-900 font-bold text-lg">Bail terminé</h3>
+                        <p className="text-slate-500 text-sm mt-1">
+                            Ce contrat est clôturé. Vous pouvez maintenant procéder à la restitution de la caution sur le portefeuille du locataire.
+                        </p>
+                    </div>
+        
+                    <RefundDepositModal 
+                        leaseId={lease.id}
+                        tenantName={tenantName}
+                        depositAmount={lease.depositAmount}
+                        ownerId={session.user.id}
+                    />
                 </div>
             </div>
         )}
@@ -281,13 +302,15 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     </div>
 
                     <div className="bg-slate-50 print:bg-transparent print:border-l-2 p-2 print:p-0.5 print:-mx-0.5 -mx-2 border-l-4 border-slate-300">
-                        <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer et Dépôt de Garantie</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer, Dépôt de Garantie et Avance</h3>
                         <p className="mb-1 print:mb-0">
                             Loyer mensuel : <strong className="text-sm print:text-[9px] mx-1">{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.
                         </p>
                         <p>
-                            Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. 
-                            Cette somme ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restituée au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.
+                            Dépôt de garantie (Caution) : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>.<br/>
+                            {/* Affichage conditionnel sécurisé de l'avance */}
+                            Avance sur loyer : <strong>{(lease.advanceAmount || 0).toLocaleString()} FCFA</strong>.<br/>
+                            Le dépôt de garantie ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restitué au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.
                         </p>
                     </div>
 

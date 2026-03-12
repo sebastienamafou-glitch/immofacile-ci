@@ -1,7 +1,8 @@
+// app/dashboard/owner/leases/new/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation"; 
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft, Building2, UserPlus, Calendar, Wallet, Info } from "lucide-react";
@@ -14,8 +15,12 @@ import { Property } from "@prisma/client";
 
 import { TenantCredentialsModal } from "@/components/TenantCredentialsModal";
 
-export default function NewLeasePage() {
+// --- COMPOSANT FORMULAIRE ISOLÉ POUR useSearchParams ---
+function NewLeaseForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectedPropertyId = searchParams.get("propertyId");
+
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   
@@ -40,8 +45,18 @@ export default function NewLeasePage() {
         try {
             const res = await api.get('/owner/properties');
             if (res.data.success) {
-                const availableProps = res.data.properties.filter((p: any) => p.isAvailable);
+                // Typage strict et filtrage
+                const availableProps = res.data.properties.filter((p: Property & { isAvailable?: boolean }) => p.isAvailable);
                 setProperties(availableProps);
+
+                // Auto-sélection si on vient d'une page détail
+                if (preselectedPropertyId) {
+                    const matchedProperty = availableProps.find((p: Property) => p.id === preselectedPropertyId);
+                    if (matchedProperty) {
+                        setSelectedPropertyId(matchedProperty.id);
+                        setRent(matchedProperty.price.toString());
+                    }
+                }
             }
         } catch (e) { 
             console.error(e); 
@@ -49,7 +64,7 @@ export default function NewLeasePage() {
         }
     };
     loadProperties();
-  }, []);
+  }, [preselectedPropertyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +85,6 @@ export default function NewLeasePage() {
     setLoading(true);
 
     try {
-        // Calcul du dépôt de garantie réel à envoyer à l'API (en FCFA)
         const totalDeposit = numRent * numDepositMonths;
         const totalAdvance = numRent * numAdvanceMonths;
 
@@ -80,8 +94,8 @@ export default function NewLeasePage() {
             tenantName,
             tenantPhone,
             rent: numRent,
-            deposit: totalDeposit,
-            advance: totalAdvance, // Assurez-vous que votre API accepte ce nouveau champ si nécessaire
+            depositAmount: totalDeposit, // Alignement strict avec le schéma (si mis à jour dans l'API)
+            advanceAmount: totalAdvance, // Nécessite la mise à jour du schéma (voir étape 1)
             startDate
         });
 
@@ -99,8 +113,9 @@ export default function NewLeasePage() {
                 router.push(`/dashboard/owner/leases/${res.data.lease.id}`);
             }
         }
-    } catch (error: any) {
-        toast.error(error.response?.data?.error || "Erreur lors de la création du bail.");
+    } catch (error: unknown) { // Typage strict
+        const axiosError = error as { response?: { data?: { error?: string } } };
+        toast.error(axiosError.response?.data?.error || "Erreur lors de la création du bail.");
     } finally {
         setLoading(false);
     }
@@ -118,8 +133,7 @@ export default function NewLeasePage() {
   const totalToPay = calculatedDeposit + calculatedAdvance;
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans flex flex-col items-center justify-center">
-        
+    <>
         <div className="max-w-3xl w-full space-y-6">
             <Link href="/dashboard/owner/leases" className="inline-flex items-center text-slate-400 hover:text-white gap-2 transition text-sm">
                 <ArrowLeft className="w-4 h-4" /> Annuler et retour
@@ -291,6 +305,17 @@ export default function NewLeasePage() {
             tenantPhone={newCredentials.phone} 
             tempPass={newCredentials.password}
         />
-    </div>
+    </>
   );
+}
+
+// --- PAGE PRINCIPALE AVEC SUSPENSE (Obligatoire pour useSearchParams) ---
+export default function NewLeasePage() {
+    return (
+        <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans flex flex-col items-center justify-center">
+            <Suspense fallback={<div className="text-white">Chargement du formulaire...</div>}>
+                <NewLeaseForm />
+            </Suspense>
+        </div>
+    );
 }

@@ -1,3 +1,5 @@
+// app/dashboard/owner/actions.ts
+
 'use server'
 
 import { auth } from "@/auth";
@@ -45,7 +47,7 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
                 signerId: ownerId, // ✅ ID Sûr
                 ipAddress: ip,
                 userAgent: userAgent,
-                documentType: "LEASE_AGREEMENT",
+                documentType: "LEASE", // ✅ Alignement strict avec le schéma
                 signedAt: new Date(),
                 // ✅ Correction : Suppression de sessionToken qui causait l'erreur
                 signatureData: `Validated by Owner (${ownerEmail}). IP: ${ip}`
@@ -57,6 +59,7 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
             where: { id: leaseId },
             data: {
                 signatureStatus: "COMPLETED",
+                status: "ACTIVE", // ✅ Rétablissement de l'intégrité de la machine d'état
                 isActive: true,
                 updatedAt: new Date()
             }
@@ -69,7 +72,7 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
                 entityId: leaseId,
                 entityType: "LEASE",
                 userId: ownerId,
-                metadata: { ip, ownerEmail, documentType: "LEASE_AGREEMENT" }
+                metadata: { ip, ownerEmail, documentType: "LEASE" }
             }
         });
     }); // <-- Fin de la transaction
@@ -77,8 +80,9 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
     revalidatePath(`/dashboard/owner/leases/${leaseId}`);
     return { success: true };
 
-  } catch (error: any) {
+  } catch (error: unknown) { // ✅ Typage strict appliqué
     console.error("Erreur signature propriétaire:", error);
-    return { error: error.message || "Erreur technique." };
+    const errorMessage = error instanceof Error ? error.message : "Erreur technique.";
+    return { error: errorMessage };
   }
 }

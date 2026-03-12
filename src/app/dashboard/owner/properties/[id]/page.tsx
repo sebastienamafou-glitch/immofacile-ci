@@ -34,7 +34,7 @@ interface PropertyWithDetails extends Property {
 
 export default function PropertyDetailPage() {
   const params = useParams();
-  const id = params?.id as string;
+  const id = params?.propertyId as string;
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -61,35 +61,31 @@ export default function PropertyDetailPage() {
         if(!id) return;
         
         try {
-            const stored = localStorage.getItem("immouser");
-            if (!stored) { router.push('/login'); return; }
-            const user = JSON.parse(stored);
-
-            const res = await api.get(`/owner/properties/${id}`, {
-                headers: { 'x-user-email': user.email }
-            });
+            // Nettoyage : NextAuth gère l'authentification via les cookies automatiquement
+            const res = await api.get(`/owner/properties/${id}`);
 
             if (res.data.success) {
                 setProperty(res.data.property);
-                // Init form
                 const p = res.data.property;
                 setEditForm({
                     title: p.title, description: p.description || "", price: p.price,
                     bedrooms: p.bedrooms, bathrooms: p.bathrooms, surface: p.surface || 0
                 });
             } else {
-                throw new Error(res.data.error);
+                throw new Error(res.data.error || "Erreur serveur");
             }
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
             toast.error("Impossible de charger le bien.");
-            
+            // Typage strict et activation de l'UI d'erreur pour éviter l'écran blanc
+            const axiosError = err as { response?: { data?: { error?: string } }, message?: string };
+            setError(axiosError.response?.data?.error || axiosError.message || "Le bien est introuvable.");
         } finally {
             setLoading(false);
         }
     };
     fetchProperty();
-  }, [id, router]);
+  }, [id]); // router retiré des dépendances car non nécessaire
 
   // 2. SUPPRESSION
   const handleDelete = async () => {
@@ -105,20 +101,18 @@ export default function PropertyDetailPage() {
     });
 
     if (result.isConfirmed) {
+        setLoading(true);
         try {
-            const stored = localStorage.getItem("immouser");
-            const user = stored ? JSON.parse(stored) : null;
-            
-            await api.delete(`/owner/properties/${id}`, {
-                headers: { 'x-user-email': user?.email }
-            });
+            // Nettoyage des headers inutiles
+            await api.delete(`/owner/properties/${id}`);
             
             toast.success("Bien supprimé.");
             router.push('/dashboard/owner/properties');
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            toast.error("Impossible de charger le bien.");
-            setError(error.response?.data?.error || "Le bien est introuvable ou vous n'y avez pas accès.");
+            toast.error("Impossible de supprimer le bien.");
+            const axiosError = error as { response?: { data?: { error?: string } } };
+            setError(axiosError.response?.data?.error || "Le bien est introuvable ou vous n'y avez pas accès.");
         } finally {
             setLoading(false);
         }
@@ -129,19 +123,17 @@ export default function PropertyDetailPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdating(true);
-    const stored = localStorage.getItem("immouser");
-    const user = stored ? JSON.parse(stored) : null;
 
     try {
-        const res = await api.put(`/owner/properties/${id}`, editForm, {
-            headers: { 'x-user-email': user?.email }
-        });
+        // Nettoyage des headers inutiles
+        const res = await api.put(`/owner/properties/${id}`, editForm);
         if(res.data.success) {
-            setProperty(res.data.property); // Mise à jour locale
+            setProperty(res.data.property); 
             toast.success("Modifications enregistrées !");
             setIsEditModalOpen(false);
         }
-    } catch (e) {
+    } catch (error: unknown) {
+        console.error(error);
         toast.error("Erreur lors de la mise à jour.");
     } finally {
         setIsUpdating(false);
@@ -157,6 +149,14 @@ export default function PropertyDetailPage() {
     if(!property?.images) return;
     setSelectedImageIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
   };
+
+  // ✅ AJOUT MANQUANT : Protection du rendu
+  if (loading) return (
+    <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-slate-400 gap-4">
+        <Loader2 className="w-12 h-12 text-[#F59E0B] animate-spin" />
+        <p className="font-bold">Chargement des données...</p>
+    </div>
+  );
 
   if (error) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-slate-400 gap-4">
@@ -298,7 +298,8 @@ export default function PropertyDetailPage() {
                     ) : (
                         <div className="text-center py-6">
                             <p className="text-slate-500 text-sm italic mb-4">Ce bien est actuellement vacant.</p>
-                            <Link href="/dashboard/owner/leases/new">
+                            {/* Injection du propertyId via l'URL */}
+                            <Link href={`/dashboard/owner/leases/new?propertyId=${id}`}>
                                 <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
                                     <Plus className="w-4 h-4 mr-2" /> Ajouter un locataire
                                 </Button>

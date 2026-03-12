@@ -6,27 +6,46 @@ import { Wallet, Plus, TrendingUp, TrendingDown, ArrowUpRight, DollarSign, Activ
 import Swal from 'sweetalert2';
 import { api } from "@/lib/api"; 
 import FinanceChart from "./FinanceChart";
-// ✅ SÉCURITÉ : Import du type officiel Prisma
-import { Property } from "@prisma/client";
 
-interface UserStats {
+// ✅ 1. Interfaces alignées sur le payload réel de route.ts
+interface DashboardUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  role: string;
   walletBalance: number;
-  escrowBalance: number;
-  referralBalance: number;
+  isVerified: boolean;
 }
 
 interface DashboardStats {
-  totalRent: number;
-  totalExpenses: number;
-  netIncomeYTD: number;
-  [key: string]: any;
+  totalProperties: number;
+  occupancyRate: number;
+  monthlyIncome: number;
+  activeIncidentsCount: number;
+  totalExpenses: number; // Ajouté suite à l'évolution de l'API
+  netIncomeYTD: number;  // Ajouté suite à l'évolution de l'API
+}
+
+// Interface partielle car l'API ne renvoie pas une Property Prisma complète
+interface DashboardProperty {
+    id: string;
+    title: string;
+    address: string;
+    isPublished: boolean;
+    price: number;
+    commune: string;
+    images: string[];
+    bedrooms: number;
+    bathrooms: number;
+    surface: number | null;
+    type: string;
+    isAvailable?: boolean;
 }
 
 interface StatsProps {
-  user: UserStats;
-  stats: DashboardStats;
-  // ✅ CORRECTION : Typage strict. On est sûr que p.id et p.title existent.
-  properties: Property[];
+  user: DashboardUser; 
+  stats: DashboardStats; 
+  properties: DashboardProperty[]; 
   onWithdraw: () => void;
   onRefresh?: () => void;
 }
@@ -58,7 +77,6 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
         return;
     }
     
-    // ✅ Génération sécurisée grâce au typage Property[]
     const optionsHtml = properties.map(p => `<option value="${p.id}">${p.title}</option>`).join('');
     
     const { value: formValues } = await Swal.fire({
@@ -166,7 +184,8 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 </div>
             </div>
             <div className="h-64 w-full"> 
-                <FinanceChart stats={stats} />
+                {/* Suppression du as any, le typage est désormais strict */}
+                <FinanceChart stats={stats} /> 
             </div>
         </div>
 
@@ -201,11 +220,12 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
                         <span className="block opacity-70 text-[9px] uppercase">Séquestre</span>
-                        <span className="font-bold">{user?.escrowBalance?.toLocaleString('fr-FR') || 0} F</span>
+                        {/* Valeurs fictives ou à ajouter plus tard dans l'API */}
+                        <span className="font-bold">0 F</span>
                     </div>
                     <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
                         <span className="block opacity-70 text-[9px] uppercase">Commissions</span>
-                        <span className="font-bold">{user?.referralBalance?.toLocaleString('fr-FR') || 0} F</span>
+                        <span className="font-bold">0 F</span>
                     </div>
                 </div>
 
@@ -223,7 +243,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
       {/* 3. KPIS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* KPI Revenus */}
+          {/* KPI Revenus (Adapté aux données réelles) */}
           <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-emerald-500/30 transition duration-300">
             <div className="absolute top-0 right-0 p-16 bg-emerald-500/5 blur-3xl rounded-full group-hover:bg-emerald-500/10 transition"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -231,46 +251,46 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                     <DollarSign className="w-5 h-5" />
                 </div>
                 <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">
-                    <TrendingUp className="w-3 h-3" /> + Revenus
+                    <TrendingUp className="w-3 h-3" /> Revenus
                 </span>
             </div>
             <div className="relative z-10">
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Loyers Encaissés (Annuel)</p>
-                <p className="text-3xl font-black text-white">{stats?.totalRent?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Revenu Mensuel Est.</p>
+                <p className="text-3xl font-black text-white">{stats?.monthlyIncome?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
             </div>
           </div>
 
-          {/* KPI Dépenses */}
+          {/* KPI Propriétés (Adapté) */}
+          <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-blue-500/30 transition duration-300">
+            <div className="absolute top-0 right-0 p-16 bg-blue-500/5 blur-3xl rounded-full group-hover:bg-blue-500/10 transition"></div>
+            <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+                    <PieChart className="w-5 h-5" />
+                </div>
+                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full">
+                    Parc
+                </span>
+            </div>
+            <div className="relative z-10">
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Total Biens</p>
+                <p className="text-3xl font-black text-white">{stats?.totalProperties || 0} <span className="text-sm font-medium text-slate-600">Unités</span></p>
+            </div>
+          </div>
+
+          {/* KPI Incidents/Occupation (Adapté) */}
           <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-red-500/30 transition duration-300">
             <div className="absolute top-0 right-0 p-16 bg-red-500/5 blur-3xl rounded-full group-hover:bg-red-500/10 transition"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
                 <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
                     <Activity className="w-5 h-5" />
                 </div>
-                <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
-                    <TrendingDown className="w-3 h-3" /> Charges
+                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded-full border border-slate-700">
+                    Occ. {stats?.occupancyRate || 0}%
                 </span>
             </div>
             <div className="relative z-10">
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Total Dépenses</p>
-                <p className="text-3xl font-black text-white">{stats?.totalExpenses?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
-            </div>
-          </div>
-
-          {/* KPI Net */}
-          <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-blue-500/30 transition duration-300">
-            <div className="absolute top-0 right-0 p-16 bg-blue-500/5 blur-3xl rounded-full group-hover:bg-blue-500/10 transition"></div>
-            <div className="flex justify-between items-start mb-4 relative z-10">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
-                    <Wallet className="w-5 h-5" />
-                </div>
-                <span className="flex items-center gap-1 text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full">
-                    Net
-                </span>
-            </div>
-            <div className="relative z-10">
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Bénéfice Net (YTD)</p>
-                <p className="text-3xl font-black text-blue-400">{stats?.netIncomeYTD?.toLocaleString('fr-FR') || 0} <span className="text-sm font-medium text-slate-600">F</span></p>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Incidents Actifs</p>
+                <p className="text-3xl font-black text-red-400">{stats?.activeIncidentsCount || 0}</p>
             </div>
           </div>
       </div>

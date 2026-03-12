@@ -1,18 +1,17 @@
 "use client";
 
 import { Phone, Wrench, Plus, MapPin, BadgeCheck } from "lucide-react";
-// ✅ Import Prisma pour être cohérent
-import { User } from "@prisma/client";
 
-// On étend User car Prisma n'a pas forcément 'location' ou 'job' natifs si ce n'est pas dans le schéma
-// Mais on suppose ici que 'jobTitle' et 'address' font l'affaire.
-interface ArtisanUser extends User {
-  jobTitle: string | null;
-  address: string | null;
+// ✅ DTO STRICT : Ce que l'API route.ts extrait du modèle User
+export interface DashboardArtisan {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  job: string; // ✅ Mappé par l'API
 }
 
 interface ArtisansListProps {
-  artisans: ArtisanUser[];
+  artisans: DashboardArtisan[];
   onAddArtisan: () => void;
 }
 
@@ -37,23 +36,15 @@ export default function ArtisansList({ artisans, onAddArtisan }: ArtisansListPro
             {artisans && artisans.length > 0 ? artisans.map((art) => (
                 <div key={art.id} className="bg-slate-50 border border-slate-100 p-4 rounded-2xl group hover:border-orange-200 hover:bg-white hover:shadow-lg transition">
                     <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-bold text-slate-900 group-hover:text-orange-500 transition line-clamp-1">{art.name}</h4>
-                        {/* kycStatus 'VERIFIED' remplace isVerified */}
-                        {art.kycStatus === 'VERIFIED' && (
-                             <span className="bg-green-100 text-green-600 text-[9px] px-2 py-0.5 rounded-full uppercase font-bold flex items-center gap-1 shrink-0">
-                                <BadgeCheck className="w-3 h-3" /> Vérifié
-                             </span>
-                        )}
+                        <h4 className="font-bold text-slate-900 group-hover:text-orange-500 transition line-clamp-1">{art.name || "Artisan"}</h4>
                     </div>
                     
-                    <p className="text-orange-500 text-xs font-bold uppercase tracking-wide mb-1">{art.jobTitle || "Artisan"}</p>
-                    <p className="text-slate-500 text-[10px] mb-4 flex items-center gap-1">
-                        <MapPin className="w-3 h-3" /> {art.address || "Abidjan"}
-                    </p>
+                    {/* ✅ Utilisation du champ 'job' retourné par l'API */}
+                    <p className="text-orange-500 text-xs font-bold uppercase tracking-wide mb-1">{art.job}</p>
                     
                     <a 
                         href={`tel:${art.phone}`} 
-                        className="flex items-center justify-center gap-2 w-full bg-white border border-slate-200 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition"
+                        className="flex items-center justify-center gap-2 w-full mt-4 bg-white border border-slate-200 py-2 rounded-lg text-xs font-bold text-slate-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition"
                     >
                         <Phone className="w-3 h-3" /> Appeler
                     </a>

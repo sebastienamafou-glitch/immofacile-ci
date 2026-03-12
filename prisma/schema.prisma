@@ -274,7 +274,7 @@ model Lease {
   endDate       DateTime?
   monthlyRent   Int
   depositAmount Int
-  advanceAmount Int?
+  advanceAmount Int?  
   status        LeaseStatus @default(PENDING)
   isActive      Boolean     @default(false)
 

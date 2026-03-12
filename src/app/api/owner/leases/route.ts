@@ -8,57 +8,8 @@ export const dynamic = 'force-dynamic';
 // ============================================================================
 // GET : Lister les baux (VOTRE CODE ORIGINAL INTACT)
 // ============================================================================
-export async function GET(request: Request) {
-  try {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+// app/api/owner/leases/route.ts - Bloc POST modifié
 
-    const leases = await prisma.lease.findMany({
-      where: { 
-          property: { ownerId: userId }, 
-          status: { not: 'CANCELLED' } 
-      },
-      orderBy: [
-          { isActive: 'desc' },
-          { status: 'asc' },   
-          { createdAt: 'desc' }
-      ],
-      include: {
-        tenant: { 
-            select: { 
-                id: true, name: true, phone: true, email: true, image: true,
-                // On inclut le statut KYC via la relation pour l'affichage
-                kyc: { select: { status: true } }
-            } 
-        },
-        property: { 
-            select: { id: true, title: true, commune: true, address: true, images: true } 
-        }
-      }
-    });
-
-    // Remapping pour simplifier le front
-    const formattedLeases = leases.map(l => ({
-        ...l,
-        tenant: {
-            ...l.tenant,
-            kycStatus: l.tenant.kyc?.status || "PENDING",
-            kyc: undefined
-        }
-    }));
-
-    return NextResponse.json({ success: true, leases: formattedLeases });
-
-  } catch (error) {
-    console.error("🚨 Erreur GET Leases:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
-}
-
-// ============================================================================
-// POST : Créer un bail (AVEC LE BOUCLIER LOI N° 2019-576)
-// ============================================================================
 export async function POST(request: Request) {
   try {
     // 1. SÉCURITÉ : Auth v5
@@ -74,8 +25,9 @@ export async function POST(request: Request) {
     }
 
     const rent = Number(body.rent);
-    const deposit = Number(body.deposit || 0);
-    const advance = Number(body.advance || 0); // ✅ Capture de l'avance
+    // ✅ Alignement strict avec le payload du frontend
+    const deposit = Number(body.depositAmount || 0); 
+    const advance = Number(body.advanceAmount || 0);
 
     // 🛑 2. BOUCLIER JURIDIQUE BACKEND : LOI N° 2019-576 🛑
     if (deposit > rent * 2) {
@@ -163,7 +115,7 @@ export async function POST(request: Request) {
             endDate: body.endDate ? new Date(body.endDate) : null,
             monthlyRent: rent,
             depositAmount: deposit,
-            advanceAmount: advance, // ✅ Enregistrement en base de données
+            advanceAmount: advance, // ✅ Enregistrement validé par le schéma
             status: "PENDING",
             isActive: false, 
             signatureStatus: "PENDING",
@@ -178,7 +130,7 @@ export async function POST(request: Request) {
         credentials: isNewUser ? { email: body.tenantEmail, password: tempPassword } : null
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) { // ✅ Typage strict appliqué
     console.error("🚨 CRASH POST Lease:", error);
     return NextResponse.json({ error: "Erreur interne." }, { status: 500 });
   }

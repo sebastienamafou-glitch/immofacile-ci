@@ -24,15 +24,15 @@ export async function giveNoticeAction(leaseId: string, departureDate: Date, ten
       throw new Error("Le bail n'est pas actif.");
     }
 
+    // Clôture du bail
     const updatedLease = await prisma.lease.update({
       where: { id: leaseId },
       data: {
-        status: "IN_NOTICE", 
-        noticeGivenAt: new Date(),
-        plannedDepartureDate: departureDate,
+        status: "TERMINATED",
+        isActive: false, // ✅ OBLIGATOIRE : Désactivation stricte du bail
+        endDate: new Date(),
       }
     });
-
     await prisma.auditLog.create({
       data: {
         action: "NOTICE_GIVEN",

@@ -1,43 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { Users, Plus, MessageCircle, FileText, ShieldCheck, MapPin } from "lucide-react";
+import { Users, Plus, ShieldCheck, MapPin, FileText } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-// ✅ IMPORT OFFICIEL
-import { Property, Lease, User } from "@prisma/client";
 
-// ✅ DÉFINITION ROBUSTE (Basée sur Prisma)
-// On décrit exactement ce que l'API nous envoie (Propriété + Baux + Locataire)
-type PropertyWithTenants = Property & {
-    leases: (Lease & {
-        tenant: User | null; // Le locataire peut être null si supprimé
-    })[];
-};
+// ✅ DTO STRICT : Définition des baux inclus dans la propriété
+export interface DashboardTenantProperty {
+    title: string;
+    commune: string | null;
+    leases: {
+        id?: string; // Optionnel : route.ts ne l'envoie pas actuellement
+        startDate?: string | Date; // Optionnel
+        monthlyRent: number;
+        isActive: boolean;
+        tenant: {
+            id?: string;
+            name: string | null;
+            phone: string | null;
+            email: string | null;
+            isVerified?: boolean;
+        } | null;
+    }[];
+}
 
-export default function TenantsList({ properties }: { properties: PropertyWithTenants[] }) {
+export default function TenantsList({ properties }: { properties: DashboardTenantProperty[] }) {
   
   // Aplatissement sécurisé
   const activeTenants = properties?.flatMap(p => 
     (p.leases || [])
-        // On filtre : bail actif ET locataire existant
         .filter(l => l.isActive && l.tenant)
-        .map(l => ({
-            id: l.tenant!.id, // Le '!' est sûr grâce au filter ci-dessus
-            leaseId: l.id,   
-            name: l.tenant!.name || "Locataire Inconnu",
-            phone: l.tenant!.phone || "Non renseigné",
+        .map((l, index) => ({
+            id: l.tenant?.id || `fallback-id-${index}`,
+            leaseId: l.id || "",   
+            name: l.tenant?.name || "Locataire Inconnu",
+            phone: l.tenant?.phone || "Non renseigné",
             property: p.title || "Bien sans nom",
             commune: p.commune || "",
             rent: l.monthlyRent || 0,
             startDate: l.startDate ? new Date(l.startDate).toLocaleDateString('fr-FR') : "N/A",
-            isVerified: l.tenant!.kycStatus === 'VERIFIED',
+            isVerified: l.tenant?.isVerified || false,
         }))
   ) || [];
 
   return (
     <div className="bg-slate-900 border border-white/5 rounded-[2rem] p-8 mt-8 shadow-xl relative overflow-hidden">
         
-        {/* EN-TÊTE */}
         <div className="flex justify-between items-center mb-6 relative z-10">
             <div>
                 <h3 className="font-black text-xl text-white flex items-center gap-2">
@@ -56,7 +63,6 @@ export default function TenantsList({ properties }: { properties: PropertyWithTe
             </Link>
         </div>
 
-        {/* TABLEAU */}
         <div className="overflow-x-auto relative z-10">
             {activeTenants.length > 0 ? (
                 <table className="w-full text-left text-sm border-collapse">
