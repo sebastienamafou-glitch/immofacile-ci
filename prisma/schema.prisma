@@ -7,8 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -56,19 +56,20 @@ model User {
   sessions Session[]
 
   // --- Relations Métier ---
-  propertiesOwned  Property[] @relation("PropertyOwner")
-  propertiesManaged Property[] @relation("PropertyAgent") 
-  leases           Lease[]    @relation("LeaseTenant")
-  leasesManaged    Lease[]    @relation("LeaseAgent")
-  missionsAccepted Mission[]  @relation("AgentMissions")
+  propertiesOwned   Property[] @relation("PropertyOwner")
+  propertiesManaged Property[] @relation("PropertyAgent")
+  leases            Lease[]    @relation("LeaseTenant")
+  leasesManaged     Lease[]    @relation("LeaseAgent")
+  missionsAccepted  Mission[]  @relation("AgentMissions")
 
-  walletBalance Float    @default(0)
+  walletBalance Float @default(0)
 
   leads               Lead[]
   incidentsReported   Incident[]           @relation("IncidentReporter")
   incidentsAssigned   Incident[]           @relation("ArtisanIncidents")
   quotesIssued        Quote[]
   transactions        Transaction[]
+  payments            Payment[]
   signatureProofs     SignatureProof[]
   investmentContracts InvestmentContract[]
   listings            Listing[]
@@ -234,9 +235,9 @@ model Property {
   views       Int          @default(0) // 
 
   ownerId String
-  owner   User   @relation("PropertyOwner", fields: [ownerId], references: [id])
+  owner   User    @relation("PropertyOwner", fields: [ownerId], references: [id])
   agentId String?
-  agent   User?  @relation("PropertyAgent", fields: [agentId], references: [id])
+  agent   User?   @relation("PropertyAgent", fields: [agentId], references: [id])
 
   leases      Lease[]
   incidents   Incident[]
@@ -252,16 +253,16 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([commune])
-  @@index([price])
-  @@index([type])
-  @@index([commune, price]) // Pour les recherches type "Villas à moins de X millions"
-
   // --- Acquisition & SEO Programmatique ---
   source      ListingSource @default(MANUAL)
   originalUrl String?       @unique // Anti-doublon strict
   isClaimed   Boolean       @default(true) // false pour les annonces aspirées
   seoSlug     String?       @unique // ex: appartement-3-pieces-cocody-angre-ref123
+
+  @@index([commune])
+  @@index([price])
+  @@index([type])
+  @@index([commune, price]) // Pour les recherches type "Villas à moins de X millions"
 }
 
 // ==========================================
@@ -274,7 +275,7 @@ model Lease {
   endDate       DateTime?
   monthlyRent   Int
   depositAmount Int
-  advanceAmount Int?  
+  advanceAmount Int?
   status        LeaseStatus @default(PENDING)
   isActive      Boolean     @default(false)
 
@@ -359,7 +360,7 @@ model InvestmentContract {
   paymentReference String? @unique
   status           String  @default("PENDING")
 
-  roi         Decimal  @default(0)
+  roi Decimal @default(0)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -410,15 +411,15 @@ model Listing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // --- Acquisition & SEO Programmatique ---
+  source      ListingSource @default(MANUAL)
+  originalUrl String?       @unique
+  isClaimed   Boolean       @default(true)
+  seoSlug     String?       @unique
+
   @@index([city])
   @@index([pricePerNight])
   @@index([city, pricePerNight]) // Pour les recherches type "Studio à Abidjan à moins de 50k"
-
-  // --- Acquisition & SEO Programmatique ---
-  source      ListingSource @default(MANUAL)
-  originalUrl String?       @unique 
-  isClaimed   Boolean       @default(true) 
-  seoSlug     String?       @unique
 }
 
 model Booking {
@@ -433,10 +434,10 @@ model Booking {
   listingId String
   listing   Listing @relation(fields: [listingId], references: [id])
 
-  payment   BookingPayment?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  guestCount Int           @default(1)
+  payment    BookingPayment?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  guestCount Int             @default(1)
 
   @@unique([listingId, startDate])
 }
@@ -484,15 +485,15 @@ model Payment {
   quoteId String? // Ajouté
   quote   Quote?  @relation(fields: [quoteId], references: [id])
 
-  userId  String?
-  user    User?   @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 }
 
 model BookingPayment {
-  id            String          @id @default(cuid())
+  id            String @id @default(cuid())
   amount        Int
   provider      String
-  transactionId String          @unique
+  transactionId String @unique
   status        String
 
   agencyCommission   Int
@@ -709,12 +710,13 @@ model Notification {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title   String
-  message String
-  isRead  Boolean @default(false)
-  type    String  @default("INFO")
-  link    String? // Lien de redirection
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  type      String   @default("INFO")
+  link      String? // Lien de redirection
   createdAt DateTime @default(now())
+
   @@index([userId])
   @@index([userId, isRead]) // Spécifique pour accélérer le "count" des non-lus
 }
@@ -724,22 +726,22 @@ model Notification {
 // ==========================================
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  action      String?   // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
-  entityId    String?  // L'ID de l'objet touché (ex: ID du Booking ou du User)
-  entityType  String?  // Ex: "BOOKING", "USER", "PAYMENT"
-  
-  userId      String?   // Celui qui a fait l'action (Admin, System ou User)
-  userEmail   String?  // Snapshot de l'email (au cas où le user est supprimé plus tard)
-  
-  metadata    Json?    // Détails techniques (ex: { oldStatus: "PENDING", newStatus: "VERIFIED" })
-  ipAddress   String?
-  userAgent   String?
-  
-  createdAt   DateTime @default(now())
+  id         String  @id @default(cuid())
+  action     String? // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
+  entityId   String? // L'ID de l'objet touché (ex: ID du Booking ou du User)
+  entityType String? // Ex: "BOOKING", "USER", "PAYMENT"
+
+  userId    String? // Celui qui a fait l'action (Admin, System ou User)
+  userEmail String? // Snapshot de l'email (au cas où le user est supprimé plus tard)
+
+  metadata  Json? // Détails techniques (ex: { oldStatus: "PENDING", newStatus: "VERIFIED" })
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
 
   // Relation optionnelle vers le User (si vous voulez faire des joins)
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([action])
