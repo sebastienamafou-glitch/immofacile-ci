@@ -10,10 +10,14 @@ export const dynamic = 'force-dynamic';
 // =========================================================
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte du nom de dossier
+  { params }: { params: { propertyId: string } } // ✅ CORRECTION : params est synchrone dans les routes API Next.js 14
 ) {
   try {
-    const { propertyId } = await params;
+    const propertyId = params.propertyId; // Extraction directe
+
+    if (!propertyId) {
+      return NextResponse.json({ error: "ID de propriété manquant" }, { status: 400 });
+    }
 
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -53,10 +57,10 @@ export async function GET(
 // =========================================================
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte
+  { params }: { params: { propertyId: string } } // ✅ CORRECTION
 ) {
   try {
-    const { propertyId } = await params;
+    const propertyId = params.propertyId;
     
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -96,10 +100,10 @@ export async function PUT(
 // =========================================================
 export async function DELETE(
   req: Request,
-  { params }: { params: Promise<{ propertyId: string }> } // ✅ Restauration stricte
+  { params }: { params: { propertyId: string } } // ✅ CORRECTION
 ) {
   try {
-    const { propertyId } = await params;
+    const propertyId = params.propertyId;
     
     const session = await auth();
     if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

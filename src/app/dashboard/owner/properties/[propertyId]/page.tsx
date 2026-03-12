@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
-import { useRouter } from "next/navigation"; 
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation"; 
 import { api } from "@/lib/api";
 import type { Property, Lease, Incident, User as PrismaUser } from "@prisma/client";
 import { 
@@ -31,13 +31,12 @@ interface PropertyWithDetails extends Property {
     agency: { name: string; email: string; phone: string } | null;
 }
 
-// ✅ CORRECTION ARCHITECTURALE : Réception des params sous forme de Promise (Standard Next.js App Router)
-export default function PropertyDetailPage({ params }: { params: Promise<{ propertyId: string }> }) {
-  // Déballage de la Promise avec React.use()
-  const resolvedParams = use(params);
-  const id = resolvedParams.propertyId;
-  
+export default function PropertyDetailPage() {
+  const params = useParams();
   const router = useRouter();
+
+  // Sécurité maximale : on capte l'ID peu importe comment le dossier a été nommé
+  const propertyId = (params?.propertyId || params?.id) as string | undefined;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
@@ -55,15 +54,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
   });
 
   useEffect(() => {
+    // Si pas d'ID au montage, on ne fait rien (attend l'hydratation Next.js)
+    if (!propertyId) return;
+
     const fetchProperty = async () => {
-        if(!id) {
-            setError("ID de propriété manquant dans l'URL.");
-            setLoading(false);
-            return;
-        }
-        
+        setLoading(true);
         try {
-            const res = await api.get(`/owner/properties/${id}`);
+            const res = await api.get(`/owner/properties/${propertyId}`);
 
             if (res.data.success) {
                 setProperty(res.data.property);
@@ -81,13 +78,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
             setError(axiosError.response?.data?.error || axiosError.message || "Le bien est introuvable.");
             toast.error("Impossible de charger le bien.");
         } finally {
-            setLoading(false);
+            // Garanti de s'exécuter, stoppant le spinner
+            setLoading(false); 
         }
     };
+    
     fetchProperty();
-  }, [id]);
+  }, [propertyId]);
 
   const handleDelete = async () => {
+    if (!propertyId) return;
     const result = await Swal.fire({
         title: 'Supprimer ce bien ?',
         text: "Cette action est irréversible. Toutes les données associées seront perdues.",
@@ -102,7 +102,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
     if (result.isConfirmed) {
         setLoading(true);
         try {
-            await api.delete(`/owner/properties/${id}`);
+            await api.delete(`/owner/properties/${propertyId}`);
             toast.success("Bien supprimé.");
             router.push('/dashboard/owner/properties');
         } catch (error: unknown) {
@@ -118,10 +118,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!propertyId) return;
     setIsUpdating(true);
 
     try {
-        const res = await api.put(`/owner/properties/${id}`, editForm);
+        const res = await api.put(`/owner/properties/${propertyId}`, editForm);
         if(res.data.success) {
             setProperty(res.data.property); 
             toast.success("Modifications enregistrées !");
@@ -144,6 +145,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
     setSelectedImageIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
   };
 
+  // États UI critiques
   if (loading) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-slate-400 gap-4">
         <Loader2 className="w-12 h-12 text-[#F59E0B] animate-spin" />
@@ -163,14 +165,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
 
   if (!property) return null;
 
-  // Calculs d'état (Corrigé avec l'opérateur de chaînage optionnel)
   const activeLease = property.leases?.find(l => l.isActive);
   const isOccupied = !!activeLease;
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-200 p-6 lg:p-10 pb-20 font-sans">
       
-      {/* HEADER NAVIGATION */}
       <div className="flex justify-between items-center mb-8">
         <Link href="/dashboard/owner/properties" className="flex items-center text-slate-400 hover:text-white gap-2 transition text-sm font-bold">
             <ArrowLeft className="w-4 h-4" /> Retour aux propriétés
@@ -192,10 +192,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         
-        {/* COLONNE GAUCHE : VISUELS & INFOS */}
         <div className="xl:col-span-2 space-y-8">
             
-            {/* GALERIE */}
             <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 relative group h-[400px]">
                 {property.images && property.images.length > 0 ? (
                     <>
@@ -216,7 +214,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
                     </div>
                 )}
                 
-                {/* STATUS BADGE */}
                 <div className="absolute top-4 left-4">
                     <Badge className={isOccupied ? "bg-blue-600" : "bg-emerald-500"}>
                         {isOccupied ? "LOUÉ" : "DISPONIBLE"}
@@ -224,7 +221,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
                 </div>
             </div>
 
-            {/* DÉTAILS */}
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8">
                 <h1 className="text-3xl font-black text-white mb-2">{property.title}</h1>
                 <p className="text-slate-400 flex items-center gap-2 mb-6">
@@ -262,7 +258,6 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
 
         </div>
 
-        {/* COLONNE DROITE : STATUT & LOCATAIRE */}
         <div className="space-y-6">
             
             <Card className="bg-slate-900 border-slate-800">
@@ -289,7 +284,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ prope
                     ) : (
                         <div className="text-center py-6">
                             <p className="text-slate-500 text-sm italic mb-4">Ce bien est actuellement vacant.</p>
-                            <Link href={`/dashboard/owner/leases/new?propertyId=${id}`}>
+                            <Link href={`/dashboard/owner/leases/new?propertyId=${propertyId}`}>
                                 <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
                                     <Plus className="w-4 h-4 mr-2" /> Ajouter un locataire
                                 </Button>
