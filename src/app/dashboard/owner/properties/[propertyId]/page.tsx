@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation"; // ✅ useParams préféré
+import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation"; 
 import { api } from "@/lib/api";
 import type { Property, Lease, Incident, User as PrismaUser } from "@prisma/client";
 import { 
@@ -25,43 +25,44 @@ import { Badge } from "@/components/ui/badge";
 // Composants Métier
 import PublishAkwabaModal from "@/components/PublishAkwabaModal";
 
-// Extension du type pour inclure les relations
 interface PropertyWithDetails extends Property {
     leases: (Lease & { tenant: PrismaUser | null })[];
     incidents: Incident[];
     agency: { name: string; email: string; phone: string } | null;
 }
 
-export default function PropertyDetailPage() {
-  const params = useParams();
-  const id = params?.propertyId as string;
+// ✅ CORRECTION ARCHITECTURALE : Réception des params sous forme de Promise (Standard Next.js App Router)
+export default function PropertyDetailPage({ params }: { params: Promise<{ propertyId: string }> }) {
+  // Déballage de la Promise avec React.use()
+  const resolvedParams = use(params);
+  const id = resolvedParams.propertyId;
+  
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
   const [property, setProperty] = useState<PropertyWithDetails | null>(null);
   
-  // Galerie Lightbox
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // Édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Formulaire d'édition (State local)
   const [editForm, setEditForm] = useState({
       title: "", description: "", price: 0, 
       bedrooms: 0, bathrooms: 0, surface: 0
   });
 
-  // 1. CHARGEMENT
   useEffect(() => {
     const fetchProperty = async () => {
-        if(!id) return;
+        if(!id) {
+            setError("ID de propriété manquant dans l'URL.");
+            setLoading(false);
+            return;
+        }
         
         try {
-            // Nettoyage : NextAuth gère l'authentification via les cookies automatiquement
             const res = await api.get(`/owner/properties/${id}`);
 
             if (res.data.success) {
@@ -76,22 +77,20 @@ export default function PropertyDetailPage() {
             }
         } catch (err: unknown) {
             console.error(err);
-            toast.error("Impossible de charger le bien.");
-            // Typage strict et activation de l'UI d'erreur pour éviter l'écran blanc
             const axiosError = err as { response?: { data?: { error?: string } }, message?: string };
             setError(axiosError.response?.data?.error || axiosError.message || "Le bien est introuvable.");
+            toast.error("Impossible de charger le bien.");
         } finally {
             setLoading(false);
         }
     };
     fetchProperty();
-  }, [id]); // router retiré des dépendances car non nécessaire
+  }, [id]);
 
-  // 2. SUPPRESSION
   const handleDelete = async () => {
     const result = await Swal.fire({
         title: 'Supprimer ce bien ?',
-        text: "Cette action est irréversible. Toutes les données associées (incidents, historique) seront perdues.",
+        text: "Cette action est irréversible. Toutes les données associées seront perdues.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -103,29 +102,25 @@ export default function PropertyDetailPage() {
     if (result.isConfirmed) {
         setLoading(true);
         try {
-            // Nettoyage des headers inutiles
             await api.delete(`/owner/properties/${id}`);
-            
             toast.success("Bien supprimé.");
             router.push('/dashboard/owner/properties');
         } catch (error: unknown) {
             console.error(error);
-            toast.error("Impossible de supprimer le bien.");
             const axiosError = error as { response?: { data?: { error?: string } } };
             setError(axiosError.response?.data?.error || "Le bien est introuvable ou vous n'y avez pas accès.");
+            toast.error("Impossible de supprimer le bien.");
         } finally {
             setLoading(false);
         }
     }
   };
 
-  // 3. MISE À JOUR
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdating(true);
 
     try {
-        // Nettoyage des headers inutiles
         const res = await api.put(`/owner/properties/${id}`, editForm);
         if(res.data.success) {
             setProperty(res.data.property); 
@@ -140,7 +135,6 @@ export default function PropertyDetailPage() {
     }
   };
 
-  // Lightbox Navigation
   const nextImage = () => {
     if(!property?.images) return;
     setSelectedImageIndex((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
@@ -150,7 +144,6 @@ export default function PropertyDetailPage() {
     setSelectedImageIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
   };
 
-  // ✅ AJOUT MANQUANT : Protection du rendu
   if (loading) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-slate-400 gap-4">
         <Loader2 className="w-12 h-12 text-[#F59E0B] animate-spin" />
@@ -170,8 +163,8 @@ export default function PropertyDetailPage() {
 
   if (!property) return null;
 
-  // Calculs d'état
-  const activeLease = property.leases.find(l => l.isActive);
+  // Calculs d'état (Corrigé avec l'opérateur de chaînage optionnel)
+  const activeLease = property.leases?.find(l => l.isActive);
   const isOccupied = !!activeLease;
 
   return (
@@ -183,7 +176,6 @@ export default function PropertyDetailPage() {
             <ArrowLeft className="w-4 h-4" /> Retour aux propriétés
         </Link>
         <div className="flex gap-3">
-             {/* BOUTON AKWABA */}
              <PublishAkwabaModal 
                 propertyId={property.id} 
                 propertyTitle={property.title} 
@@ -205,7 +197,7 @@ export default function PropertyDetailPage() {
             
             {/* GALERIE */}
             <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 relative group h-[400px]">
-                {property.images.length > 0 ? (
+                {property.images && property.images.length > 0 ? (
                     <>
                         <Image 
                             src={property.images[0]} 
@@ -242,17 +234,17 @@ export default function PropertyDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-[#0B1120] p-4 rounded-2xl border border-slate-800 text-center">
                         <DollarSign className="w-5 h-5 text-emerald-500 mx-auto mb-2" />
-                        <p className="text-xl font-bold text-white">{property.price.toLocaleString()} F</p>
+                        <p className="text-xl font-bold text-white">{property.price?.toLocaleString()} F</p>
                         <p className="text-[10px] text-slate-500 uppercase">Loyer</p>
                     </div>
                     <div className="bg-[#0B1120] p-4 rounded-2xl border border-slate-800 text-center">
                         <BedDouble className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                        <p className="text-xl font-bold text-white">{property.bedrooms}</p>
+                        <p className="text-xl font-bold text-white">{property.bedrooms || 0}</p>
                         <p className="text-[10px] text-slate-500 uppercase">Chambres</p>
                     </div>
                     <div className="bg-[#0B1120] p-4 rounded-2xl border border-slate-800 text-center">
                         <Bath className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                        <p className="text-xl font-bold text-white">{property.bathrooms}</p>
+                        <p className="text-xl font-bold text-white">{property.bathrooms || 0}</p>
                         <p className="text-[10px] text-slate-500 uppercase">Douches</p>
                     </div>
                     <div className="bg-[#0B1120] p-4 rounded-2xl border border-slate-800 text-center">
@@ -273,7 +265,6 @@ export default function PropertyDetailPage() {
         {/* COLONNE DROITE : STATUT & LOCATAIRE */}
         <div className="space-y-6">
             
-            {/* CARTE LOCATAIRE */}
             <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
@@ -284,10 +275,10 @@ export default function PropertyDetailPage() {
                     {activeLease ? (
                         <div className="text-center">
                             <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-500 font-bold text-xl border border-blue-500/20">
-                                {activeLease.tenant?.name?.charAt(0)}
+                                {activeLease.tenant?.name?.charAt(0) || 'L'}
                             </div>
-                            <p className="text-white font-bold text-lg">{activeLease.tenant?.name}</p>
-                            <p className="text-slate-500 text-sm mb-4">{activeLease.tenant?.email}</p>
+                            <p className="text-white font-bold text-lg">{activeLease.tenant?.name || 'Locataire'}</p>
+                            <p className="text-slate-500 text-sm mb-4">{activeLease.tenant?.email || 'Pas d\'email'}</p>
                             
                             <Link href={`/dashboard/owner/leases/${activeLease.id}`}>
                                 <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">
@@ -298,7 +289,6 @@ export default function PropertyDetailPage() {
                     ) : (
                         <div className="text-center py-6">
                             <p className="text-slate-500 text-sm italic mb-4">Ce bien est actuellement vacant.</p>
-                            {/* Injection du propertyId via l'URL */}
                             <Link href={`/dashboard/owner/leases/new?propertyId=${id}`}>
                                 <Button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
                                     <Plus className="w-4 h-4 mr-2" /> Ajouter un locataire
@@ -309,7 +299,6 @@ export default function PropertyDetailPage() {
                 </CardContent>
             </Card>
 
-            {/* CARTE INCIDENTS */}
             <Card className="bg-slate-900 border-slate-800">
                 <CardHeader>
                     <CardTitle className="text-white flex items-center gap-2">
@@ -317,7 +306,7 @@ export default function PropertyDetailPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {property.incidents.length > 0 ? (
+                    {property.incidents && property.incidents.length > 0 ? (
                         <div className="space-y-3">
                             {property.incidents.slice(0, 3).map(inc => (
                                 <div key={inc.id} className="flex justify-between items-center p-3 bg-[#0B1120] rounded-lg border border-slate-800">
@@ -345,7 +334,6 @@ export default function PropertyDetailPage() {
         </div>
       </div>
 
-      {/* --- MODALE ÉDITION (TIROIR) --- */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0f172a] border border-slate-800 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
@@ -386,8 +374,7 @@ export default function PropertyDetailPage() {
         </div>
       )}
 
-      {/* --- LIGHTBOX GALERIE --- */}
-      {isLightboxOpen && property.images.length > 0 && (
+      {isLightboxOpen && property.images && property.images.length > 0 && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center">
             <button onClick={() => setIsLightboxOpen(false)} className="absolute top-6 right-6 text-slate-400 hover:text-white p-2 z-50"><X className="w-8 h-8" /></button>
             
@@ -406,4 +393,3 @@ export default function PropertyDetailPage() {
     </div>
   );
 }
- 
