@@ -43,13 +43,14 @@ export async function getContractData(contractId?: string) {
       id: contract.id,
       amount: contract.amount,
       packName: contract.packName || "Pack Standard",
-      date: contract.signedAt,
+      signedAt: contract.signedAt, // ✅ CORRECTION : Alignement strict sur le DTO
       status: contract.status,
+      roi: Number(contract.roi || 0), // ✅ CORRECTION : Ajout du ROI et conversion sécurisée du Decimal
       user: {
         name: contract.user.name,
         address: contract.user.address || "Adresse non renseignée",
-        idNumber: readableId, // ✅ Le vrai numéro apparaît ici
-        idType: contract.user.kyc?.idType || "CNI"
+        idType: contract.user.kyc?.idType || "CNI", 
+        idNumber: readableId 
       }
     }
   };

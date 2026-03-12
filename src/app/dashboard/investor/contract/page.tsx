@@ -8,10 +8,17 @@ export default async function ContractHistoryPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  // Récupérer tous les contrats (Signés et En attente)
+  // Récupérer tous les contrats (Signés et En attente) avec sélection stricte
   const contracts = await prisma.investmentContract.findMany({
     where: { userId: session.user.id },
     orderBy: { signedAt: 'desc' },
+    select: {
+      id: true,
+      status: true,
+      packName: true,
+      amount: true,
+      signedAt: true
+    }
   });
 
   return (

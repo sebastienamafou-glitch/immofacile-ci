@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from "next/navigation";
+// ✅ CORRECTION 2 : Import de useParams
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -14,46 +15,40 @@ import { getContractData, sendContractOtp, signContract } from "@/actions/contra
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
-// ✅ 1. TYPAGE STRICT DES RELATIONS (Basé sur schema.prisma : User + UserKYC)
 interface ContractUser {
   name: string | null;
   address: string | null;
-  idType?: string | null; // Provient de la relation UserKYC
-  idNumber?: string | null; // Provient de la relation UserKYC
+  idType?: string | null; 
+  idNumber?: string | null; 
 }
 
-// ✅ 2. TYPAGE STRICT DU CONTRAT (Basé sur schema.prisma : InvestmentContract)
+// ✅ CORRECTIONS 1 & 3 : Ajout du ROI et alignement de 'signedAt'
 interface InvestmentContractData {
   id: string;
-  status: string; // Ex: "PENDING", "ACTIVE"
-  date: string | Date; // Correspond au signedAt ou createdAt de ton API
+  status: string; 
+  signedAt: string | Date; 
   amount: number;
+  roi: number; 
   packName: string | null;
   user: ContractUser;
 }
 
-// ✅ 3. TYPAGE DES PROPS DE LA PAGE
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function InvestorContractPage({ params }: PageProps) {
+// ✅ CORRECTION 2 : Suppression de l'interface PageProps (inutile avec useParams)
+export default function InvestorContractPage() {
   const router = useRouter();
-  const contractId = params.id;
+  const params = useParams();
+  
+  // ✅ CORRECTION 2 : Extraction sécurisée côté client
+  const contractId = params?.id as string;
 
-  // ✅ Remplacement de <any> par notre interface stricte
   const [loading, setLoading] = useState(true);
   const [contractData, setContractData] = useState<InvestmentContractData | null>(null);
   
-  // États de signature
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
-  const [signStep, setSignStep] = useState<1 | 2>(1); // Typage strict des étapes
+  const [signStep, setSignStep] = useState<1 | 2>(1); 
   const [otp, setOtp] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // CHARGEMENT DES DONNÉES
   useEffect(() => {
     const loadData = async () => {
       if (!contractId) return;
@@ -65,7 +60,6 @@ export default function InvestorContractPage({ params }: PageProps) {
           toast.error(res.error);
           router.push("/dashboard/investor"); 
         } else if (res.contract) {
-          // L'API doit renvoyer un objet respectant InvestmentContractData
           setContractData(res.contract as InvestmentContractData);
         }
       } catch (error) {
@@ -78,7 +72,6 @@ export default function InvestorContractPage({ params }: PageProps) {
     loadData();
   }, [contractId, router]);
 
-  // ENVOI OTP
   const handleSendCode = async () => {
     setIsProcessing(true);
     try {
@@ -96,7 +89,6 @@ export default function InvestorContractPage({ params }: PageProps) {
     }
   };
 
-  // VÉRIFICATION OTP
   const handleVerifyCode = async () => {
     setIsProcessing(true);
     try {
@@ -104,9 +96,9 @@ export default function InvestorContractPage({ params }: PageProps) {
       
       if (res.success) {
         setIsSignModalOpen(false);
-        // ✅ Mise à jour locale typée de manière sûre
+        // ✅ CORRECTION 3 : Utilisation de signedAt
         setContractData((prev) => 
-          prev ? { ...prev, status: 'ACTIVE', date: new Date() } : null
+          prev ? { ...prev, status: 'ACTIVE', signedAt: new Date() } : null
         );
         
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
@@ -162,7 +154,8 @@ export default function InvestorContractPage({ params }: PageProps) {
             </div>
             <div className="text-right">
                 <p className="text-xs font-bold uppercase">Réf : CTR-{contractId.slice(-8).toUpperCase()}</p>
-                <p className="text-[10px] text-gray-500 italic">Émis le : {new Date(contractData.date).toLocaleDateString()}</p>
+                {/* ✅ CORRECTION 3 : Utilisation de signedAt */}
+                <p className="text-[10px] text-gray-500 italic">Émis le : {new Date(contractData.signedAt).toLocaleDateString()}</p>
             </div>
         </div>
 
@@ -205,6 +198,10 @@ export default function InvestorContractPage({ params }: PageProps) {
                     {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(contractData.amount)} FCFA
                 </span>
             </div>
+            {/* ✅ CORRECTION 1 : Intégration légale du ROI */}
+            <p className="text-[11pt] leading-relaxed text-justify mb-4 mt-4">
+                En contrepartie, la Société s'engage à verser un retour sur investissement (ROI) fixé à <strong>{contractData.roi}%</strong>, selon les conditions définies au présent programme.
+            </p>
         </div>
 
         {/* SIGNATURES */}
@@ -270,6 +267,8 @@ export default function InvestorContractPage({ params }: PageProps) {
                         <p className="font-bold mb-1">Résumé de l'engagement :</p>
                         <ul className="list-disc pl-4 space-y-1">
                             <li>Montant : {contractData.amount.toLocaleString()} FCFA</li>
+                            {/* ✅ CORRECTION 1 : Intégration du ROI dans le résumé avant signature */}
+                            <li>Rentabilité garantie (ROI) : {contractData.roi}%</li>
                             <li>Identité : {contractData.user.name || "N/A"} {contractData.user.idNumber ? `(${contractData.user.idNumber})` : ""}</li>
                         </ul>
                     </div>

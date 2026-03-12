@@ -10,25 +10,34 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// ✅ ON IMPORTE LES TYPES PRISMA DIRECTEMENT ICI
-import type { Transaction, InvestmentContract, VerificationStatus } from "@prisma/client";
-
-// ✅ IMPORTS DES MODULES
+// ✅ ON SUPPRIME L'IMPORT PRISMA. Le Client Component ne doit rien savoir de la base de données.
 import LogoutButton from './LogoutButton';
 import DocumentsCard from './DocumentsCard';
 import NewsFeed from './NewsFeed';
 import WithdrawModal from './WithdrawModal';
 
-// ✅ ON DÉCLARE ET ON EXPORTE L'INTERFACE DIRECTEMENT ICI (Plus de bug de chemin)
+// ✅ DTO STRICT 100% FRONT-END (Miroir exact de page.tsx)
 export interface InvestorDashboardData {
   id: string;
   name: string | null;
   email: string | null;
   walletBalance: number;
   backerTier: string;
-  kycStatus: VerificationStatus | "UNINITIALIZED";
-  transactions: Transaction[];
-  investmentContracts: InvestmentContract[];
+  kycStatus: string;
+  transactions: {
+    id: string;
+    amount: number;
+    type: string;
+    status: string;
+    createdAt: Date | string; // Next.js passe les dates en string lors de la sérialisation
+  }[];
+  investmentContracts: {
+    id: string;
+    amount: number;
+    status: string;
+    roi: number;
+    signedAt: Date | string;
+  }[];
 }
 
 interface DashboardViewProps {
@@ -51,7 +60,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
     }
 
     let runningBalance = 0;
-    // On doit cloner le tableau pour le trier sans muter les props
     const sortedTx = [...user.transactions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const data = sortedTx.map(tx => {
@@ -102,7 +110,6 @@ export default function DashboardView({ user }: DashboardViewProps) {
            </p>
         </div>
 
-        {/* Correction de la structure des boutons du Header */}
         <div className="flex items-center gap-3 flex-wrap">
             
             {/* --- Notifications --- */}

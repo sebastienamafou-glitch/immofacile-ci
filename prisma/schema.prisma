@@ -359,6 +359,8 @@ model InvestmentContract {
   paymentReference String? @unique
   status           String  @default("PENDING")
 
+  roi         Decimal  @default(0)
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
 

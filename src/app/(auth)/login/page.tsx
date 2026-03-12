@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-// ✅ SEUL L'IMPORT DE SIGNIN EST NÉCESSAIRE MAINTENANT
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,12 +68,12 @@ function LoginForm() {
         // ✅ REDIRECTION DIRECTE : La page rechargera avec le nouveau cookie actif
         setTimeout(() => {
             const callbackUrl = searchParams.get('callbackUrl');
-            const investType = searchParams.get('type');
+            const investorType = searchParams.get('type');
 
-            if (investType === 'investor') {
+            if (investorType === 'investor') {
                 const packId = searchParams.get('pack');
                 const amount = searchParams.get('amount');
-                window.location.href = `/invest/dashboard?pack=${packId}&amount=${amount}&welcome=true`;
+                window.location.href = `/investor/dashboard?pack=${packId}&amount=${amount}&welcome=true`;
                 return;
             }
 

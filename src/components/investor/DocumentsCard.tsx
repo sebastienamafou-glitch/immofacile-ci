@@ -3,28 +3,30 @@
 import { FileText, Download, CheckCircle, Lock, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import type { InvestmentContract } from "@prisma/client";
-import type { InvestorDashboardData } from "./DashboardView"; // ✅ Import de notre interface propre
+// ✅ IMPORT STRICT FRONT-END (Zéro Prisma)
+import type { InvestorDashboardData } from "./DashboardView"; 
 
 interface DocumentsCardProps {
-  contracts: InvestmentContract[]; // Typage strict Prisma
-  user: InvestorDashboardData;     // Typage strict utilisateur
+  // ✅ TYPAGE DTO : On utilise le type extrait du parent
+  contracts: InvestorDashboardData['investmentContracts']; 
+  user: InvestorDashboardData;     
 }
 
 export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
   const router = useRouter();
 
-  const handleAccessDocument = (contract: InvestmentContract) => {
-    // CAS 1 : Le PDF est déjà stocké sur le Cloud
-    // @ts-ignore - Si contractUrl n'est pas encore dans ton schema Prisma, on force pour l'instant
-    if (contract.contractUrl) {
+  const handleAccessDocument = (contract: InvestorDashboardData['investmentContracts'][0]) => {
+    // ⚠️ INFO ARCHITECTURE : contractUrl n'existe pas dans le schéma InvestmentContract.
+    // Pour l'instant on bypass avec un cast TypeScript propre au lieu d'un @ts-ignore global,
+    // mais il faudra ajouter ce champ dans schema.prisma à l'avenir.
+    const url = (contract as any).contractUrl;
+
+    if (url) {
         toast.success("Téléchargement du document officiel...");
-        // @ts-ignore
-        window.open(contract.contractUrl, '_blank');
+        window.open(url, '_blank');
         return;
     }
 
-    // CAS 2 : Pas de PDF stocké -> On ouvre la Vue Numérique
     toast.info("Ouverture de la version numérique certifiée...");
     router.push(`/dashboard/investor/contract/${contract.id}`);
   };
@@ -51,8 +53,9 @@ export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
                                 <FileText className="w-5 h-5" />
                             </div>
                             <div>
+                                {/* Le packName n'est pas dans le DTO pour l'instant, on utilise une valeur par défaut */}
                                 <p className="text-sm font-bold text-white group-hover:text-[#F59E0B] transition">
-                                    {contract.packName ? `Contrat_${contract.packName}.pdf` : "Contrat_Investissement.pdf"}
+                                    Contrat_Investissement.pdf
                                 </p>
                                 <p className="text-[10px] text-slate-500">
                                     {contract.status === 'ACTIVE' 
@@ -63,8 +66,7 @@ export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
                         </div>
                         
                         <div className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center group-hover:bg-[#F59E0B] group-hover:text-black transition">
-                            {/* @ts-ignore */}
-                            {contract.contractUrl ? (
+                            {(contract as any).contractUrl ? (
                                 <Download className="w-4 h-4 text-slate-500 group-hover:text-black" />
                             ) : (
                                 <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-black" />
@@ -78,7 +80,6 @@ export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
                 </div>
             )}
             
-            {/* Relevé Fiscal (Placeholder) */}
              <div className="flex items-center justify-between p-4 bg-white/[0.03] rounded-2xl border border-white/5 opacity-50 cursor-not-allowed">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
