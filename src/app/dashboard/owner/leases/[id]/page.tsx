@@ -17,7 +17,8 @@ import { Button } from "@/components/ui/button";
 export const dynamic = 'force-dynamic';
 
 export default async function OwnerLeasePage({ params }: { params: { id: string } }) {
-  const { id } = await params;
+  // ✅ CORRECTION : Accès synchrone et direct à params.id
+  const id = params.id;
 
   const session = await auth();
   if (!session?.user?.id) return redirect("/auth/login");
@@ -120,7 +121,6 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-4 bg-white">
                              <div className="flex flex-col items-center">
-                                {/* ✅ CORRECTION : ClientQRCode */}
                                 <ClientQRCode 
                                     value={`https://immofacile.ci/compliance/${lease.id}`} 
                                     size={120} 
@@ -159,27 +159,6 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         </div>
                     </div>
 
-                    {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION === */}
-                    {lease.status === "IN_NOTICE" && (
-                        <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
-                            <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-                                <div>
-                                    <h3 className="text-slate-900 font-bold text-lg">Bail terminé</h3>
-                                    <p className="text-slate-500 text-sm mt-1">
-                                        Ce contrat est clôturé. Vous pouvez maintenant procéder à la restitution de la caution sur le portefeuille du locataire.
-                                     </p>
-                                 </div>
-                    
-                                 <RefundDepositModal 
-                                     leaseId={lease.id}
-                                     tenantName={tenantName}
-                                     depositAmount={lease.depositAmount}
-                                     ownerId={session.user.id}
-                                 />
-                             </div>
-                         </div>
-                    )}
-                    
                     {/* Action form pour valider le départ */}
                     <form action={async () => {
                         "use server";
@@ -195,7 +174,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
             </div>
         )}
 
-        {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION (DÉSIMBRIQUÉ) === */}
+        {/* === ACTION DE FIN DE BAIL : RESTITUTION CAUTION === */}
         {lease.status === "TERMINATED" && (
             <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
                 <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
@@ -216,9 +195,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
             </div>
         )}
 
-        {/* --- DOCUMENT OFFICIEL (OPTIMISÉ 1 PAGE - FORCE BRUTE) --- */}
-        
-        {/* 🪄 ASTUCE CSS : Force le navigateur à ignorer ses marges par défaut et autorise le dézoom */}
+        {/* --- DOCUMENT OFFICIEL --- */}
         <style dangerouslySetInnerHTML={{__html: `
             @media print {
                 @page { margin: 5mm; size: A4 portrait; }
@@ -228,7 +205,7 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                     -webkit-text-size-adjust: none !important; 
                 }
                 #printable-contract { 
-                    zoom: 0.88; /* Dézoom de 12% pour garantir que tout rentre */
+                    zoom: 0.88; 
                 } 
             }
         `}} />
@@ -308,7 +285,6 @@ export default async function OwnerLeasePage({ params }: { params: { id: string 
                         </p>
                         <p>
                             Dépôt de garantie (Caution) : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>.<br/>
-                            {/* Affichage conditionnel sécurisé de l'avance */}
                             Avance sur loyer : <strong>{(lease.advanceAmount || 0).toLocaleString()} FCFA</strong>.<br/>
                             Le dépôt de garantie ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restitué au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.
                         </p>

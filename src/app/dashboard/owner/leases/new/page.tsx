@@ -1,4 +1,3 @@
-// app/dashboard/owner/leases/new/page.tsx
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
@@ -11,9 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Property } from "@prisma/client";
 
 import { TenantCredentialsModal } from "@/components/TenantCredentialsModal";
+
+// ✅ DTO STRICT : Aligné sur la réponse de /api/owner/properties
+export interface AvailableProperty {
+    id: string;
+    title: string;
+    price: number;
+    isAvailable: boolean;
+}
 
 // --- COMPOSANT FORMULAIRE ISOLÉ POUR useSearchParams ---
 function NewLeaseForm() {
@@ -22,7 +28,7 @@ function NewLeaseForm() {
   const preselectedPropertyId = searchParams.get("propertyId");
 
   const [loading, setLoading] = useState(false);
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<AvailableProperty[]>([]);
   
   // Form States
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
@@ -45,13 +51,13 @@ function NewLeaseForm() {
         try {
             const res = await api.get('/owner/properties');
             if (res.data.success) {
-                // Typage strict et filtrage
-                const availableProps = res.data.properties.filter((p: Property & { isAvailable?: boolean }) => p.isAvailable);
+                // Filtrage sécurisé basé sur le DTO
+                const availableProps = res.data.properties.filter((p: AvailableProperty) => p.isAvailable);
                 setProperties(availableProps);
 
                 // Auto-sélection si on vient d'une page détail
                 if (preselectedPropertyId) {
-                    const matchedProperty = availableProps.find((p: Property) => p.id === preselectedPropertyId);
+                    const matchedProperty = availableProps.find((p: AvailableProperty) => p.id === preselectedPropertyId);
                     if (matchedProperty) {
                         setSelectedPropertyId(matchedProperty.id);
                         setRent(matchedProperty.price.toString());
@@ -94,8 +100,8 @@ function NewLeaseForm() {
             tenantName,
             tenantPhone,
             rent: numRent,
-            depositAmount: totalDeposit, // Alignement strict avec le schéma (si mis à jour dans l'API)
-            advanceAmount: totalAdvance, // Nécessite la mise à jour du schéma (voir étape 1)
+            depositAmount: totalDeposit,
+            advanceAmount: totalAdvance,
             startDate
         });
 
@@ -113,7 +119,7 @@ function NewLeaseForm() {
                 router.push(`/dashboard/owner/leases/${res.data.lease.id}`);
             }
         }
-    } catch (error: unknown) { // Typage strict
+    } catch (error: unknown) {
         const axiosError = error as { response?: { data?: { error?: string } } };
         toast.error(axiosError.response?.data?.error || "Erreur lors de la création du bail.");
     } finally {
@@ -159,23 +165,27 @@ function NewLeaseForm() {
                             </h3>
                             <div className="space-y-2">
                                 <Label className="text-slate-300 text-xs uppercase font-bold">Sélectionner une propriété disponible <span className="text-red-500">*</span></Label>
-                                <select 
-                                    required
-                                    className="w-full bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none appearance-none font-medium"
-                                    value={selectedPropertyId}
-                                    onChange={(e) => {
-                                        setSelectedPropertyId(e.target.value);
-                                        const p = properties.find(prop => prop.id === e.target.value);
-                                        if(p) setRent(p.price.toString());
-                                    }}
-                                >
-                                    <option value="">-- Choisir parmi vos biens vacants --</option>
-                                    {properties.map(p => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.title} — {p.price.toLocaleString()} FCFA
-                                        </option>
-                                    ))}
-                                </select>
+                                {/* ✅ CORRECTION : Les balises <option> sont désormais à l'intérieur du <select> */}
+                                <div className="relative">
+                                    <select 
+                                        required
+                                        className="w-full bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none appearance-none font-medium"
+                                        value={selectedPropertyId}
+                                        onChange={(e) => {
+                                            setSelectedPropertyId(e.target.value);
+                                            const p = properties.find(prop => prop.id === e.target.value);
+                                            if(p) setRent(p.price.toString());
+                                        }}
+                                    >
+                                        <option value="">-- Choisir parmi vos biens vacants --</option>
+                                        {properties.map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.title} — {p.price.toLocaleString()} FCFA
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-4 top-3.5 text-slate-500 pointer-events-none">▼</div>
+                                </div>
                             </div>
                         </div>
 
@@ -253,27 +263,33 @@ function NewLeaseForm() {
                             <div className="grid md:grid-cols-2 gap-6 bg-[#0B1120] p-4 rounded-lg border border-slate-800">
                                 <div className="space-y-2">
                                     <Label className="text-slate-300 text-xs uppercase font-bold">Dépôt de garantie (Mois)</Label>
-                                    <select 
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none"
-                                        value={depositMonths}
-                                        onChange={(e) => setDepositMonths(e.target.value)}
-                                    >
-                                        <option value="0">Aucune caution (0 mois)</option>
-                                        <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
-                                        <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
-                                    </select>
+                                    <div className="relative">
+                                        <select 
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none appearance-none"
+                                            value={depositMonths}
+                                            onChange={(e) => setDepositMonths(e.target.value)}
+                                        >
+                                            <option value="0">Aucune caution (0 mois)</option>
+                                            <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
+                                            <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
+                                        </select>
+                                        <div className="absolute right-4 top-4 text-slate-500 pointer-events-none">▼</div>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label className="text-slate-300 text-xs uppercase font-bold">Avance sur loyer (Mois)</Label>
-                                    <select 
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none"
-                                        value={advanceMonths}
-                                        onChange={(e) => setAdvanceMonths(e.target.value)}
-                                    >
-                                        <option value="0">Aucune avance (0 mois)</option>
-                                        <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
-                                        <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
-                                    </select>
+                                    <div className="relative">
+                                        <select 
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-1 focus:ring-[#F59E0B] outline-none appearance-none"
+                                            value={advanceMonths}
+                                            onChange={(e) => setAdvanceMonths(e.target.value)}
+                                        >
+                                            <option value="0">Aucune avance (0 mois)</option>
+                                            <option value="1">1 mois ({currentRent.toLocaleString()} F)</option>
+                                            <option value="2">2 mois ({(currentRent * 2).toLocaleString()} F) - Max légal</option>
+                                        </select>
+                                        <div className="absolute right-4 top-4 text-slate-500 pointer-events-none">▼</div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -289,7 +305,7 @@ function NewLeaseForm() {
                         <Button 
                             type="submit" 
                             disabled={loading || properties.length === 0}
-                            className="w-full bg-[#F59E0B] hover:bg-yellow-500 text-black font-black uppercase tracking-wide h-14 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95"
+                            className="w-full bg-[#F59E0B] hover:bg-yellow-500 text-black font-black uppercase tracking-wide h-14 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50"
                         >
                             {loading ? <Loader2 className="animate-spin" /> : "Générer le contrat de bail"}
                         </Button>
@@ -313,7 +329,7 @@ function NewLeaseForm() {
 export default function NewLeasePage() {
     return (
         <div className="min-h-screen bg-[#0B1120] text-white p-6 lg:p-10 font-sans flex flex-col items-center justify-center">
-            <Suspense fallback={<div className="text-white">Chargement du formulaire...</div>}>
+            <Suspense fallback={<div className="flex flex-col items-center gap-4 mt-20 text-slate-500"><Loader2 className="animate-spin w-8 h-8 text-[#F59E0B]"/>Chargement du formulaire...</div>}>
                 <NewLeaseForm />
             </Suspense>
         </div>

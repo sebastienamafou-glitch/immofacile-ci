@@ -3,27 +3,85 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { Loader2, ArrowLeft, Printer, ShieldAlert, Gavel, MailWarning } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2, ArrowLeft, Printer, ShieldAlert, MailWarning } from "lucide-react";
+import { toast } from "sonner";
+
+// ✅ DTO STRICT : Définit exactement ce dont le PDF a besoin
+interface FormalNoticeData {
+    id: string;
+    startDate: string | Date;
+    monthlyRent: number;
+    property: {
+        title: string;
+        address: string;
+        commune: string;
+    };
+    tenant: {
+        name: string;
+    };
+    // Les infos du propriétaire ne sont pas toujours renvoyées par l'API de base du bail.
+    // Nous les rendons optionnelles pour éviter les crashs.
+    ownerInfo?: {
+        name?: string;
+        address?: string;
+        phone?: string;
+    };
+}
 
 export default function FormalNoticePage() {
-  const { id } = useParams();
+  const params = useParams();
   const router = useRouter();
+  
+  // ✅ SÉCURITÉ : Extraction sécurisée de l'ID (fallback sur id ou leaseId selon le nom de votre dossier)
+  const id = (params?.id || params?.leaseId) as string | undefined;
+
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<FormalNoticeData | null>(null);
 
   useEffect(() => {
-    const fetchLease = async () => {
+    if (!id) return; // Stoppe l'exécution si l'ID n'est pas prêt
+
+    const fetchLeaseData = async () => {
       try {
         const res = await api.get(`/owner/leases/${id}`);
-        if (res.data.success) setData(res.data.lease);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+        if (res.data.success) {
+            // Mapping de sécurité si l'API ne renvoie pas la structure exacte attendue
+            const lease = res.data.lease;
+            setData({
+                id: lease.id,
+                startDate: lease.startDate,
+                monthlyRent: lease.monthlyRent,
+                property: {
+                    title: lease.property?.title || "Adresse Inconnue",
+                    address: lease.property?.address || "",
+                    commune: lease.property?.commune || "",
+                },
+                tenant: {
+                    name: lease.tenant?.name || "Locataire Inconnu"
+                },
+                ownerInfo: {
+                    // Si l'API renvoie property.owner, on l'utilise, sinon on laisse vide
+                    name: lease.property?.owner?.name || "Le Propriétaire",
+                    address: lease.property?.owner?.address || "Adresse non renseignée",
+                    phone: lease.property?.owner?.phone || "Non renseigné"
+                }
+            });
+        } else {
+            throw new Error(res.data.error || "Bail introuvable");
+        }
+      } catch (e: any) { 
+        console.error(e); 
+        toast.error("Impossible de générer le document. Données incomplètes.");
+        router.push('/dashboard/owner/tenants');
+      } finally { 
+        setLoading(false); 
+      }
     };
-    fetchLease();
-  }, [id]);
+    
+    fetchLeaseData();
+  }, [id, router]);
 
-  if (loading) return (
+  if (loading || !data) return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-white gap-4">
         <Loader2 className="animate-spin w-10 h-10 text-red-500"/> 
         <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Rédaction de l'acte juridique...</p>
@@ -56,9 +114,10 @@ export default function FormalNoticePage() {
           <div className="space-y-1">
             <h2 className="font-black text-xl uppercase tracking-tighter">Babimmo</h2>
             <div className="text-[12px] text-slate-600 leading-tight">
-                <p className="font-bold text-black uppercase">{data.property.owner.name}</p>
-                <p>{data.property.owner.address || "Abidjan, Côte d'Ivoire"}</p>
-                <p>Tél : {data.property.owner.phone}</p>
+                {/* Sécurisation de l'affichage avec l'opérateur optionnel */}
+                <p className="font-bold text-black uppercase">{data.ownerInfo?.name}</p>
+                <p>{data.ownerInfo?.address}</p>
+                <p>Tél : {data.ownerInfo?.phone}</p>
             </div>
           </div>
           
@@ -74,7 +133,7 @@ export default function FormalNoticePage() {
           <div className="w-1/2 text-sm bg-slate-50 p-6 border-l-4 border-black">
             <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Destinataire :</p>
             <p className="font-black text-lg uppercase">{data.tenant.name}</p>
-            <p className="mt-1">{data.property.title}</p>
+            <p className="mt-1 font-bold">{data.property.title}</p>
             <p className="italic text-slate-600">{data.property.address}, {data.property.commune}</p>
           </div>
         </div>
@@ -121,7 +180,7 @@ export default function FormalNoticePage() {
           </div>
 
           <p>
-            À défaut de réception du paiement intégral dans ce délai, nous serons au regret d'engager sans préavis une <strong>procédure de résiliation de bail et d'expulsion</strong> auprès du Tribunal de Grande Instance, conformément aux dispositions légales en vigueur en République de Côte d'Ivoire.
+            À défaut de réception du paiement intégral dans ce délai, nous serons au regret d'engager sans préavis une <strong>procédure de résiliation de bail et d'expulsion</strong> auprès de la juridiction compétente, conformément aux dispositions de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.
           </p>
 
           <p>Nous vous rappelons que les frais de procédure qui en découleraient seront intégralement à votre charge.</p>
@@ -132,12 +191,12 @@ export default function FormalNoticePage() {
         {/* --- 5. SIGNATURES --- */}
         <div className="mt-20 flex justify-between items-start">
             <div className="text-[10px] text-slate-400">
-                Document certifié par la plateforme Babimmo<br/>
-                ID Transaction : {data.id.substring(0, 12)}<br/>
+                Document généré par la plateforme Babimmo<br/>
+                ID Réf : {data.id.substring(0, 12)}<br/>
                 Horodatage : {new Date().toLocaleTimeString()}
             </div>
             <div className="flex flex-col items-center gap-16">
-                <p className="font-bold text-xs uppercase underline">Signature du Bailleur / Mandataire</p>
+                <p className="font-bold text-xs uppercase underline">Le Bailleur / Mandataire</p>
                 {/* Emplacement cachet fictif */}
                 <div className="w-32 h-32 border-2 border-blue-700/20 rounded-full flex items-center justify-center text-blue-700/20 -rotate-12 font-black text-[10px] uppercase border-dashed">
                     Cachet Babimmo

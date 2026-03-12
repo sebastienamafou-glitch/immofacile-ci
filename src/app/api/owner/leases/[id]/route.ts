@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+
 export const dynamic = 'force-dynamic';
 
 // ========================================================
@@ -9,10 +9,10 @@ export const dynamic = 'force-dynamic';
 // ========================================================
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } } // ✅ CORRECTION : params synchrone
 ) {
   try {
-    const { id } = await params;
+    const id = params.id; // Extraction directe
 
     // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
     const session = await auth();
@@ -52,14 +52,14 @@ export async function GET(
 // ========================================================
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } } // ✅ CORRECTION : params synchrone
 ) {
   try {
-    const { id } = await params;
+    const id = params.id; // Extraction directe
+    
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = session.user.id;
 
     const body = await request.json();
 
