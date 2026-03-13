@@ -282,8 +282,8 @@ async function processInvestmentPayment(
         data: { status: "SUCCESS" } 
     });
 
-    // ✅ CORRECTION TS : Utilisation des Enums Role existants (GUEST au lieu de USER)
-    let newRole = Role.GUEST;
+    // ✅ CORRECTION TS : On force TS à comprendre que cette variable peut prendre N'IMPORTE QUELLE valeur de l'Enum Role
+    let newRole: Role = Role.GUEST; 
     let isPremium = false;
     
     if (amountPaid >= 500000) {

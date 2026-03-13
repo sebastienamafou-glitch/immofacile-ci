@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+export async function GET() { // ✅ Suppression du paramètre 'request' non utilisé
   try {
     // 1. SÉCURITÉ BLINDÉE (Auth v5)
     const session = await auth();
@@ -29,11 +27,12 @@ export async function GET(request: Request) {
     const stats = await prisma.payment.aggregate({
         where: { status: "SUCCESS" },
         _sum: {
-            amount: true,          // Volume d'affaires (GMV)
-            amountPlatform: true,  // Revenue Net
-            amountOwner: true,     // Reversé aux clients
+            amount: true,          
+            amountPlatform: true,  
+            amountOwner: true,     
         },
-        _count: { id: true }
+        // ✅ CORRECTION : Utilisation de _all pour le count
+        _count: { _all: true } 
     });
 
     // 3. RÉCUPERATION DES DEUX FLUX
@@ -43,7 +42,14 @@ export async function GET(request: Request) {
             where: { status: "SUCCESS" },
             orderBy: { date: 'desc' }, 
             take: 50, 
-            include: {
+            // ✅ CORRECTION : Remplacement de l'include illégal par un select en cascade
+            select: {
+                id: true,
+                amount: true,
+                amountPlatform: true,
+                status: true,
+                date: true,
+                type: true,
                 lease: {
                     select: {
                         property: { select: { title: true } },
@@ -56,8 +62,15 @@ export async function GET(request: Request) {
         prisma.transaction.findMany({
             orderBy: { createdAt: 'desc' },
             take: 50,
-            include: {
-                user: { select: { name: true, email: true, role: true } }
+            select: { 
+                id: true,
+                amount: true,
+                status: true,
+                createdAt: true,
+                reason: true,
+                type: true,
+                // ✅ CORRECTION : Utilisation de 'role' au lieu de 'type' qui n'existe pas dans le schéma
+                user: { select: { name: true, role: true } } 
             }
         })
     ]);
@@ -70,14 +83,13 @@ export async function GET(request: Request) {
         status: p.status, 
         date: p.date,
         type: p.type,
-        // ✅ SÉCURITÉ NULL CHECK (?. pour éviter le crash)
         details: p.lease 
             ? `${p.lease.tenant?.name || 'Locataire'} - ${p.lease.property?.title || 'Bien'}`
             : "Paiement direct",
         category: "AGENCY"
     }));
 
-    const historyFromTransactions = rawTransactions.map(t => ({
+    const historyFromTransactions = rawTransactions.map((t: any) => ({
         id: t.id,
         amount: t.amount,
         commission: 0,
@@ -90,7 +102,7 @@ export async function GET(request: Request) {
         category: "CORPORATE"
     }));
 
-    // Fusion et Tri propre (Typage Date)
+    // Fusion et Tri propre
     const mergedHistory = [...historyFromPayments, ...historyFromTransactions]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 100); 
@@ -100,7 +112,7 @@ export async function GET(request: Request) {
       stats: {
           volume: stats._sum.amount || 0,
           totalRevenue: stats._sum.amountPlatform || 0, 
-          transactionCount: stats._count.id || 0
+          transactionCount: stats._count._all || 0
       },
       history: mergedHistory
     });
