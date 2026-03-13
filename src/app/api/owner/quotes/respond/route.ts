@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
+// ✅ IMPORT DES ENUMS AJOUTÉ
+import { TransactionType, BalanceType, QuoteStatus, IncidentStatus } from "@prisma/client";
 
 const FINANCE_RULES = {
   PLATFORM_FEE_RATE: 0.05, 
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    if (quote.status !== 'PENDING') {
+    if (quote.status !== QuoteStatus.PENDING) { // ✅ ENUM APPLIQUÉ
         return NextResponse.json({ error: "Ce devis n'est plus en attente" }, { status: 400 });
     }
 
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
         await prisma.$transaction([
             prisma.quote.update({
                 where: { id: quoteId },
-                data: { status: 'REJECTED' }
+                data: { status: QuoteStatus.REJECTED } // ✅ ENUM APPLIQUÉ
             }),
             prisma.notification.create({
                 data: {
@@ -77,7 +79,7 @@ export async function POST(req: Request) {
         const amountToPay = quote.totalAmount;
         const currentBalance = userFinance?.walletBalance || 0;
 
-        if (currentBalance < amountToPay) {
+        if (currentBalance < amountToPay || !userFinance) {
             return NextResponse.json({ 
                 error: "Solde insuffisant", 
                 code: "INSUFFICIENT_FUNDS",
@@ -94,54 +96,71 @@ export async function POST(req: Request) {
 
         const result = await prisma.$transaction(async (tx) => {
             
-            // 1. Débit Propriétaire
+            // 1. Débit Propriétaire (Avec verrouillage optimiste & KYC)
             const updatedFinance = await tx.userFinance.update({
-                where: { userId: userId }, // Retrait de la version optimiste si le champ n'existe pas dans le schéma actuel
-                data: { walletBalance: { decrement: amountToPay } }
+                where: { 
+                    userId: userId,
+                    version: userFinance.version 
+                },
+                data: { 
+                    walletBalance: { decrement: amountToPay },
+                    monthlyVolume: { increment: amountToPay }, // ✅ CONFORMITÉ KYC
+                    version: { increment: 1 }
+                }
             });
 
-            // 2. Crédit Artisan
+            // 2. Crédit Artisan (Avec KYC)
             await tx.userFinance.upsert({
                 where: { userId: quote.artisanId },
-                create: { userId: quote.artisanId, walletBalance: artisanNet },
-                update: { walletBalance: { increment: artisanNet } }
+                create: { 
+                    userId: quote.artisanId, 
+                    walletBalance: artisanNet,
+                    monthlyVolume: artisanNet // ✅ CONFORMITÉ KYC
+                },
+                update: { 
+                    walletBalance: { increment: artisanNet },
+                    monthlyVolume: { increment: artisanNet } // ✅ CONFORMITÉ KYC
+                }
             });
 
             // 3. Traçabilité (Table Transaction)
             const paymentRef = `DEV-${quote.number}-${Date.now()}`;
+            
             await tx.transaction.create({
                 data: {
                     userId: userId,
-                    type: 'DEBIT',
+                    type: TransactionType.DEBIT, 
                     amount: amountToPay,
-                    balanceType: 'WALLET',
+                    balanceType: BalanceType.WALLET, 
                     reason: `Paiement du devis ${quote.number}`,
                     status: 'SUCCESS',
-                    reference: paymentRef
+                    reference: paymentRef,
+                    quoteId: quote.id
                 }
             });
 
             await tx.transaction.create({
                 data: {
                     userId: quote.artisanId,
-                    type: 'CREDIT',
+                    type: TransactionType.CREDIT, 
                     amount: artisanNet,
-                    balanceType: 'WALLET',
+                    balanceType: BalanceType.WALLET, 
                     reason: `Règlement du devis ${quote.number}`,
                     status: 'SUCCESS',
-                    reference: paymentRef + "-C"
+                    reference: paymentRef + "-C",
+                    quoteId: quote.id
                 }
             });
 
             // 4. Mise à jour des statuts
             await tx.quote.update({
                 where: { id: quoteId },
-                data: { status: 'ACCEPTED' }
+                data: { status: QuoteStatus.ACCEPTED } // ✅ ENUM APPLIQUÉ
             });
 
             await tx.incident.update({
                 where: { id: quote.incidentId },
-                data: { status: 'IN_PROGRESS' }
+                data: { status: IncidentStatus.IN_PROGRESS } // ✅ ENUM APPLIQUÉ
             });
 
             // 5. Notifications

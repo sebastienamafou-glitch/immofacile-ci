@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
+import { Prisma, TransactionType, BalanceType } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
             throw new Error("INSUFFICIENT_FUNDS");
         }
 
-        // B. Débit du compte (Optimistic Locking)
+        // B. Débit du compte (Optimistic Locking + KYC Volume)
         await tx.userFinance.update({
             where: { 
                 userId: userId,
@@ -50,16 +50,17 @@ export async function POST(req: Request) {
             },
             data: { 
                 walletBalance: { decrement: amount },
+                monthlyVolume: { increment: amount }, // ✅ CONFORMITÉ KYC (Ajout du volume de transaction)
                 version: { increment: 1 }
             }
         });
 
-        // C. Création de la trace de transaction
+        // C. Création de la trace de transaction avec ENUMS
         await tx.transaction.create({
             data: {
                 amount: amount,
-                type: "DEBIT",
-                balanceType: "WALLET",
+                type: TransactionType.DEBIT,
+                balanceType: BalanceType.WALLET,
                 reason: `Retrait vers ${paymentDetails}`,
                 status: "PENDING",
                 userId: userId,
