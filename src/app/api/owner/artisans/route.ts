@@ -1,33 +1,46 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
+
+// 1. SCHÉMA DE VALIDATION (POST)
+const createArtisanSchema = z.object({
+  name: z.string().min(2, "Le nom est requis"),
+  jobTitle: z.string().min(2, "Le métier est requis").transform(val => val.toUpperCase()),
+  phone: z.string().min(8, "Numéro de téléphone invalide"),
+  address: z.string().optional().default("Abidjan"),
+  email: z.string().email("Email invalide").optional().or(z.literal(''))
+});
 
 // ==========================================
 // 1. GET : LISTER LES ARTISANS
 // ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (Via ID)
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. RÉCUPÉRATION
-    // Note: Ici on récupère tous les utilisateurs "ARTISAN" de la plateforme.
-    // Dans une version future "Private Network", on filtrera sur une table de relation OwnerArtisan.
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    
+    // Seuls les propriétaires, agences et admins peuvent lister le catalogue d'artisans
+    if (user?.role !== Role.OWNER && user?.role !== Role.AGENCY_ADMIN && user?.role !== Role.SUPER_ADMIN) {
+        return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+
     const artisans = await prisma.user.findMany({
       where: { 
-        role: 'ARTISAN',
+        role: Role.ARTISAN,
         isActive: true
       },
       select: {
         id: true,
         name: true,
-        jobTitle: true,
+        jobTitle: true, // Cohérence avec le frontend garantie
         phone: true,
         address: true,
         email: true,
@@ -35,82 +48,78 @@ const userId = session.user.id;
       orderBy: { name: 'asc' }
     });
 
-    // Mapping propre
-    const formattedArtisans = artisans.map(a => ({
-        id: a.id,
-        name: a.name || "Artisan sans nom",
-        job: a.jobTitle || "AUTRE",
-        phone: a.phone || "",
-        location: a.address || "Abidjan",
-        email: a.email,
-        rating: 5.0 // Placeholder pour future feature de notation
-    }));
-
-    return NextResponse.json({ success: true, artisans: formattedArtisans });
+    return NextResponse.json({ success: true, artisans });
 
   } catch (error) {
-    console.error("API Artisans Error:", error);
+    console.error("[API_ARTISANS_GET]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
 
 // ==========================================
-// 2. POST : CRÉER UN NOUVEL ARTISAN
+// 2. POST : AJOUTER UN ARTISAN (Réseau privé)
 // ==========================================
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    
+    if (user?.role !== Role.OWNER && user?.role !== Role.AGENCY_ADMIN && user?.role !== Role.SUPER_ADMIN) {
+        return NextResponse.json({ error: "Seul un gestionnaire peut ajouter un artisan." }, { status: 403 });
+    }
+
     const body = await request.json();
-    const { name, job, phone, location, email } = body;
+    const validation = createArtisanSchema.safeParse(body);
 
-    // Validation des champs requis
-    if (!name || !job || !phone) {
-        return NextResponse.json({ error: "Le nom, le métier et le téléphone sont obligatoires." }, { status: 400 });
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
     }
 
-    // 2. VÉRIFICATION DOUBLON (Conflit)
+    const { name, jobTitle, phone, address, email } = validation.data;
+
+    // Vérification stricte des doublons
     const existing = await prisma.user.findFirst({
-        where: { OR: [{ phone }, { email: email || undefined }] }
-    });
-
-    if (existing) {
-        return NextResponse.json({ error: "Ce numéro de téléphone ou cet email est déjà enregistré." }, { status: 409 });
-    }
-
-    // 3. CRÉATION
-    const newArtisan = await prisma.user.create({
-        data: {
-            name,
-            jobTitle: job.toUpperCase(), // Standardisation
-            phone,              
-            address: location || "Abidjan", 
-            email: email || null,
-            role: 'ARTISAN',
-            isAvailable: true,
-            isActive: true,
-            // On pourrait ajouter ici : createdBy: userId (si le schéma le supporte)
+        where: { 
+            OR: [
+                { phone }, 
+                ...(email ? [{ email }] : [])
+            ] 
         }
     });
 
-    return NextResponse.json({ 
-        success: true, 
-        artisan: {
-            id: newArtisan.id,
-            name: newArtisan.name,
-            job: newArtisan.jobTitle,
-            phone: newArtisan.phone,
-            location: newArtisan.address,
-            rating: 5.0
-        } 
+    if (existing) {
+        return NextResponse.json({ error: "Ce numéro de téléphone ou cet email est déjà utilisé." }, { status: 409 });
+    }
+
+    // Création
+    const newArtisan = await prisma.user.create({
+        data: {
+            name,
+            jobTitle, 
+            phone,              
+            address, 
+            email: email || null,
+            role: Role.ARTISAN,
+            isAvailable: true,
+            isActive: true,
+        },
+        select: {
+            id: true,
+            name: true,
+            jobTitle: true,
+            phone: true,
+            address: true
+        }
     });
 
+    return NextResponse.json({ success: true, artisan: newArtisan });
+
   } catch (error) {
-    console.error("Erreur création artisan:", error);
+    console.error("[API_ARTISANS_POST]", error);
     return NextResponse.json({ error: "Erreur serveur lors de la création." }, { status: 500 });
   }
 }

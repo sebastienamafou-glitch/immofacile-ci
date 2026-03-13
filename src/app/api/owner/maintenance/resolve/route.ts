@@ -1,50 +1,60 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client"; // ✅ Import de l'Enum généré
+import { Role, IncidentStatus } from "@prisma/client";
+import { z } from "zod";
+
+// 1. SCHÉMA DE VALIDATION (Plus d'email dans le payload)
+const resolveSchema = z.object({
+  incidentId: z.string().min(1, "L'ID de l'incident est requis"),
+  finalCost: z.number().int().nonnegative("Le coût final ne peut pas être négatif").optional()
+});
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { incidentId, userEmail, finalCost } = body;
+    // 2. IDENTITÉ SERVEUR (Inviolable)
+    const session = await auth();
+    const userId = session?.user?.id;
 
-    // 1. Validation des données entrantes
-    if (!incidentId || !userEmail) {
-      return NextResponse.json({ error: "Données manquantes (ID ou Email)" }, { status: 400 });
-    }
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. Vérifier l'utilisateur
-    const user = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!user) {
-      return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 401 });
-    }
-
-    // 3. Récupérer l'incident ET la propriété liée
-    const incident = await prisma.incident.findUnique({
-      where: { id: incidentId },
-      include: { property: true } 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
     });
 
-    if (!incident) {
-      return NextResponse.json({ error: "Incident introuvable" }, { status: 404 });
+    if (!user) return NextResponse.json({ error: "Utilisateur inconnu" }, { status: 401 });
+
+    const body = await req.json();
+    const validation = resolveSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
     }
 
-    // 4. SÉCURITÉ : Vérifier que l'utilisateur est bien le PROPRIÉTAIRE ou ADMIN
-    const isOwner = incident.property.ownerId === user.id;
-    // ✅ UTILISATION DE L'ENUM SÉCURISÉ
+    const { incidentId, finalCost } = validation.data;
+
+    // 3. VÉRIFICATION DE LA PROPRIÉTÉ
+    const incident = await prisma.incident.findUnique({
+      where: { id: incidentId },
+      include: { property: { select: { ownerId: true } } } 
+    });
+
+    if (!incident) return NextResponse.json({ error: "Incident introuvable" }, { status: 404 });
+
+    const isOwner = incident.property.ownerId === userId;
     const isAdmin = user.role === Role.SUPER_ADMIN || user.role === Role.ADMIN;
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: "Action non autorisée. Vous n'êtes pas le propriétaire de ce bien." }, { status: 403 });
     }
 
-    // 5. Mise à jour de l'incident
+    // 4. RÉSOLUTION SÉCURISÉE
     const updatedIncident = await prisma.incident.update({
       where: { id: incidentId },
       data: {
-        status: 'RESOLVED',
-        finalCost: finalCost ? parseInt(finalCost) : incident.finalCost,
+        status: IncidentStatus.RESOLVED,
+        finalCost: finalCost !== undefined ? finalCost : incident.finalCost,
       }
     });
 
@@ -55,7 +65,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error("Erreur lors de la résolution de l'incident:", error);
+    console.error("[API_RESOLVE_POST]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

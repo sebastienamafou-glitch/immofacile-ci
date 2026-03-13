@@ -64,8 +64,8 @@ export default function TenantIncidentsPage() {
             </select>
           </div>
           <div>
-            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description</label>
-            <textarea id="swal-desc" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mt-1 outline-none focus:border-orange-500 h-24" placeholder="Décrivez le problème en détails..."></textarea>
+            <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Description détaillée</label>
+            <textarea id="swal-desc" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mt-1 outline-none focus:border-orange-500 h-24" placeholder="Décrivez le problème en détails (minimum 10 caractères)..."></textarea>
           </div>
         </div>
       `,
@@ -77,8 +77,10 @@ export default function TenantIncidentsPage() {
       preConfirm: () => {
         const typeEl = document.getElementById('swal-type') as HTMLSelectElement;
         const descEl = document.getElementById('swal-desc') as HTMLTextAreaElement;
-        if (!descEl.value) {
-            Swal.showValidationMessage('La description est obligatoire');
+        
+        // ✅ SYNCHRONISATION AVEC ZOD BACKEND (Min 10 char)
+        if (!descEl.value || descEl.value.trim().length < 10) {
+            Swal.showValidationMessage('La description doit contenir au moins 10 caractères pour être traitée.');
             return false;
         }
         return { type: typeEl.value, description: descEl.value };
@@ -88,11 +90,18 @@ export default function TenantIncidentsPage() {
     if (formValues) {
       setSubmitting(true);
       try {
-        await api.post('/tenant/incidents', formValues); 
+        const res = await api.post('/tenant/incidents', formValues); 
+        // Gestion propre de l'erreur renvoyée par l'API (ex: Pas de bail actif)
+        if (res.data.error) {
+           Swal.fire({ icon: 'warning', title: 'Attention', text: res.data.error, background: '#0F172A', color: '#fff' });
+           return;
+        }
         Swal.fire({ icon: 'success', title: 'Signalé !', toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, background: '#10B981', color: '#fff' });
         fetchIncidents();
-      } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Erreur', text: 'Impossible d\'envoyer le signalement.', background: '#0F172A', color: '#fff' });
+      } catch (e: any) {
+        // Affichage du message d'erreur exact du backend si disponible
+        const errorMessage = e.response?.data?.error || 'Impossible d\'envoyer le signalement.';
+        Swal.fire({ icon: 'error', title: 'Erreur', text: errorMessage, background: '#0F172A', color: '#fff' });
       } finally {
         setSubmitting(false);
       }

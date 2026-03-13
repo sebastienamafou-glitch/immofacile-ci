@@ -1,50 +1,55 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
+export const dynamic = 'force-dynamic';
+
+// 1. VALIDATION STRICTE ZOD
+const withdrawSchema = z.object({
+  amount: z.number().int().positive("Le montant doit être un entier positif"),
+  paymentDetails: z.string().min(10, "Détails de paiement invalides")
+});
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ : Session Serveur (v5)
+    // 2. SÉCURITÉ : Session Serveur (v5)
     const session = await auth();
     const userId = session?.user?.id;
 
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-    // 2. VALIDATION DES ENTRÉES
+    // 3. VALIDATION DU PAYLOAD
     const body = await req.json();
-    const { amount, paymentDetails } = body;
+    const validation = withdrawSchema.safeParse(body);
 
-    const amountInt = Math.floor(Number(amount));
-
-    if (!amountInt || amountInt <= 0) {
-        return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
-    }
-    if (!paymentDetails || typeof paymentDetails !== 'string') {
-        return NextResponse.json({ error: "Détails de paiement requis" }, { status: 400 });
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
     }
 
-    // 3. TRANSACTION FINANCIÈRE ATOMIQUE
+    const { amount, paymentDetails } = validation.data;
+
+    // 4. TRANSACTION FINANCIÈRE ATOMIQUE
     await prisma.$transaction(async (tx) => {
         
-        // A. Vérification du Solde (Dans UserFinance)
+        // A. Vérification du Solde
         const finance = await tx.userFinance.findUnique({ 
             where: { userId: userId } 
         });
 
-        if (!finance || finance.walletBalance < amountInt) {
-            throw new Error("Solde insuffisant pour ce retrait.");
+        if (!finance || finance.walletBalance < amount) {
+            throw new Error("INSUFFICIENT_FUNDS");
         }
 
-        // B. Débit du compte (Optimistic Locking via version)
+        // B. Débit du compte (Optimistic Locking)
         await tx.userFinance.update({
             where: { 
                 userId: userId,
                 version: finance.version 
             },
             data: { 
-                walletBalance: { decrement: amountInt },
+                walletBalance: { decrement: amount },
                 version: { increment: 1 }
             }
         });
@@ -52,25 +57,32 @@ export async function POST(req: Request) {
         // C. Création de la trace de transaction
         await tx.transaction.create({
             data: {
-                amount: amountInt,
+                amount: amount,
                 type: "DEBIT",
-                balanceType: "WALLET", // ✅ Champ obligatoire ajouté
+                balanceType: "WALLET",
                 reason: `Retrait vers ${paymentDetails}`,
                 status: "PENDING",
                 userId: userId,
-                reference: `WITHDRAW-${Date.now()}` // Référence unique
+                reference: `WITHDRAW-${Date.now()}`
             }
         });
     });
 
     return NextResponse.json({ success: true });
 
-  } catch (error: any) {
-    console.error("Erreur Retrait:", error);
-    // Gestion propre des erreurs transactionnelles
-    if (error.message.includes("Solde insuffisant")) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+  } catch (error) {
+    console.error("[API_WITHDRAW_ERROR]", error);
+
+    // 5. GESTION EXPERTE DES ERREURS (Sans 'any')
+    if (error instanceof Error && error.message === "INSUFFICIENT_FUNDS") {
+        return NextResponse.json({ error: "Solde insuffisant pour ce retrait." }, { status: 400 });
     }
-    return NextResponse.json({ error: "Erreur lors du traitement." }, { status: 500 });
+
+    // Capture spécifique du verrouillage optimiste de Prisma (P2025)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+         return NextResponse.json({ error: "Une transaction est déjà en cours. Veuillez réessayer." }, { status: 409 });
+    }
+
+    return NextResponse.json({ error: "Erreur lors du traitement bancaire." }, { status: 500 });
   }
 }

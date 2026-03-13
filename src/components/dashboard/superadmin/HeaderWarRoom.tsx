@@ -16,9 +16,9 @@ export default function HeaderWarRoom() {
             <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Cible</label>
             <select id="swal-target" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-3 outline-none focus:border-orange-500 transition">
               <option value="ALL">Tout le monde (Global)</option>
-              <option value="TENANT">Locataires uniquement</option>
-              <option value="OWNER">Propriétaires uniquement</option>
-              <option value="ARTISAN">Artisans uniquement</option>
+              <option value="TENANTS">Locataires uniquement</option>
+              <option value="OWNERS">Propriétaires & Agences</option>
+              <option value="INVESTORS">Investisseurs</option>
             </select>
           </div>
           <div class="grid grid-cols-2 gap-4">
@@ -28,6 +28,7 @@ export default function HeaderWarRoom() {
                   <option value="INFO">Information 🔵</option>
                   <option value="WARNING">Alerte 🔴</option>
                   <option value="SUCCESS">Succès 🟢</option>
+                  <option value="ERROR">Urgence 🚨</option>
                 </select>
              </div>
              <div>
@@ -50,7 +51,8 @@ export default function HeaderWarRoom() {
       customClass: { popup: 'rounded-[2rem] border border-slate-700' },
       preConfirm: () => {
         return {
-          targetRole: (document.getElementById('swal-target') as HTMLSelectElement).value,
+          // ✅ CORRECTION : 'target' au lieu de 'targetRole' pour matcher Zod
+          target: (document.getElementById('swal-target') as HTMLSelectElement).value,
           type: (document.getElementById('swal-type') as HTMLSelectElement).value,
           title: (document.getElementById('swal-title') as HTMLInputElement).value,
           message: (document.getElementById('swal-message') as HTMLTextAreaElement).value
@@ -59,14 +61,18 @@ export default function HeaderWarRoom() {
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await api.post('/superadmin/notifications/broadcast', result.value);
-          Swal.fire({
-             icon: 'success', 
-             title: 'Diffusion Réussie', 
-             text: `${res.data.count} utilisateurs ont reçu la notification.`,
-             background: '#0F172A', color: '#fff',
-             confirmButtonColor: '#10B981'
-          });
+          // ✅ CORRECTION : Nouvelle URL de l'API
+          const res = await api.post('/superadmin/notifications/send', result.value);
+          
+          if (res.data.success) {
+              Swal.fire({
+                 icon: 'success', 
+                 title: 'Diffusion Réussie', 
+                 text: `${res.data.count} utilisateurs ont reçu la notification.`,
+                 background: '#0F172A', color: '#fff',
+                 confirmButtonColor: '#10B981'
+              });
+          }
         } catch (e) {
           Swal.fire({ icon: 'error', title: 'Erreur', text: "Échec de l'envoi", background: '#0F172A', color: '#fff' });
         }

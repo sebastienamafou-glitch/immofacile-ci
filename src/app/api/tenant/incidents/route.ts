@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { Role, LeaseStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// GET : Liste historique des incidents
+// 1. VALIDATION STRICTE DU PAYLOAD (Zod)
+const incidentSchema = z.object({
+    type: z.string().optional(),
+    title: z.string().optional(),
+    description: z.string().min(10, "La description doit être détaillée (10 caractères min)."),
+    priority: z.string().default('NORMAL'),
+    propertyId: z.string().optional(),
+    photos: z.array(z.string().url("URL invalide")).default([])
+}).refine(data => data.title || data.type, {
+    message: "Le type ou le titre de l'incident est obligatoire.",
+    path: ["title"]
+});
+
 export async function GET(request: Request) {
   try {
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const incidents = await prisma.incident.findMany({
@@ -25,58 +38,67 @@ const userId = session.user.id;
     return NextResponse.json({ success: true, incidents });
 
   } catch (error) {
-    console.error("Erreur GET Incidents:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("[API_INCIDENTS_GET]", error);
+    return NextResponse.json({ error: "Erreur serveur lors de la récupération des incidents." }, { status: 500 });
   }
 }
 
-// POST : Créer un incident
 export async function POST(request: Request) {
   try {
+    // 2. SÉCURITÉ & AUTHENTIFICATION BLINDÉE
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+    });
+
+    // Escalade de privilèges bloquée
+    if (!user || user.role !== Role.TENANT) {
+        return NextResponse.json({ error: "Seul un locataire peut déclarer un incident." }, { status: 403 });
+    }
+
+    // 3. VALIDATION DU BODY
     const body = await request.json();
-    
-    // ✅ CORRECTIF ICI : On récupère aussi 'type'
-    let { title, type, description, priority, propertyId, photos } = body;
+    const validation = incidentSchema.safeParse(body);
 
-    // ✅ MAPPING INTELLIGENT : Si 'title' est vide mais que 'type' est là, on utilise 'type'
-    if (!title && type) {
-        title = type; // Ex: "PLOMBERIE" devient le titre
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
     }
 
-    // Validation
-    if (!title || !description) {
-        return NextResponse.json({ error: "Le type et la description sont obligatoires" }, { status: 400 });
-    }
+    let { title, type, description, priority, propertyId, photos } = validation.data;
+    const finalTitle = title || type || "Incident non qualifié";
 
-    // 2. RÉSOLUTION DU BIEN (Auto-Detection)
+    // 4. RÉSOLUTION DU BIEN (Uniquement les contrats ACTIFS)
     if (!propertyId) {
         const activeLeases = await prisma.lease.findMany({
-            where: { tenantId: userId, status: { in: ['ACTIVE', 'PENDING'] } },
+            where: { 
+                tenantId: userId, 
+                status: LeaseStatus.ACTIVE // ❌ Fini le 'PENDING', on ne déclare pas de fuite sur un bail non signé
+            },
             select: { propertyId: true }
         });
 
         if (activeLeases.length === 1) {
-            propertyId = activeLeases[0].propertyId; // ✅ Auto-assignation
+            propertyId = activeLeases[0].propertyId; // Auto-assignation chirurgicale
         } else if (activeLeases.length === 0) {
-            return NextResponse.json({ error: "Aucun contrat actif." }, { status: 403 });
+            return NextResponse.json({ error: "Vous n'avez aucun contrat de bail actif." }, { status: 403 });
         } else {
-            return NextResponse.json({ error: "Veuillez préciser le bien concerné." }, { status: 400 });
+            return NextResponse.json({ error: "Vous avez plusieurs contrats. Veuillez préciser le bien concerné." }, { status: 400 });
         }
     }
 
-    // 3. CRÉATION
+    // 5. CRÉATION DE L'INCIDENT
     const newIncident = await prisma.incident.create({
       data: {
-        title: title, // On utilise le titre consolidé
+        title: finalTitle,
         description,
-        priority: priority || 'NORMAL',
+        priority,
         status: 'OPEN',
-        photos: photos || [],
+        photos,
         reporterId: userId,
         propertyId: propertyId
       }
@@ -84,8 +106,8 @@ const userId = session.user.id;
 
     return NextResponse.json({ success: true, incident: newIncident });
 
-  } catch (error: any) {
-    console.error("Erreur Création Incident:", error);
-    return NextResponse.json({ error: "Erreur serveur", details: error.message }, { status: 500 });
+  } catch (error) {
+    console.error("[API_INCIDENTS_POST]", error);
+    return NextResponse.json({ error: "Erreur critique lors de la création de l'incident." }, { status: 500 });
   }
 }

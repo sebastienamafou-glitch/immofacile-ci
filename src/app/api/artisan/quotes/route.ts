@@ -1,24 +1,53 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { Role } from "@prisma/client";
+
+export const dynamic = 'force-dynamic';
+
+// 1. VALIDATION FINANCIÈRE STRICTE (Zod)
+const quoteItemSchema = z.object({
+  description: z.string().min(3, "La description de la ligne est requise"),
+  quantity: z.number().int().positive("La quantité doit être supérieure à 0"),
+  unitPrice: z.number().int().nonnegative("Le prix unitaire ne peut pas être négatif") // En FCFA, on utilise des entiers
+});
+
+const quoteSchema = z.object({
+  incidentId: z.string().min(1, "L'ID de l'incident est requis"),
+  items: z.array(quoteItemSchema).min(1, "Un devis doit contenir au moins un élément"),
+  notes: z.string().optional(),
+  validityDays: z.number().int().positive().default(30)
+});
 
 export async function POST(request: Request) {
   try {
-    // 1. SÉCURITÉ
+    // 2. SÉCURITÉ & VÉRIFICATION DES RÔLES
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const body = await request.json();
-    const { incidentId, items, notes, validityDays } = body; 
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+    });
 
-    if (!incidentId || !items || items.length === 0) {
-        return NextResponse.json({ error: "Données incomplètes" }, { status: 400 });
+    if (!user || user.role !== Role.ARTISAN) {
+        return NextResponse.json({ error: "Seul un artisan certifié peut émettre un devis." }, { status: 403 });
     }
 
-    // 2. VÉRIFICATION
+    // 3. NETTOYAGE ET VALIDATION DU PAYLOAD
+    const body = await request.json();
+    const validation = quoteSchema.safeParse(body);
+
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données de devis invalides", details: validation.error.format() }, { status: 400 });
+    }
+
+    const { incidentId, items, notes, validityDays } = validation.data; 
+
+    // 4. CONTRÔLE D'INTÉGRITÉ MÉTIER
     const incident = await prisma.incident.findUnique({
         where: { id: incidentId },
         include: { 
@@ -28,12 +57,12 @@ const userId = session.user.id;
     });
 
     if (!incident) return NextResponse.json({ error: "Incident introuvable" }, { status: 404 });
-    if (incident.assignedToId !== userId) return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-    if (incident.quote) return NextResponse.json({ error: "Un devis existe déjà" }, { status: 400 });
+    if (incident.assignedToId !== userId) return NextResponse.json({ error: "Vous n'êtes pas assigné à ce chantier" }, { status: 403 });
+    if (incident.quote) return NextResponse.json({ error: "Un devis a déjà été émis pour cet incident" }, { status: 400 });
 
-    // 3. CALCULS
+    // 5. CALCULS SÉCURISÉS (Backend Only)
     let totalNet = 0;
-    const formattedItems = items.map((item: any) => {
+    const formattedItems = items.map(item => {
         const lineTotal = item.quantity * item.unitPrice;
         totalNet += lineTotal;
         return {
@@ -45,17 +74,18 @@ const userId = session.user.id;
     });
 
     const quoteNumber = `DEV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    const expirationDate = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
-    // 4. TRANSACTION (Devis + Notif)
+    // 6. EXÉCUTION ATOMIQUE (Devis + Statut + Notification)
     const result = await prisma.$transaction(async (tx) => {
-        // A. Créer le devis
+        // A. Création du devis
         const newQuote = await tx.quote.create({
             data: {
                 number: quoteNumber,
                 status: 'PENDING',
                 totalNet: totalNet,
-                totalAmount: totalNet,
-                validityDate: new Date(Date.now() + (validityDays || 30) * 24 * 60 * 60 * 1000),
+                totalAmount: totalNet, // Gestion des taxes à prévoir plus tard si nécessaire
+                validityDate: expirationDate,
                 notes: notes,
                 incidentId: incidentId,
                 artisanId: userId,
@@ -63,23 +93,20 @@ const userId = session.user.id;
             }
         });
 
-        // B. Update Incident
+        // B. Mise à jour de l'incident
         await tx.incident.update({
             where: { id: incidentId },
             data: { status: 'QUOTATION' } 
         });
 
-        // C. 🔔 NOTIFICATION (C'EST ICI QUE SE TROUVE LE LIEN)
+        // C. Notification au propriétaire
         await tx.notification.create({
             data: {
                 userId: incident.property.ownerId,
                 title: "Nouveau Devis Reçu 📄",
-                message: `L'artisan a envoyé un devis de ${totalNet} FCFA pour "${incident.title}".`,
+                message: `L'artisan a soumis un devis de ${totalNet.toLocaleString('fr-FR')} FCFA pour "${incident.title}".`,
                 type: "INFO",
-                
-                // ✅ LE LIEN CORRIGÉ VERS LE DOSSIER MAINTENANCE
                 link: `/dashboard/owner/maintenance/incidents/${incidentId}`, 
-                
                 isRead: false
             }
         });
@@ -90,7 +117,7 @@ const userId = session.user.id;
     return NextResponse.json({ success: true, quote: result });
 
   } catch (error) {
-    console.error("Erreur Devis:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("[API_QUOTES_POST]", error);
+    return NextResponse.json({ error: "Erreur critique lors de la génération du devis." }, { status: 500 });
   }
 }

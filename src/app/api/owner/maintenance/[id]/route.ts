@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { Role } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,21 +11,21 @@ export async function GET(
 ) {
   try {
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
+    
     if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+    });
 
     const incident = await prisma.incident.findUnique({
       where: { id: params.id },
       include: {
-        // ✅ ON GARDE LES RELATIONS (Tables liées)
-        property: true,
+        property: { select: { id: true, title: true, ownerId: true } },
         reporter: { select: { name: true, phone: true } },
         assignedTo: { select: { name: true, phone: true, jobTitle: true } },
-        
-        // ❌ ON RETIRE "photos: true" (Car c'est un champ simple, il vient tout seul)
-
-        // ✅ ON GARDE LE DEVIS
         quote: {
             include: { 
                 items: true, 
@@ -35,14 +35,19 @@ const userId = session.user.id;
       }
     });
 
-    if (!incident || incident.property.ownerId !== userId) {
-       return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+    if (!incident) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+
+    const isOwner = incident.property.ownerId === userId;
+    const isAdmin = user?.role === Role.SUPER_ADMIN || user?.role === Role.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+       return NextResponse.json({ error: "Accès interdit" }, { status: 403 });
     }
 
     return NextResponse.json({ success: true, incident });
 
-  } catch (error: any) {
-    console.error("Erreur GET Incident:", error.message);
+  } catch (error) {
+    console.error("[API_INCIDENT_DETAIL_GET]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

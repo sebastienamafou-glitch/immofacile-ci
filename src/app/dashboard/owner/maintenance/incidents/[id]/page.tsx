@@ -12,20 +12,30 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import IncidentChat from "@/components/shared/IncidentChat";
-import Swal from "sweetalert2"; // ✅ AJOUT : Module d'alerte tactique
+import Swal from "sweetalert2";
+import { Incident, User, Quote, QuoteItem } from "@prisma/client";
+
+// --- TYPAGE STRICT ---
+type ExtendedQuote = Quote & { items: QuoteItem[] };
+type IncidentWithDetails = Incident & {
+  reporter: Partial<User>;
+  assignedTo?: Partial<User>;
+  quote?: ExtendedQuote | null; // C'est un objet, pas un tableau
+};
 
 export default function OwnerIncidentDetail() {
   const { id } = useParams();
   const router = useRouter();
   
-  const [incident, setIncident] = useState<any>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [incident, setIncident] = useState<IncidentWithDetails | null>(null);
+  const [currentUser, setCurrentUser] = useState<Partial<User> | null>(null);
   const [loading, setLoading] = useState(true);
 
   // 1. CHARGEMENT DES DONNÉES
   const fetchData = async () => {
     try {
-      const res = await api.get(`/owner/incidents/${id}`);
+      // ✅ CORRECTION : La bonne route sécurisée que nous avons créée
+      const res = await api.get(`/owner/maintenance/${id}`);
       if (res.data.success) {
           setIncident(res.data.incident);
       }
@@ -35,7 +45,8 @@ export default function OwnerIncidentDetail() {
 
     } catch (e) { 
       console.error(e);
-      // router.push('/dashboard/owner/incidents'); // Décommenter en prod
+      toast.error("Impossible de charger le dossier technique.");
+      router.push('/dashboard/owner/maintenance');
     } finally { 
       setLoading(false); 
     }
@@ -43,18 +54,17 @@ export default function OwnerIncidentDetail() {
 
   useEffect(() => { if(id) fetchData(); }, [id]);
 
-  // 2. ACTION : VALIDER OU REFUSER LE DEVIS (AVEC LOGIQUE FINANCIÈRE)
+  // 2. ACTION : VALIDER OU REFUSER LE DEVIS
   const handleQuoteResponse = async (quoteId: string, action: 'ACCEPT' | 'REJECT') => {
       try {
-          // Indicateur visuel de traitement
           const toastId = toast.loading("Traitement de la transaction...");
 
+          // Cette route API sera notre prochain point d'audit critique
           await api.post('/owner/quotes/respond', { quoteId, action });
           
           toast.dismiss(toastId);
 
           if (action === 'ACCEPT') {
-            // 🎉 SUCCÈS : Paiement effectué
             Swal.fire({
                 title: 'Paiement Validé !',
                 text: 'Le montant a été débité et l\'artisan notifié.',
@@ -62,7 +72,7 @@ export default function OwnerIncidentDetail() {
                 background: '#0F172A', color: '#fff',
                 confirmButtonColor: '#10B981'
             });
-            fetchData(); // Mise à jour UI
+            fetchData(); 
           } else {
             toast.info("Devis refusé.");
             fetchData();
@@ -71,12 +81,10 @@ export default function OwnerIncidentDetail() {
       } catch (e: any) {
           toast.dismiss();
 
-          // 🚨 GESTION INTELLIGENTE DE L'ERREUR 402 (SOLDE INSUFFISANT)
           if (e.response && e.response.status === 402) {
               const { required, balance, redirectUrl } = e.response.data;
               const missing = required - balance;
 
-              // Affichage de la Modale Tactique
               Swal.fire({
                   title: 'Fonds Insuffisants 💸',
                   html: `
@@ -88,23 +96,21 @@ export default function OwnerIncidentDetail() {
                     </div>
                   `,
                   icon: 'warning',
-                  background: '#1E293B', // Dark Slate
+                  background: '#1E293B',
                   color: '#fff',
                   showCancelButton: true,
                   confirmButtonText: '⚡ Recharger mon Wallet',
                   cancelButtonText: 'Annuler',
-                  confirmButtonColor: '#F97316', // Orange Brand
+                  confirmButtonColor: '#F97316',
                   cancelButtonColor: '#64748B'
               }).then((result) => {
                   if (result.isConfirmed) {
-                      // Redirection vers la page de paiement CinetPay (via notre page de topup)
                       router.push(redirectUrl);
                   }
               });
               return;
           }
 
-          // Autres erreurs génériques
           toast.error(e.response?.data?.error || "Erreur technique lors de la validation.");
       }
   };
@@ -112,7 +118,8 @@ export default function OwnerIncidentDetail() {
   if (loading) return <div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div>;
   if (!incident) return null;
 
-  const activeQuote = incident.quotes && incident.quotes.length > 0 ? incident.quotes[0] : null;
+  // ✅ CORRECTION : Utilisation de l'objet singulier retourné par Prisma
+  const activeQuote = incident.quote;
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-200 p-4 md:p-10 font-sans pb-20">
@@ -159,7 +166,7 @@ export default function OwnerIncidentDetail() {
                     <p className="text-slate-300 text-lg leading-relaxed font-medium italic">
                         "{incident.description}"
                     </p>
-                    {incident.photos?.length > 0 && (
+                    {incident.photos && incident.photos.length > 0 && (
                         <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
                             {incident.photos.map((url: string, i: number) => (
                                 <img key={i} src={url} className="h-20 w-20 object-cover rounded-lg border border-white/10" alt="Preuve"/>
@@ -175,7 +182,9 @@ export default function OwnerIncidentDetail() {
                             <span className="text-xs font-bold uppercase tracking-wider text-white">Discussion avec l'artisan</span>
                         </div>
                         <div className="flex-1 overflow-hidden">
-                            <IncidentChat incidentId={incident.id} currentUserId={currentUser?.id} />
+                            {currentUser?.id && (
+                                <IncidentChat incidentId={incident.id} currentUserId={currentUser.id} />
+  )}
                         </div>
                     </div>
                 )}
@@ -203,7 +212,7 @@ export default function OwnerIncidentDetail() {
 
                         {/* Liste des prestations */}
                         <div className="p-6 space-y-4 bg-[#0F172A]">
-                            {activeQuote.items.map((item: any, i: number) => (
+                            {activeQuote.items.map((item: QuoteItem, i: number) => (
                                 <div key={i} className="flex justify-between items-center text-sm border-b border-slate-800 pb-3 last:border-0 last:pb-0">
                                     <div>
                                         <span className="font-bold text-slate-200 block">{item.description}</span>

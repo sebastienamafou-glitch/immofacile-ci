@@ -1,48 +1,26 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-import { v2 as cloudinary } from "cloudinary";
-
-// Configuration Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { z } from "zod";
+import { Role, Prisma, IncidentStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// --- HELPER : UPLOAD CLOUDINARY ---
-async function uploadToCloudinary(file: File | null) {
-  if (!file || file.size === 0) return null;
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+// 1. SCHÉMA DE VALIDATION STRICTE (PUT)
+const updateIncidentSchema = z.object({
+    id: z.string().min(1, "L'ID de l'incident est requis"),
+    status: z.nativeEnum(IncidentStatus).optional(),
+    finalCost: z.number().int().nonnegative("Le coût final ne peut pas être négatif").optional(),
+    assignedToId: z.string().optional()
+});
 
-  return new Promise<string>((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: "babimmo/incidents" },
-      (error, result) => {
-        if (error) { console.error("Cloudinary Error:", error); resolve(""); } 
-        else { resolve(result?.secure_url || ""); }
-      }
-    );
-    const Readable = require("stream").Readable;
-    const readableStream = new Readable();
-    readableStream.push(buffer);
-    readableStream.push(null);
-    readableStream.pipe(stream);
-  });
-}
-
-// 1. GET : Lister les incidents
+// 2. GET : LISTER LES INCIDENTS DU PROPRIÉTAIRE
 export async function GET(req: Request) {
     try {
-        // 🔒 SÉCURITÉ : Session Cookie au lieu de Header
         const session = await auth();
-        if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-        
-        const userId = session.user.id;
+        const userId = session?.user?.id;
+
+        if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
         
         const incidents = await prisma.incident.findMany({
             where: { property: { ownerId: userId } },
@@ -56,86 +34,72 @@ export async function GET(req: Request) {
         
         return NextResponse.json({ success: true, incidents });
     } catch (e) { 
-        return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); 
+        console.error("[API_OWNER_MAINTENANCE_GET]", e);
+        return NextResponse.json({ error: "Erreur serveur lors de la récupération." }, { status: 500 }); 
     }
 }
 
-// 2. POST : CRÉER UN INCIDENT
-export async function POST(req: Request) {
-  try {
-    // 🔒 SÉCURITÉ
-    const session = await auth();
-    if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    const userId = session.user.id;
-
-    const formData = await req.formData();
-    const title = formData.get('title') as string;
-    const description = formData.get('description') as string;
-    const propertyId = formData.get('propertyId') as string;
-    const photoFile = formData.get('photo') as File | null;
-
-    if (!title || !propertyId) return NextResponse.json({ error: "Requis" }, { status: 400 });
-
-    const property = await prisma.property.findFirst({ where: { id: propertyId, ownerId: userId } });
-    if (!property) return NextResponse.json({ error: "Interdit ou bien introuvable" }, { status: 403 });
-
-    let photoUrl = photoFile ? await uploadToCloudinary(photoFile) : null;
-
-    const newIncident = await prisma.incident.create({
-        data: {
-            title,
-            description: description || "",
-            status: "OPEN",
-            priority: "NORMAL",
-            photos: photoUrl ? [photoUrl] : [],
-            propertyId: property.id,
-            reporterId: userId 
-        }
-    });
-
-    return NextResponse.json({ success: true, incident: newIncident });
-  } catch (error) { return NextResponse.json({ error: "Erreur création" }, { status: 500 }); }
-}
-
-// 3. PUT : ASSIGNER & RÉSOUDRE
+// 3. PUT : ASSIGNER UN ARTISAN OU METTRE À JOUR LE STATUT
 export async function PUT(req: Request) {
   try {
-    // 🔒 SÉCURITÉ
     const session = await auth();
-    if (!session || !session.user?.id) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    const userId = session.user.id;
+    const userId = session?.user?.id;
+
+    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
     const body = await req.json();
-    const { id, status, finalCost, assignedToId } = body; 
+    const validation = updateIncidentSchema.safeParse(body);
 
-    if (!id) return NextResponse.json({ error: "ID manquant" }, { status: 400 });
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
+    }
 
+    const { id, status, finalCost, assignedToId } = validation.data;
+
+    // A. Vérification de propriété
     const incident = await prisma.incident.findUnique({
       where: { id },
-      include: { property: true } 
+      include: { property: { select: { ownerId: true } } } 
     });
 
-    if (!incident || incident.property.ownerId !== userId) return NextResponse.json({ error: "Interdit" }, { status: 403 });
+    if (!incident) return NextResponse.json({ error: "Incident introuvable" }, { status: 404 });
+    if (incident.property.ownerId !== userId) return NextResponse.json({ error: "Accès refusé. Vous ne possédez pas ce bien." }, { status: 403 });
 
-    const updateData: any = {};
+    // B. Préparation de la mise à jour (Typage strict Prisma)
+    const updateData: Prisma.IncidentUpdateInput = {};
     if (status) updateData.status = status;
-    if (finalCost !== undefined) updateData.finalCost = parseInt(finalCost);
+    if (finalCost !== undefined) updateData.finalCost = finalCost;
     
+    // C. Vérification métier : L'assigné est-il vraiment un artisan ?
     if (assignedToId) {
-        updateData.assignedToId = assignedToId;
-        if (incident.status === 'OPEN') {
-            updateData.status = 'IN_PROGRESS';
+        const artisan = await prisma.user.findUnique({
+            where: { id: assignedToId },
+            select: { role: true }
+        });
+
+        if (!artisan || artisan.role !== Role.ARTISAN) {
+            return NextResponse.json({ error: "L'utilisateur ciblé n'est pas un artisan certifié." }, { status: 400 });
+        }
+
+        updateData.assignedTo = { connect: { id: assignedToId } };
+        
+        // Auto-bascule du statut si l'incident vient d'être ouvert
+        if (incident.status === IncidentStatus.OPEN && !status) {
+            updateData.status = IncidentStatus.IN_PROGRESS;
         }
     }
 
-    const updated = await prisma.incident.update({
+    // D. Exécution de la mise à jour
+    const updatedIncident = await prisma.incident.update({
       where: { id },
-      data: updateData
+      data: updateData,
+      include: { assignedTo: { select: { name: true } } }
     });
 
-    return NextResponse.json({ success: true, incident: updated });
+    return NextResponse.json({ success: true, incident: updatedIncident });
 
   } catch (error) {
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error("[API_OWNER_MAINTENANCE_PUT]", error);
+    return NextResponse.json({ error: "Erreur serveur lors de la mise à jour." }, { status: 500 });
   }
 }

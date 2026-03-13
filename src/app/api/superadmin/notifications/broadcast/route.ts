@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+import { Role, Prisma } from "@prisma/client";
 
+export const dynamic = 'force-dynamic';
+
+// 1. VALIDATION STRICTE (Zod)
+const broadcastSchema = z.object({
+  target: z.string(), 
+  title: z.string().min(3, "Titre trop court"),
+  message: z.string().min(5, "Message trop court"),
+  type: z.enum(["INFO", "SUCCESS", "WARNING", "ERROR", "SYSTEM"]).default("INFO"),
+  link: z.string().optional()
+});
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    // 2. SÉCURITÉ BLINDÉE (Auth v5)
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -21,23 +32,47 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    // 2. RÉCUPÉRATION DU MESSAGE
+    // 3. VALIDATION DU PAYLOAD
     const body = await req.json();
-    const { title, message, targetRole, type } = body; 
-    // targetRole peut être 'ALL', 'OWNER', 'TENANT', 'ARTISAN', 'INVESTOR'
+    const validation = broadcastSchema.safeParse(body);
 
-    if (!title || !message) {
-        return NextResponse.json({ error: "Titre et message requis" }, { status: 400 });
+    if (!validation.success) {
+        return NextResponse.json({ error: "Données invalides", details: validation.error.format() }, { status: 400 });
     }
 
-    // 3. CIBLAGE DES TROUPES
-    // On cible uniquement les utilisateurs actifs pour éviter le spam inutile
-    const whereClause: any = { isActive: true };
-    if (targetRole && targetRole !== 'ALL') {
-        whereClause.role = targetRole;
-    }
+    const { target, title, message, type, link } = validation.data;
+
+    // 4. CIBLAGE STRICT (Typage Prisma natif, fin des 'any')
+    let rolesToTarget: Role[] = [];
     
-    // On récupère juste les ID pour optimiser
+    switch (target) {
+        case "TENANT":
+        case "TENANTS":
+            rolesToTarget = [Role.TENANT];
+            break;
+        case "OWNER":
+        case "OWNERS":
+            rolesToTarget = [Role.OWNER, Role.AGENCY_ADMIN]; // Inclusion stricte des agences
+            break;
+        case "ARTISAN":
+            rolesToTarget = [Role.ARTISAN];
+            break;
+        case "INVESTOR":
+        case "INVESTORS":
+            rolesToTarget = [Role.INVESTOR, Role.AMBASSADOR];
+            break;
+        case "ALL":
+        default:
+            break;
+    }
+
+    // Construction typée de la clause Where
+    const whereClause: Prisma.UserWhereInput = { isActive: true };
+    
+    if (target !== "ALL" && rolesToTarget.length > 0) {
+        whereClause.role = { in: rolesToTarget };
+    }
+
     const targets = await prisma.user.findMany({
         where: whereClause,
         select: { id: true }
@@ -47,30 +82,29 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, count: 0, message: "Aucune cible éligible trouvée." });
     }
 
-    // 4. TIR DE BARRAGE (Création de masse)
-    // Prisma createMany est très performant pour ça
+    // 5. TIR DE BARRAGE (Bulk Insert Atomique)
     const notificationsData = targets.map(user => ({
         userId: user.id,
         title: title,
         message: message,
-        type: type || 'INFO', // INFO, WARNING, SUCCESS, SYSTEM
+        type: type,
         isRead: false,
-        link: '/dashboard', // Lien par défaut vers le tableau de bord
-        createdAt: new Date()
+        link: link || '/dashboard', 
     }));
 
-    await prisma.notification.createMany({
-        data: notificationsData
+    const result = await prisma.notification.createMany({
+        data: notificationsData,
+        skipDuplicates: true
     });
 
     return NextResponse.json({ 
         success: true, 
-        count: targets.length,
-        message: `Message envoyé à ${targets.length} utilisateurs.`
+        count: result.count,
+        message: `Message envoyé à ${result.count} utilisateurs.`
     });
 
   } catch (error) {
-    console.error("Broadcast Error:", error);
+    console.error("[BROADCAST_ERROR]", error);
     return NextResponse.json({ error: "Erreur serveur lors de la diffusion." }, { status: 500 });
   }
 }

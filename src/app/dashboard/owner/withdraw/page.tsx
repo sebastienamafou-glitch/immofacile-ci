@@ -24,8 +24,6 @@ export default function WithdrawalPage() {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        // ✅ APPEL SÉCURISÉ : Auth via Cookie
-        // Note: Cette route doit exister dans api/owner/finance/route.ts
         const res = await api.get('/owner/finance');
         if (res.data.success) {
           setWalletBalance(res.data.walletBalance || 0);
@@ -49,12 +47,13 @@ export default function WithdrawalPage() {
     setAmount(walletBalance.toString());
   };
 
+  // 3. SOUMISSION DU FORMULAIRE
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // --- VALIDATIONS LOCALES ---
     const value = parseInt(amount);
     
+    // Validations (qui serviront si l'utilisateur manipule le DOM pour activer le bouton)
     if (isNaN(value) || value <= 0) {
         return Swal.fire({ title: "Montant Invalide", text: "Veuillez saisir un montant positif.", icon: "warning", background: '#0f172a', color: '#fff' });
     }
@@ -70,7 +69,7 @@ export default function WithdrawalPage() {
     setLoading(true);
 
     try {
-      // ✅ APPEL SÉCURISÉ : Pas de headers manuels
+      // ✅ APPEL API SÉCURISÉ
       const res = await api.post('/owner/withdraw', {
         amount: value,
         paymentDetails: `${method} - ${phone}` 
@@ -100,6 +99,8 @@ export default function WithdrawalPage() {
 
   if (initializing) return <div className="min-h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-[#F59E0B] w-12 h-12"/></div>;
 
+  const isFormValid = !isNaN(parseInt(amount)) && parseInt(amount) > 0 && parseInt(amount) <= walletBalance && phone.length >= 10;
+
   return (
     <div className="min-h-screen bg-[#0B1120] p-6 md:p-10 text-white font-sans">
       
@@ -122,10 +123,10 @@ export default function WithdrawalPage() {
         {/* CARTE SOLDE */}
         <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2rem] mb-6 relative overflow-hidden shadow-xl">
              <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-32 h-32 text-white"/></div>
-             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+             <div className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                 Solde Disponible
-             </p>
+             </div>
              <p className="text-4xl font-black text-white">{walletBalance.toLocaleString()} <span className="text-xl text-emerald-500">FCFA</span></p>
         </div>
         
@@ -178,7 +179,7 @@ export default function WithdrawalPage() {
           </div>
 
           {/* Téléphone */}
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <label className="text-xs font-bold text-slate-500 uppercase ml-1">Numéro Bénéficiaire</label>
             <div className="relative group">
                 <Phone className="absolute left-5 top-5 w-5 h-5 text-slate-500 group-focus-within:text-[#F59E0B] transition-colors" />
@@ -198,13 +199,13 @@ export default function WithdrawalPage() {
 
           <button 
             type="submit" 
-            disabled={loading || parseInt(amount) > walletBalance || parseInt(amount) <= 0 || phone.length < 10}
+            disabled={loading || !isFormValid}
             className="w-full bg-[#F59E0B] text-black font-black py-5 rounded-2xl hover:bg-yellow-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 active:scale-95 mt-4"
           >
             {loading ? <Loader2 className="animate-spin mx-auto w-6 h-6" /> : "CONFIRMER LE VIREMENT"}
           </button>
 
-          <p className="text-center text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+          <p className="text-center text-[10px] text-slate-500 uppercase font-bold tracking-wider mt-4">
             🔒 Transaction sécurisée SSL 256-bit
           </p>
         </form>
