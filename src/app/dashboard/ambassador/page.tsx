@@ -9,9 +9,19 @@ export const dynamic = 'force-dynamic';
 
 export default async function AmbassadorDashboard() {
   const session = await auth();
+  
+  // 1. VÉRIFICATION DE LA SESSION
   if (!session?.user?.id) redirect("/login");
 
-  // Récupération des données du démarcheur (Ambassadeur)
+  // 2. VÉRIFICATION DU RÔLE (Le Videur Instantané)
+  // On utilise le rôle stocké dans la session pour aller très vite.
+  // Si le rôle n'y est pas, on vérifie manuellement, mais AVANT de charger les lourdes data.
+  const userRole = session.user.role; 
+  if (userRole && userRole !== "AMBASSADOR" && userRole !== "SUPER_ADMIN") {
+      redirect("/dashboard");
+  }
+
+  // 3. SEULEMENT MAINTENANT, ON CHARGE LES DONNÉES (Car l'utilisateur est légitime)
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     include: {
@@ -27,13 +37,13 @@ export default async function AmbassadorDashboard() {
     }
   });
 
-  // S'il n'y a pas d'utilisateur du tout, c'est un problème d'auth -> /login
-if (!user) redirect("/login");
-
-// S'il est connecté mais n'a pas le bon rôle -> on le sort de cette zone restreinte sans le déconnecter
-if (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN") {
-    redirect("/dashboard"); // Ou une page "Accès Refusé"
-}
+  // Sécurité supplémentaire au cas où l'utilisateur n'existe plus en base
+  if (!user) redirect("/login");
+  
+  // Sécurité "Hard Check" au cas où le rôle dans la session n'était pas à jour
+  if (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN") {
+      redirect("/dashboard");
+  }
 
   const isKycVerified = user.kyc?.status === "VERIFIED";
   const kycPending = user.kyc?.status === "PENDING";
