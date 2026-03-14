@@ -27,7 +27,13 @@ export default async function AmbassadorDashboard() {
     }
   });
 
-  if (!user || (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN")) redirect("/login");
+  // S'il n'y a pas d'utilisateur du tout, c'est un problème d'auth -> /login
+if (!user) redirect("/login");
+
+// S'il est connecté mais n'a pas le bon rôle -> on le sort de cette zone restreinte sans le déconnecter
+if (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN") {
+    redirect("/dashboard"); // Ou une page "Accès Refusé"
+}
 
   const isKycVerified = user.kyc?.status === "VERIFIED";
   const kycPending = user.kyc?.status === "PENDING";
