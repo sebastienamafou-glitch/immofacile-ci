@@ -1,4 +1,4 @@
-import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, IncidentStatus } from '@prisma/client';
+import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, IncidentStatus, QuoteStatus } from '@prisma/client';
 import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -11,7 +11,6 @@ async function main() {
   // ==========================================
   console.log('🧹 Nettoyage de la base de données...');
   
-  // Suppression en cascade (l'ordre compte pour éviter les erreurs de foreign key)
   await prisma.quoteItem.deleteMany();
   await prisma.message.deleteMany();
   await prisma.signatureProof.deleteMany();
@@ -36,7 +35,6 @@ async function main() {
   
   await prisma.property.deleteMany();
   
-  // Tables dépendantes de User (Finance/KYC sont on-delete cascade normalement, mais on nettoie au cas où)
   await prisma.userFinance.deleteMany();
   await prisma.userKYC.deleteMany();
   await prisma.user.deleteMany(); 
@@ -49,7 +47,6 @@ async function main() {
   // ==========================================
   // 2. CRÉATION DE L'AGENCE
   // ==========================================
-  // On utilise upsert pour éviter les crashs si l'agence existe déjà malgré le clean
   const agency = await prisma.agency.upsert({
     where: { code: 'IMMO-PRESTIGE' },
     update: {},
@@ -64,7 +61,7 @@ async function main() {
       taxId: 'CC-1234567-X',
       logoUrl: 'https://placehold.co/400x400/0f172a/white?text=IP',
       walletBalance: 0,
-      defaultCommissionRate: 0.10 // Ajouté car obligatoire dans ton schéma récent
+      defaultCommissionRate: 0.10
     },
   });
   console.log(`🏢 Agence créée : ${agency.name}`);
@@ -81,7 +78,7 @@ async function main() {
     { email: 'locataire@gmail.com', name: 'Luc Locataire', role: Role.TENANT, jobTitle: 'Informaticien', income: 800000, agencyId: null, tier: 1 },
     { email: 'plombier@pro.ci', name: 'Mario Plombier', role: Role.ARTISAN, jobTitle: 'Plombier Certifié', phone: '+225 05050505', agencyId: null, tier: 2 },
     { email: 'investisseur@gmail.com', name: 'Ivan Investisseur', role: Role.INVESTOR, jobTitle: 'Business Angel', isBacker: true, backerTier: 'VISIONNAIRE', agencyId: null, tier: 3 },
-    { email: 'ambassadeur@gmail.com', name: 'Amine Ambassadeur', role: Role.AMBASSADOR, jobTitle: 'Apporteur d\'affaires', agencyId: null, tier: 1 }, // ✅ AJOUT DU RÔLE MANQUANT
+    { email: 'ambassadeur@gmail.com', name: 'Amine Ambassadeur', role: Role.AMBASSADOR, jobTitle: 'Apporteur d\'affaires', agencyId: null, tier: 1 },
     { email: 'touriste@gmail.com', name: 'Thomas Touriste', role: Role.GUEST, agencyId: null, tier: 1 },
   ];
 
@@ -101,7 +98,6 @@ async function main() {
         isBacker: u.isBacker || false,
         backerTier: u.backerTier || null,
 
-        // ✅ CORRECTION STRUCTURELLE KYC
         kyc: {
             create: {
                 status: VerificationStatus.VERIFIED,
@@ -111,12 +107,12 @@ async function main() {
             }
         },
 
-        // ✅ CORRECTION STRUCTURELLE FINANCE
         finance: {
             create: {
-                walletBalance: 1000000, // On donne 1M à tout le monde pour tester
+                walletBalance: 1000000, // 1M de FCFA pour tester les paiements et retraits
                 kycTier: u.tier,
                 income: u.income || 0,
+                monthlyVolume: 0,
                 version: 1
             }
         }
@@ -127,7 +123,7 @@ async function main() {
   console.log(`👥 ${usersData.length} Utilisateurs créés.`);
 
   // ==========================================
-  // 4. PROPRIÉTÉ & GESTION
+  // 4. PROPRIÉTÉ & GESTION & MAINTENANCE
   // ==========================================
   const owner = usersMap['proprio.agence@gmail.com'];
   const tenant = usersMap['locataire@gmail.com'];
@@ -154,7 +150,6 @@ async function main() {
     });
     console.log(`🏠 Bien créé : ${property.title}`);
 
-    // --- BAIL ---
     if (tenant) {
       const lease = await prisma.lease.create({
         data: {
@@ -162,9 +157,9 @@ async function main() {
           endDate: new Date('2025-01-01'),
           monthlyRent: 1500000,
           depositAmount: 3000000,
-          advanceAmount: 3000000, // <--- Ajoutez l'avance !
-          status: LeaseStatus.PENDING, // <--- Changez en PENDING !
-          isActive: false, // <--- Mettez à false
+          advanceAmount: 3000000,
+          status: LeaseStatus.ACTIVE, // Bail actif pour pouvoir déclarer des incidents
+          isActive: true,
           propertyId: property.id,
           tenantId: tenant.id,
           contractUrl: 'https://example.com/contract.pdf',
@@ -172,28 +167,63 @@ async function main() {
           agencyCommissionRate: 0.10
         },
       });
-      console.log(`📜 Bail créé pour ${tenant.name}`);
+      console.log(`📜 Bail actif créé pour ${tenant.name}`);
       
-      // --- INCIDENT ---
       if (artisan) {
+          // --- INCIDENT 1 : À ASSIGNER ---
           await prisma.incident.create({
+              data: {
+                  title: 'Problème de climatisation',
+                  description: 'Le split du salon ne refroidit plus et fait du bruit.',
+                  priority: 'NORMAL',
+                  status: IncidentStatus.OPEN, // Prêt à être assigné par le propriétaire
+                  propertyId: property.id,
+                  reporterId: tenant.id,
+                  assignedToId: null, // Pas encore d'artisan
+                  photos: ['https://placehold.co/300?text=Clim'],
+              }
+          });
+          console.log(`🔧 Incident 1 (Non assigné) créé.`);
+
+          // --- INCIDENT 2 : AVEC DEVIS EN ATTENTE DE PAIEMENT ---
+          const incidentWithQuote = await prisma.incident.create({
               data: {
                   title: 'Fuite Salle de Bain',
                   description: 'Grosse fuite sous le lavabo, urgent.',
                   priority: 'HIGH',
-                  status: IncidentStatus.IN_PROGRESS,
+                  status: IncidentStatus.QUOTATION, // L'artisan a fait le devis
                   propertyId: property.id,
                   reporterId: tenant.id,
-                  assignedToId: artisan.id,
+                  assignedToId: artisan.id, // Assigné au plombier
                   photos: ['https://placehold.co/300?text=Fuite'],
-                  createdAt: new Date()
               }
           });
-          console.log(`🔧 Incident créé pour ${artisan.name}`);
+
+          const totalNet = 45000;
+          const tax = Math.floor(totalNet * 0.18);
+          
+          await prisma.quote.create({
+              data: {
+                  number: `DEV-${Date.now().toString().slice(-6)}`,
+                  status: QuoteStatus.PENDING, // Prêt à être payé par le proprio
+                  totalNet: totalNet,
+                  taxAmount: tax,
+                  totalAmount: totalNet + tax,
+                  validityDate: new Date(new Date().setDate(new Date().getDate() + 15)),
+                  incidentId: incidentWithQuote.id,
+                  artisanId: artisan.id,
+                  items: {
+                      create: [
+                          { description: 'Recherche de fuite et démontage', quantity: 1, unitPrice: 15000, total: 15000 },
+                          { description: 'Remplacement siphon et joints', quantity: 1, unitPrice: 30000, total: 30000 }
+                      ]
+                  }
+              }
+          });
+          console.log(`📝 Incident 2 (Avec Devis en attente) créé.`);
       }
     }
 
-    // --- MISSION ---
     if (agent) {
         await prisma.mission.create({
             data: {
