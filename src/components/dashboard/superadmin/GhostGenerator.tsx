@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Swal from "sweetalert2";
-import { Loader2, FileText, Send, Plus, Trash2, BedDouble, Bath, Building2 } from "lucide-react";
+import { Loader2, FileText, Send, Plus, Trash2, BedDouble, Bath, Building2, MapPin } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSearchParams } from "next/navigation"; 
 
@@ -12,15 +12,17 @@ export default function GhostGenerator() {
       title: '', 
       price: '', 
       commune: '', 
+      address: '', // ✅ AJOUT CRITIQUE POUR PRISMA
       type: 'APPARTEMENT',
       bedrooms: 1,
       bathrooms: 1,
       description: '',
       fbLink: '',
-      images: [''] // Tableau pour gérer plusieurs images
+      images: [''] 
   });
   
   const [isSubmittingGhost, setIsSubmittingGhost] = useState(false);
+
   useEffect(() => {
       const fbLinkParam = searchParams.get('fbLink');
       const descParam = searchParams.get('desc');
@@ -34,7 +36,6 @@ export default function GhostGenerator() {
       }
   }, [searchParams]);
 
-  // Gestion des champs d'images dynamiques
   const handleImageChange = (index: number, value: string) => {
       const newImages = [...ghostData.images];
       newImages[index] = value;
@@ -49,13 +50,13 @@ export default function GhostGenerator() {
   };
 
   const handleCreateGhost = async () => {
-    if (!ghostData.title || !ghostData.price || !ghostData.commune) {
-        return Swal.fire({ icon: 'error', title: 'Erreur', text: "Titre, Prix et Commune sont obligatoires.", background: '#0F172A', color: '#fff' });
+    // ✅ VALIDATION MISE À JOUR
+    if (!ghostData.title || !ghostData.price || !ghostData.commune || !ghostData.address) {
+        return Swal.fire({ icon: 'error', title: 'Erreur', text: "Titre, Prix, Commune et Adresse sont obligatoires.", background: '#0F172A', color: '#fff' });
     }
 
     setIsSubmittingGhost(true);
     try {
-        // On nettoie les liens d'images vides avant l'envoi
         const cleanedData = {
             ...ghostData,
             price: Number(ghostData.price),
@@ -88,8 +89,8 @@ export default function GhostGenerator() {
             }
         });
 
-        // Reset du formulaire
-        setGhostData({ title: '', price: '', commune: '', type: 'APPARTEMENT', bedrooms: 1, bathrooms: 1, description: '', fbLink: '', images: [''] });
+        // ✅ RESET MIS À JOUR
+        setGhostData({ title: '', price: '', commune: '', address: '', type: 'APPARTEMENT', bedrooms: 1, bathrooms: 1, description: '', fbLink: '', images: [''] });
     } catch (e) {
         Swal.fire({ icon: 'error', title: 'Oups', text: "Échec de la création.", background: '#0F172A', color: '#fff' });
     } finally {
@@ -111,7 +112,6 @@ export default function GhostGenerator() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 relative z-10">
-            {/* LIGNE 1 : Titre et Type */}
             <div className="md:col-span-8">
                 <input 
                     type="text" placeholder="Titre (ex: Superbe Villa Duplex)" 
@@ -133,7 +133,6 @@ export default function GhostGenerator() {
                 </select>
             </div>
 
-            {/* LIGNE 2 : Loyer, Commune, Chambres, Douches */}
             <div className="md:col-span-4">
                 <input 
                     type="number" placeholder="Loyer (FCFA)" 
@@ -148,24 +147,33 @@ export default function GhostGenerator() {
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-orange-500 transition" 
                 />
             </div>
-            <div className="md:col-span-2 relative">
+            {/* ✅ CHAMP ADRESSE AJOUTÉ */}
+            <div className="md:col-span-4 relative">
+                <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <input 
+                    type="text" placeholder="Adresse/Quartier" 
+                    value={ghostData.address} onChange={e => setGhostData({...ghostData, address: e.target.value})}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 pl-10 text-sm text-white outline-none focus:border-orange-500 transition" 
+                />
+            </div>
+
+            <div className="md:col-span-6 relative">
                 <BedDouble className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
                 <input 
-                    type="number" min="1" placeholder="Ch." 
+                    type="number" min="1" placeholder="Chambres" 
                     value={ghostData.bedrooms} onChange={e => setGhostData({...ghostData, bedrooms: parseInt(e.target.value) || 0})}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 pl-10 text-sm text-white outline-none focus:border-orange-500 transition" 
                 />
             </div>
-            <div className="md:col-span-2 relative">
+            <div className="md:col-span-6 relative">
                 <Bath className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
                 <input 
-                    type="number" min="1" placeholder="SdB" 
+                    type="number" min="1" placeholder="Salles de bain" 
                     value={ghostData.bathrooms} onChange={e => setGhostData({...ghostData, bathrooms: parseInt(e.target.value) || 0})}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 pl-10 text-sm text-white outline-none focus:border-orange-500 transition" 
                 />
             </div>
 
-            {/* LIGNE 3 : Description Facebook (Commodités) */}
             <div className="md:col-span-12">
                 <textarea 
                     placeholder="Colle ici la description FB (Commodités : Clim, Ascenseur, Sous-sol...)" 
@@ -175,7 +183,6 @@ export default function GhostGenerator() {
                 />
             </div>
 
-            {/* LIGNE 4 : Images Multiples */}
             <div className="md:col-span-12 space-y-2">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Liens des Photos (Séparés)</label>
                 {ghostData.images.map((img, index) => (
@@ -197,7 +204,6 @@ export default function GhostGenerator() {
                 </button>
             </div>
 
-            {/* LIGNE 5 : Lien Original FB */}
             <div className="md:col-span-12 mt-2">
                 <input 
                     type="text" placeholder="Lien du post Facebook original (Pour tes archives)" 

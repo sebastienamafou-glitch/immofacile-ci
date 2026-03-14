@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
+// ✅ IMPORT DES ENUMS
+import { Role, PropertyType, ListingSource } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +16,7 @@ cloudinary.config({
 
 export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ (Super Admin uniquement)
+    // 1. SÉCURITÉ ZERO TRUST
     const session = await auth();
     const userId = session?.user?.id;
     
@@ -25,19 +27,20 @@ export async function POST(req: Request) {
         select: { role: true }
     });
 
-    if (admin?.role !== "SUPER_ADMIN") {
+    if (admin?.role !== Role.SUPER_ADMIN) { // ✅ ENUM STRICT
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
     // 2. RÉCUPÉRATION DES DONNÉES ENRICHIES
     const body = await req.json();
-    const { title, price, commune, type, bedrooms, bathrooms, description, fbLink, images } = body;
+    // ✅ AJOUT DE "address"
+    const { title, price, commune, address, type, bedrooms, bathrooms, description, fbLink, images } = body;
 
-    if (!title || !price || !commune) {
+    if (!title || !price || !commune || !address) {
         return NextResponse.json({ error: "Données incomplètes" }, { status: 400 });
     }
 
-    // 3. LE SYSTÈME FANTÔME (Recherche ou Création du propriétaire Ghost)
+    // 3. LE SYSTÈME FANTÔME
     const ghostEmail = "ghost_machine@babimmo.ci";
     let ghostOwner = await prisma.user.findUnique({ where: { email: ghostEmail } });
 
@@ -46,57 +49,70 @@ export async function POST(req: Request) {
             data: {
                 name: "Démarcheur Facebook",
                 email: ghostEmail,
-                role: "OWNER",
-                isVerified: false, // On s'assure qu'il n'a pas de KYC pour déclencher le bandeau de revendication
+                role: Role.OWNER, // ✅ ENUM STRICT
+                isVerified: false, 
             }
         });
     }
 
-    // Formatage de la description avec le lien FB si présent (pour l'Admin)
     let finalDescription = description || "Annonce importée depuis les réseaux sociaux.";
     if (fbLink) {
         finalDescription += `\n\n---\nLien d'origine (Archives Babimmo) : ${fbLink}`;
     }
 
     // ==========================================
-    // 🔥 LE FILTRE D'IMMORTALITÉ CLOUDINARY
+    // 🔥 UPLOAD PARALLÈLE CLOUDINARY (ANTI-TIMEOUT)
     // ==========================================
-    const permanentImageUrls = [];
+    const permanentImageUrls: string[] = [];
     
-    if (Array.isArray(images)) {
-        for (const imageUrl of images) {
-            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+    if (Array.isArray(images) && images.length > 0) {
+        // Exécution de toutes les requêtes Cloudinary en MÊME TEMPS
+        const uploadPromises = images
+            .filter(url => typeof url === 'string' && url.trim() !== "")
+            .map(async (imageUrl) => {
                 try {
-                    // Cloudinary aspire la photo FB et l'héberge chez toi à vie
                     const uploadResponse = await cloudinary.uploader.upload(imageUrl, {
                         folder: "babimmo/ghosts",
                     });
-                    permanentImageUrls.push(uploadResponse.secure_url);
+                    return uploadResponse.secure_url;
                 } catch (imgError) {
-                    console.error("Erreur d'aspiration Cloudinary :", imgError);
-                    // Si Facebook bloque l'aspiration, on garde le lien temporaire en secours
-                    permanentImageUrls.push(imageUrl);
+                    console.error("Erreur d'aspiration Cloudinary sur une image :", imgError);
+                    return imageUrl; // Fallback
                 }
-            }
-        }
+            });
+        
+        // Attente de la résolution groupée
+        const results = await Promise.all(uploadPromises);
+        permanentImageUrls.push(...results);
     }
 
-    // 4. CRÉATION DU BIEN EXPRESS AVEC TOUTES LES INFOS
+    // 4. PRÉPARATION DES DONNÉES (Pour gérer la contrainte unique de fbLink)
+    const propertyData: any = {
+        title: title.trim(),
+        price: parseInt(price, 10),
+        commune: commune.trim(),
+        address: address.trim(), // ✅ PRISE EN COMPTE DU FRONTEND
+        type: (type as PropertyType) || PropertyType.APPARTEMENT, // ✅ ENUM STRICT
+        bedrooms: parseInt(bedrooms, 10) || 1,
+        bathrooms: parseInt(bathrooms, 10) || 1,
+        description: finalDescription,
+        images: permanentImageUrls, 
+        isPublished: true,
+        isAvailable: true,
+        ownerId: ghostOwner.id,
+        // ✅ TRAÇABILITÉ AUTOMATIQUE DE L'ASPIRATEUR
+        source: ListingSource.SCRAPER, 
+        isClaimed: false
+    };
+
+    // On n'ajoute originalUrl que s'il existe vraiment, pour éviter le crash de l'index @unique
+    if (fbLink && fbLink.trim() !== "") {
+        propertyData.originalUrl = fbLink.trim();
+    }
+
+    // 5. CRÉATION DU BIEN
     const property = await prisma.property.create({
-        data: {
-            title: title.trim(),
-            price: parseInt(price, 10),
-            commune: commune.trim(),
-            address: "Adresse sur demande", // Valeur par défaut pour protéger le bien
-            type: type || "APPARTEMENT",
-            bedrooms: parseInt(bedrooms, 10) || 1,
-            bathrooms: parseInt(bathrooms, 10) || 1,
-            description: finalDescription,
-            images: permanentImageUrls, // ✅ On injecte les liens immortels ici !
-            isPublished: true,
-            isAvailable: true,
-            ownerId: ghostOwner.id
-        }
+        data: propertyData
     });
 
     return NextResponse.json({ 
