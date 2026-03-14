@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { IncidentStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
-// ✅ BONNE PRATIQUE : On enveloppe la route avec auth() pour la session v5
-export const GET = auth(async (req) => {
+export async function GET(req: Request) {
   try {
-    const session = req.auth;
+    // 1. AUTHENTIFICATION ZERO TRUST
+    const session = await auth();
     const userId = session?.user?.id;
 
     if (!userId) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
+    // 2. REQUÊTE PRISMA OPTIMISÉE
     const artisan = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -22,12 +24,14 @@ export const GET = auth(async (req) => {
         email: true,
         role: true,
         isAvailable: true, 
+        isVerified: true, // ✅ CORRECTION : Nécessaire pour le Widget KYC
         finance: {
             select: { walletBalance: true }
         },
         incidentsAssigned: { 
           where: {
-            status: { in: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] }
+            // ✅ CORRECTION : Ajout de QUOTATION pour voir les devis en attente
+            status: { in: [IncidentStatus.OPEN, IncidentStatus.IN_PROGRESS, IncidentStatus.QUOTATION, IncidentStatus.RESOLVED] }
           },
           orderBy: { createdAt: 'desc' },
           select: {
@@ -37,7 +41,9 @@ export const GET = auth(async (req) => {
             status: true,
             priority: true,
             createdAt: true,
-            quoteAmount: true,
+            quote: { // ✅ CORRECTION : On va chercher le vrai montant du devis généré
+                select: { totalAmount: true } 
+            },
             property: { 
                 select: { address: true, commune: true } 
             },
@@ -49,7 +55,7 @@ export const GET = auth(async (req) => {
       }
     });
 
-    // Autorisation : Artisan ou Super Admin (pour maintenance)
+    // 3. CONTRÔLE RBAC
     if (!artisan || (artisan.role !== "ARTISAN" && artisan.role !== "SUPER_ADMIN")) {
         return NextResponse.json({ error: "Accès réservé aux artisans partenaires." }, { status: 403 });
     }
@@ -57,6 +63,7 @@ export const GET = auth(async (req) => {
     const currentBalance = artisan.finance?.walletBalance || 0;
     const incidents = artisan.incidentsAssigned || [];
 
+    // 4. FORMATAGE DU DTO POUR LE FRONTEND
     const formattedJobs = incidents.map((j) => ({
         id: j.id,
         title: j.title,
@@ -66,7 +73,7 @@ export const GET = auth(async (req) => {
         address: j.property ? `${j.property.address}, ${j.property.commune}` : "Adresse inconnue",
         reporterName: j.reporter?.name || "Locataire",
         reporterPhone: j.reporter?.phone || "",
-        quoteAmount: j.quoteAmount || 0,
+        quoteAmount: j.quote?.totalAmount || 0, // ✅ CORRECTION : Utilisation du montant du devis
         createdAt: j.createdAt
     }));
 
@@ -77,7 +84,8 @@ export const GET = auth(async (req) => {
         name: artisan.name,
         email: artisan.email,
         walletBalance: currentBalance,
-        isAvailable: artisan.isAvailable ?? true 
+        isAvailable: artisan.isAvailable ?? true,
+        isVerified: artisan.isVerified ?? false // ✅ CORRECTION : Transmission au frontend
       },
       stats: {
         jobsCount: formattedJobs.length,
@@ -91,4 +99,4 @@ export const GET = auth(async (req) => {
     console.error("🔥 Erreur Artisan Dashboard API:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
-});
+}

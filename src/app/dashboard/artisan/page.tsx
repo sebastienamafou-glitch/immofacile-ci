@@ -20,7 +20,7 @@ interface Job {
   id: string;
   title: string;
   description: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  status: 'OPEN' | 'IN_PROGRESS' | 'QUOTATION' | 'RESOLVED' | 'CLOSED';
   priority: string;
   address: string;
   reporterName?: string;
@@ -35,7 +35,7 @@ interface ArtisanData {
     email: string;
     walletBalance: number;
     isAvailable: boolean;
-    isVerified: boolean; // ✅ Ajout pour le KYC
+    isVerified: boolean; 
   };
   stats: any;
   jobs: Job[];
@@ -43,7 +43,6 @@ interface ArtisanData {
 
 // ✅ WIDGET KYC ARTISAN
 const ArtisanKycWidget = ({ isVerified }: { isVerified: boolean }) => {
-  // Si vérifié, on affiche un bandeau discret de succès
   if (isVerified) return (
     <div className="mb-8 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
         <div className="p-2 bg-emerald-500/20 rounded-full text-emerald-500">
@@ -56,7 +55,6 @@ const ArtisanKycWidget = ({ isVerified }: { isVerified: boolean }) => {
     </div>
   );
 
-  // Sinon, gros bloc d'appel à l'action
   return (
     <div className="mb-8 p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-xl relative overflow-hidden group transition hover:scale-[1.01]">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -91,21 +89,14 @@ export default function ArtisanDashboard() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ArtisanData | null>(null);
   
-  // États Modale
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  // --- DATA FETCHING ---
+  // --- DATA FETCHING (Zero Trust via Cookies) ---
   const fetchDashboard = async () => {
     try {
-        const stored = localStorage.getItem("immouser");
-        if (!stored) { router.push("/login"); return; }
-        const user = JSON.parse(stored);
-
-        // ✅ Ajout du header x-user-email pour la sécurité
-        const res = await api.get('/artisan/dashboard', {
-             headers: { 'x-user-email': user.email }
-        });
+        // ✅ CORRECTION : Les cookies HTTP-Only de Next-Auth sont envoyés automatiquement
+        const res = await api.get('/artisan/dashboard');
         
         if (res.data.success) {
             setData(res.data);
@@ -113,6 +104,8 @@ export default function ArtisanDashboard() {
     } catch (error: any) {
         if (error.response?.status === 401) {
              router.push('/login');
+        } else {
+             toast.error("Erreur lors du chargement des données.");
         }
     } finally {
         setLoading(false);
@@ -154,35 +147,36 @@ export default function ArtisanDashboard() {
   return (
     <div className="p-6 md:p-10 font-sans text-slate-200 bg-[#0B1120] min-h-screen pb-20">
         
-        {/* HEADER */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-10 border-b border-slate-800 pb-8">
-            <div>
-                <h1 className="text-3xl font-black text-white mb-2 uppercase">Bonjour, {data.user.name}</h1>
-                <div className="flex items-center gap-3">
-                    {data.user.isVerified ? (
-                        <Badge variant="outline" className="border-emerald-500 text-emerald-500 bg-emerald-500/10 gap-1 pl-1">
-                            <CheckCircle className="w-3 h-3" /> Artisan Certifié
-                        </Badge>
-                    ) : (
-                        <Badge variant="outline" className="border-slate-600 text-slate-400">Non Vérifié</Badge>
-                    )}
-                    
-                    <button onClick={toggleAvailability} className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold transition-all ${data.user.isAvailable ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : 'border-slate-600 text-slate-400 bg-slate-800'}`}>
-                        <div className={`w-2 h-2 rounded-full ${data.user.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-                        {data.user.isAvailable ? 'DISPONIBLE' : 'HORS LIGNE'}
-                    </button>
+            <div className="flex-1">
+                <div className="flex justify-between items-start w-full">
+                     <div>
+                        <h1 className="text-3xl font-black text-white mb-2 uppercase">Bonjour, {data.user.name}</h1>
+                        <div className="flex items-center gap-3">
+                            {data.user.isVerified ? (
+                                <Badge variant="outline" className="border-emerald-500 text-emerald-500 bg-emerald-500/10 gap-1 pl-1">
+                                    <CheckCircle className="w-3 h-3" /> Artisan Certifié
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline" className="border-slate-600 text-slate-400">Non Vérifié</Badge>
+                            )}
+                            
+                            <button onClick={toggleAvailability} className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-bold transition-all ${data.user.isAvailable ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10' : 'border-slate-600 text-slate-400 bg-slate-800'}`}>
+                                <div className={`w-2 h-2 rounded-full ${data.user.isAvailable ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                                {data.user.isAvailable ? 'DISPONIBLE' : 'HORS LIGNE'}
+                            </button>
+                        </div>
+                     </div>
+                     <div className="bg-slate-900 px-6 py-4 rounded-xl border border-slate-800 shadow-lg text-right w-full md:w-auto">
+                        <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solde Portefeuille</p>
+                        <p className="text-3xl font-black text-emerald-400 tracking-tight">{formatCurrency(data.user.walletBalance)}</p>
+                    </div>
                 </div>
-            </div>
-             <div className="bg-slate-900 px-6 py-4 rounded-xl border border-slate-800 shadow-lg text-right w-full md:w-auto">
-                <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solde Portefeuille</p>
-                <p className="text-3xl font-black text-emerald-400 tracking-tight">{formatCurrency(data.user.walletBalance)}</p>
             </div>
         </header>
 
-        {/* ✅ BLOC KYC */}
         <ArtisanKycWidget isVerified={data.user.isVerified} />
 
-        {/* LISTE DES MISSIONS */}
         <div className="space-y-4">
             {data.jobs.length === 0 ? (
                 <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/30">
@@ -194,11 +188,10 @@ export default function ArtisanDashboard() {
                     <Card key={job.id} className="bg-slate-900 border-slate-800 text-slate-200 shadow-xl hover:border-slate-700 transition">
                         <CardContent className="p-6 flex flex-col lg:flex-row gap-8">
                             
-                            {/* INFO GAUCHE */}
                             <div className="flex-1 space-y-4">
                                 <div className="flex items-center gap-3">
-                                    <Badge className={`${job.status === 'IN_PROGRESS' ? 'bg-orange-600 hover:bg-orange-600' : job.status === 'RESOLVED' ? 'bg-emerald-600 hover:bg-emerald-600' : 'bg-blue-600 hover:bg-blue-600'} text-white border-none px-3 py-1`}>
-                                        {job.status === 'IN_PROGRESS' ? 'EN COURS' : job.status === 'RESOLVED' ? 'TERMINÉ' : 'NOUVELLE DEMANDE'}
+                                    <Badge className={`${job.status === 'IN_PROGRESS' || job.status === 'QUOTATION' ? 'bg-orange-600' : job.status === 'RESOLVED' ? 'bg-emerald-600' : 'bg-blue-600'} text-white border-none px-3 py-1`}>
+                                        {job.status === 'IN_PROGRESS' ? 'EN COURS' : job.status === 'QUOTATION' ? 'DEVIS EN ATTENTE' : job.status === 'RESOLVED' ? 'TERMINÉ' : 'NOUVELLE DEMANDE'}
                                     </Badge>
                                     <span className="text-xs text-slate-500 font-mono flex items-center gap-1 font-bold">
                                         <Clock className="w-3 h-3"/> {new Date(job.createdAt).toLocaleDateString()}
@@ -216,7 +209,7 @@ export default function ArtisanDashboard() {
                                     <p className="text-slate-300 text-xs font-bold bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 flex items-center gap-2">
                                         <MapPin className="w-3 h-3 text-orange-500"/> {job.address}
                                     </p>
-                                    {job.status === 'IN_PROGRESS' && (
+                                    {(job.status === 'IN_PROGRESS' || job.status === 'QUOTATION') && (
                                          <p className="text-slate-300 text-xs font-bold bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 flex items-center gap-2">
                                             <Phone className="w-3 h-3 text-blue-500"/> {job.reporterPhone || "Non renseigné"}
                                          </p>
@@ -224,7 +217,6 @@ export default function ArtisanDashboard() {
                                 </div>
                             </div>
 
-                            {/* --- ACTIONS DROITE --- */}
                             <div className="flex flex-col justify-center gap-4 min-w-[240px] border-t lg:border-t-0 lg:border-l border-slate-800 pt-6 lg:pt-0 lg:pl-8">
                                 <div className="text-right w-full mb-2">
                                     <p className="text-[10px] text-slate-500 font-black uppercase mb-1 tracking-wider">Montant Estimé</p>
@@ -233,7 +225,6 @@ export default function ArtisanDashboard() {
                                     </p>
                                 </div>
 
-                                {/* CAS 1: NOUVELLE DEMANDE */}
                                 {job.status === 'OPEN' && (
                                     <div className="space-y-3 w-full">
                                         <div className="grid grid-cols-2 gap-2">
@@ -244,15 +235,9 @@ export default function ArtisanDashboard() {
                                                 <XCircle className="w-3 h-3 mr-2"/> Refuser
                                             </Button>
                                         </div>
-                                        <Link href={`/dashboard/artisan/incidents/${job.id}/quote`} className="w-full block">
-                                            <Button variant="secondary" className="w-full text-xs font-bold uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 h-10">
-                                                <DollarSign className="w-3 h-3 mr-2"/> Faire un devis
-                                            </Button>
-                                        </Link>
                                     </div>
                                 )}
                                 
-                                {/* CAS 2: EN COURS */}
                                 {job.status === 'IN_PROGRESS' && (
                                     <div className="space-y-3 w-full">
                                         {(!job.quoteAmount || job.quoteAmount === 0) && (
@@ -268,6 +253,13 @@ export default function ArtisanDashboard() {
                                         >
                                             <Camera className="w-5 h-5 mr-2" /> Clôturer le chantier
                                         </Button>
+                                    </div>
+                                )}
+
+                                {job.status === 'QUOTATION' && (
+                                    <div className="text-center p-3 bg-orange-500/10 text-orange-500 font-bold rounded-xl border border-orange-500/20 flex flex-col items-center">
+                                        <Clock className="w-6 h-6 mb-1"/>
+                                        <span className="text-xs uppercase tracking-widest text-center">En attente<br/>de paiement</span>
                                     </div>
                                 )}
 
