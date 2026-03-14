@@ -4,12 +4,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendNotification } from "@/lib/notifications"; 
-import { logActivity } from "@/lib/logger"; // ✅ 1. IMPORT DU LOGGER
+import { logActivity } from "@/lib/logger"; 
+// ✅ 1. IMPORT DES ENUMS STRICTS
+import { VerificationStatus, Role } from "@prisma/client";
 
 // =========================================================
 // 1. SOUMISSION DU DOSSIER (Utilisateur)
 // =========================================================
-export async function submitKycApplication(documentUrl: string, idType: string) {
+export async function submitKycApplication(
+  documentUrl: string, 
+  idType: string, 
+  idNumber: string // ✅ 2. AJOUT DU PARAMÈTRE MANQUANT
+) {
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -22,22 +28,25 @@ export async function submitKycApplication(documentUrl: string, idType: string) 
     await prisma.userKYC.upsert({
       where: { userId: userId },
       update: {
-        status: "PENDING",
+        status: VerificationStatus.PENDING, // ✅ ENUM STRICT
         documents: [documentUrl],
         idType: idType,
+        idNumber: idNumber, // ✅ SAUVEGARDE DU NUMÉRO EN BDD
         updatedAt: new Date(),
         rejectionReason: null 
       },
       create: {
         userId: userId,
-        status: "PENDING",
+        status: VerificationStatus.PENDING, // ✅ ENUM STRICT
         documents: [documentUrl],
-        idType: idType
+        idType: idType,
+        idNumber: idNumber // ✅ SAUVEGARDE DU NUMÉRO EN BDD
       }
     });
 
     revalidatePath("/dashboard/tenant");
     revalidatePath("/dashboard/owner");
+    revalidatePath("/dashboard/artisan"); // ✅ Ajout pour l'artisan
     return { success: true };
 
   } catch (error) {
@@ -61,15 +70,17 @@ export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED"
         select: { role: true }
     });
 
-    if (adminUser?.role !== "SUPER_ADMIN") {
+    if (adminUser?.role !== Role.SUPER_ADMIN) { // ✅ ENUM STRICT
         return { error: "Action réservée aux administrateurs." };
     }
+
+    const finalStatus = decision === "VERIFIED" ? VerificationStatus.VERIFIED : VerificationStatus.REJECTED;
 
     // 1. Mise à jour de la table UserKYC
     const updatedKyc = await prisma.userKYC.update({
       where: { id: kycId },
       data: {
-        status: decision,
+        status: finalStatus, // ✅ ENUM STRICT
         rejectionReason: decision === "REJECTED" ? reason : null,
         reviewedAt: new Date(),
         reviewedBy: session.user.id
@@ -130,7 +141,7 @@ export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED"
             title: "Action Requise : Dossier Rejeté 🛑",
             message: `Votre pièce d'identité a été refusée. Motif : ${reason || "Non spécifié"}. Veuillez soumettre un nouveau document.`,
             type: "ERROR",
-            link: "/dashboard/tenant/kyc"
+            link: "/dashboard/kyc"
         });
     }
 
@@ -144,7 +155,7 @@ export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED"
 }
 
 // =========================================================
-// 3. POLLING TEMPS RÉEL (La Magie ✨)
+// 3. POLLING TEMPS RÉEL
 // =========================================================
 export async function getLiveKycStatus() {
   const session = await auth();

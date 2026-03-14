@@ -5,29 +5,36 @@ import { ArrowLeft, HardHat, FileText, CheckCircle2, Loader2, Camera, ShieldChec
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
 import { submitKycApplication } from "@/actions/kyc";
+import { api } from "@/lib/api"; // ✅ IMPORT DE L'AXIOS SÉCURISÉ
 import Swal from "sweetalert2";
 
 export default function ArtisanKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // ✅ 1. ÉTATS DE SÉCURITÉ (AJOUTÉS)
+  // ✅ 1. ÉTATS DE SÉCURITÉ
   const [consent, setConsent] = useState(false);
   const [idNumber, setIdNumber] = useState(""); // Numéro KBIS/NINEA à chiffrer
   const [idType, setIdType] = useState("KBIS_ARTISAN"); // Type par défaut
 
+  // ✅ 2. VÉRIFICATION SERVEUR (ZERO TRUST)
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('immouser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        setStatus(user.kycStatus || "NONE");
-        if (user.kycRejectionReason) {
-             setRejectionReason(user.kycRejectionReason);
+    const fetchKycStatus = async () => {
+      try {
+        const res = await api.get('/artisan/kyc');
+        if (res.data.success) {
+          setStatus(res.data.kyc?.status || "NONE");
+          setRejectionReason(res.data.kyc?.rejectionReason || null);
         }
+      } catch (e) {
+        console.error("Impossible de récupérer le statut KYC", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) { console.error(e); }
+    };
+    fetchKycStatus();
   }, []);
 
   const handleKycSuccess = async (result: any) => {
@@ -40,20 +47,12 @@ export default function ArtisanKYCPage() {
     }
 
     try {
-      // ✅ 2. ENVOI SÉCURISÉ AVEC NUMÉRO
+      // ✅ 3. ENVOI SÉCURISÉ AVEC NUMÉRO
       const response = await submitKycApplication(secureUrl, idType, idNumber);
       
       if (response.error) throw new Error(response.error);
 
       setStatus("PENDING");
-      
-      const storedUser = localStorage.getItem('immouser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        user.kycStatus = "PENDING";
-        user.kycRejectionReason = null;
-        localStorage.setItem('immouser', JSON.stringify(user));
-      }
 
       Swal.fire({
         icon: 'success',
@@ -77,6 +76,10 @@ export default function ArtisanKYCPage() {
       setConsent(false);
       setIdNumber(""); // Reset
   };
+
+  if (loading) {
+      return <div className="min-h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-orange-500" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-200 p-4 lg:p-10 font-sans pb-24">
@@ -163,7 +166,7 @@ export default function ArtisanKYCPage() {
                 // CAS 4 : UPLOAD
                 <div className="relative z-10">
                     
-                    {/* ✅ 3. CHAMP DE SAISIE (AJOUTÉ) */}
+                    {/* ✅ CHAMP DE SAISIE */}
                     <div className="mb-6">
                         <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block ml-1 tracking-widest">
                             Numéro d'immatriculation (SIRET / NINEA) <span className="text-orange-500">*</span>
@@ -180,7 +183,7 @@ export default function ArtisanKYCPage() {
                         </div>
                     </div>
 
-                    {/* ✅ 4. CONSENTEMENT */}
+                    {/* ✅ CONSENTEMENT */}
                     <div className="mb-6 flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-orange-500/30">
                         <input 
                             type="checkbox" 

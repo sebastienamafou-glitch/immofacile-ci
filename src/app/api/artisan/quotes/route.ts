@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { Role } from "@prisma/client";
+// ✅ IMPORT DES ENUMS STRICTS
+import { Role, QuoteStatus, IncidentStatus } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const quoteItemSchema = z.object({
   description: z.string().min(3, "La description de la ligne est requise"),
   quantity: z.number().int().positive("La quantité doit être supérieure à 0"),
-  unitPrice: z.number().int().nonnegative("Le prix unitaire ne peut pas être négatif") // En FCFA, on utilise des entiers
+  unitPrice: z.number().int().nonnegative("Le prix unitaire ne peut pas être négatif")
 });
 
 const quoteSchema = z.object({
@@ -28,13 +29,19 @@ export async function POST(request: Request) {
 
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
+    // ✅ AJOUT : Récupération de isVerified pour le KYC
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true }
+        select: { role: true, isVerified: true }
     });
 
     if (!user || user.role !== Role.ARTISAN) {
         return NextResponse.json({ error: "Seul un artisan certifié peut émettre un devis." }, { status: 403 });
+    }
+
+    // ✅ BLINDAGE KYC : L'artisan doit être vérifié
+    if (!user.isVerified) {
+        return NextResponse.json({ error: "Votre profil doit être vérifié (KYC) pour émettre des devis." }, { status: 403 });
     }
 
     // 3. NETTOYAGE ET VALIDATION DU PAYLOAD
@@ -73,18 +80,22 @@ export async function POST(request: Request) {
         };
     });
 
+    const taxAmount = 0; // Explicite pour le schéma
+    const totalAmount = totalNet + taxAmount;
+    
     const quoteNumber = `DEV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
     const expirationDate = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
     // 6. EXÉCUTION ATOMIQUE (Devis + Statut + Notification)
     const result = await prisma.$transaction(async (tx) => {
-        // A. Création du devis
+        // A. Création du devis avec ENUMS
         const newQuote = await tx.quote.create({
             data: {
                 number: quoteNumber,
-                status: 'PENDING',
+                status: QuoteStatus.PENDING, // ✅ ENUM
                 totalNet: totalNet,
-                totalAmount: totalNet, // Gestion des taxes à prévoir plus tard si nécessaire
+                taxAmount: taxAmount,
+                totalAmount: totalAmount,
                 validityDate: expirationDate,
                 notes: notes,
                 incidentId: incidentId,
@@ -93,10 +104,10 @@ export async function POST(request: Request) {
             }
         });
 
-        // B. Mise à jour de l'incident
+        // B. Mise à jour de l'incident avec ENUMS
         await tx.incident.update({
             where: { id: incidentId },
-            data: { status: 'QUOTATION' } 
+            data: { status: IncidentStatus.QUOTATION } // ✅ ENUM
         });
 
         // C. Notification au propriétaire
@@ -104,7 +115,7 @@ export async function POST(request: Request) {
             data: {
                 userId: incident.property.ownerId,
                 title: "Nouveau Devis Reçu 📄",
-                message: `L'artisan a soumis un devis de ${totalNet.toLocaleString('fr-FR')} FCFA pour "${incident.title}".`,
+                message: `L'artisan a soumis un devis de ${totalAmount.toLocaleString('fr-FR')} FCFA pour "${incident.title}".`,
                 type: "INFO",
                 link: `/dashboard/owner/maintenance/incidents/${incidentId}`, 
                 isRead: false
