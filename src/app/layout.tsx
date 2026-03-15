@@ -55,13 +55,13 @@ export default function RootLayout({
     <html lang="fr" className="dark">
       <body className={`${fontSans.variable} ${fontMono.variable} antialiased bg-[#0B1120] text-slate-200`}>
         <Providers>
-          {/* <AuthSync /> */ }   {/* ⬅️ NEUTRALISÉ */}
+          <AuthSync /> 
           <ServiceWorkerRegister />
           {children}
           <Toaster position="top-right" richColors theme="dark" closeButton />
         </Providers>
         
-        {/* <CookieBanner /> */ } {/* ⬅️ NEUTRALISÉ */}
+        <CookieBanner /> 
       </body>
     </html>
   );

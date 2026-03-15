@@ -195,6 +195,7 @@ export function AppSidebar({ className }: { className?: string }) {
                         <Link 
                         key={item.href} 
                         href={item.href}
+                        prefetch={false} 
                         className={cn(
                             "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group relative mb-1",
                             isActive 
@@ -221,11 +222,11 @@ export function AppSidebar({ className }: { className?: string }) {
         <div className="px-3 py-2 mt-4">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 opacity-60 pl-1">Système</p>
             {COMMON_ITEMS.map((item) => (
-                <Link key={item.href} href={item.href} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all mb-1 group">
+                <Link key={item.href} href={item.href} prefetch={false} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-white/5 transition-all mb-1 group">
                     <item.icon className="w-4 h-4 text-slate-500 group-hover:text-slate-300" />
                     <span className="text-sm">{item.label}</span>
                 </Link>
-            ))}
+    ))}
         </div>
       </div>
 
