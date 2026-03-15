@@ -124,36 +124,57 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, nextUrl));
   }
 
-  // ============================================================
+// ============================================================
   // 🛡️ SÉCURITÉ : CLOISONNEMENT STRICT DES DASHBOARDS
   // ============================================================
   if (isLoggedIn && userRole) {
     
+    // 1. Protection des sous-dossiers spécifiques
     if (path.startsWith('/dashboard/superadmin') && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/login", nextUrl));
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    if (path.startsWith('/dashboard/agency')) {
-        const canAccessAgency = userRole === 'SUPER_ADMIN' || userRole === 'AGENCY_ADMIN';
-        if (!canAccessAgency) return NextResponse.redirect(new URL("/login", nextUrl));
+    if (path.startsWith('/dashboard/agency') && userRole !== 'SUPER_ADMIN' && userRole !== 'AGENCY_ADMIN') {
+        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    if (path.startsWith('/dashboard/agent')) {
-        const canAccessAgent = userRole === 'SUPER_ADMIN' || userRole === 'AGENT';
-        if (!canAccessAgent) return NextResponse.redirect(new URL("/login", nextUrl));
+    if (path.startsWith('/dashboard/agent') && userRole !== 'SUPER_ADMIN' && userRole !== 'AGENT') {
+        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    if (path.startsWith('/dashboard/ambassador')) {
-        const canAccessAmbassador = userRole === 'SUPER_ADMIN' || userRole === 'AMBASSADOR';
-        if (!canAccessAmbassador) return NextResponse.redirect(new URL("/login", nextUrl));
+    if (path.startsWith('/dashboard/ambassador') && userRole !== 'SUPER_ADMIN' && userRole !== 'AMBASSADOR') {
+        return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    if (path.startsWith('/dashboard/owner') && userRole !== 'OWNER' && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/login", nextUrl));
+    if (path.startsWith('/dashboard/owner') && userRole !== 'SUPER_ADMIN' && userRole !== 'OWNER') {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
-    if (path.startsWith('/dashboard/tenant') && userRole !== 'TENANT' && userRole !== 'SUPER_ADMIN') {
-       return NextResponse.redirect(new URL("/login", nextUrl));
+    if (path.startsWith('/dashboard/tenant') && userRole !== 'SUPER_ADMIN' && userRole !== 'TENANT') {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+
+    // ✅ NOUVELLES RÈGLES OUBLIÉES
+    if (path.startsWith('/dashboard/invest') && userRole !== 'SUPER_ADMIN' && userRole !== 'INVESTOR') {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+
+    if (path.startsWith('/dashboard/artisan') && userRole !== 'SUPER_ADMIN' && userRole !== 'ARTISAN') {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+
+    // 2. Gestion de la racine /dashboard (Aiguilleur principal)
+    // Si l'utilisateur va sur /dashboard (ou une page générique comme /dashboard/settings),
+    // on l'autorise à rester. S'il va STRICTEMENT sur /dashboard, on le redirige vers son espace spécifique.
+    if (path === '/dashboard') {
+        if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/superadmin", nextUrl));
+        if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
+        if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl));
+        if (userRole === 'AMBASSADOR') return NextResponse.redirect(new URL("/dashboard/ambassador", nextUrl));
+        if (userRole === 'OWNER') return NextResponse.redirect(new URL("/dashboard/owner", nextUrl));
+        if (userRole === 'TENANT') return NextResponse.redirect(new URL("/dashboard/tenant", nextUrl));
+        if (userRole === 'INVESTOR') return NextResponse.redirect(new URL("/dashboard/invest", nextUrl));
+        if (userRole === 'ARTISAN') return NextResponse.redirect(new URL("/dashboard/artisan", nextUrl));
     }
   }
   
