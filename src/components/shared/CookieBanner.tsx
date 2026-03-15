@@ -32,7 +32,7 @@ export default function CookieBanner() {
   return (
     <>
       {/* 🚀 LE CŒUR DU RGPD : Google Analytics n'est injecté QUE si GRANTED */}
-      {consent === "GRANTED" && <GoogleAnalytics gaId="G-36JC3KB6E5" />}
+      {/* {consent === "GRANTED" && <GoogleAnalytics gaId="G-36JC3KB6E5" />} */}
 
       {/* BANNIÈRE UI */}
       {consent === "PENDING" && (
