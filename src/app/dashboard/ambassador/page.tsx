@@ -40,10 +40,7 @@ export default async function AmbassadorDashboard() {
   // Sécurité supplémentaire au cas où l'utilisateur n'existe plus en base
   if (!user) redirect("/login");
   
-  // Sécurité "Hard Check" au cas où le rôle dans la session n'était pas à jour
-  if (user.role !== "AMBASSADOR" && user.role !== "SUPER_ADMIN") {
-      redirect("/dashboard");
-  }
+  
 
   const isKycVerified = user.kyc?.status === "VERIFIED";
   const kycPending = user.kyc?.status === "PENDING";
