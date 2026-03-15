@@ -367,6 +367,7 @@ model InvestmentContract {
 
   packName String?
   amount   Int
+  contractUrl String? 
 }
 
 // ==========================================

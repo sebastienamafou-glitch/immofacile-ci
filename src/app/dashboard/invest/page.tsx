@@ -2,8 +2,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import DashboardView from "@/components/investor/DashboardView";
+import { Role } from "@prisma/client"; // ✅ IMPORT DE L'ENUM STRICT
 
-// ✅ 1. TYPAGE STRICT 100% FRONT-END (Zéro dépendance Prisma directe)
+// ✅ 1. TYPAGE STRICT 100% FRONT-END
 export interface InvestorDashboardData {
   id: string;
   name: string | null;
@@ -29,22 +30,30 @@ export interface InvestorDashboardData {
 
 export default async function DashboardPage() {
   const session = await auth();
+  
+  // 1. VÉRIFICATION DE LA SESSION
   if (!session?.user?.id) redirect("/login");
 
-  // 2. Récupération optimisée en DB
+  // 2. LE VIDEUR (EARLY EXIT) - SÉCURITÉ ZERO TRUST
+  const userRole = session.user.role;
+  if (userRole && userRole !== Role.INVESTOR && userRole !== Role.SUPER_ADMIN) {
+      redirect("/dashboard"); // ✅ On redirige les curieux vers leur propre espace
+  }
+
+  // 3. REQUÊTE DB OPTIMISÉE (Uniquement si l'utilisateur est légitime)
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
       id: true,
       name: true,
       email: true,
+      role: true, // ✅ On récupère le rôle pour le hard-check
       backerTier: true,
       finance: { select: { walletBalance: true } },
       kyc: { select: { status: true } },
       transactions: {
         orderBy: { createdAt: 'desc' },
         take: 10,
-        // Sélection stricte pour alléger la requête
         select: { id: true, amount: true, type: true, status: true, createdAt: true }
       },
       investmentContracts: {
@@ -57,7 +66,12 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  // 3. Mapping de sécurité (Protection contre les crashs de sérialisation Decimal/Float)
+  // 4. HARD-CHECK (Au cas où le token de session serait obsolète)
+  if (user.role !== Role.INVESTOR && user.role !== Role.SUPER_ADMIN) {
+      redirect("/dashboard");
+  }
+
+  // 5. MAPPING DE SÉCURITÉ
   const safeUser: InvestorDashboardData = {
     id: user.id,
     name: user.name,
@@ -67,7 +81,7 @@ export default async function DashboardPage() {
     kycStatus: user.kyc?.status || "UNINITIALIZED",
     transactions: user.transactions.map(t => ({
         ...t,
-        amount: Number(t.amount) // Sécurisation Decimal -> Number
+        amount: Number(t.amount) 
     })),
     investmentContracts: user.investmentContracts.map(c => ({
         ...c,

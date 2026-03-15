@@ -16,14 +16,10 @@ export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
   const router = useRouter();
 
   const handleAccessDocument = (contract: InvestorDashboardData['investmentContracts'][0]) => {
-    // ⚠️ INFO ARCHITECTURE : contractUrl n'existe pas dans le schéma InvestmentContract.
-    // Pour l'instant on bypass avec un cast TypeScript propre au lieu d'un @ts-ignore global,
-    // mais il faudra ajouter ce champ dans schema.prisma à l'avenir.
-    const url = (contract as any).contractUrl;
-
-    if (url) {
+    // ✅ FINI LE "ANY", TYPESCRIPT CONNAÎT MAINTENANT contractUrl
+    if (contract.contractUrl) {
         toast.success("Téléchargement du document officiel...");
-        window.open(url, '_blank');
+        window.open(contract.contractUrl, '_blank');
         return;
     }
 
@@ -66,7 +62,7 @@ export default function DocumentsCard({ contracts, user }: DocumentsCardProps) {
                         </div>
                         
                         <div className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center group-hover:bg-[#F59E0B] group-hover:text-black transition">
-                            {(contract as any).contractUrl ? (
+                            {contract.contractUrl ? (
                                 <Download className="w-4 h-4 text-slate-500 group-hover:text-black" />
                             ) : (
                                 <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-black" />

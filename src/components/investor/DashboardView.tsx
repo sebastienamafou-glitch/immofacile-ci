@@ -37,6 +37,7 @@ export interface InvestorDashboardData {
     status: string;
     roi: number;
     signedAt: Date | string;
+    contractUrl?: string | null; 
   }[];
 }
 
@@ -98,6 +99,8 @@ export default function DashboardView({ user }: DashboardViewProps) {
       
       {/* ================= HEADER ================= */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
+        
+        {/* BLOC 1 : TEXTE */}
         <div>
            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black uppercase tracking-widest mb-3">
              <ShieldCheck className="w-3 h-3" /> Actionnaire Vérifié
@@ -110,6 +113,7 @@ export default function DashboardView({ user }: DashboardViewProps) {
            </p>
         </div>
 
+        {/* BLOC 2 : BOUTONS */}
         <div className="flex items-center gap-3 flex-wrap">
             
             {/* --- Notifications --- */}
