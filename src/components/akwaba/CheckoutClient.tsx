@@ -9,6 +9,8 @@ import { Loader2, ShieldCheck, Calendar, Users, ArrowLeft, UserCheck } from "luc
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { createSecureBooking } from "@/actions/akwaba/booking.action";
+import { initiateBookingPayment } from "@/actions/payment";
 
 interface CheckoutClientProps {
   listing: {
@@ -23,7 +25,7 @@ interface CheckoutClientProps {
   guests: number;
   nights: number;
   total: number;
-  currentUserEmail: string; // ✅ Reçoit l'email validé
+  currentUserEmail: string; 
 }
 
 export default function CheckoutClient({ 
@@ -36,41 +38,37 @@ export default function CheckoutClient({
     setProcessing(true);
     
     try {
-        // PROD STRICT : On ne touche pas aux headers d'auth ici.
-        // Le Cookie HttpOnly fait tout le travail.
-        const res = await fetch('/api/akwaba/booking/create', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json'
-                // ❌ SUPPRIMÉ : 'x-user-email'. Le middleware s'en charge !
-            },
-            body: JSON.stringify({
-                listingId: listing.id,
-                startDate,
-                endDate,
-                guests
-            })
+        // 1. On verrouille les dates (Transaction atomique)
+        const bookingResponse = await createSecureBooking({
+            listingId: listing.id,
+            startDate,
+            endDate,
+            guestCount: guests
         });
 
-        const data = await res.json();
+        if (bookingResponse.success && bookingResponse.bookingId) {
+            
+            // 2. On génère le lien de paiement CinetPay
+            const paymentResponse = await initiateBookingPayment(bookingResponse.bookingId);
 
-        if (res.ok && data.success) {
-            await Swal.fire({
-                title: 'Réservation Confirmée ! 🌍',
-                text: 'Votre séjour est validé. Préparez vos valises !',
-                icon: 'success',
-                confirmButtonColor: '#ea580c',
-                confirmButtonText: 'Voir mon billet'
-            });
-            router.push('/dashboard/guest/trips');
-        } else {
-            // Gestion d'erreur robuste
-            if (res.status === 401) {
-                toast.error("Session expirée. Veuillez vous reconnecter.");
-                router.push("/login");
+            if (paymentResponse.success && paymentResponse.paymentUrl) {
+                await Swal.fire({
+                    title: 'Panier Sécurisé 🔒',
+                    text: 'Vos dates sont bloquées pour 15 minutes. Redirection vers le paiement sécurisé...',
+                    icon: 'info',
+                    confirmButtonColor: '#ea580c',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+                
+                // 3. Redirection EXTERNE absolue vers CinetPay
+                window.location.href = paymentResponse.paymentUrl;
             } else {
-                toast.error(data.error || "Impossible de finaliser la réservation.");
+                toast.error(paymentResponse.error || "Impossible d'initialiser le paiement.");
             }
+
+        } else {
+            toast.error(bookingResponse.error || "Dates non disponibles.");
         }
     } catch (error) {
         console.error(error);

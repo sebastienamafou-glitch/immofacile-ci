@@ -342,8 +342,8 @@ async function processAkwabaPayment(tx: TxClient, bookingPayment: BookingPayment
         await tx.transaction.create({ data: { amount: hostPayout, type: TransactionType.CREDIT, status: 'SUCCESS', reason: `Réservation Akwaba #${bookingData.listing.title}`, userId: hostId, reference: `AKW-${transactionId}`, balanceType: BalanceType.WALLET, previousHash: "GENESIS" } });
         
         postActions.push(async () => {
-            await sendNotification({ userId: bookingData.guestId, title: "Réservation Confirmée ! 🎒", message: `Paiement reçu pour "${bookingData.listing.title}".`, type: "SUCCESS", link: `/dashboard/tenant/bookings/${bookingPayment.bookingId}` });
-            await sendNotification({ userId: hostId, title: "Nouvelle Réservation ! 🏠", message: `Réservation payée pour "${bookingData.listing.title}".`, type: "INFO", link: `/dashboard/host/bookings/${bookingPayment.bookingId}` });
+            await sendNotification({ userId: bookingData.guestId, title: "Réservation Confirmée ! 🎒", message: `Paiement reçu pour "${bookingData.listing.title}".`, type: "SUCCESS", link: `/dashboard/guest/trips` });
+            await sendNotification({ userId: hostId, title: "Nouvelle Réservation ! 🏠", message: `Réservation payée pour "${bookingData.listing.title}".`, type: "INFO", link: `/dashboard/owner/akwaba/calendar` });
         });
 
         // ✅ CORRECTION TS : bypass strict type pour le logger manquant

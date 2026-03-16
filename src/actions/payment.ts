@@ -100,3 +100,80 @@ export async function initiateInvestmentPayment(contractId: string, phoneNumber:
     return { error: "Erreur serveur critique." };
   }
 }
+export async function initiateBookingPayment(bookingId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "Non autorisé" };
+
+    // 1. VERROUILLAGE & SÉCURITÉ DB
+    const booking = await prisma.booking.findUnique({
+      where: { 
+        id: bookingId,
+        guestId: session.user.id 
+      },
+      include: { guest: true, listing: true }
+    });
+
+    if (!booking) return { error: "Réservation introuvable." };
+    if (booking.status !== 'PENDING') return { error: "Cette réservation n'est plus en attente de paiement." };
+
+    // 2. GÉNÉRATION TRANSACTION ID (Format Akwaba)
+    const transactionId = `AKW-${booking.id}-${Date.now()}`;
+
+    // 3. PAYLOAD CINETPAY STRICT
+    const payload = {
+      apikey: process.env.CINETPAY_API_KEY,
+      site_id: process.env.CINETPAY_SITE_ID,
+      transaction_id: transactionId,
+      amount: booking.totalPrice, 
+      currency: "XOF",
+      description: `Akwaba - Séjour à ${booking.listing.title.substring(0, 30)}`,
+      channels: "ALL",
+      customer_id: session.user.id,
+      customer_name: booking.guest.name || "Guest",
+      customer_surname: "",
+      customer_email: booking.guest.email || "",
+      customer_phone_number: booking.guest.phone || "0000000000", // Rempli par CinetPay si vide
+      customer_address: "CI",
+      customer_city: "Abidjan",
+      customer_country: "CI",
+      notify_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/cinetpay`, 
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/guest/trips?payment=success`
+    };
+
+    // 4. APPEL CINETPAY
+    const response = await fetch("https://api-checkout.cinetpay.com/v2/payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (data.code !== "201") {
+      console.error("Erreur CinetPay Akwaba:", data);
+      return { error: data.description || "Erreur d'initialisation du paiement." };
+    }
+
+    // 5. TRAÇABILITÉ (Audit Trail via BookingPayment)
+    await prisma.bookingPayment.create({
+      data: {
+        amount: booking.totalPrice,
+        provider: "CINETPAY",
+        transactionId: transactionId,
+        status: "PENDING",
+        bookingId: booking.id,
+        // Ces valeurs seront calculées réellement par le Webhook lors du SUCCESS
+        agencyCommission: 0, 
+        hostPayout: 0,
+        platformCommission: 0
+      }
+    });
+
+    return { success: true, paymentUrl: data.data.payment_url };
+
+  } catch (error: any) {
+    console.error("Erreur initiateBookingPayment:", error);
+    return { error: "Erreur serveur critique." };
+  }
+}

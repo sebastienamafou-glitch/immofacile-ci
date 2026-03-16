@@ -6,8 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ArrowLeft, ShieldCheck, Star, Calendar, CreditCard, Lock, UserCircle2 } from "lucide-react";
-import CheckoutButton from "@/components/akwaba/CheckoutButton"; // Composant Client qu'on va créer juste après
-
+import CheckoutClient from "@/components/akwaba/CheckoutClient";
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({
@@ -116,13 +115,21 @@ export default async function CheckoutPage({
                         Votre compte sera débité de <strong>{total.toLocaleString()} FCFA</strong>.
                     </p>
 
-                    {/* ✅ BOUTON ACTION CLIENT */}
-                    <CheckoutButton 
-                        listingId={listing.id}
-                        startDate={startDate.toISOString()}
-                        endDate={endDate.toISOString()}
-                        totalPrice={total}
-                        userEmail={userEmail}
+                    {/* ✅ BOUTON ACTION CLIENT (Le nouveau moteur) */}
+                    <CheckoutClient 
+                        listing={{
+                            id: listing.id,
+                            title: listing.title,
+                            city: listing.city,
+                            pricePerNight: listing.pricePerNight,
+                            images: listing.images,
+                        }}
+                        startDate={startDate}
+                        endDate={endDate}
+                        guests={parseInt(searchParams.guests || "1")}
+                        nights={nights}
+                        total={total}
+                        currentUserEmail={userEmail}
                     />
                 </div>
             </div>
