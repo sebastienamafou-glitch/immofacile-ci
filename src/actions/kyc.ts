@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendNotification } from "@/lib/notifications"; 
 import { logActivity } from "@/lib/logger"; 
-// ✅ 1. IMPORT DES ENUMS STRICTS
+import { encrypt } from "@/lib/crypto"; 
 import { VerificationStatus, Role } from "@prisma/client";
 
 // =========================================================
@@ -24,6 +24,9 @@ export async function submitKycApplication(
       return { error: "Vous devez être connecté." };
     }
 
+    // ✅ CHIFFREMENT DE LA DONNÉE SENSIBLE AVANT INSERTION
+    const secureIdNumber = encrypt(idNumber);
+
     // Mise à jour ou Création (Upsert)
     await prisma.userKYC.upsert({
       where: { userId: userId },
@@ -31,7 +34,7 @@ export async function submitKycApplication(
         status: VerificationStatus.PENDING, // ✅ ENUM STRICT
         documents: [documentUrl],
         idType: idType,
-        idNumber: idNumber, // ✅ SAUVEGARDE DU NUMÉRO EN BDD
+        idNumber: secureIdNumber, // ✅ SAUVEGARDE SÉCURISÉE EN BDD
         updatedAt: new Date(),
         rejectionReason: null 
       },
@@ -40,7 +43,7 @@ export async function submitKycApplication(
         status: VerificationStatus.PENDING, // ✅ ENUM STRICT
         documents: [documentUrl],
         idType: idType,
-        idNumber: idNumber // ✅ SAUVEGARDE DU NUMÉRO EN BDD
+        idNumber: secureIdNumber // ✅ SAUVEGARDE SÉCURISÉE EN BDD
       }
     });
 

@@ -57,6 +57,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: ClipboardCheck, label: "Dossiers Locataires", href: "/dashboard/agent/files" }, 
     { icon: Key, label: "Biens sous Gestion", href: "/dashboard/agent/properties" },
     { icon: Key, label: "Conciergerie", href: "/dashboard/agent/akwaba" },
+    { icon: Wallet, label: "Mon Portefeuille", href: "/dashboard/agent/wallet" }, 
   ],
   ARTISAN: [
     { icon: LayoutDashboard, label: "Mes Missions", href: "/dashboard/artisan" },

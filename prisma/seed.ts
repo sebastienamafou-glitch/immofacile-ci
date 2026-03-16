@@ -1,4 +1,14 @@
-import { PrismaClient, Role, VerificationStatus, PropertyType, LeaseStatus, MissionType, IncidentStatus, QuoteStatus } from '@prisma/client';
+import { 
+    PrismaClient, 
+    Role, 
+    VerificationStatus, 
+    PropertyType, 
+    LeaseStatus, 
+    MissionType, 
+    MissionStatus, // 🔴 Import ajouté
+    IncidentStatus, 
+    QuoteStatus 
+} from '@prisma/client';
 import { hash } from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -7,10 +17,19 @@ async function main() {
   console.log('🌱 Démarrage du "Full Ecosystem Seed"...');
 
   // ==========================================
-  // 1. GRAND NETTOYAGE
+  // 1. GRAND NETTOYAGE (Ordre strict respecté)
   // ==========================================
   console.log('🧹 Nettoyage de la base de données...');
   
+  // Tables périphériques et de logs
+  await prisma.processedWebhook.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.lead.deleteMany(); // 🔴 Ajout anti-crash FK
+  await prisma.account.deleteMany();
+  await prisma.session.deleteMany();
+
+  // Cœur métier
   await prisma.quoteItem.deleteMany();
   await prisma.message.deleteMany();
   await prisma.signatureProof.deleteMany();
@@ -97,6 +116,7 @@ async function main() {
         jobTitle: u.jobTitle,
         isBacker: u.isBacker || false,
         backerTier: u.backerTier || null,
+        walletBalance: 1000000, // 🔴 Correction : Approvisionnement direct à la racine User
 
         kyc: {
             create: {
@@ -109,7 +129,7 @@ async function main() {
 
         finance: {
             create: {
-                walletBalance: 1000000, // 1M de FCFA pour tester les paiements et retraits
+                walletBalance: 1000000, // Conservé pour la conformité UEMOA si utilisé plus tard
                 kycTier: u.tier,
                 income: u.income || 0,
                 monthlyVolume: 0,
@@ -158,7 +178,7 @@ async function main() {
           monthlyRent: 1500000,
           depositAmount: 3000000,
           advanceAmount: 3000000,
-          status: LeaseStatus.ACTIVE, // Bail actif pour pouvoir déclarer des incidents
+          status: LeaseStatus.ACTIVE,
           isActive: true,
           propertyId: property.id,
           tenantId: tenant.id,
@@ -170,31 +190,29 @@ async function main() {
       console.log(`📜 Bail actif créé pour ${tenant.name}`);
       
       if (artisan) {
-          // --- INCIDENT 1 : À ASSIGNER ---
           await prisma.incident.create({
               data: {
                   title: 'Problème de climatisation',
                   description: 'Le split du salon ne refroidit plus et fait du bruit.',
                   priority: 'NORMAL',
-                  status: IncidentStatus.OPEN, // Prêt à être assigné par le propriétaire
+                  status: IncidentStatus.OPEN,
                   propertyId: property.id,
                   reporterId: tenant.id,
-                  assignedToId: null, // Pas encore d'artisan
+                  assignedToId: null,
                   photos: ['https://placehold.co/300?text=Clim'],
               }
           });
           console.log(`🔧 Incident 1 (Non assigné) créé.`);
 
-          // --- INCIDENT 2 : AVEC DEVIS EN ATTENTE DE PAIEMENT ---
           const incidentWithQuote = await prisma.incident.create({
               data: {
                   title: 'Fuite Salle de Bain',
                   description: 'Grosse fuite sous le lavabo, urgent.',
                   priority: 'HIGH',
-                  status: IncidentStatus.QUOTATION, // L'artisan a fait le devis
+                  status: IncidentStatus.QUOTATION,
                   propertyId: property.id,
                   reporterId: tenant.id,
-                  assignedToId: artisan.id, // Assigné au plombier
+                  assignedToId: artisan.id,
                   photos: ['https://placehold.co/300?text=Fuite'],
               }
           });
@@ -205,7 +223,7 @@ async function main() {
           await prisma.quote.create({
               data: {
                   number: `DEV-${Date.now().toString().slice(-6)}`,
-                  status: QuoteStatus.PENDING, // Prêt à être payé par le proprio
+                  status: QuoteStatus.PENDING,
                   totalNet: totalNet,
                   taxAmount: tax,
                   totalAmount: totalNet + tax,
@@ -228,7 +246,7 @@ async function main() {
         await prisma.mission.create({
             data: {
                 type: MissionType.ETAT_DES_LIEUX_SORTIE,
-                status: 'PENDING',
+                status: MissionStatus.PENDING, // 🔴 Typage strict appliqué
                 fee: 50000,
                 dateScheduled: new Date(new Date().setDate(new Date().getDate() + 5)),
                 propertyId: property.id,
