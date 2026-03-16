@@ -74,10 +74,9 @@ model User {
   investmentContracts InvestmentContract[]
   listings            Listing[]
   bookings            Booking[]
-
-  reviews              Review[]
-  wishlists            Wishlist[]
-  sentMessages         Message[]
+  reviews             Review[]
+  wishlists           Wishlist[]
+  sentMessages        Message[]
   conversationsAsGuest Conversation[] @relation("GuestConversations")
   conversationsAsHost  Conversation[] @relation("HostConversations")
 
@@ -232,7 +231,7 @@ model Property {
   longitude   Float?
   isPublished Boolean      @default(true)
   isAvailable Boolean      @default(true)
-  views       Int          @default(0) // 
+  views       Int          @default(0) 
 
   ownerId String
   owner   User    @relation("PropertyOwner", fields: [ownerId], references: [id])
@@ -255,9 +254,9 @@ model Property {
 
   // --- Acquisition & SEO Programmatique ---
   source      ListingSource @default(MANUAL)
-  originalUrl String?       @unique // Anti-doublon strict
+  originalUrl String? @unique // Anti-doublon strict
   isClaimed   Boolean       @default(true) // false pour les annonces aspirées
-  seoSlug     String?       @unique // ex: appartement-3-pieces-cocody-angre-ref123
+  seoSlug     String? @unique // ex: appartement-3-pieces-cocody-angre-ref123
 
   @@index([commune])
   @@index([price])
@@ -300,7 +299,6 @@ model Lease {
   updatedAt DateTime @updatedAt
 
   agencyCommissionRate Float?
-
   noticeGivenAt        DateTime? // Date exacte du clic (Preuve légale)
   plannedDepartureDate DateTime? // Date de départ prévue/calculée
 }
@@ -414,9 +412,9 @@ model Listing {
 
   // --- Acquisition & SEO Programmatique ---
   source      ListingSource @default(MANUAL)
-  originalUrl String?       @unique
+  originalUrl String? @unique
   isClaimed   Boolean       @default(true)
-  seoSlug     String?       @unique
+  seoSlug     String? @unique
 
   @@index([city])
   @@index([pricePerNight])
@@ -478,16 +476,14 @@ model Payment {
   platformTaxAmount Int   @default(0)
 
   providerResponse Json?
-
-  // 👇 MODIFICATIONS APPORTÉES 👇
-  leaseId String? // Devenu Optionnel (?)
+  leaseId String?
   lease   Lease?  @relation(fields: [leaseId], references: [id])
 
-  quoteId String? // Ajouté
+  quoteId String?
   quote   Quote?  @relation(fields: [quoteId], references: [id])
 
   userId String?
-  user   User?   @relation(fields: [userId], references: [id])
+  user   User? @relation(fields: [userId], references: [id])
 }
 
 model BookingPayment {
@@ -495,7 +491,8 @@ model BookingPayment {
   amount        Int
   provider      String
   transactionId String @unique
-  status        String
+  status        PaymentStatus @default(PENDING) 
+  errorReason   String?                         
 
   agencyCommission   Int
   hostPayout         Int
@@ -505,12 +502,15 @@ model BookingPayment {
   booking   Booking @relation(fields: [bookingId], references: [id])
 
   createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Transaction {
   id          String          @id @default(cuid())
   amount      Int
-  type        TransactionType // Enum CREDIT/DEBIT
+  type        TransactionType // Enum CREDIT/DEBIT/REFUND
   balanceType BalanceType // Quel solde est touché (WALLET/ESCROW)
   reason      String
   status      String          @default("SUCCESS")
@@ -522,7 +522,6 @@ model Transaction {
   // SÉCURITÉ : Audit Trail
   previousHash String? // Pour détecter les altérations de DB
 
-  // ✅ AJOUTS STRATÉGIQUES POUR LA MAINTENANCE
   quoteId String?
   quote   Quote?  @relation(fields: [quoteId], references: [id])
 
@@ -533,6 +532,10 @@ model Transaction {
   property   Property? @relation(fields: [propertyId], references: [id])
 
   createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt]) 
 }
 
 model AgencyTransaction {
@@ -594,7 +597,7 @@ model Incident {
   property   Property @relation(fields: [propertyId], references: [id])
 
   conversation Conversation?
-  transactions Transaction[] // ✅ Relation pour suivre les coûts
+  transactions Transaction[] 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -609,7 +612,7 @@ model Lead {
   status String  @default("NEW")
 
   agentId String?
-  agent   User?   @relation(fields: [agentId], references: [id])
+  agent   User? @relation(fields: [agentId], references: [id])
 
   createdAt DateTime @default(now())
 }
@@ -636,12 +639,12 @@ model Conversation {
   guest   User?   @relation("GuestConversations", fields: [guestId], references: [id])
 
   hostId String?
-  host   User?   @relation("HostConversations", fields: [hostId], references: [id])
+  host   User? @relation("HostConversations", fields: [hostId], references: [id])
 
   listingId String?
   listing   Listing? @relation(fields: [listingId], references: [id])
 
-  incidentId String?   @unique
+  incidentId String? @unique
   incident   Incident? @relation(fields: [incidentId], references: [id])
 
   messages Message[]
@@ -677,7 +680,7 @@ model Quote {
   totalAmount Int
 
   validityDate DateTime
-  notes        String?  @db.Text
+  notes        String? @db.Text
 
   items QuoteItem[]
 
@@ -690,7 +693,7 @@ model Quote {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  transactions Transaction[] // ✅ Relation pour savoir si le devis a été payé
+  transactions Transaction[] 
   payments     Payment[]
 }
 
@@ -715,49 +718,62 @@ model Notification {
   message   String
   isRead    Boolean  @default(false)
   type      String   @default("INFO")
-  link      String? // Lien de redirection
+  link      String?
   createdAt DateTime @default(now())
 
   @@index([userId])
-  @@index([userId, isRead]) // Spécifique pour accélérer le "count" des non-lus
+  @@index([userId, isRead]) 
 }
 
 // ==========================================
-// 12. SYSTÈME D'AUDIT & SÉCURITÉ
+// 11. SYSTÈME D'AUDIT & SÉCURITÉ
 // ==========================================
 
 model AuditLog {
-  id         String  @id @default(cuid())
-  action     String? // Ex: "KYC_VALIDATED", "PAYMENT_RECEIVED", "USER_DELETED"
-  entityId   String? // L'ID de l'objet touché (ex: ID du Booking ou du User)
-  entityType String? // Ex: "BOOKING", "USER", "PAYMENT"
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entityId   String?
+  entityType String?
 
-  userId    String? // Celui qui a fait l'action (Admin, System ou User)
-  userEmail String? // Snapshot de l'email (au cas où le user est supprimé plus tard)
+  userId    String?
+  userEmail String?
 
-  metadata  Json? // Détails techniques (ex: { oldStatus: "PENDING", newStatus: "VERIFIED" })
+  metadata  Json?
   ipAddress String?
   userAgent String?
-
   createdAt DateTime @default(now())
 
-  // Relation optionnelle vers le User (si vous voulez faire des joins)
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([action])
 }
 
+model ProcessedWebhook {
+  id          String   @id
+  processedAt DateTime @default(now())
+
+  @@index([processedAt]) 
+}
+
 // ==========================================
-// 11. ENUMS (RÉFÉRENTIEL FINANCIER)
+// 12. ENUMS (RÉFÉRENTIEL FINANCIER & SYSTÈME)
 // ==========================================
+
+enum AuditAction {
+  PAYMENT_SUCCESS
+  BOOKING_PAYMENT_SUCCESS
+  CROWDFUNDING_SUCCESS
+  PAYMENT_FAILED
+  FRAUD_ATTEMPT
+  KYC_VALIDATED
+  USER_DELETED
+}
 
 enum TransactionType {
   CREDIT
   DEBIT
   REFUND
-  PAYMENT
-  INVESTMENT
 }
 
 enum BalanceType {

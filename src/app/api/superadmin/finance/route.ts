@@ -4,9 +4,23 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() { // ✅ Suppression du paramètre 'request' non utilisé
+// =============================================================================
+// 🛡️ DTO STRICT (Élimination de l'anti-pattern "any")
+// =============================================================================
+interface FinanceHistoryItem {
+    id: string;
+    amount: number;
+    commission: number;
+    status: string;
+    date: Date;
+    type: string;
+    details: string;
+    category: "AGENCY" | "CORPORATE";
+}
+
+export async function GET() { 
   try {
-    // 1. SÉCURITÉ BLINDÉE (Auth v5)
+    // 1. SÉCURITÉ BLINDÉE (Auth v5 & RBAC)
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -31,18 +45,16 @@ export async function GET() { // ✅ Suppression du paramètre 'request' non uti
             amountPlatform: true,  
             amountOwner: true,     
         },
-        // ✅ CORRECTION : Utilisation de _all pour le count
         _count: { _all: true } 
     });
 
-    // 3. RÉCUPERATION DES DEUX FLUX
+    // 3. RÉCUPÉRATION DES DEUX FLUX EN PARALLÈLE
     const [rawPayments, rawTransactions] = await Promise.all([
         // Flux A : Gestion Locative
         prisma.payment.findMany({
             where: { status: "SUCCESS" },
             orderBy: { date: 'desc' }, 
             take: 50, 
-            // ✅ CORRECTION : Remplacement de l'include illégal par un select en cascade
             select: {
                 id: true,
                 amount: true,
@@ -69,42 +81,42 @@ export async function GET() { // ✅ Suppression du paramètre 'request' non uti
                 createdAt: true,
                 reason: true,
                 type: true,
-                // ✅ CORRECTION : Utilisation de 'role' au lieu de 'type' qui n'existe pas dans le schéma
                 user: { select: { name: true, role: true } } 
             }
         })
     ]);
 
-    // 4. MAPPING & FUSION
-    const historyFromPayments = rawPayments.map(p => ({
+    // 4. MAPPING STRICT & FUSION (Zéro "any")
+    const historyFromPayments: FinanceHistoryItem[] = rawPayments.map(p => ({
         id: p.id,
         amount: p.amount,
         commission: p.amountPlatform,
         status: p.status, 
         date: p.date,
-        type: p.type,
+        type: p.type, 
         details: p.lease 
             ? `${p.lease.tenant?.name || 'Locataire'} - ${p.lease.property?.title || 'Bien'}`
             : "Paiement direct",
         category: "AGENCY"
     }));
 
-    const historyFromTransactions = rawTransactions.map((t: any) => ({
+    // Inférence TypeScript préservée, plus besoin de forcer (t: any)
+    const historyFromTransactions: FinanceHistoryItem[] = rawTransactions.map(t => ({
         id: t.id,
         amount: t.amount,
-        commission: 0,
+        commission: 0, 
         status: t.status,
         date: t.createdAt,
         type: t.reason || "WALLET",
         details: t.user 
-            ? `${t.user.name} (${t.type === 'CREDIT' ? 'Entrée' : 'Sortie'})`
+            ? `${t.user.name || 'Utilisateur'} (${t.type === 'CREDIT' ? 'Entrée' : 'Sortie'})`
             : "Opération Système",
         category: "CORPORATE"
     }));
 
-    // Fusion et Tri propre
+    // 5. FUSION ET TRI PROPRE
     const mergedHistory = [...historyFromPayments, ...historyFromTransactions]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
         .slice(0, 100); 
     
     return NextResponse.json({

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { TransactionType, BalanceType } from "@prisma/client";
+import { TransactionType, BalanceType, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +72,8 @@ export async function POST(request: Request) {
     }
 
     // 6. PRÉPARATION TRANSACTION (ACID)
-    const prismaOperations = [];
+    // ✅ Typage explicite pour éviter l'inférence 'any[]'
+    const prismaOperations: Prisma.PrismaPromise<unknown>[] = [];
     let distributedCheck = 0;
     let beneficiariesCount = 0;
     const timestamp = Date.now();
@@ -104,8 +105,7 @@ export async function POST(request: Request) {
                             reason: `Dividendes - ${periodName}`,
                             status: "SUCCESS",
                             userId: shareholder.userId,
-                            reference: `DIV-${periodName.replace(/\s+/g, '')}-${shareholder.userId.substring(0,6)}-${timestamp}`,
-                            previousHash: "GENESIS"
+                            reference: `DIV-${periodName.replace(/\s+/g, '')}-${shareholder.userId.substring(0,6)}-${timestamp}`
                         }
                     })
                 );
