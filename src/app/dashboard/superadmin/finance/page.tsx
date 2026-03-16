@@ -9,10 +9,11 @@ import {
   Activity, Loader2, AlertCircle, ArrowUpRight 
 } from "lucide-react";
 
-// ✅ IMPORT DU MODULE DE DISTRIBUTION
+// ✅ IMPORT DES COMPOSANTS
 import DividendDistributor from "@/components/admin/DividendDistributor";
+import { ExportFinanceButton } from "@/components/admin/ExportFinanceButton";
 
-// --- TYPES STRICTS (DTO) ---
+// --- TYPES STRICTS (DTO Synchronisé avec l'API) ---
 interface FinanceStats {
   volume: number;
   totalRevenue: number;
@@ -27,6 +28,7 @@ interface TransactionHistory {
   date: string;
   type: string;
   details: string;
+  category: "AGENCY" | "CORPORATE"; // 🔴 Ajout du champ manquant
 }
 
 interface FinanceData {
@@ -89,15 +91,20 @@ export default function FinancePage() {
   return (
     <div className="min-h-screen bg-[#020617] text-white p-6 md:p-8 font-sans">
       
-      {/* HEADER */}
-      <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="bg-[#F59E0B]/10 text-[#F59E0B] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-[#F59E0B]/20">
-                Super Admin
-            </span>
+      {/* HEADER AVEC BOUTON D'EXPORT */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+          <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-[#F59E0B]/10 text-[#F59E0B] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-[#F59E0B]/20">
+                    Super Admin
+                </span>
+              </div>
+              <h1 className="text-3xl font-black text-white tracking-tight">TRÉSORERIE GLOBALE 💰</h1>
+              <p className="text-slate-400 text-sm mt-1">Suivi consolidé des flux financiers, commissions et reversements.</p>
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">TRÉSORERIE GLOBALE 💰</h1>
-          <p className="text-slate-400 text-sm mt-1">Suivi consolidé des flux financiers, commissions et reversements.</p>
+          
+          {/* ✅ Intégration du composant d'export */}
+          <ExportFinanceButton />
       </div>
 
       {/* KPI GRID */}
@@ -145,7 +152,7 @@ export default function FinancePage() {
 
       </div>
 
-      {/* ✅ MODULE DE DISTRIBUTION DES DIVIDENDES */}
+      {/* MODULE DE DISTRIBUTION DES DIVIDENDES */}
       <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
           <DividendDistributor />
       </div>
@@ -193,10 +200,11 @@ export default function FinancePage() {
                                 </div>
                             </td>
                             <td className="p-4">
+                                {/* 🔴 Adaptation dynamique de la couleur selon la catégorie */}
                                 <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase border ${
-                                    item.type === 'LOYER' 
-                                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
-                                    : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                    item.category === 'CORPORATE' 
+                                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' 
+                                    : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                                 }`}>
                                     {item.type}
                                 </span>
@@ -211,7 +219,7 @@ export default function FinancePage() {
                                 {formatMoney(item.amount)} F
                             </td>
                             <td className="p-4 text-right pr-6 font-mono text-[#F59E0B] font-bold group-hover:text-[#fbbf24] transition">
-                                + {formatMoney(item.commission)} F
+                                {item.commission > 0 ? `+ ${formatMoney(item.commission)} F` : '-'}
                             </td>
                         </tr>
                     ))}
