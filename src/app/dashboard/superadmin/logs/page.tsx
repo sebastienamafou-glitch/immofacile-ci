@@ -6,15 +6,16 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api"; 
 import { 
   ArrowLeft, Search, ShieldAlert, UserPlus, 
-  Banknote, Activity, FileSpreadsheet, Fingerprint, Calendar, Loader2
+  Banknote, Activity, FileSpreadsheet, Fingerprint, Calendar, Loader2,
+  ShieldCheck // ✅ Ajouté pour les logs KYC
 } from "lucide-react";
 import { toast } from "sonner";
+import { AuditAction } from "@prisma/client"; // ✅ Typage strict depuis Prisma
 
-// ✅ BEST PRACTICE : Interface alignée avec Prisma sans aucun 'any'
+// ✅ BEST PRACTICE : Interface alignée avec Prisma
 interface AuditLog {
   id: string;
-  action: string;
-  category: string;
+  action: AuditAction; // 🔴 Plus de 'string' générique
   metadata: Record<string, unknown> | null; 
   createdAt: string;
   user: {
@@ -76,6 +77,14 @@ export default function AdminLogsPage() {
     return matchesSearch && matchesDate;
   });
 
+  // ✅ NOUVEAU : Déduction intelligente de la catégorie métier
+  const getCategory = (action: AuditAction): string => {
+      if (action.includes('PAYMENT') || action.includes('CROWDFUNDING')) return 'FINANCE';
+      if (action.includes('FRAUD') || action.includes('DELETED')) return 'SECURITY';
+      if (action.includes('KYC')) return 'COMPLIANCE';
+      return 'SYSTEM';
+  };
+
   // EXPORT CSV INTÉGRAL
   const handleExportCSV = () => {
     if (filteredLogs.length === 0) return toast.error("Aucune donnée à exporter.");
@@ -85,7 +94,7 @@ export default function AdminLogsPage() {
     const rows = filteredLogs.map(log => [
         `"${log.id}"`,
         `"${new Date(log.createdAt).toISOString()}"`,
-        `"${log.category}"`,
+        `"${getCategory(log.action)}"`, // ✅ Appel du Helper
         `"${log.user?.name || 'SYSTEM'}"`,
         `"${log.user?.role || 'BOT'}"`,
         `"${log.action.replace(/"/g, '""')}"`,
@@ -106,11 +115,13 @@ export default function AdminLogsPage() {
     toast.success("Extraction du registre effectuée.");
   };
 
-  const getIcon = (category: string) => {
+  // ✅ Mise à jour pour se baser sur l'action plutôt que l'ancienne catégorie
+  const getIcon = (action: AuditAction) => {
+      const category = getCategory(action);
       switch(category) {
           case 'FINANCE': return <Banknote className="w-4 h-4 text-emerald-400" />;
           case 'SECURITY': return <ShieldAlert className="w-4 h-4 text-red-500" />;
-          case 'AUTH': return <UserPlus className="w-4 h-4 text-blue-500" />;
+          case 'COMPLIANCE': return <ShieldCheck className="w-4 h-4 text-blue-500" />;
           default: return <Activity className="w-4 h-4 text-slate-500" />;
       }
   };
@@ -216,8 +227,8 @@ export default function AdminLogsPage() {
                                 </td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2 font-black text-[9px] bg-slate-950 w-fit px-2 py-1 rounded border border-slate-800 uppercase tracking-tighter">
-                                        {getIcon(log.category)}
-                                        {log.category || 'SYSTEM'}
+                                        {getIcon(log.action)}
+                                        {getCategory(log.action)}
                                     </div>
                                 </td>
                                 <td className="p-4">

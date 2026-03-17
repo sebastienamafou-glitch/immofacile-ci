@@ -119,7 +119,7 @@ export default async function CompliancePage({ params }: PageProps) {
             )}
             {/* BOUTON TÉLÉCHARGEMENT PDF */}
             <a 
-                href={`/api/documents/lease/${lease.id}`} 
+                href={`/api/documents/compliance/${lease.id}`} 
                 target="_blank"
                 className="flex items-center gap-2 text-[10px] font-bold bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded transition"
             >
