@@ -147,7 +147,7 @@ export default function DocumentsList({ properties }: { properties: DashboardDoc
                                             <p className="text-xs text-slate-500 mb-6 relative z-10">Signé le : {signedDate}</p>
 
                                             <div className="flex gap-2 mt-auto relative z-10">
-                                                <Link href={`/dashboard/contract/${lease.id || ''}`} className="flex-1 bg-white hover:bg-slate-200 text-black text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition active:scale-95">
+                                                <Link href={`/dashboard/owner/leases/${lease.id || ''}`} className="flex-1 bg-white hover:bg-slate-200 text-black text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition active:scale-95">
                                                     <Eye className="w-3.5 h-3.5" /> Ouvrir
                                                 </Link>
                                                 <button onClick={() => handleSendEmail('Contrat de Bail')} className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 hover:text-white transition">
@@ -201,9 +201,9 @@ export default function DocumentsList({ properties }: { properties: DashboardDoc
                                             <p className="text-xs text-slate-500 mb-6 relative z-10">Outil juridique en cas d'impayés.</p>
 
                                             <div className="flex gap-2 mt-auto relative z-10">
-                                                <button className="flex-1 bg-slate-800 hover:bg-red-500/10 hover:text-red-500 text-slate-400 text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition border border-slate-700">
+                                                <Link href={`/dashboard/owner/leases/${lease.id || ''}/notice`} className="flex-1 bg-slate-800 hover:bg-red-500/10 hover:text-red-500 text-slate-400 text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition border border-slate-700">
                                                     <Printer className="w-3.5 h-3.5" /> Générer
-                                                </button>
+                                                </Link>
                                             </div>
                                         </div>
 
