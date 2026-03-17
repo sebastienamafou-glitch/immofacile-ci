@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom"; // ✅ IMPORT POUR ÉCHAPPER AU CONTEXTE CSS
 import { X, User, Phone, Loader2, Home } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,14 +15,22 @@ interface LeadCaptureModalProps {
 export default function LeadCaptureModal({ isOpen, onClose, propertyId, propertyTitle }: LeadCaptureModalProps) {
   const [formData, setFormData] = useState({ name: '', phone: '' });
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false); // ✅ GESTION HYDRATATION NEXT.JS
 
+  // 1. Indiquer que le composant est monté côté client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 2. Verrouiller le scroll de l'arrière-plan
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = 'unset';
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Si rendu côté serveur ou modal fermé, on ne rend rien
+  if (!mounted || !isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,11 +60,10 @@ export default function LeadCaptureModal({ isOpen, onClose, propertyId, property
     }
   };
 
-  return (
-    // 1. Z-index à 60, aligné en bas sur mobile (items-end), centré sur desktop (sm:items-center)
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#020617]/40 backdrop-blur-sm animate-in fade-in duration-200">
+  // 3. Extraction de l'UI dans une variable
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#020617]/60 backdrop-blur-sm animate-in fade-in duration-200">
       
-      // 2. Bords arrondis uniquement en haut sur mobile, slide depuis le bas, max-height pour scroller si l'écran est petit
       <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-20px_60px_-15px_rgba(0,0,0,0.3)] sm:shadow-2xl overflow-hidden animate-in slide-in-from-bottom-full sm:zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto pb-6 sm:pb-0">
         
         {/* Petit trait gris en haut pour indiquer le "swipe" sur mobile */}
@@ -63,7 +71,7 @@ export default function LeadCaptureModal({ isOpen, onClose, propertyId, property
             <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
         </div>
 
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
             <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Home className="text-orange-500 w-5 h-5" />
                 Visiter ce bien
@@ -106,4 +114,7 @@ export default function LeadCaptureModal({ isOpen, onClose, propertyId, property
       </div>
     </div>
   );
+
+  // 4. RENDU À LA RACINE DU DOM (BODY) VIA PORTAL
+  return createPortal(modalContent, document.body);
 }
