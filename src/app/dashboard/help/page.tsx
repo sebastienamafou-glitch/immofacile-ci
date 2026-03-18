@@ -223,7 +223,7 @@ export default function HelpPage() {
                         <p className="text-green-100/80 text-sm font-medium mb-6">Réponse instantanée via WhatsApp.</p>
                         
                         <a 
-                            href="https://wa.me/22507070707?text=Bonjour%20Babimmo" 
+                            href="https://wa.me/0330783974175?text=Bonjour%20Babimmo" 
                             target="_blank" 
                             className="w-full bg-white text-[#075E54] font-bold py-3.5 rounded-xl hover:bg-green-50 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95"
                         >
