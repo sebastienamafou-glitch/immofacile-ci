@@ -1,67 +1,114 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { Role } from "@prisma/client";
+import { z } from "zod";
+import bcrypt from "bcryptjs"; 
+import { logActivity } from "@/lib/logger";
 
-export const dynamic = 'force-dynamic';
+// =============================================================================
+// 🛡️ TYPAGE STRICT (Aligné sur le SweetAlert front-end)
+// =============================================================================
+const createSaaSSchema = z.object({
+  agencyName: z.string().min(2, "Le nom de l'agence est requis"),
+  agencySlug: z.string().min(2, "Le slug est requis"),
+  adminName: z.string().min(2, "Le nom de l'admin est requis"),
+  adminEmail: z.string().email("Format d'email invalide"),
+  adminPhone: z.string().optional(),
+});
 
-export async function GET(request: Request) {
+export async function POST(req: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST
+    // 1. SÉCURITÉ PÉRIMÉTRIQUE (Zero Trust)
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-
-    const admin = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true }
-    });
-
-    if (!admin || admin.role !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    if (!session || !session.user?.id) {
+        return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // 2. RÉCUPÉRATION DES AGENCES (AVEC KPI)
-    const agencies = await prisma.agency.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { 
-            listings: true,   // Nombre d'annonces
-            properties: true, // Nombre de biens
-            users: true       // Nombre d'agents/membres
-          }
-        },
-        // On récupère l'admin de l'agence pour contact
-        users: {
-            where: { role: 'AGENCY_ADMIN' },
-            select: { name: true, email: true, phone: true },
-            take: 1
-        }
-      }
+    const admin = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { role: true }
     });
 
-    // 3. FORMATAGE POUR LE DASHBOARD
-    const formattedAgencies = agencies.map(agency => ({
-        id: agency.id,
-        name: agency.name,
-        code: agency.code,
-        walletBalance: agency.walletBalance,
-        isActive: agency.isActive,
-        stats: {
-            listings: agency._count.listings,
-            properties: agency._count.properties,
-            staff: agency._count.users
-        },
-        admin: agency.users[0] || { name: "Non assigné", email: "N/A" },
-        createdAt: agency.createdAt
-    }));
+    if (!admin || admin.role !== Role.SUPER_ADMIN) {
+      return NextResponse.json({ error: "Accès refusé. Opération réservée au Super Admin." }, { status: 403 });
+    }
 
-    return NextResponse.json({ success: true, agencies: formattedAgencies });
+    // 2. VALIDATION DES DONNÉES ENTRANTES
+    const body = await req.json();
+    const parsed = createSaaSSchema.safeParse(body);
+    
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
 
-  } catch (error) {
-    console.error("List Agencies Error:", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    const { agencyName, agencySlug, adminName, adminEmail, adminPhone } = parsed.data;
+
+    // 3. VÉRIFICATION DES DOUBLONS AVANT TRANSACTION
+    const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (existingUser) {
+      return NextResponse.json({ error: "Cet email est déjà utilisé par un autre compte." }, { status: 400 });
+    }
+
+    const existingAgency = await prisma.agency.findUnique({ where: { slug: agencySlug } });
+    if (existingAgency) {
+      return NextResponse.json({ error: "Ce slug d'agence est déjà pris." }, { status: 400 });
+    }
+
+    // 4. GÉNÉRATION DES CREDENTIALS & SÉCURITÉ
+    const tempPassword = Math.random().toString(36).slice(-8) + "A1!"; 
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const code = `AG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // 5. TRANSACTION ATOMIQUE (Création SaaS complète)
+    const newAgency = await prisma.$transaction(async (tx) => {
+      // A. Création de la structure Agence
+      const agency = await tx.agency.create({
+        data: {
+          name: agencyName,
+          slug: agencySlug,
+          code: code,
+          isActive: true,
+          primaryColor: "#FF7900", // Couleur par défaut du front-end
+        }
+      });
+
+      // B. Création du Directeur (AGENCY_ADMIN) rattaché
+      await tx.user.create({
+        data: {
+          name: adminName,
+          email: adminEmail,
+          phone: adminPhone || null,
+          password: hashedPassword,
+          role: Role.AGENCY_ADMIN,
+          agencyId: agency.id,
+          isVerified: true, 
+        }
+      });
+
+      return agency;
+    });
+
+    // 6. TRAÇABILITÉ (Audit Log)
+    await logActivity({
+      action: "ADMIN_LOGIN", // Utilisez une action valide de votre logger.ts
+      entityId: newAgency.id,
+      entityType: "AGENCY",
+      userId: session.user.id,
+      metadata: { agencyName, adminEmail, action: "CREATED_B2B_AGENCY" }
+    });
+
+    // 7. RÉPONSE ATTENDUE PAR LE SWEETALERT
+    return NextResponse.json({ 
+      success: true, 
+      credentials: { 
+        email: adminEmail, 
+        tempPassword: tempPassword 
+      } 
+    }, { status: 201 });
+
+  } catch (error: unknown) {
+    console.error("Erreur Création Agence B2B:", error);
+    return NextResponse.json({ error: "Erreur interne du serveur lors de la création." }, { status: 500 });
   }
 }
