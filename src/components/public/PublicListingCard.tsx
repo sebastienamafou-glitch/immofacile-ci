@@ -1,7 +1,7 @@
 import { MapPin, Users, Bed, Bath } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image"; // ✅ Import Next/Image
+import Image from "next/image";
 import { Listing } from "@prisma/client";
 
 interface PublicListingCardProps {
@@ -10,7 +10,6 @@ interface PublicListingCardProps {
 }
 
 export default function PublicListingCard({ listing, primaryColor = "#FF7900" }: PublicListingCardProps) {
-  // Sécurité si le tableau images est vide
   const mainImage = listing.images?.[0] || "/placeholder-house.jpg";
 
   return (
@@ -20,9 +19,9 @@ export default function PublicListingCard({ listing, primaryColor = "#FF7900" }:
         <Image 
             src={mainImage} 
             alt={listing.title} 
-            fill // Remplit le conteneur parent
+            fill
             className="object-cover group-hover:scale-110 transition duration-700"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Optimisation Mobile
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         <div className="absolute top-3 right-3 bg-white/90 backdrop-blur text-slate-900 px-3 py-1 rounded-full text-xs font-bold shadow-sm z-10">
              {listing.pricePerNight.toLocaleString()} FCFA <span className="font-normal text-slate-500">/ nuit</span>
@@ -48,11 +47,12 @@ export default function PublicListingCard({ listing, primaryColor = "#FF7900" }:
         </div>
 
         <div className="mt-auto">
-            <Link href={`/listings/${listing.id}`} className="block">
-                <Button className="w-full text-white font-bold" style={{ backgroundColor: primaryColor }}>
+            {/* ✅ CORRECTION : Utilisation de asChild pour éviter l'imbrication <button> dans <a> */}
+            <Button asChild className="w-full text-white font-bold" style={{ backgroundColor: primaryColor }}>
+                <Link href={`/listings/${listing.id}`}>
                     Réserver maintenant
-                </Button>
-            </Link>
+                </Link>
+            </Button>
         </div>
       </div>
     </div>

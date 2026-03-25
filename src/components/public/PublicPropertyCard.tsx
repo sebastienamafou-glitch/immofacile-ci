@@ -2,7 +2,7 @@ import { MapPin, Ruler } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image"; // ✅ Import Next/Image
+import Image from "next/image";
 import { Property, Lease } from "@prisma/client";
 
 interface PublicPropertyCardProps {
@@ -13,7 +13,6 @@ interface PublicPropertyCardProps {
 export default function PublicPropertyCard({ property, primaryColor = "#FF7900" }: PublicPropertyCardProps) {
   const mainImage = property.images?.[0] || "/placeholder-house.jpg";
   
-  // Si un bail est actif, le bien n'est pas dispo
   const isAvailable = property.leases?.length === 0;
 
   return (
@@ -56,11 +55,12 @@ export default function PublicPropertyCard({ property, primaryColor = "#FF7900" 
             </p>
         </div>
 
-        <Link href={`/properties/${property.id}`} className="block mt-4">
-            <Button variant="outline" className="w-full border-slate-300 hover:bg-slate-50 hover:text-slate-900 font-bold">
+        {/* ✅ CORRECTION : Utilisation de asChild */}
+        <Button asChild variant="outline" className="w-full border-slate-300 hover:bg-slate-50 hover:text-slate-900 font-bold mt-4">
+            <Link href={`/properties/${property.id}`}>
                 Voir les détails
-            </Button>
-        </Link>
+            </Link>
+        </Button>
       </div>
     </div>
   );

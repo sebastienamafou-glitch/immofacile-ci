@@ -178,15 +178,21 @@ export default async function AgencyDashboardPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="border-slate-700 text-white bg-slate-900 hover:bg-slate-800">
-            <UserPlus className="mr-2 h-4 w-4" /> Nouvel Agent
-          </Button>
-          <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-lg shadow-orange-900/20">
-            <BarChart3 className="mr-2 h-4 w-4" /> Rapport Mensuel
-          </Button>
+          {/* ✅ Rendu cliquable via Link vers la page d'équipe pour inviter un agent */}
+          <Link href="/dashboard/agency/team">
+            <Button variant="outline" className="border-slate-700 text-white bg-slate-900 hover:bg-slate-800 transition-colors">
+              <UserPlus className="mr-2 h-4 w-4" /> Nouvel Agent
+            </Button>
+          </Link>
+          
+          {/* ✅ Rendu cliquable via Link vers la page finance (portefeuille) */}
+          <Link href="/dashboard/agency/wallet">
+            <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-lg shadow-orange-900/20 transition-transform active:scale-95">
+              <BarChart3 className="mr-2 h-4 w-4" /> Rapport Mensuel
+            </Button>
+          </Link>
         </div>
       </div>
-
       {/* ✅ BLOC KYC AGENCE (Nouveau) */}
       <AgencyKycWidget isVerified={isAgencyVerified} />
 

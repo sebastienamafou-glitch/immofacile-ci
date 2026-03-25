@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Mail, Phone, MapPin, ShieldCheck, Globe } from "lucide-react"; // ✅ Imports nettoyés
+import { Mail, Phone, MapPin, ShieldCheck, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PublicListingCard from "@/components/public/PublicListingCard";
@@ -11,8 +11,10 @@ import Image from "next/image";
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const slug = params.slug;
   const agency = await prisma.agency.findUnique({ where: { slug } });
+  
   return {
     title: agency ? `${agency.name} - Vitrine Babimmo` : "Agence Introuvable",
+    // L'apostrophe ici est dans du code JS (template literal), donc pas de souci
     description: `Découvrez les biens immobiliers de ${agency?.name || "l'agence"}.`
   };
 }
@@ -26,12 +28,12 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
     include: {
         listings: {
             where: { isPublished: true },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: "desc" }
         },
         properties: {
             where: { isPublished: true },
             include: { leases: { where: { isActive: true } } },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: "desc" }
         }
     }
   });
@@ -54,9 +56,17 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
             <div className="flex flex-col md:flex-row items-center gap-8">
                 
                 {/* Logo */}
-                <div className="w-32 h-32 md:w-40 md:h-40 bg-white rounded-2xl shadow-2xl flex items-center justify-center p-4 shrink-0">
+                <div className="w-32 h-32 md:w-40 md:h-40 bg-white rounded-2xl shadow-2xl flex items-center justify-center p-4 shrink-0 relative overflow-hidden">
                     {agency.logoUrl ? (
-                        <img src={agency.logoUrl} alt={agency.name} className="w-full h-full object-contain" />
+                        <div className="relative w-full h-full">
+                            <Image 
+                                src={agency.logoUrl} 
+                                alt={agency.name} 
+                                fill
+                                sizes="(max-width: 768px) 8rem, 10rem"
+                                className="object-contain" 
+                            />
+                        </div>
                     ) : (
                         <span className="text-3xl font-black text-slate-800 uppercase">
                             {agency.name.substring(0,2)}
@@ -68,10 +78,10 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
                 <div className="text-center md:text-left flex-1">
                     <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                         <h1 className="text-3xl md:text-5xl font-black tracking-tight">{agency.name}</h1>
-                        {/* ✅ CORRECTION ICI : Retrait de title="..." qui faisait planter TS */}
                         {agency.isActive && (
-                            <div title="Agence Vérifiée">
+                            <div>
                                 <ShieldCheck className="text-blue-400 w-8 h-8" />
+                                <span className="sr-only">Agence Vérifiée</span>
                             </div>
                         )}
                     </div>
@@ -95,8 +105,8 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
 
                 {/* Call To Action */}
                 <div>
-                     <Button size="lg" className="font-bold text-white shadow-lg h-12 px-8 text-lg" style={{ backgroundColor: brandColor }}>
-                        Contacter l'agence
+                     <Button size="lg" className="font-bold text-white shadow-lg h-12 px-8 text-lg transition-transform active:scale-95" style={{ backgroundColor: brandColor }}>
+                        Contacter l&apos;agence
                      </Button>
                 </div>
             </div>
@@ -126,7 +136,8 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
                 <TabsContent value="short_term" className="space-y-6 animate-in fade-in-50">
                     {agency.listings.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {agency.listings.map((listing: any) => (
+                            {/* ✅ Inférence TS : 'listing' est de type 'Listing' automatiquement */}
+                            {agency.listings.map((listing) => (
                                 <PublicListingCard key={listing.id} listing={listing} primaryColor={brandColor} />
                             ))}
                         </div>
@@ -142,7 +153,8 @@ export default async function AgencyPublicPage({ params }: { params: { slug: str
                 <TabsContent value="long_term" className="space-y-6 animate-in fade-in-50">
                     {agency.properties.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {agency.properties.map((prop: any) => (
+                            {/* ✅ Inférence TS : 'prop' est de type 'Property' avec relation 'leases' incluse */}
+                            {agency.properties.map((prop) => (
                                 <PublicPropertyCard key={prop.id} property={prop} primaryColor={brandColor} />
                             ))}
                         </div>
