@@ -68,6 +68,7 @@ const MENUS: Record<string, MenuItem[]> = {
   SUPER_ADMIN: [
     { icon: Server, label: "Command Center", href: "/dashboard/superadmin" }, 
     { icon: Users, label: "Utilisateurs", href: "/dashboard/superadmin/users" },
+    { icon: Building2, label: "Agences & Partenaires", href: "/dashboard/superadmin/agencies" },
     { icon: TrendingUp, label: "Actionnaires", href: "/dashboard/superadmin/investors/new" },
     { icon: Key, label: "Parc Immobilier", href: "/dashboard/superadmin/properties" },
     { icon: Wallet, label: "Finances Globales", href: "/dashboard/superadmin/finance" }, 

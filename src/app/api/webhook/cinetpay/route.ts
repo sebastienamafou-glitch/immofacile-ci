@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     let bodyData: unknown;
     try {
       bodyData = JSON.parse(rawBody);
-    } catch (e) {
+    } catch {
       bodyData = Object.fromEntries(new URLSearchParams(rawBody).entries());
     }
 

@@ -720,8 +720,7 @@ model Notification {
   type      String   @default("INFO")
   link      String?
   createdAt DateTime @default(now())
-
-  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)]) // Crucial pour le GET
   @@index([userId, isRead]) 
 }
 

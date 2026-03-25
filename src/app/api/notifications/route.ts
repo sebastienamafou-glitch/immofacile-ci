@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
-// 1. GET : Récupérer mes notifications
+// 1. GET : Récupérer les notifications avec sélection de champs (Optimisation Sentry)
 export async function GET(req: Request) {
-    // 🛡️ SÉCURITÉ : On récupère l'ID via le cookie de session (inviolable)
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -17,10 +14,20 @@ export async function GET(req: Request) {
     }
 
     try {
-        // 🔥 OPTIMISATION : Exécution en parallèle (Gain de temps massif)
+        // 🔥 OPTIMISATION : On ne récupère que les champs nécessaires pour alléger le payload
+        // Cela réduit la charge mémoire et le temps de transfert réseau.
         const [notifications, unreadCount] = await Promise.all([
             prisma.notification.findMany({
                 where: { userId },
+                select: {
+                    id: true,
+                    title: true,
+                    isRead: true,
+                    createdAt: true,
+                    type: true,
+                    link: true,
+                    // message est volontairement omis ici s'il est trop lourd pour une liste
+                },
                 orderBy: { createdAt: 'desc' },
                 take: 20
             }),
@@ -29,19 +36,29 @@ export async function GET(req: Request) {
             })
         ]);
 
-        return NextResponse.json({ notifications, unreadCount });
+        return NextResponse.json(
+            { notifications, unreadCount },
+            { 
+                headers: { 
+                    // Cache de 10 secondes pour éviter les appels trop fréquents lors de navigations rapides
+                    'Cache-Control': 'private, max-age=10, stale-while-revalidate=5' 
+                } 
+            }
+        );
     } catch (error) {
         console.error("Erreur notifications:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
     }
 }
 
-// 2. PUT : Marquer comme lu
+// 2. PUT : Marquer comme lu (Optimisation des requêtes)
 export async function PUT(req: Request) {
     const session = await auth();
     const userId = session?.user?.id;
     
-    if (!userId) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    if (!userId) {
+        return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
 
     try {
         const { id } = await req.json(); 
@@ -52,8 +69,12 @@ export async function PUT(req: Request) {
                 data: { isRead: true }
             });
         } else {
+            // Sécurité : On s'assure que la notification appartient bien à l'utilisateur
             await prisma.notification.updateMany({
-                where: { id, userId },
+                where: { 
+                    id, 
+                    userId 
+                },
                 data: { isRead: true }
             });
         }
