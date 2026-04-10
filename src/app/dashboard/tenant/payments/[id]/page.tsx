@@ -10,32 +10,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+// Typage strict pour éradiquer le 'any'
+interface PaymentDetail {
+  id: string;
+  amount: number;
+  date: string;
+  reference?: string;
+}
+
+interface LeaseDetail {
+  tenant?: {
+    name: string;
+    phone?: string;
+  };
+}
+
 export default function PaymentReceiptPage() {
   const params = useParams();
   const router = useRouter();
-  const [payment, setPayment] = useState<any>(null);
-  const [lease, setLease] = useState<any>(null); // Pour avoir les infos du bien/bailleur
+  const [payment, setPayment] = useState<PaymentDetail | null>(null);
+  const [lease, setLease] = useState<LeaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. SÉCURITÉ : Récupération User
-        const storedUser = localStorage.getItem("immouser");
-        if (!storedUser) {
-            router.push("/login");
-            return;
-        }
-        const currentUser = JSON.parse(storedUser);
-
-        // 2. APPEL API AVEC HEADERS (La correction est ici ⬇️)
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email }
-        });
+        // ✅ 1. K.I.S.S : Appel API direct (NextAuth gère l'authentification)
+        const res = await api.get('/tenant/dashboard');
 
         if (res.data.success) {
-          // On cherche le paiement correspondant à l'ID de l'URL dans l'historique
-          const foundPayment = res.data.payments?.find((p: any) => p.id === params.id);
+          // ✅ 2. CORRECTION : On cherche dans le tableau imbriqué res.data.lease.payments
+          const foundPayment = res.data.lease?.payments?.find((p: PaymentDetail) => p.id === params.id);
           
           if (foundPayment) {
             setPayment(foundPayment);
@@ -45,9 +50,21 @@ export default function PaymentReceiptPage() {
             router.push('/dashboard/tenant/payments');
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Erreur quittance:", error);
-        toast.error("Impossible de charger la quittance.");
+        
+        const isAuthError = 
+            typeof error === "object" && 
+            error !== null && 
+            "response" in error && 
+            (error as { response?: { status?: number } }).response?.status === 401;
+
+        if (isAuthError) {
+            router.push("/login");
+        } else {
+            toast.error("Impossible de charger la quittance.");
+            router.push('/dashboard/tenant/payments');
+        }
       } finally {
         setLoading(false);
       }
@@ -130,7 +147,7 @@ export default function PaymentReceiptPage() {
                         <User className="w-3 h-3" /> Locataire
                     </p>
                     <p className="font-bold text-slate-900 text-sm">{lease?.tenant?.name || "Client"}</p>
-                    <p className="text-xs text-slate-500">{lease?.tenant?.phone}</p>
+                    <p className="text-xs text-slate-500">{lease?.tenant?.phone || "Non renseigné"}</p>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
@@ -162,7 +179,7 @@ export default function PaymentReceiptPage() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-500 font-medium">Moyen de paiement</span>
-                    <span className="text-slate-900 font-bold">Mobile Money (Wave/OM)</span>
+                    <span className="text-slate-900 font-bold">Mobile Money</span>
                 </div>
             </div>
 
@@ -179,7 +196,7 @@ export default function PaymentReceiptPage() {
             <div className="mt-12 text-center">
                 <Receipt className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                 <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Document certifié par Babimmo CI</p>
-                <p className="text-[9px] text-slate-300 font-mono mt-1 break-all">ID: {payment.id} • HASH: {payment.reference}</p>
+                <p className="text-[9px] text-slate-300 font-mono mt-1 break-all">ID: {payment.id} • HASH: {payment.reference || 'N/A'}</p>
             </div>
         </div>
       </div>

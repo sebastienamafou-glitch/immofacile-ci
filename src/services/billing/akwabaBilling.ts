@@ -9,21 +9,9 @@ import {
 } from "@prisma/client";
 import { sendNotification } from "@/lib/notifications";
 import { logActivity } from "@/lib/logger";
-import { prisma } from "@/lib/prisma"; // ✅ Instance globale importée
-
-// =============================================================================
-// 🛡️ TYPAGE STRICT EXPORTÉ
-// =============================================================================
-export type TxClient = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
-
-export interface CinetPayApiData {
-    payment_method: string;
-    status: string;
-    amount: string;
-    currency?: string;
-    description?: string;
-    payment_date?: string;
-}
+import { prisma } from "@/lib/prisma";
+import { mapCinetPayMethod } from "@/lib/utils"; // ✅ Import du traducteur strict
+import { TxClient, CinetPayApiData } from "@/services/billing/types"; // ✅ Typage unifié (DRY)
 
 // =============================================================================
 // 🚀 MOTEUR DE TRAITEMENT (AKWABA / COURT SÉJOUR)
@@ -74,11 +62,14 @@ export async function processAkwabaPayment(
     const hostPayout = amountPaid - platformFee;
     const hostId = bookingData.listing.hostId;
 
+    // ✅ MAPPER STRICT : Protection contre le crash Prisma P2009
+    const safeProvider = mapCinetPayMethod(apiData.payment_method);
+
     await tx.bookingPayment.update({ 
         where: { id: bookingPayment.id }, 
         data: { 
             status: PaymentStatus.SUCCESS, 
-            provider: apiData.payment_method || "CINETPAY", 
+            provider: safeProvider, // 👈 CORRECTION : Typage fort Enum appliqué
             platformCommission: platformFee, 
             agencyCommission: 0,
             hostPayout: hostPayout, 
@@ -91,10 +82,10 @@ export async function processAkwabaPayment(
         data: { status: BookingStatus.PAID } 
     });
 
-    // 1. Paiement du Propriétaire (Host)
-    await tx.user.update({ 
-        where: { id: hostId }, 
-        data: { walletBalance: { increment: hostPayout } } 
+    // 1. Paiement du Propriétaire (Host) via UserFinance
+    await tx.userFinance.update({ 
+        where: { userId: hostId }, 
+        data: { walletBalance: { increment: hostPayout } }
     });
     await tx.transaction.create({ 
         data: { 
@@ -109,14 +100,11 @@ export async function processAkwabaPayment(
     });
 
     // 2. Paiement de la Plateforme (Requête hors verrou transactionnel)
-    const superAdmin = await prisma.user.findFirst({ 
-        where: { role: Role.SUPER_ADMIN }, 
-        select: { id: true } 
-    });
+    const superAdmin = await prisma.user.findFirst({ where: { role: Role.SUPER_ADMIN } });
     
     if (superAdmin && platformFee > 0) {
-        await tx.user.update({
-            where: { id: superAdmin.id },
+        await tx.userFinance.update({
+            where: { userId: superAdmin.id },
             data: { walletBalance: { increment: platformFee } }
         });
         await tx.transaction.create({

@@ -46,7 +46,8 @@ const PUBLIC_ROUTES = [
   '/api/webhooks/cinetpay', 
   '/api/webhooks/stripe',
   '/api/public',
-  '/api/signup'
+  '/api/signup',
+  '/api/cron',
 ];
 
 // @ts-ignore
@@ -100,6 +101,9 @@ export default auth(async (req) => {
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
       if (isLoggedIn && path === '/login') {
+          // ✅ NOUVEAU : Interception directe pour les nouveaux inscrits
+          if (userRole === 'UNASSIGNED') return NextResponse.redirect(new URL("/onboarding", nextUrl));
+
           if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/superadmin", nextUrl)); 
           if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
           if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl)); 
@@ -124,7 +128,25 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`, nextUrl));
   }
 
-// ============================================================
+  // ============================================================
+  // 🚀 NOUVEAU : VERROUILLAGE GLOBAL DE L'ONBOARDING
+  // ============================================================
+  if (isLoggedIn) {
+    const isUnassigned = userRole === 'UNASSIGNED';
+    const isOnboardingPage = path === '/onboarding';
+
+    // Règle 1 : Si non assigné et qu'il tente de naviguer ailleurs, on le force sur onboarding
+    if (isUnassigned && !isOnboardingPage && !path.startsWith('/api')) {
+      return NextResponse.redirect(new URL("/onboarding", nextUrl));
+    }
+
+    // Règle 2 : Si déjà assigné et qu'il tente de refaire l'onboarding, on l'éjecte vers son dashboard
+    if (!isUnassigned && isOnboardingPage) {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+  }
+
+  // ============================================================
   // 🛡️ SÉCURITÉ : CLOISONNEMENT STRICT DES DASHBOARDS
   // ============================================================
   if (isLoggedIn && userRole) {
@@ -167,6 +189,7 @@ export default auth(async (req) => {
     // Si l'utilisateur va sur /dashboard (ou une page générique comme /dashboard/settings),
     // on l'autorise à rester. S'il va STRICTEMENT sur /dashboard, on le redirige vers son espace spécifique.
     if (path === '/dashboard') {
+        if (userRole === 'UNASSIGNED') return NextResponse.redirect(new URL("/onboarding", nextUrl));
         if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL("/dashboard/superadmin", nextUrl));
         if (userRole === 'AGENCY_ADMIN') return NextResponse.redirect(new URL("/dashboard/agency", nextUrl));
         if (userRole === 'AGENT') return NextResponse.redirect(new URL("/dashboard/agent", nextUrl));

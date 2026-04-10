@@ -25,25 +25,30 @@ export default function TenantPaymentsHistoryPage() {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        // 1. SÉCURITÉ : Récupération User
-        const storedUser = localStorage.getItem("immouser");
-        if (!storedUser) {
-            router.push("/login");
-            return;
-        }
-        const currentUser = JSON.parse(storedUser);
-
-        // 2. APPEL API AVEC HEADERS (Indispensable pour éviter le 401/404)
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email }
-        });
+        // 1. K.I.S.S : Appel direct sans localStorage, l'auth est gérée par le cookie NextAuth
+        const res = await api.get('/tenant/dashboard');
 
         if (res.data.success) {
-            setPayments(res.data.payments || []);
+            // 2. CORRECTION ARCHITECTURALE : Les paiements sont imbriqués dans le bail (lease)
+            setPayments(res.data.lease?.payments || []);
+        } else {
+            toast.error("Impossible de récupérer l'historique.");
         }
-      } catch (error) {
-        console.error(error);
-        toast.error("Impossible de charger l'historique.");
+      } catch (error: unknown) {
+        console.error("Fetch Error:", error);
+        
+        // Typage strict de l'erreur pour éviter 'any'
+        const isAuthError = 
+            typeof error === "object" && 
+            error !== null && 
+            "response" in error && 
+            (error as { response?: { status?: number } }).response?.status === 401;
+
+        if (isAuthError) {
+            router.push("/login");
+        } else {
+            toast.error("Erreur lors du chargement des paiements.");
+        }
       } finally {
         setLoading(false);
       }

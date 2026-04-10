@@ -1,44 +1,63 @@
-'use server'
+// src/actions/onboarding.ts
+'use server';
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Role } from "@prisma/client";
 
 export async function setUserRole(role: string) {
   const session = await auth();
   const userEmail = session?.user?.email;
 
-  if (!userEmail) return { success: false, error: "Non connecté" };
-
-  // Validation des rôles autorisés
-  const allowedRoles = ["TENANT", "OWNER", "AGENT", "GUEST"];
-  if (!allowedRoles.includes(role)) {
-    return { success: false, error: "Rôle invalide" };
-  }
+  if (!userEmail) return { success: false, error: "Non connecté." };
 
   try {
-    // Mise à jour en base
-    await prisma.user.update({
+    // 1. Vérification de l'état actuel de l'utilisateur en base
+    const currentUser = await prisma.user.findUnique({
       where: { email: userEmail },
-      data: { role: role as any } // Cast as any si l'enum Prisma est strict
+      select: { role: true }
     });
 
-    // Détermination de la redirection
+    if (!currentUser) {
+      return { success: false, error: "Utilisateur introuvable." };
+    }
+
+    // 2. SÉCURITÉ CRITIQUE : Rejet immédiat si le rôle n'est plus UNASSIGNED
+    if (currentUser.role !== 'UNASSIGNED') {
+      return { success: false, error: "Action refusée : votre profil est déjà configuré." };
+    }
+
+    // 3. Typage strict et validation du rôle demandé
+    const allowedRoles: Role[] = ["TENANT", "OWNER", "AGENT", "GUEST"];
+    
+    if (!allowedRoles.includes(role as Role)) {
+      return { success: false, error: "Rôle sélectionné invalide." };
+    }
+
+    const validRole = role as Role;
+
+    // 4. Mutation sécurisée (Typage fort, aucun 'any')
+    await prisma.user.update({
+      where: { email: userEmail },
+      data: { role: validRole }
+    });
+
+    // 5. Routage dynamique selon le rôle
     let destination = "/dashboard";
-    switch (role) {
+    switch (validRole) {
         case "GUEST": destination = "/dashboard/guest"; break;
         case "OWNER": destination = "/dashboard/owner"; break;
         case "TENANT": destination = "/dashboard/tenant"; break;
         case "AGENT": destination = "/dashboard/agent"; break;
     }
 
-    // On revalide pour que le middleware ou le layout prenne en compte le changement
     revalidatePath("/");
     
     return { success: true, redirectUrl: destination };
 
-  } catch (error) {
-    console.error("Erreur onboarding:", error);
-    return { success: false, error: "Erreur lors de la sauvegarde." };
+  } catch (error: unknown) {
+    console.error("Erreur setUserRole:", error);
+    return { success: false, error: "Erreur serveur lors de la sauvegarde." };
   }
 }

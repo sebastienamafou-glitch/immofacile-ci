@@ -7,6 +7,11 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: "https://450fd2a67b5e77f5aa149028a625e7a0@o4510858024583168.ingest.de.sentry.io/4510858025042000",
 
+  // Filtrage du bruit côté client (WebView Android/Facebook)
+  ignoreErrors: [
+    /Java object is gone/i,
+  ],
+
   // Add optional integrations for additional features
   integrations: [Sentry.replayIntegration()],
 

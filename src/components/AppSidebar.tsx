@@ -96,10 +96,10 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: FileText, label: "Historique", href: "/dashboard/guest/history" },
   ],
   INVESTOR: [
-    { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/investor" },
-    { icon: FileSignature, label: "Mes Contrats", href: "/dashboard/investor/contract" },
-    { icon: ShieldCheck, label: "Vérification KYC", href: "/dashboard/investor/kyc" },
-  ]
+  { icon: LayoutDashboard, label: "Tableau de Bord", href: "/dashboard/invest" },
+  { icon: FileSignature, label: "Mes Contrats", href: "/dashboard/invest/contract" },
+  { icon: ShieldCheck, label: "Vérification KYC", href: "/dashboard/invest/kyc" },
+]
 };
 
 const COMMON_ITEMS: MenuItem[] = [

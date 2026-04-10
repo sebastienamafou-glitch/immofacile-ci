@@ -3,15 +3,12 @@ import {
     InvestmentContract, 
     Role, 
     TransactionType, 
-    BalanceType 
+    BalanceType,
+    InvestmentStatus // ✅ IMPORT DE L'ENUMÉRATION
 } from "@prisma/client";
 import { logActivity } from "@/lib/logger";
-import { prisma } from "@/lib/prisma"; // ✅ Instance globale importée
-
-// =============================================================================
-// 🛡️ TYPAGE STRICT (Isolé pour éviter les dépendances circulaires)
-// =============================================================================
-export type TxClient = Omit<Prisma.TransactionClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+import { prisma } from "@/lib/prisma";
+import { TxClient } from "@/services/billing/types"; // ✅ Typage unifié (DRY)
 
 // =============================================================================
 // 🚀 MOTEUR DE TRAITEMENT (CROWDFUNDING & INVESTISSEMENT)
@@ -23,12 +20,13 @@ export async function processInvestmentPayment(
     amountPaid: number, 
     transactionId: string
 ) {
-    if (investmentContract.status === "ACTIVE" || investmentContract.status === "SUCCESS") return;
+    // ✅ CORRECTION ENUMÉRATION : Utilisation de InvestmentStatus.ACTIVE
+    if (investmentContract.status === InvestmentStatus.ACTIVE || investmentContract.status === InvestmentStatus.COMPLETED) return;
 
     if (!isValidPayment) {
         await tx.investmentContract.update({ 
             where: { id: investmentContract.id }, 
-            data: { status: "FAILED" } 
+            data: { status: InvestmentStatus.CANCELLED } // 👈 CORRECTION
         });
         return;
     }
@@ -37,14 +35,14 @@ export async function processInvestmentPayment(
         console.error(`🚨 [Alerte Fraude] Investissement ${investmentContract.id} : attendu ${investmentContract.amount}, reçu ${amountPaid}`);
         await tx.investmentContract.update({ 
             where: { id: investmentContract.id }, 
-            data: { status: "FAILED" } 
+            data: { status: InvestmentStatus.CANCELLED } // 👈 CORRECTION
         });
         return;
     }
 
     await tx.investmentContract.update({ 
         where: { id: investmentContract.id }, 
-        data: { status: "SUCCESS" } 
+        data: { status: InvestmentStatus.ACTIVE } // 👈 CORRECTION
     });
 
     let newRole: Role = Role.GUEST; 
@@ -74,10 +72,12 @@ export async function processInvestmentPayment(
     });
 
     if (superAdmin) {
-        await tx.user.update({
-            where: { id: superAdmin.id },
+        // ✅ CORRECTION ARCHITECTURE : Ciblage de UserFinance
+        await tx.userFinance.update({
+            where: { userId: superAdmin.id },
             data: { walletBalance: { increment: amountPaid } }
         });
+        
         await tx.transaction.create({
             data: {
                 amount: amountPaid,

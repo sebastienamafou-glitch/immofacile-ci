@@ -41,7 +41,7 @@ export async function GET() {
 
 
 // ============================================================================
-// 2. POST : Créer un nouveau bail (VOTRE CODE ORIGINAL)
+// 2. POST : Créer un nouveau bail avec Génération de l'Échéancier
 // ============================================================================
 export async function POST(request: Request) {
   try {
@@ -126,10 +126,25 @@ export async function POST(request: Request) {
          return NextResponse.json({ error: "Bien déjà loué !" }, { status: 409 });
     }
 
-    // CRÉATION BAIL
+    // PRÉPARATION DE L'ÉCHÉANCIER (12 MOIS)
+    const schedulesToCreate = [];
+    const leaseStartDate = new Date(body.startDate);
+
+    for (let i = 0; i < 12; i++) {
+        const scheduleDate = new Date(leaseStartDate);
+        scheduleDate.setMonth(leaseStartDate.getMonth() + i);
+        
+        schedulesToCreate.push({
+            expectedDate: scheduleDate,
+            amount: rent,
+            status: "PENDING" as const // Type strict pour l'enum RentStatus
+        });
+    }
+
+    // CRÉATION BAIL + ÉCHÉANCIER (Écriture Imbriquée Atomique)
     const newLease = await prisma.lease.create({
         data: {
-            startDate: new Date(body.startDate),
+            startDate: leaseStartDate,
             endDate: body.endDate ? new Date(body.endDate) : null,
             monthlyRent: rent,
             depositAmount: deposit,
@@ -139,6 +154,9 @@ export async function POST(request: Request) {
             signatureStatus: "PENDING",
             tenantId: tenant.id,
             propertyId: property.id,
+            rentSchedules: {
+                create: schedulesToCreate
+            }
         }
     });
 

@@ -147,21 +147,20 @@ export async function refundDepositAction(leaseId: string, deductions: number, o
 
       const refundAmount = lease.depositAmount - deductions;
 
-      // 1. Débiter le propriétaire (ou l'agence selon qui détient les fonds)
-      // Note : On suppose que les fonds sont sur le wallet du propriétaire
-      const owner = await tx.user.findUnique({ where: { id: ownerId } });
-      if (!owner || owner.walletBalance < refundAmount) {
+      // 1. Débiter le propriétaire via UserFinance
+      const ownerFinance = await tx.userFinance.findUnique({ where: { userId: ownerId } });
+      if (!ownerFinance || ownerFinance.walletBalance < refundAmount) {
          throw new Error("Solde insuffisant sur votre portefeuille pour restituer la caution.");
       }
 
-      await tx.user.update({
-        where: { id: ownerId },
+      await tx.userFinance.update({
+        where: { userId: ownerId },
         data: { walletBalance: { decrement: refundAmount } }
       });
 
-      // 2. Créditer le portefeuille du locataire
-      await tx.user.update({
-        where: { id: lease.tenantId },
+      // 2. Créditer le portefeuille du locataire via UserFinance
+      await tx.userFinance.update({
+        where: { userId: lease.tenantId },
         data: { walletBalance: { increment: refundAmount } }
       });
 
@@ -222,5 +221,114 @@ export async function refundDepositAction(leaseId: string, deductions: number, o
 
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Erreur inconnue" };
+  }
+}
+
+// ============================================================================
+// 4. LOCATAIRE : PAIEMENT D'UNE ÉCHÉANCE DE LOYER
+// ============================================================================
+export async function payRentAction(scheduleId: string, tenantId: string) {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Vérification de l'échéance
+      const schedule = await tx.rentSchedule.findUnique({
+        where: { id: scheduleId },
+        include: { lease: { include: { property: true } } }
+      });
+
+      if (!schedule || schedule.lease.tenantId !== tenantId) {
+        throw new Error("Échéance introuvable ou action non autorisée.");
+      }
+      if (schedule.status === "PAID") {
+        throw new Error("Cette échéance est déjà payée.");
+      }
+
+      const amountToPay = schedule.amount;
+      const ownerId = schedule.lease.property.ownerId;
+
+      // 2. Vérification du solde du locataire (Ciblage de UserFinance)
+      const tenantFinance = await tx.userFinance.findUnique({ 
+        where: { userId: tenantId } 
+      });
+      
+      if (!tenantFinance || tenantFinance.walletBalance < amountToPay) {
+         throw new Error("Solde insuffisant sur votre portefeuille. Veuillez le recharger.");
+      }
+
+      // 3. Mouvements financiers (Débit Locataire / Crédit Propriétaire via UserFinance)
+      await tx.userFinance.update({
+        where: { userId: tenantId },
+        data: { walletBalance: { decrement: amountToPay } }
+      });
+
+      // Attention : on s'assure que le propriétaire a bien une entrée UserFinance
+      // Si on veut être ultra-résilient, un upsert serait l'idéal, mais un update suffit si on part 
+      // du principe que chaque utilisateur a son wallet créé à l'inscription.
+      await tx.userFinance.update({
+        where: { userId: ownerId },
+        data: { walletBalance: { increment: amountToPay } }
+      });
+
+      // 4. Mise à jour du statut de l'échéance
+      const updatedSchedule = await tx.rentSchedule.update({
+        where: { id: scheduleId },
+        data: { 
+          status: "PAID",
+          paidAt: new Date()
+        }
+      });
+
+      // 5. Traçabilité (Transactions)
+      await tx.transaction.create({
+        data: {
+          amount: amountToPay,
+          type: "DEBIT",
+          balanceType: "WALLET",
+          status: "SUCCESS",
+          reason: `Paiement loyer échéance - ${schedule.lease.property.title}`,
+          userId: tenantId,
+          reference: `RENT-OUT-${scheduleId.substring(0,8)}`,
+          previousHash: "GENESIS"
+        }
+      });
+
+      await tx.transaction.create({
+        data: {
+          amount: amountToPay,
+          type: "CREDIT",
+          balanceType: "WALLET",
+          status: "SUCCESS",
+          reason: `Réception loyer - ${schedule.lease.property.title}`,
+          userId: ownerId,
+          reference: `RENT-IN-${scheduleId.substring(0,8)}`,
+          previousHash: "GENESIS"
+        }
+      });
+
+      // 6. Notification au propriétaire
+      await tx.notification.create({
+        data: {
+          userId: ownerId,
+          title: "Nouveau loyer reçu 💰",
+          message: `Le loyer de ${amountToPay.toLocaleString()} FCFA pour "${schedule.lease.property.title}" a été payé et crédité sur votre portefeuille.`,
+          type: "SUCCESS",
+          link: `/dashboard/owner/leases/${schedule.lease.id}`
+        }
+      });
+
+      // 7. Audit Log
+      await tx.auditLog.create({
+        data: {
+          action: "PAYMENT_SUCCESS",
+          entityId: scheduleId,
+          entityType: "RENT_SCHEDULE",
+          userId: tenantId,
+        }
+      });
+
+      return { success: true, schedule: updatedSchedule };
+    });
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : "Erreur lors du paiement." };
   }
 }

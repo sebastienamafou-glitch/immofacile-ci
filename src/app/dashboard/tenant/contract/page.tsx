@@ -39,31 +39,46 @@ interface LeaseContract {
   }
 }
 
+// Interface locale propre pour remplacer le "any" de l'utilisateur
+interface UserData {
+  name: string;
+  email: string;
+  phone?: string;
+}
+
 export default function TenantContractDashboard() {
   const [lease, setLease] = useState<LeaseContract | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 1. CHARGEMENT
+  // 1. CHARGEMENT NETTOYÉ
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const storedUser = localStorage.getItem("immouser");
-        if (!storedUser) { router.push("/login"); return; }
-        const currentUser = JSON.parse(storedUser);
-        setUser(currentUser);
+        // ✅ On appelle l'API directement, NextAuth gère l'identité via les cookies
+        const res = await api.get('/tenant/dashboard');
 
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': currentUser.email }
-        });
-
-        if (res.data.success && res.data.lease) {
-            setLease(res.data.lease);
+        if (res.data.success) {
+            setLease(res.data.lease || null);
+            setUser(res.data.user || null);
+        } else {
+            toast.error("Impossible de récupérer les informations du contrat.");
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Fetch Error:", error);
-        toast.error("Erreur lors du chargement.");
+        
+        const isAuthError = 
+            typeof error === "object" && 
+            error !== null && 
+            "response" in error && 
+            (error as { response?: { status?: number } }).response?.status === 401;
+
+        if (isAuthError) {
+            router.push("/login");
+        } else {
+            toast.error("Erreur lors du chargement du contrat.");
+        }
       } finally {
         setLoading(false);
       }
@@ -74,7 +89,6 @@ export default function TenantContractDashboard() {
   // 2. NAVIGATION VERS LA PAGE OFFICIELLE
   const goToOfficialContract = () => {
     if (!lease) return;
-    // Redirection vers la page dynamique [id] que nous avons créée précédemment
     router.push(`/dashboard/tenant/contract/${lease.id}`);
   };
 
@@ -112,7 +126,7 @@ export default function TenantContractDashboard() {
                 </div>
             </div>
             
-            {/* LE BOUTON D'ACTION PRINCIPAL (Redirige maintenant vers la page détaillée) */}
+            {/* LE BOUTON D'ACTION PRINCIPAL */}
             {isSigned ? (
                 <Button 
                     onClick={goToOfficialContract} 
@@ -141,7 +155,7 @@ export default function TenantContractDashboard() {
                         </div>
                         <div className="flex-1">
                             <p className="text-white font-bold text-sm">Contrat validé juridiquement</p>
-                            <p className="text-xs text-slate-500 font-mono mt-1 break-all">Empreinte : {lease.documentHash}</p>
+                            <p className="text-xs text-slate-500 font-mono mt-1 break-all">Empreinte : {lease.documentHash || "En attente de hachage"}</p>
                         </div>
                     </div>
                 )}
@@ -186,7 +200,7 @@ export default function TenantContractDashboard() {
                             <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-xs font-bold text-white">L</div>
                             <div>
                                 <p className="text-xs text-slate-500 font-bold uppercase">Locataire (Vous)</p>
-                                <p className="text-white font-bold text-sm">{user?.name}</p>
+                                <p className="text-white font-bold text-sm">{user?.name || "Locataire"}</p>
                             </div>
                         </div>
                     </div>

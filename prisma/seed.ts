@@ -5,9 +5,11 @@ import {
     PropertyType, 
     LeaseStatus, 
     MissionType, 
-    MissionStatus, // 🔴 Import ajouté
+    MissionStatus,
     IncidentStatus, 
-    QuoteStatus 
+    QuoteStatus,
+    InvestmentStatus, // ✅ IMPORT AJOUTÉ
+    InvestmentPack    // ✅ IMPORT AJOUTÉ
 } from '@prisma/client';
 import { hash } from 'bcrypt';
 
@@ -21,15 +23,13 @@ async function main() {
   // ==========================================
   console.log('🧹 Nettoyage de la base de données...');
   
-  // Tables périphériques et de logs
   await prisma.processedWebhook.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
-  await prisma.lead.deleteMany(); // 🔴 Ajout anti-crash FK
+  await prisma.lead.deleteMany();
   await prisma.account.deleteMany();
   await prisma.session.deleteMany();
 
-  // Cœur métier
   await prisma.quoteItem.deleteMany();
   await prisma.message.deleteMany();
   await prisma.signatureProof.deleteMany();
@@ -116,7 +116,7 @@ async function main() {
         jobTitle: u.jobTitle,
         isBacker: u.isBacker || false,
         backerTier: u.backerTier || null,
-        walletBalance: 1000000, // 🔴 Correction : Approvisionnement direct à la racine User
+        // 🔴 SUPPRESSION DU walletBalance A LA RACINE (Source d'erreur P2009/Typage)
 
         kyc: {
             create: {
@@ -129,7 +129,7 @@ async function main() {
 
         finance: {
             create: {
-                walletBalance: 1000000, // Conservé pour la conformité UEMOA si utilisé plus tard
+                walletBalance: 1000000, // ✅ UNIQUE SOURCE DE VÉRITÉ FINANCIÈRE
                 kycTier: u.tier,
                 income: u.income || 0,
                 monthlyVolume: 0,
@@ -246,7 +246,7 @@ async function main() {
         await prisma.mission.create({
             data: {
                 type: MissionType.ETAT_DES_LIEUX_SORTIE,
-                status: MissionStatus.PENDING, // 🔴 Typage strict appliqué
+                status: MissionStatus.PENDING, 
                 fee: 50000,
                 dateScheduled: new Date(new Date().setDate(new Date().getDate() + 5)),
                 propertyId: property.id,
@@ -265,8 +265,8 @@ async function main() {
           data: {
               userId: investor.id,
               amount: 5000000,
-              packName: 'VISIONNAIRE',
-              status: 'ACTIVE',
+              packName: InvestmentPack.VIP, // ✅ CORRECTION ENUM
+              status: InvestmentStatus.ACTIVE, // ✅ CORRECTION ENUM
               paymentReference: 'INV-SEED-REF-001',
               ipAddress: '192.168.1.1',
               signatureData: 'data:image/png;base64,fake_signature...',

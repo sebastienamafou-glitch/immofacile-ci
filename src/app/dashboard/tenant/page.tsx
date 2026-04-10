@@ -8,83 +8,82 @@ import {
   MapPin, AlertTriangle, FileText, ArrowRight
 } from "lucide-react";
 
-// ✅ IMPORTS SÉCURISÉS
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TenantDashboardResponse } from "@/lib/types/tenant";
 
-// ✅ IMPORTS COMPOSANTS UI
 import RentPaymentCard from "@/components/dashboard/tenant/RentPaymentCard";
 import PaymentHistory from "@/components/dashboard/tenant/PaymentHistory";
 
 export default function TenantDashboard() {
   const [data, setData] = useState<TenantDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<boolean>(false);
   
   const router = useRouter();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const stored = localStorage.getItem("immouser");
-        if (!stored) { 
-            router.push("/login"); 
-            return; 
-        }
-        const user = JSON.parse(stored);
-
-        const res = await api.get('/tenant/dashboard', {
-            headers: { 'x-user-email': user.email }
-        });
+        // ✅ K.I.S.S : L'API lit le cookie de session nativement. 
+        // Plus besoin de lire le localStorage ni d'injecter des headers manuellement.
+        const res = await api.get<TenantDashboardResponse>('/tenant/dashboard');
 
         if (res.data.success) {
             setData(res.data);
         } else {
-            // Si l'API répond mais signale un échec (souvent car pas de bail)
-            // On force l'état "Nouveau Locataire" au lieu de crasher
-            setData({ lease: null, user: user, incidents: [] } as any);
+            setError(true);
         }
-      } catch (err: any) {
-        console.error("Erreur dashboard", err);
-        if (err.response?.status === 401) {
+      } catch (err: unknown) {
+        console.error("Erreur dashboard:", err);
+        
+        // ✅ Typage strict : Vérification sécurisée de l'erreur sans utiliser 'any'
+        const isAuthError = 
+            typeof err === "object" && 
+            err !== null && 
+            "response" in err && 
+            (err as { response?: { status?: number } }).response?.status === 401;
+
+        if (isAuthError) {
             router.push("/login");
         } else {
-            // 🔥 CORRECTION : Interception de l'erreur (ex: 404)
-            // On bascule gracieusement sur l'interface d'accueil au lieu du triangle rouge.
-            const stored = localStorage.getItem("immouser");
-            const user = stored ? JSON.parse(stored) : { name: "Locataire" };
-            setData({ lease: null, user: user, incidents: [] } as any);
+            // En cas d'erreur 500 ou problème réseau, on affiche l'écran d'erreur propre
+            setError(true);
         }
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, [router]);
 
-  // --- ÉTAT : CHARGEMENT ---
-  if (loading) return (
-    <div className="min-h-screen bg-[#060B18] flex items-center justify-center">
-        <Loader2 className="animate-spin text-orange-500 w-12 h-12" />
-    </div>
-  );
-
-  // --- ÉTAT : ERREUR CRITIQUE ---
-  if (error) return (
-    <div className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center text-slate-400 gap-4">
-      <div className="bg-red-500/10 p-4 rounded-full">
-        <AlertTriangle className="w-10 h-10 text-red-500" />
+  // --- ÉTAT 1 : CHARGEMENT ---
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#060B18] flex items-center justify-center">
+          <Loader2 className="animate-spin text-orange-500 w-12 h-12" />
       </div>
-      <p className="font-medium">Un problème inattendu est survenu.</p>
-      <Button onClick={() => window.location.reload()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
-        Réessayer
-      </Button>
-    </div>
-  );
+    );
+  }
 
-  // --- ÉTAT : NOUVEAU VISITEUR (Sans dossier) ---
+  // --- ÉTAT 2 : ERREUR CRITIQUE ---
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center text-slate-400 gap-4">
+        <div className="bg-red-500/10 p-4 rounded-full">
+          <AlertTriangle className="w-10 h-10 text-red-500" />
+        </div>
+        <p className="font-medium">Un problème inattendu est survenu lors du chargement de votre dossier.</p>
+        <Button onClick={() => window.location.reload()} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
+          Réessayer
+        </Button>
+      </div>
+    );
+  }
+
+  // --- ÉTAT 3 : NOUVEAU VISITEUR (Sans bail actif ou en attente) ---
   if (!data?.lease) {
     return (
         <main className="min-h-screen bg-[#060B18] flex flex-col items-center justify-center p-6 text-center text-slate-300">
@@ -107,7 +106,7 @@ export default function TenantDashboard() {
     );
   }
 
-  // --- ÉTAT : LOCATAIRE ACTIF (DASHBOARD COMPLET) ---
+  // --- ÉTAT 4 : LOCATAIRE ACTIF (DASHBOARD COMPLET) ---
   const { lease, user, incidents } = data;
   const property = lease.property;
   const displayName = user.name ? user.name.split(' ')[0] : "Locataire";

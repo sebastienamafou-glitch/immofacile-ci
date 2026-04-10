@@ -1,10 +1,10 @@
-import NextAuth from "next-auth"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/lib/prisma"
-import authConfig from "@/auth.config"
-import Credentials from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
-import { z } from "zod"
+import NextAuth from "next-auth";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
+import authConfig from "@/auth.config";
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 
 export const { 
   handlers: { GET, POST },
@@ -15,7 +15,7 @@ export const {
   // @ts-ignore
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  ...authConfig, // ✅ Il récupère les callbacks directement d'ici
+  ...authConfig,
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -27,7 +27,10 @@ export const {
           const { identifier, password } = parsedCredentials.data;
           
           const user = await prisma.user.findFirst({
-            where: { OR: [{ email: identifier }, { phone: identifier }] }
+            where: { OR: [{ email: identifier }, { phone: identifier }] },
+            include: {
+              finance: true // ✅ Indispensable : charge le modèle lié UserFinance [cite: 7]
+            }
           });
 
           if (!user || !user.password) return null;
@@ -40,4 +43,4 @@ export const {
     }),
   ],
   debug: process.env.NODE_ENV === "development",
-})
+});

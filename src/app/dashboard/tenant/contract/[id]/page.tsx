@@ -10,8 +10,11 @@ import {
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-
+import { Calendar, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { payRentAction } from "@/actions/lease.actions"; // Ajuste le chemin si besoin
+import { revalidatePath } from "next/cache";
 export const dynamic = 'force-dynamic';
+
 
 export default async function TenantContractPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -24,6 +27,9 @@ export default async function TenantContractPage({ params }: { params: { id: str
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
+        rentSchedules: {
+            orderBy: { expectedDate: 'asc' }
+        },
         property: {
             include: {
                 owner: { select: { id: true, name: true, email: true, phone: true } },
@@ -127,6 +133,80 @@ export default async function TenantContractPage({ params }: { params: { id: str
                 </div>
             </div>
         </div>
+
+        {/* === ÉCHÉANCIER DES LOYERS (Rent Schedule) === */}
+        {lease.rentSchedules && lease.rentSchedules.length > 0 && (
+            <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
+                <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-slate-500" />
+                    Échéancier des Loyers
+                </h2>
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-4">Échéance</th>
+                                    <th className="px-6 py-4">Montant</th>
+                                    <th className="px-6 py-4">Statut</th>
+                                    <th className="px-6 py-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                                {lease.rentSchedules.map((schedule) => {
+                                    // Configuration des badges selon le statut
+                                    const statusConfig = {
+                                        PENDING: { bg: 'bg-slate-100', text: 'text-slate-700', icon: Clock, label: 'En attente' },
+                                        PAID: { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: CheckCircle, label: 'Payé' },
+                                        LATE: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertCircle, label: 'En retard' },
+                                        PARTIAL: { bg: 'bg-orange-100', text: 'text-orange-700', icon: Clock, label: 'Partiel' }
+                                    }[schedule.status];
+
+                                    const StatusIcon = statusConfig.icon;
+
+                                    return (
+                                        <tr key={schedule.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-slate-900">
+                                                {new Date(schedule.expectedDate).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                                            </td>
+                                            <td className="px-6 py-4 font-bold text-slate-900">
+                                                {schedule.amount.toLocaleString()} FCFA
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig.bg} ${statusConfig.text}`}>
+                                                    <StatusIcon className="w-3.5 h-3.5" />
+                                                    {statusConfig.label}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {schedule.status === "PENDING" ? (
+                                                    <form action={async () => {
+                                                        "use server";
+                                                        const res = await payRentAction(schedule.id, userId);
+                                                        if (res.success) {
+                                                            revalidatePath(`/dashboard/tenant/contract/${lease.id}`);
+                                                        } 
+                                                  }}>
+                                                        <Button type="submit" variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700">
+                                                            Payer ce mois
+                                                        </Button>
+                                                   </form>
+                                               ) : schedule.status === "PAID" ? (
+                                                   <span className="text-slate-400 text-xs">Le {new Date(schedule.paidAt || schedule.updatedAt).toLocaleDateString('fr-FR')}</span>
+                                               ) : (
+                                                   <span className="text-slate-400 text-xs">-</span>
+                                             )}
+                                           </td>
+                                            
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* --- DOCUMENT OFFICIEL (OPTIMISÉ 1 PAGE - FORCE BRUTE) --- */}
         <style dangerouslySetInnerHTML={{__html: `
