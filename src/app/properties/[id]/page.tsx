@@ -64,7 +64,6 @@ export default async function PublicPropertyPage(props: PageProps) {
 
   const isLoggedIn = !!session?.user;
   const isGhost = property.isClaimed === false;
-  const hasMultipleImages = property.images && property.images.length > 1;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.immofacile.ci";
   const propertyUrl = `${appUrl}/properties/${property.id}`;
   const whatsappShareMessage = encodeURIComponent(`Découvre ce bien sur Babimmo : ${property.title} à ${property.price.toLocaleString()} FCFA.\n\nVoir les détails et photos ici : ${propertyUrl}`);
@@ -109,7 +108,7 @@ export default async function PublicPropertyPage(props: PageProps) {
          </div>
       </header>
 
-      {/* 📸 GALERIE INTERACTIVE ET LIGHTBOX (Inséré ici) */}
+      {/* 📸 GALERIE INTERACTIVE ET LIGHTBOX */}
       <PropertyGallery 
           images={property.images || []} 
           title={property.title} 
@@ -180,14 +179,12 @@ export default async function PublicPropertyPage(props: PageProps) {
                 <h3 className="font-black text-xl mb-6 text-slate-900 flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-orange-500" /> À propos de ce bien
                 </h3>
-                {/* whitespace-pre-wrap permet de garder les retours à la ligne du post Facebook original ! */}
                 <p className="text-slate-600 leading-relaxed text-base md:text-lg whitespace-pre-wrap font-medium break-words">
                     {property.description || "Aucune description détaillée n'a été fournie pour ce bien."}
                 </p>
             </div>
-        </div>
 
-        {/* CARTE / LOCALISATION */}
+            {/* 🗺️ CARTE / LOCALISATION (MAINTENANT DANS LA BONNE COLONNE) */}
             <div className="mb-12">
                 <h3 className="font-black text-xl mb-6 text-slate-900 flex items-center gap-2">
                     <MapPin className="w-5 h-5 text-orange-500" /> Emplacement du bien
@@ -197,6 +194,8 @@ export default async function PublicPropertyPage(props: PageProps) {
                     address={property.address || undefined} 
                 />
             </div>
+
+        </div> {/* ✅ FERMETURE DE LA COLONNE GAUCHE (md:col-span-8) */}
 
         {/* COLONNE DROITE : CARTE ACTION STICKY (DESKTOP) */}
         <div className="md:col-span-4 relative hidden md:block">
