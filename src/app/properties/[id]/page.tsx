@@ -6,7 +6,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import ApplyButton from "@/components/property/ApplyButton";
 import GhostTracker from "@/components/property/GhostTracker";
-import ClaimBanner from "@/components/property/ClaimBanner"; // ✅ Import ajouté
+import ClaimBanner from "@/components/property/ClaimBanner"; 
+import PropertyGallery from "@/components/property/PropertyGallery";
+import PropertyMap from "@/components/property/PropertyMap";
 import { 
   MapPin, CheckCircle, Share2, ArrowLeft, Heart, BedDouble, 
   Bath, Square, User, ShieldCheck, ShieldAlert, AlertTriangle,
@@ -107,48 +109,11 @@ export default async function PublicPropertyPage(props: PageProps) {
          </div>
       </header>
 
-      {/* 📱 GALERIE MOBILE NATIVE (SWIPEABLE) */}
-      <div className={`md:hidden relative w-full h-[55vh] bg-slate-200 ${isGhost ? '' : 'mt-0'}`}>
-        {property.images && property.images.length > 0 ? (
-            <div className="flex overflow-x-auto snap-x snap-mandatory h-full w-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {property.images.map((img, idx) => (
-                    <div key={idx} className="w-full h-full flex-shrink-0 snap-center relative">
-                        <Image src={img} alt={`${property.title} - Vue ${idx + 1}`} fill className="object-cover" priority={idx === 0} />
-                        {/* Ombre dégradée pour faire ressortir le header */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent pointer-events-none"></div>
-                    </div>
-                ))}
-            </div>
-        ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
-                <Image src="/logo.png" alt="No image" width={64} height={64} className="opacity-20 mb-2 grayscale" />
-                <span className="text-sm font-bold">Image indisponible</span>
-            </div>
-        )}
-
-        {/* Indicateur de Swipe élégant */}
-        {hasMultipleImages && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase flex items-center gap-2 shadow-lg border border-white/10">
-                Balayez les photos <MoveRight className="w-3 h-3 animate-pulse" />
-            </div>
-        )}
-      </div>
-
-      {/* 💻 GALERIE DESKTOP (GRID PREMIUM) */}
-      <div className={`hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[65vh] max-w-7xl mx-auto rounded-3xl overflow-hidden px-6 ${isGhost ? 'mt-6' : 'mt-24'}`}>
-        <div className="col-span-2 row-span-2 relative bg-slate-200 rounded-l-3xl overflow-hidden group cursor-pointer">
-            {property.images?.[0] ? (
-                <Image src={property.images[0]} alt="Vue principale" fill className="object-cover transition duration-700 group-hover:scale-105" priority />
-            ) : <div className="w-full h-full bg-slate-100"></div>}
-            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition"></div>
-        </div>
-        {property.images?.slice(1, 5).map((img, idx) => (
-            <div key={idx} className="relative bg-slate-200 overflow-hidden group cursor-pointer last:rounded-br-3xl [&:nth-child(3)]:rounded-tr-3xl">
-                 <Image src={img} alt={`Vue ${idx + 1}`} fill className="object-cover transition duration-700 group-hover:scale-105" />
-                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition"></div>
-            </div>
-        ))}
-      </div>
+      {/* 📸 GALERIE INTERACTIVE ET LIGHTBOX (Inséré ici) */}
+      <PropertyGallery 
+          images={property.images || []} 
+          title={property.title} 
+      />
 
       {/* CONTENU PRINCIPAL */}
       <div className="max-w-7xl mx-auto px-5 py-8 md:grid md:grid-cols-12 md:gap-16">
@@ -221,6 +186,17 @@ export default async function PublicPropertyPage(props: PageProps) {
                 </p>
             </div>
         </div>
+
+        {/* CARTE / LOCALISATION */}
+            <div className="mb-12">
+                <h3 className="font-black text-xl mb-6 text-slate-900 flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-orange-500" /> Emplacement du bien
+                </h3>
+                <PropertyMap 
+                    commune={property.commune} 
+                    address={property.address || undefined} 
+                />
+            </div>
 
         {/* COLONNE DROITE : CARTE ACTION STICKY (DESKTOP) */}
         <div className="md:col-span-4 relative hidden md:block">

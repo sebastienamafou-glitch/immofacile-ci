@@ -12,6 +12,9 @@ interface PropertyGalleryProps {
 export default function PropertyGallery({ images, title }: PropertyGalleryProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // ✅ NOUVEL ÉTAT : Garde en mémoire l'image affichée en grand
+  const [selectedMainIndex, setSelectedMainIndex] = useState(0);
 
   // Sécurité si pas d'images
   const safeImages = images && images.length > 0 ? images : ["/placeholder.jpg"];
@@ -31,6 +34,13 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
     setCurrentIndex((prev) => (prev - 1 + safeImages.length) % safeImages.length);
   };
 
+  // ✅ LOGIQUE DE SWAP : On prend toutes les images SAUF celle qui est déjà en grand
+  // Et on en garde maximum 4 pour remplir la grille de droite.
+  const thumbnails = safeImages
+    .map((img, index) => ({ img, index }))
+    .filter((item) => item.index !== selectedMainIndex)
+    .slice(0, 4);
+
   return (
     <>
       {/* --- GRILLE D'AFFICHAGE (Desktop & Mobile) --- */}
@@ -38,42 +48,47 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
         
         {/* Image Principale (Grande à gauche) */}
         <div 
-          onClick={() => openLightbox(0)}
+          onClick={() => openLightbox(selectedMainIndex)} // Ouvre la Lightbox
           className="md:col-span-2 md:row-span-2 relative cursor-pointer hover:opacity-95 transition"
         >
           <Image 
-            src={safeImages[0]} 
+            src={safeImages[selectedMainIndex]} 
             alt={title} 
             fill 
-            className="object-cover" 
+            className="object-cover transition-all duration-300" 
             priority
           />
         </div>
 
         {/* Images Secondaires (Grille à droite) */}
-        {safeImages.slice(1, 5).map((img, idx) => (
+        {thumbnails.map((item) => (
           <div 
-            key={idx} 
-            onClick={() => openLightbox(idx + 1)}
-            className="hidden md:block relative cursor-pointer hover:opacity-95 transition"
+            key={item.index} 
+            // ✅ LE CLIC MAGIQUE : Remplace l'image principale par cette miniature !
+            onClick={() => setSelectedMainIndex(item.index)}
+            className="hidden md:block relative cursor-pointer group/thumb overflow-hidden"
           >
             <Image 
-              src={img} 
-              alt={`${title} - photo ${idx + 2}`} 
+              src={item.img} 
+              alt={`${title} - photo ${item.index + 1}`} 
               fill 
-              className="object-cover" 
+              className="object-cover transition-transform duration-500 group-hover/thumb:scale-110" 
             />
+            {/* Petit voile noir qui disparait au survol pour dynamiser l'UI */}
+            <div className="absolute inset-0 bg-black/20 group-hover/thumb:bg-transparent transition-colors duration-300"></div>
           </div>
         ))}
 
         {/* Bouton "Voir toutes les photos" si plus de 5 images */}
-        <button 
-            onClick={() => openLightbox(0)}
-            className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-slate-900 px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-white transition"
-        >
-            <Grid className="w-4 h-4" />
-            Voir les {safeImages.length} photos
-        </button>
+        {safeImages.length > 5 && (
+          <button 
+              onClick={() => openLightbox(0)}
+              className="absolute bottom-4 right-4 bg-white/90 backdrop-blur text-slate-900 px-4 py-2 rounded-lg text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-white transition hover:scale-105"
+          >
+              <Grid className="w-4 h-4" />
+              Voir les {safeImages.length} photos
+          </button>
+        )}
       </div>
 
       {/* --- LIGHTBOX (PLEIN ÉCRAN) --- */}
@@ -90,13 +105,16 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
             {/* Navigation Gauche */}
             <button 
                 onClick={prevImage}
-                className="absolute left-4 md:left-8 text-white p-3 bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block"
+                className="absolute left-4 md:left-8 text-white p-3 bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block z-10"
             >
                 <ChevronLeft className="w-8 h-8" />
             </button>
 
-            {/* Image Centrale */}
-            <div className="relative w-full h-full max-w-6xl max-h-[85vh] p-4 flex items-center justify-center">
+            {/* Image Centrale (Avec stopPropagation ajouté pour éviter de fermer en cliquant sur l'image) */}
+            <div 
+                className="relative w-full h-full max-w-6xl max-h-[85vh] p-4 flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()} 
+            >
                 <Image 
                     src={safeImages[currentIndex]} 
                     alt="Plein écran" 
@@ -109,7 +127,7 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
             {/* Navigation Droite */}
             <button 
                 onClick={nextImage}
-                className="absolute right-4 md:right-8 text-white p-3 bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block"
+                className="absolute right-4 md:right-8 text-white p-3 bg-white/10 hover:bg-white/20 rounded-full transition hidden md:block z-10"
             >
                 <ChevronRight className="w-8 h-8" />
             </button>

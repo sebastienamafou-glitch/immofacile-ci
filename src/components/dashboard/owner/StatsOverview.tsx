@@ -56,16 +56,19 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
   // --- MODALE RECHARGEMENT ---
   const handleRecharge = () => {
     Swal.fire({
-      title: 'Approvisionner le compte',
-      text: 'Ajoutez des fonds pour vos dépenses futures.',
-      input: 'number',
-      inputLabel: 'Montant (FCFA)',
-      inputPlaceholder: 'Ex: 50000',
-      showCancelButton: true,
-      confirmButtonText: 'Procéder au paiement',
-      confirmButtonColor: '#10B981',
-      cancelButtonText: 'Annuler',
-      background: '#0F172A', color: '#fff',
+      icon: 'info',
+      title: 'Bientôt disponible 🚧',
+      html: `
+        <div class="text-sm text-slate-300 mt-2">
+          Le module de rechargement sécurisé (Wave, Orange Money, MTN, Visa) est en cours de finalisation par nos équipes techniques.
+          <br/><br/>
+          <span class="text-xs text-slate-500 font-bold uppercase tracking-widest">Merci de votre patience !</span>
+        </div>
+      `,
+      confirmButtonText: "C'est noté",
+      confirmButtonColor: '#F59E0B',
+      background: '#0F172A',
+      color: '#fff',
       customClass: { popup: 'border border-white/10 rounded-3xl' }
     });
   };
