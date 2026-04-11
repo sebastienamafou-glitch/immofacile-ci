@@ -135,8 +135,8 @@ export default function TermsPage() {
                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-3">Support Technique</p>
                             <div className="space-y-3">
-                                <a href="mailto:support@babimmo.ci" className="inline-flex items-center gap-2 text-orange-600 font-bold hover:underline">
-                                    <Mail className="w-4 h-4" /> support@babimmo.ci
+                                <a href="mailto:contact@webappci.com" className="inline-flex items-center gap-2 text-orange-600 font-bold hover:underline">
+                                    <Mail className="w-4 h-4" /> contact@webappci.com
                                 </a>
                             </div>
                         </div>

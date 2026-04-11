@@ -51,7 +51,7 @@ export default function Pricing() {
                       <li className="flex gap-3"><Check className="w-5 h-5 text-emerald-500 shrink-0" /> API dédiée</li>
                       <li className="flex gap-3"><Check className="w-5 h-5 text-emerald-500 shrink-0" /> Marque blanche</li>
                   </ul>
-                  <a href="mailto:sales@babimmo.ci" className="block w-full py-3 rounded-xl border border-white/10 text-center font-bold text-white hover:bg-white/5 transition text-sm">Contacter Sales</a>
+                  <a href="mailto:contact@webappci.com" className="block w-full py-3 rounded-xl border border-white/10 text-center font-bold text-white hover:bg-white/5 transition text-sm">Contacter Sales</a>
               </div>
           </div>
       </div>

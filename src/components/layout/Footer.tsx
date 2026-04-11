@@ -44,7 +44,7 @@ export default function Footer() {
                   <ul className="space-y-4 text-sm text-slate-400 font-medium">
                       <li><Link href="/terms" className="hover:text-[#F59E0B] transition">CGU & Mentions Légales</Link></li>
                       <li><Link href="/privacy" className="hover:text-[#F59E0B] transition">Confidentialité (ARTCI)</Link></li>
-                      <li><a href="mailto:support@babimmo.ci" className="hover:text-[#F59E0B] transition">Centre d'aide</a></li>
+                      <li><a href="mailto:contact@webappci.com" className="hover:text-[#F59E0B] transition">Centre d'aide</a></li>
                   </ul>
               </div>
           </div>

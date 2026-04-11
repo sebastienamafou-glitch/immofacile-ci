@@ -154,8 +154,8 @@ export default function PrivacyPage() {
                     </p>
                     <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 text-center">
                         <p className="text-xs font-bold text-blue-900 mb-2 uppercase tracking-widest">Délégué à la Protection (DPO)</p>
-                        <a href="mailto:privacy@babimmo.ci" className="text-blue-600 font-black hover:underline text-lg flex items-center justify-center gap-2">
-                            <Mail className="w-5 h-5" /> privacy@babimmo.ci
+                        <a href="mailto:contact@webappci.com" className="text-blue-600 font-black hover:underline text-lg flex items-center justify-center gap-2">
+                            <Mail className="w-5 h-5" /> contact@webappci.com
                         </a>
                     </div>
                 </article>

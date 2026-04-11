@@ -15,6 +15,7 @@ import {
 import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { setUserRole } from "@/actions/onboarding";
+import { useSession } from "next-auth/react";
 
 // ─────────────────────────────────────────────
 // Types stricts alignés sur le schéma Prisma
@@ -122,6 +123,7 @@ const COLOR_THEMES: Record<ColorKey, ColorTheme> = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { update } = useSession(); 
   const [selectedRole, setSelectedRole] = useState<OnboardingRole | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -138,15 +140,15 @@ export default function OnboardingPage() {
 
       toast.success("Profil configuré avec succès !");
 
-      // Invalide le cache du router avant la redirection dure
-      router.refresh();
+      // 🚨 LA MAGIE OPÈRE ICI : On met à jour le cookie JWT en direct
+      await update({ role: selectedRole }); 
 
+      // Maintenant que le cookie a le bon rôle, le middleware nous laissera passer !
       if (result.redirectUrl) {
         window.location.href = result.redirectUrl;
       }
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Une erreur est survenue.";
+      const message = err instanceof Error ? err.message : "Une erreur est survenue.";
       toast.error(message);
       setLoading(false);
     }

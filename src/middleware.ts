@@ -97,6 +97,25 @@ export default auth(async (req) => {
   );
 
   // ============================================================
+  // 🚀 NOUVEAU : VERROUILLAGE GLOBAL DE L'ONBOARDING (PRIORITÉ 1)
+  // ============================================================
+  if (isLoggedIn) {
+    const isUnassigned = userRole === 'UNASSIGNED';
+    const isOnboardingPage = path === '/onboarding';
+    const isApiRoute = path.startsWith('/api');
+
+    // Règle 1 : Si non assigné et tente d'aller n'importe où (sauf API/NextAuth), on le force sur onboarding
+    if (isUnassigned && !isOnboardingPage && !isApiRoute) {
+      return NextResponse.redirect(new URL("/onboarding", nextUrl));
+    }
+
+    // Règle 2 : Si déjà assigné et tente d'aller sur onboarding, on l'éjecte vers son dashboard
+    if (!isUnassigned && isOnboardingPage) {
+       return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    }
+  }
+
+  // ============================================================
   // 🧭 AIGUILLEUR INTELLIGENT APRÈS CONNEXION
   // ============================================================
   if (isApiAuthRoute || isPublicRoute) {
