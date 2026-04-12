@@ -4,54 +4,81 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Link from "next/link";
+import { ListingItem } from "./ListingDiscovery"; // ✅ 1. Import du typage strict
 
-// Icône personnalisée orange pour matcher ton branding
-const orangeIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+// ✅ 2. Marqueur 100% CSS (Rapide, sans image externe, aux couleurs de ta charte)
+const babiMarkerIcon = new L.DivIcon({
+  className: "bg-transparent",
+  html: `<div class="w-auto px-3 py-1.5 bg-orange-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white font-black text-xs whitespace-nowrap hover:bg-orange-500 transition-colors">
+            📍 Babi
+         </div>`,
+  iconSize: [60, 30],
+  iconAnchor: [30, 30],
+  popupAnchor: [0, -34],
 });
 
-export default function MapComponent({ listings }: { listings: any[] }) {
-  const center: [number, number] = listings.length > 0 
-    ? [listings[0].latitude, listings[0].longitude] 
+interface MapComponentProps {
+  listings: ListingItem[];
+}
+
+export default function MapComponent({ listings }: MapComponentProps) {
+  // Sécurisation : on centre sur le premier bien qui possède de vraies coordonnées
+  const validListing = listings.find(l => l.latitude != null && l.longitude != null);
+  const center: [number, number] = validListing 
+    ? [validListing.latitude as number, validListing.longitude as number] 
     : [5.3484, -4.0305]; // Abidjan par défaut
 
   return (
     <div className="h-full w-full relative">
-      {/* Filtre CSS pour le Dark Mode sur les tuiles OpenStreetMap */}
+      {/* Modification du CSS de base Leaflet pour que TON Popup s'intègre au mode sombre */}
       <style>{`
-        .leaflet-container {
-          background: #0B1120 !important;
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+          background: #0B1120;
+          padding: 0;
+          border: 1px solid rgba(255,255,255,0.1);
         }
-        .dark-tiles {
-          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        .leaflet-popup-content {
+          margin: 0;
+          width: 192px !important; /* Force la largeur pour correspondre à ton w-48 */
+        }
+        a.leaflet-popup-close-button {
+          color: white !important;
+          padding: 4px 4px 0 0 !important;
         }
       `}</style>
 
-      <MapContainer center={center} zoom={13} className="h-full w-full z-0">
+      <MapContainer center={center} zoom={13} className="h-full w-full z-0 bg-[#0B1120]">
+        
+        {/* ✅ 3. Fond de carte natif en Dark Mode (CartoDB Dark Matter) */}
         <TileLayer
-          className="dark-tiles"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
-        {listings.map((item) => (
-          <Marker key={item.id} position={[item.latitude, item.longitude]} icon={orangeIcon}>
-            <Popup>
-              <Link href={`/akwaba/listings/${item.id}`} className="block w-48 bg-[#0B1120] rounded-lg overflow-hidden border border-white/10">
-                  <img src={item.images[0]} className="h-24 w-full object-cover" alt={item.title} />
-                  <div className="p-3">
-                      <p className="text-[10px] font-black text-white uppercase truncate">{item.title}</p>
-                      <p className="text-xs font-bold text-orange-500 mt-1">
-                          {item.pricePerNight.toLocaleString()} FCFA
-                      </p>
-                  </div>
-              </Link>
-            </Popup>
-          </Marker>
-        ))}
+        
+        {listings.map((item) => {
+          if (!item.latitude || !item.longitude) return null;
+
+          return (
+            <Marker key={item.id} position={[item.latitude, item.longitude]} icon={babiMarkerIcon}>
+              <Popup>
+                {/* 4. Conservation intacte de TON design de Popup */}
+                <Link href={`/akwaba/listings/${item.id}`} className="block rounded-lg overflow-hidden">
+                    <img 
+                        src={item.images?.[0] || "/images/placeholder.jpg"} 
+                        className="h-24 w-full object-cover" 
+                        alt={item.title} 
+                    />
+                    <div className="p-3">
+                        <p className="text-[10px] font-black text-white uppercase truncate">{item.title}</p>
+                        <p className="text-xs font-bold text-orange-500 mt-1">
+                            {item.pricePerNight.toLocaleString()} FCFA
+                        </p>
+                    </div>
+                </Link>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );

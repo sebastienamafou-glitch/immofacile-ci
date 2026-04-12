@@ -7,7 +7,6 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 
-// ✅ TYPAGE STRICT : On définit exactement ce dont on a besoin
 export interface ListingItem {
   id: string;
   title: string;
@@ -16,7 +15,6 @@ export interface ListingItem {
   neighborhood: string | null;
   images: string[];
   reviews?: { rating: number }[];
-  // Ajoute latitude et longitude si MapComponent en a besoin
   latitude?: number | null; 
   longitude?: number | null;
 }
@@ -24,9 +22,9 @@ export interface ListingItem {
 const MapComponent = dynamic(() => import("./MapComponent"), { 
   ssr: false,
   loading: () => (
-    <div className="flex flex-col items-center justify-center h-full bg-slate-900 w-full rounded-3xl">
+    <div className="flex flex-col items-center justify-center h-full bg-[#0B1120] w-full">
         <Loader2 className="animate-spin text-orange-500 mb-2" />
-        <p className="text-[10px] font-black text-slate-500 uppercase">Initialisation de la carte...</p>
+        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Initialisation de la carte...</p>
     </div>
   )
 });
@@ -41,15 +39,11 @@ export default function ListingDiscovery({ listings }: ListingDiscoveryProps) {
   return (
     <main className="relative min-h-[calc(100vh-120px)] bg-[#0B1120] overflow-hidden">
       
-      {/* ✅ OPTIMISATION ARCHITECTURALE : 
-        On utilise le CSS pour masquer (hidden) plutôt que de détruire le composant. 
-        Cela évite à Leaflet de se recharger à chaque clic !
-      */}
-      
       {/* --- VUE GRILLE --- */}
+      {/* On utilise relative/absolute pour superposer les vues sans utiliser display: none */}
       <div className={cn(
         "max-w-7xl mx-auto px-4 lg:px-8 py-10 transition-opacity duration-500 w-full",
-        view === "grid" ? "opacity-100 relative z-10 block" : "opacity-0 absolute z-0 hidden"
+        view === "grid" ? "opacity-100 relative z-10" : "opacity-0 absolute top-0 left-0 -z-10 pointer-events-none"
       )}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {listings.map((item) => (
@@ -59,17 +53,17 @@ export default function ListingDiscovery({ listings }: ListingDiscoveryProps) {
       </div>
 
       {/* --- VUE CARTE --- */}
+      {/* La carte est TOUJOURS en taille max (absolute inset-0). Elle est juste invisible et intouchable en vue grille */}
       <div className={cn(
-        "w-full h-[calc(100vh-120px)] relative transition-opacity duration-500",
-        view === "map" ? "opacity-100 z-10 block" : "opacity-0 z-0 hidden"
+        "absolute inset-0 w-full h-[calc(100vh-120px)] transition-opacity duration-500",
+        view === "map" ? "opacity-100 z-10" : "opacity-0 -z-10 pointer-events-none"
       )}>
-        {/* En gardant MapComponent monté, il reste fluide */}
         <MapComponent listings={listings} />
         
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 shadow-2xl">
             <MapPin size={12} className="text-orange-500" />
             <span className="text-[10px] font-black text-white uppercase tracking-widest">
-                {listings.length} pépites localisées
+                {listings?.length || 0} pépites localisées
             </span>
         </div>
       </div>
@@ -98,12 +92,10 @@ export default function ListingDiscovery({ listings }: ListingDiscoveryProps) {
 }
 
 function ListingCard({ item }: { item: ListingItem }) {
-    // Calcul de la note robuste
     const avgRating = item.reviews && item.reviews.length > 0 
         ? (item.reviews.reduce((acc, rev) => acc + rev.rating, 0) / item.reviews.length).toFixed(1)
         : "Nouveau";
 
-    // Sécurisation de l'image (au cas où le tableau soit vide)
     const displayImage = item.images && item.images.length > 0 ? item.images[0] : "/images/placeholder.jpg";
 
     return (
