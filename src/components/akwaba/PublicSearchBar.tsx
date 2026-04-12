@@ -9,6 +9,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker"; // ✅ IMPORT DE DATERANGE
 
 interface PublicSearchBarProps {
   availableCities: string[];
@@ -21,7 +22,10 @@ export default function PublicSearchBar({ availableCities }: PublicSearchBarProp
   const [location, setLocation] = useState(searchParams.get("city") || "");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [date, setDate] = useState<Date | undefined>();
+  
+  // ✅ ÉTAT MIS À JOUR POUR LA PLAGE DE DATES
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  
   const [guests, setGuests] = useState(searchParams.get("guests") || "1");
   const suggestionRef = useRef<HTMLDivElement>(null);
 
@@ -50,15 +54,19 @@ export default function PublicSearchBar({ availableCities }: PublicSearchBarProp
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Dans src/components/akwaba/PublicSearchBar.tsx
-const handleSearch = () => {
-  const params = new URLSearchParams();
-  if (location) params.set("city", location);
-  if (guests) params.set("guests", guests);
-  
-  // ✅ DOIT POINTER VERS /akwaba/listings
-  router.push(`/akwaba/listings?${params.toString()}`);
-};
+  // SOUMISSION DE LA RECHERCHE
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (location) params.set("city", location);
+    if (guests) params.set("guests", guests);
+    
+    // ✅ INJECTION DES DATES DANS L'URL
+    if (dateRange?.from) params.set("startDate", dateRange.from.toISOString());
+    if (dateRange?.to) params.set("endDate", dateRange.to.toISOString());
+    
+    // ✅ DOIT POINTER VERS /akwaba/listings
+    router.push(`/akwaba/listings?${params.toString()}`);
+  };
 
   return (
     <div className="w-full max-w-5xl mx-auto bg-[#1E293B]/60 backdrop-blur-2xl border border-white/10 p-2 md:p-3 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row items-center gap-2 relative transition-all duration-500 hover:border-orange-500/30">
@@ -97,26 +105,37 @@ const handleSearch = () => {
         )}
       </div>
 
-      {/* 📅 DATES */}
+      {/* 📅 DATES (Arrivée - Départ) */}
       <div className="flex-1 w-full px-6 py-2 border-b md:border-b-0 md:border-r border-white/5 transition-colors hover:bg-white/5 rounded-3xl">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Arrivée</label>
+        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Dates</label>
         <Popover>
             <PopoverTrigger asChild>
                 <button className="flex items-center gap-2 w-full text-left">
                     <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
                     <span className={cn(
-                        "text-sm font-bold transition-colors",
-                        !date ? 'text-slate-600' : 'text-white'
+                        "text-sm font-bold transition-colors truncate",
+                        !dateRange ? 'text-slate-600' : 'text-white'
                     )}>
-                        {date ? format(date, "d MMM yyyy", { locale: fr }) : "Ajouter une date"}
+                        {/* ✅ LOGIQUE D'AFFICHAGE INTELLIGENTE */}
+                        {dateRange?.from ? (
+                          dateRange.to ? (
+                            `${format(dateRange.from, "d MMM", { locale: fr })} - ${format(dateRange.to, "d MMM", { locale: fr })}`
+                          ) : (
+                            format(dateRange.from, "d MMM", { locale: fr })
+                          )
+                        ) : (
+                          "Quand partez-vous ?"
+                        )}
                     </span>
                 </button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 bg-[#0B1120] border-white/10 shadow-2xl" align="start">
+            <PopoverContent className="w-auto p-0 bg-[#0B1120] border-white/10 shadow-2xl" align="center">
                 <CalendarComponent
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
+                    mode="range" // ✅ MODE PLAGE DE DATES
+                    defaultMonth={dateRange?.from || new Date()}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2} // ✅ AFFICHE 2 MOIS
                     initialFocus
                     disabled={(date) => date < new Date()}
                     className="bg-[#0B1120] text-white rounded-xl"
