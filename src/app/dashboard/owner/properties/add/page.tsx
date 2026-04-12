@@ -21,6 +21,16 @@ const LocationPicker = dynamic(() => import("@/components/akwaba/LocationPicker"
     loading: () => <div className="h-[300px] w-full bg-slate-900 animate-pulse rounded-xl border border-slate-800 flex items-center justify-center text-slate-500 text-sm font-bold">Chargement de la carte...</div>
 });
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      code?: string;
+      error?: string;
+    };
+  };
+}
+
 export default function AddPropertyPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -78,13 +88,32 @@ export default function AddPropertyPage() {
         router.refresh(); 
         router.push('/dashboard/owner/properties'); 
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      if (error.response?.status === 401) {
-          toast.error("Session expirée. Veuillez vous reconnecter.");
+      
+      // ✅ Cast strict et sécurisé de l'erreur
+      const apiError = error as ApiError;
+      
+      // 1. LE NOUVEAU BOUCLIER KYC (Code 403)
+      if (apiError.response?.status === 403 && apiError.response?.data?.code === 'KYC_REQUIRED') {
+          toast.error("Vérification d'identité requise", {
+              description: "La loi exige de vérifier votre identité avant de publier.",
+              action: {
+                  label: "Faire mon KYC",
+                  onClick: () => router.push('/dashboard/owner/kyc')
+              },
+              duration: 8000,
+          });
+          return; 
+      }
+
+      // 🔒 2. GESTION CLASSIQUE DES ERREURS
+      if (apiError.response?.status === 401 || apiError.response?.status === 403) {
+          toast.error("Session expirée ou accès refusé. Veuillez vous reconnecter.");
           router.push('/login');
       } else {
-          const msg = error.response?.data?.error || "Erreur lors de la publication.";
+          // ⚠️ 3. ERREURS SERVEUR
+          const msg = apiError.response?.data?.error || "Erreur lors de la publication.";
           toast.error(msg);
       }
     } finally {
