@@ -94,7 +94,7 @@ export default function Navbar() {
                   <li><a href="#pricing" onClick={toggleMenu} className="block py-3 text-slate-300 border-b border-white/5">Tarifs</a></li>
                   
                   <li className="pt-4 flex flex-col gap-4">
-                      <Link href="/login" onClick={toggleMenu} className="w-full bg-slate-800 text-white py-4 rounded-2xl border border-slate-700">Connexion Propriétaire</Link>
+                      <Link href="/login" onClick={toggleMenu} className="w-full bg-slate-800 text-white py-4 rounded-2xl border border-slate-700">Connexion</Link>
                       <Link href="/signup" onClick={toggleMenu} className="w-full bg-[#F59E0B] text-black py-4 rounded-2xl shadow-xl font-black uppercase">Créer mon compte</Link>
                   </li>
 

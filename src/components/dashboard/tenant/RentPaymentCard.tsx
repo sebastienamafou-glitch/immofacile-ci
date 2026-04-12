@@ -27,20 +27,22 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
 
   const handlePayRent = async () => {
     if (!userPhone) {
-        toast.error("Veuillez ajouter un numéro de téléphone à votre profil pour payer.");
+        toast.error("Veuillez ajouter un numéro de téléphone à votre profil.");
         return;
     }
 
+    // 🚧 MODE DÉVELOPPEMENT : Affichage d'un toast informatif
+    toast.info("L'intégration Wave / Orange Money est en cours. Cette fonctionnalité sera très bientôt disponible !");
+    
+    /* // 🔒 CODE ORIGINAL CONSERVÉ POUR LA FUTURE INTÉGRATION
     setIsPaying(true); 
     try {
-        // Génération d'une clé unique pour éviter les doubles facturations
         const idempotencyKey = crypto.randomUUID();
-
         const result = await initiatePayment({
             type: isInitialPayment ? 'DEPOSIT' : 'RENT',                 
             referenceId: lease.id,   
             phone: userPhone,
-            idempotencyKey: idempotencyKey // <-- Ajout de la clé requise
+            idempotencyKey: idempotencyKey 
         });
 
         if (result.success && result.paymentUrl) {
@@ -54,6 +56,7 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
     } finally {
         setIsPaying(false); 
     }
+    */
   };
 
   return (

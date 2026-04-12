@@ -12,6 +12,7 @@ import {
     InvestmentPack    // ✅ IMPORT AJOUTÉ
 } from '@prisma/client';
 import { hash } from 'bcrypt';
+import { LEASE_CONSTANTS } from '../src/lib/constants/lease';
 
 const prisma = new PrismaClient();
 
@@ -171,13 +172,15 @@ async function main() {
     console.log(`🏠 Bien créé : ${property.title}`);
 
     if (tenant) {
+      const rentAmount = 1500000; // On stocke le loyer dans une variable
       const lease = await prisma.lease.create({
         data: {
           startDate: new Date('2024-01-01'),
           endDate: new Date('2025-01-01'),
-          monthlyRent: 1500000,
-          depositAmount: 3000000,
-          advanceAmount: 3000000,
+          monthlyRent: rentAmount,
+          // ✅ Utilisation de notre constante globale
+          depositAmount: LEASE_CONSTANTS.calculateDeposit(rentAmount),
+          advanceAmount: LEASE_CONSTANTS.calculateAdvance(rentAmount),
           status: LeaseStatus.ACTIVE,
           isActive: true,
           propertyId: property.id,

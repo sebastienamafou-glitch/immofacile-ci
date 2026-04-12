@@ -38,7 +38,7 @@ export default function PaymentHistory({ payments }: { payments: TenantPaymentDa
                                     </p>
                                     <div className="flex items-center gap-2">
                                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
-                                            {payment.type === 'DEPOSIT' ? 'Caution' : 'Loyer'}
+                                            {payment.type === 'DEPOSIT' ? 'Caution + Avance' : 'Loyer'}
                                         </p>
                                         <span className="text-[10px] text-slate-400 font-mono">
                                             - {payment.amount.toLocaleString()} F

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/logger"; // ✅ Audit Trail
+import { LEASE_CONSTANTS } from "@/lib/constants/lease";
 
 export async function POST(request: Request) {
   try {
@@ -53,9 +54,11 @@ export async function POST(request: Request) {
     // 5. CRÉATION DE LA CANDIDATURE (Lease PENDING)
     const newLease = await prisma.lease.create({
       data: {
-        startDate: new Date(), // Date de la demande (sera ajustée à la signature)
+        startDate: new Date(), 
         monthlyRent: property.price,
-        depositAmount: property.price * 2, // Convention : 2 mois de caution
+        // ✅ CALCUL DYNAMIQUE ET SÉCURISÉ SELON LA LOI
+        depositAmount: LEASE_CONSTANTS.calculateDeposit(property.price),
+        advanceAmount: LEASE_CONSTANTS.calculateAdvance(property.price),
         status: 'PENDING',
         isActive: false,
         tenantId: userId,
