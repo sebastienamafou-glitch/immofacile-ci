@@ -28,9 +28,14 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 
-    // Gestion stricte des 401 (Token expiré) et 403 (Rôle non autorisé)
+    // ✅ NOUVEAU : On détecte si c'est une erreur métier spécifique (KYC)
+    // On type l'erreur en "any" localement ici juste pour lire la donnée en toute sécurité
+    const errorData = error.response?.data as any; 
+    const isKycError = error.response?.status === 403 && errorData?.code === 'KYC_REQUIRED';
+
+    // Gestion stricte des 401 (Token expiré) et 403 (Rôle non autorisé), SAUF si c'est le KYC
     if (
-      (error.response?.status === 401 || error.response?.status === 403) && 
+      (error.response?.status === 401 || (error.response?.status === 403 && !isKycError)) && 
       originalRequest && 
       !originalRequest._retry
     ) {
