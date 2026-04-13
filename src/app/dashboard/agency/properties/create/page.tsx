@@ -1,14 +1,16 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Save, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, Save, Loader2, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CldUploadWidget } from "next-cloudinary";
 import { createPropertyAction } from "../actions";
 
-// Petit composant pour le bouton de soumission gérant l'état de chargement
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
@@ -20,8 +22,13 @@ function SubmitButton() {
 }
 
 export default function CreateAgencyPropertyPage() {
-  // Hook de Server Action (Next.js 14)
   const [state, formAction] = useFormState(createPropertyAction, null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+
+  // Fonction pour supprimer une image de la prévisualisation
+  const removeImage = (indexToRemove: number) => {
+    setImageUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 p-6">
@@ -42,15 +49,69 @@ export default function CreateAgencyPropertyPage() {
       </div>
 
       {/* FORMULAIRE */}
-      <form action={formAction} className="bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl space-y-6">
+      <form action={formAction} className="bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl space-y-8">
         
-        {/* Affichage des erreurs serveur */}
         {state?.error && (
             <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-xl text-sm font-bold">
                 {state.error}
             </div>
         )}
 
+        {/* --- SECTION PHOTOS (CLOUDINARY) --- */}
+        <div className="space-y-4">
+            <div>
+                <Label className="text-slate-300 font-bold text-lg">Photos du bien</Label>
+                <p className="text-slate-500 text-sm">Ajoutez des photos lumineuses pour mettre en valeur votre annonce.</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Prévisualisation des images uploadées */}
+                {imageUrls.map((url, index) => (
+                    <div key={index} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10">
+                        <Image src={url} alt={`Photo ${index + 1}`} fill className="object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                                type="button" 
+                                onClick={() => removeImage(index)}
+                                className="bg-red-500 text-white p-2 rounded-full hover:scale-110 transition-transform"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+
+                {/* Widget d'Upload Cloudinary */}
+                <CldUploadWidget 
+                    uploadPreset="immovacile_preset" // ⚠️ Remplace par ton Upload Preset Cloudinary non signé
+                    onSuccess={(result: any) => {
+                        if (result?.info?.secure_url) {
+                            setImageUrls((prev) => [...prev, result.info.secure_url]);
+                        }
+                    }}
+                >
+                    {({ open }) => (
+                        <button
+                            type="button"
+                            onClick={() => open()}
+                            className="aspect-square rounded-xl border-2 border-dashed border-white/10 hover:border-orange-500/50 hover:bg-orange-500/5 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-orange-500 transition-all"
+                        >
+                            <ImagePlus size={24} />
+                            <span className="text-xs font-bold uppercase tracking-wider">Ajouter</span>
+                        </button>
+                    )}
+                </CldUploadWidget>
+            </div>
+
+            {/* 🔒 INJECTION CACHÉE DES URLs POUR LA SERVER ACTION */}
+            {imageUrls.map((url, index) => (
+                <input key={index} type="hidden" name="images" value={url} />
+            ))}
+        </div>
+
+        <hr className="border-white/5" />
+
+        {/* --- SECTION INFOS TEXTUELLES --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
                 <Label className="text-slate-300">Titre de l'annonce *</Label>

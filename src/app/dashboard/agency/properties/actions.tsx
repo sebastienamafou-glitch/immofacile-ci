@@ -13,18 +13,19 @@ export interface ActionState {
   issues?: Record<string, string[]>;
 }
 
-// ✅ FIX PROBLÈME 2 : Ajout strict de .int() sur les champs concernés
 const PropertySchema = z.object({
   title: z.string().min(5, "Le titre doit faire au moins 5 caractères"),
   description: z.string().optional(),
   price: z.coerce.number().int("Le prix doit être un entier").positive("Le prix doit être positif"),
-  surface: z.coerce.number().positive().optional(), // Float dans Prisma, donc pas de .int()
+  surface: z.coerce.number().positive().optional(), 
   bedrooms: z.coerce.number().int("Doit être un entier").min(0),
   bathrooms: z.coerce.number().int("Doit être un entier").min(0),
   address: z.string().min(5),
   commune: z.string().min(2),
   type: z.nativeEnum(PropertyType),
   isAvailable: z.boolean().default(true),
+  // ✅ NOUVEAU : Validation stricte d'un tableau d'URLs
+  images: z.array(z.string().url("URL d'image invalide")).default([]), 
 });
 
 // ============================================================================
@@ -51,6 +52,8 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
     address: formData.get("address"),
     commune: formData.get("commune"),
     type: formData.get("type"),
+    // ✅ NOUVEAU : Extraction de toutes les entrées 'images' du FormData
+    images: formData.getAll("images").map(String), 
   };
 
   const validatedFields = PropertySchema.safeParse(rawData);
@@ -67,7 +70,6 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
         ...validatedFields.data,
         isAvailable: true,
         isPublished: true, 
-        images: [], 
         ownerId: session.user.id,
         agentId: session.user.id, 
         agencyId: user.agencyId,  
@@ -76,13 +78,12 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
 
     newPropertyId = newProperty.id;
 
-    // Nécessite la mise à jour de l'enum AuditAction dans schema.prisma (Problème 1)
     await logActivity({
       action: "PROPERTY_CREATED",
       entityId: newProperty.id,
       entityType: "PROPERTY",
       userId: session.user.id,
-      metadata: { source: "Agency Dashboard", price: newProperty.price }
+      metadata: { source: "Agency Dashboard", price: newProperty.price, imagesCount: validatedFields.data.images.length }
     });
 
   } catch (error: unknown) {
@@ -123,6 +124,8 @@ export async function updatePropertyAction(
     commune: formData.get("commune"),
     type: formData.get("type"),
     isAvailable: formData.get("isAvailable") === "on",
+    // ✅ NOUVEAU : Récupération des images lors de l'update
+    images: formData.getAll("images").map(String),
   };
 
   const validatedFields = PropertySchema.safeParse(rawData);
@@ -132,8 +135,6 @@ export async function updatePropertyAction(
   }
 
   try {
-    // ✅ FIX PROBLÈME 3 : Transaction Interactive pour éviter toute Race Condition
-    // On verrouille la vérification et la mise à jour dans une seule opération atomique
     await prisma.$transaction(async (tx) => {
       const existingProperty = await tx.property.findFirst({
         where: { id: propertyId, agencyId: user.agencyId }
@@ -156,7 +157,7 @@ export async function updatePropertyAction(
         metadata: {
           previousPrice: existingProperty.price,
           newPrice: updatedProperty.price,
-          changes: "Metadata update via Edit Form"
+          changes: "Metadata and images updated"
         }
       });
     });
