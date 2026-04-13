@@ -83,7 +83,13 @@ export default function CreateAgencyPropertyPage() {
 
                 {/* Widget d'Upload Cloudinary */}
                 <CldUploadWidget 
-                    uploadPreset="immovacile_preset" // ⚠️ Remplace par ton Upload Preset Cloudinary non signé
+                    uploadPreset="immovacile_preset"
+                    options={{ 
+                        maxFiles: 10, // Limiter à 10 photos par bien par exemple
+                        clientAllowedFormats: ["png", "jpg", "jpeg", "webp"], // Interdire les PDF pour des photos de maison !
+                        sources: ['local', 'camera', 'unsplash'], // Permettre la galerie
+                        multiple: true // Permettre l'upload par lot
+                    }}
                     onSuccess={(result: any) => {
                         if (result?.info?.secure_url) {
                             setImageUrls((prev) => [...prev, result.info.secure_url]);
