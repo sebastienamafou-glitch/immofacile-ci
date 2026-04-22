@@ -108,7 +108,7 @@ export default function BookingHistoryCard({ booking }: BookingHistoryCardProps)
       <div className="w-full md:w-auto flex flex-row md:flex-col gap-3">
          <Link href={`/dashboard/guest/inbox`} className="w-full">
             <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">
-                Contacter l'hôte
+                Contacter l&apos;hôte
             </Button>
          </Link>
          

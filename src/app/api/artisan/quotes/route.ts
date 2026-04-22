@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         select: { role: true, isVerified: true }
     });
 
-    if (!user || user.role !== Role.ARTISAN) {
+    if (!user || (user.role !== Role.ARTISAN && user.role !== Role.SUPER_ADMIN)) {
         return NextResponse.json({ error: "Seul un artisan certifié peut émettre un devis." }, { status: 403 });
     }
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         where: { id: incidentId },
         include: { 
             quote: true,
-            property: { select: { ownerId: true, title: true } } 
+            property: { select: { ownerId: true, title: true, agencyId: true } } 
         } 
     });
 
@@ -86,7 +86,27 @@ export async function POST(request: Request) {
     const quoteNumber = `DEV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
     const expirationDate = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
-    // 6. EXÉCUTION ATOMIQUE (Devis + Statut + Notification)
+    // 6. DÉTERMINER LA CIBLE DE LA NOTIFICATION (Propriétaire ou Agence ?)
+    let targetUserId = incident.property.ownerId; // Propriétaire par défaut
+    let notificationLink = `/dashboard/owner/maintenance/${incidentId}`; // Lien propriétaire par défaut
+
+    if (incident.property.agencyId) {
+        // Le bien est géré par une agence. On cherche un admin de cette agence.
+        const agencyAdmin = await prisma.user.findFirst({
+            where: {
+                agencyId: incident.property.agencyId,
+                role: Role.AGENCY_ADMIN
+            },
+            select: { id: true }
+        });
+
+        if (agencyAdmin) {
+            targetUserId = agencyAdmin.id; // On cible l'admin de l'agence
+            notificationLink = `/dashboard/agency/maintenance/${incidentId}`; // Lien vers l'espace agence
+        }
+    }
+
+    // 7. EXÉCUTION ATOMIQUE (Devis + Statut + Notification)
     const result = await prisma.$transaction(async (tx) => {
         // A. Création du devis avec ENUMS
         const newQuote = await tx.quote.create({
@@ -110,14 +130,14 @@ export async function POST(request: Request) {
             data: { status: IncidentStatus.QUOTATION } // ✅ ENUM
         });
 
-        // C. Notification au propriétaire
+        // C. Notification Intelligente (Agence ou Propriétaire)
         await tx.notification.create({
             data: {
-                userId: incident.property.ownerId,
+                userId: targetUserId,
                 title: "Nouveau Devis Reçu 📄",
                 message: `L'artisan a soumis un devis de ${totalAmount.toLocaleString('fr-FR')} FCFA pour "${incident.title}".`,
                 type: "INFO",
-                link: `/dashboard/owner/maintenance/incidents/${incidentId}`, 
+                link: notificationLink, 
                 isRead: false
             }
         });

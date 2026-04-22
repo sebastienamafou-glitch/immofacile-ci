@@ -2,10 +2,17 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { BookingStatus } from "@prisma/client";
 
-export async function searchListings(query: string = "") {
+// ✅ 1. Nouvelle interface pour gérer les filtres avancés
+interface SearchParams {
+  query?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function searchListings({ query = "", startDate, endDate }: SearchParams = {}) {
   try {
-    // 1. Identification sécurisée (pour les favoris)
     const session = await auth();
     const userEmail = session?.user?.email;
     
@@ -15,7 +22,22 @@ export async function searchListings(query: string = "") {
         if (user) userId = user.id;
     }
 
-    // 2. Requête Database
+    // ✅ 2. LOGIQUE ANTI-CHEVAAUCHEMENT (Moteur de dispo)
+    // On cherche les réservations qui se chevauchent avec les dates demandées
+    const bookingConflictFilter = startDate && endDate ? {
+      none: {
+        AND: [
+          { startDate: { lt: new Date(endDate) } },
+          { endDate: { gt: new Date(startDate) } }
+        ],
+        OR: [
+          { status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN] } },
+          { status: BookingStatus.PENDING, createdAt: { gt: new Date(Date.now() - 15 * 60 * 1000) } }
+        ]
+      }
+    } : undefined;
+
+    // 3. Requête Database avec le filtre intégré
     const listings = await prisma.listing.findMany({
       where: {
         isPublished: true,
@@ -23,27 +45,23 @@ export async function searchListings(query: string = "") {
           { title: { contains: query, mode: 'insensitive' } },
           { city: { contains: query, mode: 'insensitive' } },
           { neighborhood: { contains: query, mode: 'insensitive' } },
-        ] : undefined
+        ] : undefined,
+        bookings: bookingConflictFilter // 🛡️ Le filtre magique s'applique ici
       },
       include: {
-        // On vérifie si l'utilisateur a mis ce bien en favori
-        wishlists: userId ? {
-            where: { userId: userId }
-        } : false,
-        // On récupère une image
+        wishlists: userId ? { where: { userId: userId } } : false,
         host: { select: { name: true, image: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // 3. Formatage des données
     const formattedListings = listings.map(l => ({
         id: l.id,
         title: l.title,
         price: l.pricePerNight,
         location: `${l.city}${l.neighborhood ? `, ${l.neighborhood}` : ''}`,
         image: l.images[0] || '/placeholder-house.jpg',
-        rating: 4.8, // Valeur par défaut ou calculée plus tard
+        rating: 4.8, 
         isFavorite: userId ? l.wishlists.length > 0 : false,
         host: l.host
     }));

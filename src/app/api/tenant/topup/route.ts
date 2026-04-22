@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { PaymentProvider } from "@prisma/client"; 
 
 const CINETPAY_URL = "https://api-checkout.cinetpay.com/v2/payment";
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
         type: "TOPUP",
         status: "PENDING",
         reference: transactionId,
-        method: provider || "MOBILE_MONEY",
+        method: (provider as PaymentProvider) || PaymentProvider.CINETPAY,
         userId: userId // ✅ CORRECTION CRITIQUE : Liaison du paiement à l'utilisateur
       }
     });

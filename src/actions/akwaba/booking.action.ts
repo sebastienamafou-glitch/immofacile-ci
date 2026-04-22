@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
 import { differenceInDays } from "date-fns";
+import { revalidatePath } from "next/cache";
+import { differenceInHours } from "date-fns";
 
 interface CreateBookingInput {
   listingId: string;
@@ -27,22 +29,24 @@ export async function createSecureBooking(input: CreateBookingInput) {
   }
 
   try {
-    // 🚀 Lancement de la transaction atomique (Isole la requête de la concurrence)
     const booking = await prisma.$transaction(async (tx) => {
       
-      // 1. Récupération sécurisée du prix côté serveur (Ne jamais faire confiance au client)
       const listing = await tx.listing.findUnique({
         where: { id: listingId },
-        select: { pricePerNight: true, maxGuests: true },
+        select: { pricePerNight: true, maxGuests: true, hostId: true },
       });
 
       if (!listing) throw new Error("Logement introuvable.");
+      if (listing.hostId === session.user.id) throw new Error("OWNER_BOOKING");
       if (guestCount > listing.maxGuests) throw new Error("Capacité maximale dépassée.");
 
       const nights = Math.max(1, differenceInDays(end, start));
-      const totalPrice = listing.pricePerNight * nights;
+      
+      // ✅ CALCUL FINANCIER STRICT (Prix de base + 10% Frais Plateforme)
+      const basePrice = listing.pricePerNight * nights;
+      const serviceFee = Math.round(basePrice * 0.10); 
+      const totalPrice = basePrice + serviceFee;
 
-      // 2. Vérification des chevauchements + Nettoyage passif (15 min TTL)
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
       const conflict = await tx.booking.findFirst({
@@ -53,9 +57,7 @@ export async function createSecureBooking(input: CreateBookingInput) {
             { endDate: { gt: start } },
           ],
           OR: [
-            // Bloqué si Payé/Confirmé/En cours de séjour
             { status: { in: [BookingStatus.PAID, BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN] } },
-            // Bloqué si PENDING mais créé il y a MOINS de 15 minutes
             { status: BookingStatus.PENDING, createdAt: { gt: fifteenMinutesAgo } },
           ],
         },
@@ -65,7 +67,6 @@ export async function createSecureBooking(input: CreateBookingInput) {
         throw new Error("DATES_UNAVAILABLE");
       }
 
-      // 3. Création de la réservation avec le statut PENDING
       return await tx.booking.create({
         data: {
           listingId,
@@ -81,11 +82,48 @@ export async function createSecureBooking(input: CreateBookingInput) {
 
     return { success: true, bookingId: booking.id };
 
-  } catch (error: any) {
-    console.error("[BOOKING_ERROR]", error);
-    if (error.message === "DATES_UNAVAILABLE") {
-      return { success: false, error: "Ces dates viennent juste d'être réservées par un autre utilisateur." };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "";
+    if (msg === "DATES_UNAVAILABLE") return { success: false, error: "Ces dates viennent d'être réservées par un autre utilisateur." };
+    if (msg === "OWNER_BOOKING") return { success: false, error: "Impossible de réserver votre propre bien." };
+    return { success: false, error: "Erreur lors de la réservation." };
+  }
+}
+// ✅ 2. ANNULATION DE RÉSERVATION
+export async function cancelBooking(bookingId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { guestId: true, status: true, startDate: true }
+    });
+
+    if (!booking) return { success: false, error: "Réservation introuvable" };
+    if (booking.guestId !== session.user.id) return { success: false, error: "Action interdite" };
+    
+    if (booking.status === "CANCELLED" || booking.status === "COMPLETED") {
+      return { success: false, error: "Déjà annulé ou terminé." };
     }
-    return { success: false, error: error.message || "Erreur lors de la réservation." };
+
+    const hoursBeforeStart = differenceInHours(new Date(booking.startDate), new Date());
+    
+    // On empêche l'annulation si le séjour est dans moins de 24h ET que c'est déjà payé/confirmé
+    if (hoursBeforeStart < 24 && booking.status !== "PENDING") {
+       return { success: false, error: "Annulation impossible moins de 24h avant le séjour." };
+    }
+
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: "CANCELLED" }
+    });
+
+    revalidatePath("/dashboard/guest/trips");
+    return { success: true };
+
+  } catch (error) {
+    console.error("Erreur annulation:", error);
+    return { success: false, error: "Erreur serveur lors de l'annulation." };
   }
 }

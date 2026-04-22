@@ -4,7 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, Save, Loader2, ImagePlus, X } from "lucide-react";
+import { ChevronLeft, Save, Loader2, ImagePlus, X, Globe } from "lucide-react"; // Ajout de Globe
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,6 @@ export default function CreateAgencyPropertyPage() {
   const [state, formAction] = useFormState(createPropertyAction, null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
-  // Fonction pour supprimer une image de la prévisualisation
   const removeImage = (indexToRemove: number) => {
     setImageUrls((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -35,7 +34,7 @@ export default function CreateAgencyPropertyPage() {
       
       {/* HEADER STRICT */}
       <div className="flex items-center gap-4">
-        <Link href="/dashboard/agency">
+        <Link href="/dashboard/agency/properties">
           <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/5 text-white">
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -57,7 +56,7 @@ export default function CreateAgencyPropertyPage() {
             </div>
         )}
 
-        {/* --- SECTION PHOTOS (CLOUDINARY) --- */}
+        {/* --- SECTION PHOTOS --- */}
         <div className="space-y-4">
             <div>
                 <Label className="text-slate-300 font-bold text-lg">Photos du bien</Label>
@@ -65,7 +64,6 @@ export default function CreateAgencyPropertyPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Prévisualisation des images uploadées */}
                 {imageUrls.map((url, index) => (
                     <div key={index} className="relative aspect-square rounded-xl overflow-hidden group border border-white/10">
                         <Image src={url} alt={`Photo ${index + 1}`} fill className="object-cover" />
@@ -81,14 +79,13 @@ export default function CreateAgencyPropertyPage() {
                     </div>
                 ))}
 
-                {/* Widget d'Upload Cloudinary */}
                 <CldUploadWidget 
-                    uploadPreset="immovacile_preset"
+                    uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
                     options={{ 
-                        maxFiles: 10, // Limiter à 10 photos par bien par exemple
-                        clientAllowedFormats: ["png", "jpg", "jpeg", "webp"], // Interdire les PDF pour des photos de maison !
-                        sources: ['local', 'camera', 'unsplash'], // Permettre la galerie
-                        multiple: true // Permettre l'upload par lot
+                        maxFiles: 10,
+                        clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
+                        sources: ['local', 'camera', 'unsplash'],
+                        multiple: true
                     }}
                     onSuccess={(result: any) => {
                         if (result?.info?.secure_url) {
@@ -109,7 +106,6 @@ export default function CreateAgencyPropertyPage() {
                 </CldUploadWidget>
             </div>
 
-            {/* 🔒 INJECTION CACHÉE DES URLs POUR LA SERVER ACTION */}
             {imageUrls.map((url, index) => (
                 <input key={index} type="hidden" name="images" value={url} />
             ))}
@@ -163,6 +159,25 @@ export default function CreateAgencyPropertyPage() {
                     <Input name="surface" type="number" defaultValue={0} className="bg-black/50 border-white/10 text-white" />
                 </div>
             </div>
+        </div>
+
+        <hr className="border-white/5" />
+
+        {/* --- ✅ NOUVEAU : MODULE DE PUBLICATION --- */}
+        <div className="flex items-center justify-between p-6 bg-orange-500/5 border border-orange-500/20 rounded-2xl">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-orange-500/10 rounded-xl text-orange-500">
+                    <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                    <Label className="text-white font-bold text-base">Publier immédiatement</Label>
+                    <p className="text-slate-400 text-sm">Le bien sera visible publiquement sur immofacile.ci/properties</p>
+                </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="isPublished" className="sr-only peer" defaultChecked />
+                <div className="w-14 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+            </label>
         </div>
 
         <div className="pt-6 border-t border-white/10 flex justify-end">

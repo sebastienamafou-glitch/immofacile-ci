@@ -5,6 +5,7 @@ import { Role } from "@prisma/client";
 import { z } from "zod";
 import bcrypt from "bcryptjs"; 
 import { logActivity } from "@/lib/logger";
+import { AuditAction } from "@prisma/client";
 
 // =============================================================================
 // 🛡️ TYPAGE STRICT (Aligné sur le SweetAlert front-end)
@@ -91,8 +92,7 @@ export async function POST(req: Request) {
 
     // 6. TRAÇABILITÉ (Audit Log)
     await logActivity({
-      action: "ADMIN_LOGIN", // Utilisez une action valide de votre logger.ts
-      entityId: newAgency.id,
+      action: AuditAction.AGENCY_CREATED,
       entityType: "AGENCY",
       userId: session.user.id,
       metadata: { agencyName, adminEmail, action: "CREATED_B2B_AGENCY" }

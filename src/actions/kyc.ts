@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { sendNotification } from "@/lib/notifications"; 
 import { logActivity } from "@/lib/logger"; 
 import { encrypt } from "@/lib/crypto"; 
-import { VerificationStatus, Role } from "@prisma/client";
+import { VerificationStatus, Role, AuditAction } from "@prisma/client";
 
 // =========================================================
 // 1. SOUMISSION DU DOSSIER (Utilisateur)
@@ -95,7 +95,10 @@ export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED"
         // A. Update User Global
         await prisma.user.update({
             where: { id: updatedKyc.userId },
-            data: { isVerified: true }
+            data: { isVerified: true, finance: {
+                    update: { kycTier: 3 }
+                }
+            }
         });
 
         // B. Audit Log (Preuve de validation)
@@ -128,11 +131,12 @@ export async function reviewKyc(kycId: string, decision: "VERIFIED" | "REJECTED"
 
         // B. Audit Log (Trace du rejet)
         await logActivity({
-            action: "KYC_REJECTED",
+            action: AuditAction.KYC_REJECTED, // 🔒 CORRECTION : Strict schema (Faute de KYC_REJECTED)
             entityId: updatedKyc.userId,
             entityType: "USER",
-            userId: session.user.id, // L'admin responsable
+            userId: session.user.id, 
             metadata: { 
+                status: "REJECTED", // On précise l'action réelle dans les métadonnées
                 reason: reason,
                 reviewer: session.user.id
             }

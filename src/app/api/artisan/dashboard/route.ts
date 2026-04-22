@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
-    // 1. AUTHENTIFICATION ZERO TRUST
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -15,7 +14,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // 2. REQUÊTE PRISMA OPTIMISÉE
     const artisan = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -24,13 +22,9 @@ export async function GET(req: Request) {
         email: true,
         role: true,
         isAvailable: true, 
-        isVerified: true, // ✅ CORRECTION : Nécessaire pour le Widget KYC
-        finance: {
-            select: { walletBalance: true }
-        },
+        isVerified: true,
         incidentsAssigned: { 
           where: {
-            // ✅ CORRECTION : Ajout de QUOTATION pour voir les devis en attente
             status: { in: [IncidentStatus.OPEN, IncidentStatus.IN_PROGRESS, IncidentStatus.QUOTATION, IncidentStatus.RESOLVED] }
           },
           orderBy: { createdAt: 'desc' },
@@ -41,29 +35,31 @@ export async function GET(req: Request) {
             status: true,
             priority: true,
             createdAt: true,
-            quote: { // ✅ CORRECTION : On va chercher le vrai montant du devis généré
-                select: { totalAmount: true } 
-            },
-            property: { 
-                select: { address: true, commune: true } 
-            },
-            reporter: { 
-                select: { name: true, phone: true } 
-            }
+            quote: { select: { totalAmount: true } },
+            property: { select: { address: true, commune: true } },
+            reporter: { select: { name: true, phone: true } }
           }
         }
       }
     });
 
-    // 3. CONTRÔLE RBAC
     if (!artisan || (artisan.role !== "ARTISAN" && artisan.role !== "SUPER_ADMIN")) {
         return NextResponse.json({ error: "Accès réservé aux artisans partenaires." }, { status: 403 });
     }
 
-    const currentBalance = artisan.finance?.walletBalance || 0;
+    // 🚀 AGRÉGATION : Calcul des revenus réels encaissés (Wave/OM)
+    const earningsAggregation = await prisma.transaction.aggregate({
+        where: {
+            userId: userId,
+            status: 'SUCCESS',
+            type: 'CREDIT'
+        },
+        _sum: { amount: true }
+    });
+    
+    const totalEarnings = earningsAggregation._sum.amount || 0;
     const incidents = artisan.incidentsAssigned || [];
 
-    // 4. FORMATAGE DU DTO POUR LE FRONTEND
     const formattedJobs = incidents.map((j) => ({
         id: j.id,
         title: j.title,
@@ -73,7 +69,7 @@ export async function GET(req: Request) {
         address: j.property ? `${j.property.address}, ${j.property.commune}` : "Adresse inconnue",
         reporterName: j.reporter?.name || "Locataire",
         reporterPhone: j.reporter?.phone || "",
-        quoteAmount: j.quote?.totalAmount || 0, // ✅ CORRECTION : Utilisation du montant du devis
+        quoteAmount: j.quote?.totalAmount || 0, 
         createdAt: j.createdAt
     }));
 
@@ -83,14 +79,13 @@ export async function GET(req: Request) {
         id: artisan.id,
         name: artisan.name,
         email: artisan.email,
-        walletBalance: currentBalance,
         isAvailable: artisan.isAvailable ?? true,
-        isVerified: artisan.isVerified ?? false // ✅ CORRECTION : Transmission au frontend
+        isVerified: artisan.isVerified ?? false 
       },
       stats: {
         jobsCount: formattedJobs.length,
         rating: 4.8, 
-        earnings: currentBalance
+        totalEarnings: totalEarnings // On injecte le vrai total ici
       },
       jobs: formattedJobs
     });

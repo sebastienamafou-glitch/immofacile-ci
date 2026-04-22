@@ -49,10 +49,10 @@ export default function ReceiptPage() {
     </div>
   );
 
-  // --- PRÉPARATION DES DONNÉES (CORRIGÉE POUR LE TYPE STRICT) ---
+  // --- PRÉPARATION DES DONNÉES (CORRIGÉE POUR LE TYPE STRICT & FISCALITÉ) ---
   const receiptData = {
     receiptId: payment.id?.substring(0, 12).toUpperCase() || "N/A",
-    date: new Date(payment.createdAt || Date.now()).toLocaleDateString('fr-FR'),
+    date: new Date(payment.date || Date.now()).toLocaleDateString('fr-FR'),
     
     periodStart: `01 ${payment.month || 'du mois'}`, 
     periodEnd: `Fin ${payment.month || 'du mois'}`,
@@ -72,19 +72,22 @@ export default function ReceiptPage() {
       address: payment.lease?.property?.address || payment.lease?.property?.commune || "Abidjan, CI"
     },
 
-    // ✅ CORRECTION ICI : Ajout des champs manquants (totalPaid, balanceDue, paymentDate)
+    // ✅ CORRECTION ABSOLUE : Injection du type et de la ventilation des montants
     payment: {
+      type: (payment.type === "DEPOSIT" ? "DEPOSIT" : "RENT") as "DEPOSIT" | "RENT",
       amount: payment.amount || 0,
       charges: payment.charges || 0,
-      totalPaid: (payment.amount || 0) + (payment.charges || 0), // Calcul simple
-      balanceDue: 0, // Pour une quittance, on considère que c'est payé
-      method: payment.provider || "Mobile Money / Carte",
-      transactionId: payment.transactionId || "N/A",
-      paymentDate: new Date(payment.createdAt || Date.now()).toLocaleDateString('fr-FR')
+      depositAmount: payment.lease?.depositAmount || 0, // Récupéré de la DB
+      advanceAmount: payment.lease?.advanceAmount || 0, // Récupéré de la DB
+      feesAmount: payment.lease?.tenantLeasingFee || 0, // Récupéré de la DB
+      totalPaid: payment.amount || 0,
+      balanceDue: 0, 
+      method: payment.method || "Mobile Money / Carte",
+      transactionId: payment.reference || payment.id || "N/A",
+      paymentDate: new Date(payment.date || Date.now()).toLocaleDateString('fr-FR')
     },
 
     legalFooter: "Ce document est une quittance de loyer générée automatiquement par la plateforme Babimmo. Elle atteste du paiement reçu par le propriétaire via nos services de cantonnement sécurisé."
-    // Note : J'ai retiré 'techProvider' car il n'est pas dans l'interface stricte du Template
   };
 
   return (

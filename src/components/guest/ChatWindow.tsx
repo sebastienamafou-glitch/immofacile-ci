@@ -22,7 +22,7 @@ interface MessageDisplay {
 interface ChatWindowProps {
   conversationId: string;
   currentUserId: string;
-  initialMessages: any[]; // On assouplit le type pour accepter les données sérialisées
+  initialMessages: MessageDisplay[]; // ✅ TYPAGE STRICT
   otherUser: {
     name: string | null;
     image: string | null;

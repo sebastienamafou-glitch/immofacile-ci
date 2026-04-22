@@ -7,7 +7,7 @@ import type { Property, Lease, Incident, User as PrismaUser } from "@prisma/clie
 import { 
   Loader2, ArrowLeft, MapPin, Home, Bath, BedDouble, Ruler, 
   Wrench, Settings, X, ChevronLeft, ChevronRight, Save, Trash2, 
-  User, CheckCircle, AlertTriangle, Plus, DollarSign
+  User, CheckCircle, AlertTriangle, Plus, DollarSign, Building2
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 
 // Composants Métier
 import PublishAkwabaModal from "@/components/PublishAkwabaModal";
+import DelegateManagementModal from "@/components/owner/DelegateManagementModal";
 
 interface PropertyWithDetails extends Property {
     leases: (Lease & { tenant: PrismaUser | null })[];
@@ -37,6 +38,7 @@ export default function PropertyDetailPage() {
 
   // Sécurité maximale : on capte l'ID peu importe comment le dossier a été nommé
   const propertyId = (params?.propertyId || params?.id) as string | undefined;
+  const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); 
@@ -175,7 +177,14 @@ export default function PropertyDetailPage() {
         <Link href="/dashboard/owner/properties" className="flex items-center text-slate-400 hover:text-white gap-2 transition text-sm font-bold">
             <ArrowLeft className="w-4 h-4" /> Retour aux propriétés
         </Link>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+             <Button 
+                 onClick={() => setIsDelegateModalOpen(true)}
+                 className="bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 border border-purple-500/30 font-bold transition-all"
+             >
+                 <Building2 className="w-4 h-4 mr-2" /> Déléguer la gestion
+             </Button>
+
              <PublishAkwabaModal 
                 propertyId={property.id} 
                 propertyTitle={property.title} 
@@ -313,7 +322,7 @@ export default function PropertyDetailPage() {
                                     )}
                                 </div>
                             ))}
-                            <Link href="/dashboard/owner/incidents">
+                            <Link href="/dashboard/owner/maintenance">
                                 <Button variant="link" className="w-full text-slate-500 text-xs mt-2">Voir tout l'historique</Button>
                             </Link>
                         </div>
@@ -385,6 +394,17 @@ export default function PropertyDetailPage() {
         </div>
       )}
 
+      {/* MODAL DE DÉLÉGATION */}
+      <DelegateManagementModal 
+          isOpen={isDelegateModalOpen}
+          onClose={() => setIsDelegateModalOpen(false)}
+          propertyId={property.id}
+          onSuccess={() => {
+              setIsDelegateModalOpen(false);
+              router.refresh(); 
+              // Optionnel : Rediriger vers un tableau de bord ou re-fetch les datas
+          }}
+      />
     </div>
   );
 }

@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     try {
-        // 1. SÉCURITÉ PÉRIMÉTRIQUE (Auth v5)
         const session = await auth();
         const userId = session?.user?.id;
 
@@ -15,18 +14,15 @@ export async function GET() {
             return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
         }
 
-        // 2. RÉCUPÉRATION DES DONNÉES (Optimisée)
         const agent = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 role: true,
-                walletBalance: true,
-                kyc: {
-                    select: { status: true }
-                },
+                finance: { select: { walletBalance: true } }, // 🔒 CORRECTION : Ciblage de la nouvelle table
+                kyc: { select: { status: true } },
                 transactions: {
                     orderBy: { createdAt: 'desc' },
-                    take: 50, // Limite aux 50 dernières opérations pour la perf
+                    take: 50,
                     select: {
                         id: true,
                         amount: true,
@@ -39,14 +35,12 @@ export async function GET() {
             }
         });
 
-        // 3. VÉRIFICATION DU RÔLE
         if (!agent || agent.role !== Role.AGENT) {
             return NextResponse.json({ error: "Accès refusé. Profil Agent requis." }, { status: 403 });
         }
 
-        // 4. FORMATAGE DU DTO
         const responseData = {
-            walletBalance: agent.walletBalance,
+            walletBalance: agent.finance?.walletBalance || 0, // 🔒 CORRECTION : Fallback sécurisé
             kycStatus: agent.kyc?.status || "PENDING",
             transactions: agent.transactions
         };

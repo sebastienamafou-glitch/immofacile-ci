@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { 
   Building, Users, Wallet, TrendingUp, BarChart3, 
   UserPlus, AlertTriangle, MapPin, LayoutDashboard, 
-  ShieldCheck, FileCheck, CheckCircle2 
+  ShieldCheck, FileCheck, CheckCircle2, Wrench, ChevronRight 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,15 +90,17 @@ export default async function AgencyDashboardPage() {
 
   const agencyId = admin.agency!.id;
 
-  // ✅ REQUÊTES OPTIMISÉES
+  // ✅ REQUÊTES OPTIMISÉES (Full Data)
   const [
     propertiesCount,
     listingsCount,
     agents,
-    revenueData,
+    shortTermRevenue,
+    longTermRevenue, // Ajout des revenus longue durée
+    activeLeasesCount, // Ajout des baux actifs pour le vrai taux d'occupation
     propertiesByCommune,
     listingsByCity,
-    agencyData // On récupère l'agence pour vérifier son statut KYC
+    agencyData
   ] = await Promise.all([
     prisma.property.count({ where: { agencyId } }),
     prisma.listing.count({ where: { agencyId } }),
@@ -115,6 +117,13 @@ export default async function AgencyDashboardPage() {
       where: { booking: { listing: { agencyId } }, status: "SUCCESS" },
       _sum: { agencyCommission: true }
     }),
+    prisma.payment.aggregate({
+      where: { lease: { property: { agencyId } }, status: "SUCCESS" },
+      _sum: { amountAgency: true }
+    }),
+    prisma.lease.count({
+      where: { property: { agencyId }, isActive: true }
+    }),
     prisma.property.groupBy({
       by: ['commune'],
       where: { agencyId },
@@ -125,17 +134,40 @@ export default async function AgencyDashboardPage() {
       where: { agencyId },
       _count: { id: true },
     }),
-    prisma.agency.findUnique({ // ✅ Récupération info agence
+    prisma.agency.findUnique({ 
         where: { id: agencyId },
-        select: { isActive: true } // On utilise isActive comme proxy pour "Vérifié" pour l'instant
+        select: { isActive: true } 
     })
   ]);
 
-  // ✅ LOGIQUE MÉTIER
+  // ✅ RÉCUPÉRATION DES ALERTES DE MAINTENANCE
+  const activeIncidents = await prisma.incident.findMany({
+    where: {
+      property: { agencyId: agencyId },
+      status: { in: ['OPEN', 'IN_PROGRESS'] }
+    },
+    include: {
+      property: { select: { title: true } }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 3
+  });
+
+  const unassignedCount = await prisma.incident.count({
+    where: {
+      property: { agencyId: agencyId },
+      status: 'OPEN',
+      assignedToId: null
+    }
+  });
+
+  // ✅ LOGIQUE MÉTIER RÉELLE
   const totalAssets = propertiesCount + listingsCount;
-  const totalRevenue = revenueData._sum.agencyCommission || 0;
-  const growthRate = 12.5; 
-  const occupancyRate = totalAssets > 0 ? Math.round((listingsCount / totalAssets) * 85) : 0; 
+  // Fusion des revenus (Locations Courtes + Longues)
+  const totalRevenue = (shortTermRevenue._sum.agencyCommission || 0) + (longTermRevenue._sum.amountAgency || 0);
+  const growthRate = 12.5; // À dynamiser plus tard avec le mois N-1
+  // Taux d'occupation réel basé sur les baux actifs
+  const occupancyRate = propertiesCount > 0 ? Math.round((activeLeasesCount / propertiesCount) * 100) : 0;
 
   // Agrégation Zones
   const zoneMap = new Map<string, number>();
@@ -177,20 +209,24 @@ export default async function AgencyDashboardPage() {
              </span>
           </div>
         </div>
-        <div className="flex gap-3">
-          {/* ✅ Rendu cliquable via Link vers la page d'équipe pour inviter un agent */}
+        
+        {/* LE CONTENEUR UNIQUE POUR TOUS LES BOUTONS */}
+        <div className="flex gap-3 flex-wrap">
+
+          {/* Rendu cliquable via Link vers la page d'équipe pour inviter un agent */}
           <Link href="/dashboard/agency/team">
             <Button variant="outline" className="border-slate-700 text-white bg-slate-900 hover:bg-slate-800 transition-colors">
               <UserPlus className="mr-2 h-4 w-4" /> Nouvel Agent
             </Button>
           </Link>
           
-          {/* ✅ Rendu cliquable via Link vers la page finance (portefeuille) */}
+          {/* Rendu cliquable via Link vers la page finance (portefeuille) */}
           <Link href="/dashboard/agency/wallet">
             <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold shadow-lg shadow-orange-900/20 transition-transform active:scale-95">
               <BarChart3 className="mr-2 h-4 w-4" /> Rapport Mensuel
             </Button>
           </Link>
+          
         </div>
       </div>
       {/* ✅ BLOC KYC AGENCE (Nouveau) */}
@@ -291,6 +327,49 @@ export default async function AgencyDashboardPage() {
 
       {/* SECTION GESTION */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+
+         {/* MODULE ALERTES MAINTENANCE */}
+         <Card className="col-span-1 lg:col-span-3 bg-slate-900 border-slate-800 relative overflow-hidden shadow-xl mb-4">
+           {unassignedCount > 0 && (
+               <div className="absolute top-0 left-0 w-full h-1 bg-red-500 animate-pulse"></div>
+           )}
+           <CardHeader className="bg-slate-950/50 border-b border-slate-800/50 py-4 flex flex-row items-center justify-between">
+             <CardTitle className="text-white text-base font-bold flex items-center gap-2">
+               <Wrench className="w-5 h-5 text-orange-500" />
+               Urgences Techniques
+             </CardTitle>
+             {unassignedCount > 0 && (
+               <span className="px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full text-[10px] font-bold uppercase animate-pulse">
+                 {unassignedCount} à assigner
+               </span>
+             )}
+           </CardHeader>
+           <CardContent className="p-4 space-y-3">
+             {activeIncidents.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-4 text-slate-500">
+                 <CheckCircle2 className="w-6 h-6 text-emerald-500/50 mb-2" />
+                 <p className="text-xs font-medium">Aucun incident en cours</p>
+               </div>
+             ) : (
+               activeIncidents.map(incident => (
+                 <div key={incident.id} className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800/50">
+                   <div className="flex items-center gap-3 overflow-hidden">
+                     <div className={`w-2 h-2 rounded-full shrink-0 ${incident.status === 'OPEN' ? 'bg-red-500' : 'bg-orange-500'}`}></div>
+                     <div className="truncate">
+                       <p className="text-sm font-bold text-slate-200 truncate">{incident.title}</p>
+                       <p className="text-[10px] text-slate-500 truncate">{incident.property.title}</p>
+                     </div>
+                   </div>
+                 </div>
+               ))
+             )}
+             <Link href="/dashboard/agency/maintenance" className="block mt-4">
+               <Button variant="outline" className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors h-10 text-xs">
+                 Gérer la maintenance <ChevronRight className="w-4 h-4 ml-2" />
+               </Button>
+             </Link>
+           </CardContent>
+         </Card>
          
          {/* Top Agents */}
          <Card className="col-span-1 bg-slate-900 border-slate-800 overflow-hidden shadow-xl">

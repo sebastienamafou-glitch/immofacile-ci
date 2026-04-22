@@ -162,7 +162,7 @@ export default async function TreasuryPage() {
                                 {tx.type === 'CREDIT' ? '+' : '-'}{formatFCFA(tx.amount)}
                             </td>
                             <td className="p-4 text-center">
-                                {tx.status === 'COMPLETED' || tx.status === 'SUCCESS' ? (
+                                {tx.status === 'SUCCESS' ? (
                                      <div className="w-2 h-2 rounded-full bg-emerald-500 mx-auto shadow-[0_0_10px_rgba(16,185,129,0.5)]" title="Succès"></div>
                                 ) : (
                                      <div className="w-2 h-2 rounded-full bg-orange-500 mx-auto animate-pulse" title="En attente"></div>

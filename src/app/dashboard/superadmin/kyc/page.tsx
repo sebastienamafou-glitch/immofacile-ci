@@ -35,7 +35,7 @@ export default function AdminKycPage() {
   const fetchKycUsers = async () => {
     try {
         setLoading(true);
-        const res = await api.get('/superadmin/kyc/list'); 
+        const res = await api.get('/superadmin/kyc'); 
         if (res.data.success) {
             setUsers(res.data.users);
         }
@@ -91,11 +91,11 @@ export default function AdminKycPage() {
             u.id === userId && u.kyc ? { ...u, kyc: { ...u.kyc!, status: decision, rejectionReason } } : u
         ));
 
-        await api.put('/superadmin/kyc/update', { 
-            userId, 
-            status: decision, 
-            reason: rejectionReason 
-        });
+        await api.put('/superadmin/kyc', { 
+    userId, 
+    status: decision, 
+    reason: rejectionReason 
+});
         
         toast.success(`Dossier de ${name} ${isApprove ? 'validé' : 'rejeté'}.`);
     } catch (error) {

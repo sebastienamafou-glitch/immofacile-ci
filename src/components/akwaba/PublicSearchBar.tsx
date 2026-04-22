@@ -60,11 +60,13 @@ export default function PublicSearchBar({ availableCities }: PublicSearchBarProp
     if (location) params.set("city", location);
     if (guests) params.set("guests", guests);
     
-    // ✅ INJECTION DES DATES DANS L'URL
-    if (dateRange?.from) params.set("startDate", dateRange.from.toISOString());
-    if (dateRange?.to) params.set("endDate", dateRange.to.toISOString());
+    // ✅ CORRECTION : Utilisation stricte des clés "start" et "end"
+    if (dateRange?.from) params.set("start", dateRange.from.toISOString());
+    if (dateRange?.to) params.set("end", dateRange.to.toISOString());
     
-    // ✅ DOIT POINTER VERS /akwaba/listings
+    // ✅ REDIRECTION
+    // Attention : Assure-toi que cette route correspond bien à ton catalogue !
+    // Si ton catalogue principal est sur /akwaba, mets `/akwaba?${params.toString()}`
     router.push(`/akwaba/listings?${params.toString()}`);
   };
 

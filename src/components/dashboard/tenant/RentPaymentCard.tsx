@@ -20,9 +20,9 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
   const isInitialPayment = lease.status === 'PENDING';
   const canPay = lease.status === 'ACTIVE' || isInitialPayment;
 
-  // 2. CALCUL DU MONTANT : Caution + Avance (si initial), sinon Loyer mensuel
+  // 2. CALCUL DU MONTANT : Caution + Avance + Honoraires Agence (si initial), sinon Loyer mensuel
   const amountToPay = isInitialPayment 
-    ? (lease.depositAmount || 0) + (lease.advanceAmount || 0) 
+    ? (lease.depositAmount || 0) + (lease.advanceAmount || 0) + (lease.tenantLeasingFee || 0)
     : lease.monthlyRent;
 
   const handlePayRent = async () => {
@@ -31,10 +31,6 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
         return;
     }
 
-    // 🚧 MODE DÉVELOPPEMENT : Affichage d'un toast informatif
-    toast.info("L'intégration Wave / Orange Money est en cours. Cette fonctionnalité sera très bientôt disponible !");
-    
-    /* // 🔒 CODE ORIGINAL CONSERVÉ POUR LA FUTURE INTÉGRATION
     setIsPaying(true); 
     try {
         const idempotencyKey = crypto.randomUUID();
@@ -56,7 +52,6 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
     } finally {
         setIsPaying(false); 
     }
-    */
   };
 
   return (
@@ -66,7 +61,7 @@ export default function RentPaymentCard({ lease, userPhone }: RentPaymentCardPro
                 <div>
                     <div className="flex items-center gap-2 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] mb-4">
                         {isInitialPayment ? (
-                            <><Key className="w-4 h-4 text-orange-500" /> Droits d'entrée (Caution + Avance)</>
+                            <><Key className="w-4 h-4 text-orange-500" /> Droits d'entrée (Caution, Avance & Honoraires)</>
                         ) : (
                             <><Clock className="w-4 h-4 text-orange-500" /> Prochaine Échéance</>
                         )}

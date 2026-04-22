@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Role, MissionStatus } from "@prisma/client";
+import { Role, MissionStatus, AuditAction } from "@prisma/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -62,12 +62,12 @@ export async function POST(request: Request) {
     // 5. AUDIT LOG (Tracé de sécurité selon le schéma)
     await prisma.auditLog.create({
         data: {
-            action: "MISSION_ACCEPTED",
+            action: AuditAction.PROPERTY_UPDATED, // 🔒 CORRECTION : Strict schema
             entityId: updatedMission.id,
             entityType: "MISSION",
             userId: userId,
             userEmail: session.user?.email,
-            metadata: { previousStatus: "PENDING", newStatus: "ACCEPTED" }
+            metadata: { action_reelle: "MISSION_ACCEPTED", previousStatus: "PENDING", newStatus: "ACCEPTED" }
         }
     });
 

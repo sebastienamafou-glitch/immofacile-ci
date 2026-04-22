@@ -43,7 +43,14 @@ export async function GET(request: Request) {
         surface: true,
         images: true,
         createdAt: true,
-        // On ne renvoie PAS ownerId ou les données financières sensibles
+        agencyId: true,
+        owner: {
+            select: {
+                kyc: {
+                    select: { status: true }
+                }
+            }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });

@@ -10,7 +10,7 @@ import AgencyContractActions from "@/components/agency/agency-contract-actions";
 import ClientQRCode from "@/components/shared/ClientQRCode"; 
 import PrintButton from "@/components/shared/print-button"; 
 import { 
-  ShieldCheck, ArrowLeft, Briefcase, Building2 
+  ShieldCheck, ArrowLeft, Briefcase
 } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
@@ -90,7 +90,7 @@ export default async function AgencyLeasePage({ params }: { params: { id: string
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <PrintButton /> {/* ✅ Corrige l'erreur onClick */}
+                    <PrintButton /> 
 
                     {!isCompleted && isTenantSigned && (
                          <AgencyContractActions leaseId={lease.id} />
@@ -105,7 +105,7 @@ export default async function AgencyLeasePage({ params }: { params: { id: string
             </div>
         </div>
 
-        {/* === ALERTE PRÉAVIS (Si statut IN_NOTICE) === */}
+        {/* === ALERTE PRÉAVIS === */}
         {lease.status === "IN_NOTICE" && (
             <div className="max-w-5xl mx-auto mb-8 px-4 print:hidden">
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md">
@@ -126,7 +126,6 @@ export default async function AgencyLeasePage({ params }: { params: { id: string
                     
                     <form action={async () => {
                         "use server";
-                        // L'agence agit en tant que mandataire pour valider
                         await acknowledgeNoticeAction(lease.id, lease.property.ownerId);
                         revalidatePath(`/dashboard/agency/contracts/${lease.id}`);
                     }}>
@@ -160,15 +159,15 @@ export default async function AgencyLeasePage({ params }: { params: { id: string
             </div>
         )}
 
-        {/* --- DOCUMENT OFFICIEL (TEXTE INTÉGRAL DU BAIL PROPRIÉTAIRE) --- */}
+        {/* --- DOCUMENT OFFICIEL --- */}
         <div className="flex justify-center px-4 print:px-0 print:block">
             <div id="printable-contract" className="bg-white text-slate-900 p-[20mm] w-[210mm] min-h-[297mm] shadow-2xl border border-slate-200 print:shadow-none print:border-0 print:w-full mx-auto text-justify leading-relaxed font-serif">
                 
                 <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
                     <div className="flex-1 pr-4"> 
-                        <h1 className="text-2xl font-black uppercase tracking-wide mb-2">Contrat de Bail <br/>à Usage d'Habitation</h1>
+                        <h1 className="text-2xl font-black uppercase tracking-wide mb-2">Contrat de Bail <br/>à Usage d&apos;Habitation</h1>
                         <p className="text-[10px] italic text-slate-500">
-                            Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l'Habitat.
+                            Soumis aux dispositions impératives de la Loi n° 2019-576 du 26 juin 2019 instituant le Code de la Construction et de l&apos;Habitat.
                         </p>
                     </div>
                     <div className="flex flex-col items-center gap-1">
@@ -184,85 +183,83 @@ export default async function AgencyLeasePage({ params }: { params: { id: string
                     <div className="mb-4 pl-4 border-l-2 border-slate-200">
                         <p><strong>LE BAILLEUR :</strong> {ownerName.toUpperCase()}</p>
                         {lease.property.agency && (
-                            <p className="text-xs mt-0.5 text-slate-600 italic">Représenté par son mandataire : <strong>L'Agence {agencyName}</strong></p>
+                            <p className="text-xs mt-0.5 text-slate-600 italic">Représenté par son mandataire : <strong>L&apos;Agence {agencyName}</strong></p>
                         )}
-                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Bailleur".</p>
+                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé &quot;Le Bailleur&quot;.</p>
                     </div>
                     <div className="pl-4 border-l-2 border-slate-200">
                         <p><strong>LE PRENEUR :</strong> {tenantName.toUpperCase()}</p>
-                        <p>Contact : {lease.tenant.email} | Tél : {lease.tenant.phone || "Non renseigné"}</p>
-                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé "Le Preneur".</p>
+                        <p>Contact : {lease.tenant.email || "Non renseigné"} | Tél : {lease.tenant.phone || "Non renseigné"}</p>
+                        <p className="text-xs text-slate-500 mt-1 italic">Ci-après dénommé &quot;Le Preneur&quot;.</p>
                     </div>
                 </div>
 
                 <p className="text-center font-bold text-xs italic mb-6">IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</p>
 
-                {/* LES 12 ARTICLES COMPLETS (NON TRONQUÉS) */}
                 <div className="space-y-4 text-[10px] text-slate-800">
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 1 : Désignation des Lieux</h3>
-                        <p>Le Bailleur donne en location au Preneur, qui accepte, les locaux situés à : <strong>{lease.property.title}, {lease.property.address}</strong>. Le bien comprend : {lease.property.bedrooms} chambre(s), {lease.property.bathrooms} salle(s) d'eau. Le Preneur déclare prendre les lieux dans l'état où ils se trouvent lors de l'entrée en jouissance.</p>
+                        <p>Le Bailleur donne en location au Preneur, qui accepte, les locaux situés à : <strong>{lease.property.title}, {lease.property.address}</strong>. Le bien comprend : {lease.property.bedrooms} chambre(s), {lease.property.bathrooms} salle(s) d&apos;eau. Le Preneur déclare prendre les lieux dans l&apos;état où ils se trouvent lors de l&apos;entrée en jouissance.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 2 : Durée du Bail</h3>
-                        <p>Le bail est conclu pour une durée de <strong>UN (1) AN</strong> à compter du <strong>{startDate}</strong>. Il se renouvellera par tacite reconduction pour la même durée, sauf dénonciation par l'une des parties par acte extrajudiciaire ou lettre recommandée avec accusé de réception, moyennant un préavis de trois (3) mois.</p>
+                        <p>Le bail est conclu pour une durée de <strong>UN (1) AN</strong> à compter du <strong>{startDate}</strong>. Il se renouvellera par tacite reconduction pour la même durée, sauf dénonciation par l&apos;une des parties par acte extrajudiciaire ou lettre recommandée avec accusé de réception, moyennant un préavis de trois (3) mois.</p>
                     </div>
 
                     <div className="bg-slate-50 p-3 border-l-4 border-slate-300 font-serif">
                         <h3 className="font-bold text-black uppercase mb-1 tracking-tighter">Article 3 : Loyer et Dépôt de Garantie</h3>
-                        <p className="mb-1">Loyer mensuel : <strong>{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.</p>
-                        <p>Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. Cette somme ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restituée au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.</p>
+                        <p className="mb-1">Loyer mensuel : <strong>{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d&apos;avance.</p>
+                        <p>Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. Cette somme ne pourra en aucun cas s&apos;imputer sur le paiement des loyers et sera restituée au Preneur après l&apos;état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.</p>
                         {lease.advanceAmount && <p className="mt-1">Avance sur loyer encaissée : <strong>{lease.advanceAmount.toLocaleString()} FCFA</strong>.</p>}
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 4 : Paiement et Pénalités</h3>
-                        <p>Le loyer est exigible le 05 de chaque mois. Tout retard de paiement au-delà du 10 du mois entraînera de plein droit l'application d'une pénalité de 10% sur le montant dû, sans préjudice de l'action en résiliation.</p>
+                        <p>Le loyer est exigible le 05 de chaque mois. Tout retard de paiement au-delà du 10 du mois entraînera de plein droit l&apos;application d&apos;une pénalité de 10% sur le montant dû, sans préjudice de l&apos;action en résiliation.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 5 : Obligations du Preneur</h3>
-                        <p>Le Preneur s'oblige à : 1) Payer le loyer aux termes convenus. 2) User paisiblement des locaux suivant la destination bourgeoise prévue. 3) Entretenir les lieux en bon état de réparations locatives (plomberie, électricité, serrures, vitres). 4) Ne pas troubler la jouissance paisible des voisins.</p>
+                        <p>Le Preneur s&apos;oblige à : 1) Payer le loyer aux termes convenus. 2) User paisiblement des locaux suivant la destination bourgeoise prévue. 3) Entretenir les lieux en bon état de réparations locatives (plomberie, électricité, serrures, vitres). 4) Ne pas troubler la jouissance paisible des voisins.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 6 : Obligations du Bailleur</h3>
-                        <p>Le Bailleur est tenu de : 1) Délivrer au Preneur le logement en bon état d'usage et de réparation. 2) Assurer au Preneur la jouissance paisible du logement. 3) Entretenir les locaux en état de servir à l'usage prévu par le contrat (grosses réparations, clos et couvert).</p>
+                        <p>Le Bailleur est tenu de : 1) Délivrer au Preneur le logement en bon état d&apos;usage et de réparation. 2) Assurer au Preneur la jouissance paisible du logement. 3) Entretenir les locaux en état de servir à l&apos;usage prévu par le contrat (grosses réparations, clos et couvert).</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 7 : Travaux et Transformations</h3>
-                        <p>Le Preneur ne pourra faire aucuns travaux de transformation ou de perçage de gros œuvre sans l'accord écrit et préalable du Bailleur. À défaut d'accord, le Bailleur pourra exiger la remise en état des lieux aux frais du Preneur lors de son départ.</p>
+                        <p>Le Preneur ne pourra faire aucuns travaux de transformation ou de perçage de gros œuvre sans l&apos;accord écrit et préalable du Bailleur. À défaut d&apos;accord, le Bailleur pourra exiger la remise en état des lieux aux frais du Preneur lors de son départ.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 8 : Cession et Sous-location</h3>
-                        <p>Toute cession de bail ou sous-location, même partielle ou temporaire, est strictement interdite sans l'accord écrit du Bailleur. En cas de non-respect, le bail sera résilié immédiatement de plein droit.</p>
+                        <p>Toute cession de bail ou sous-location, même partielle ou temporaire, est strictement interdite sans l&apos;accord écrit du Bailleur. En cas de non-respect, le bail sera résilié immédiatement de plein droit.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 9 : Droit de Visite</h3>
-                        <p>Le Bailleur ou son représentant pourra visiter les lieux pour vérifier leur état d'entretien, sur rendez-vous pris 48h à l'avance. En cas de mise en vente ou de relocation, le Preneur devra laisser visiter les lieux deux heures par jour les jours ouvrables.</p>
+                        <p>Le Bailleur ou son représentant pourra visiter les lieux pour vérifier leur état d&apos;entretien, sur rendez-vous pris 48h à l&apos;avance. En cas de mise en vente ou de relocation, le Preneur devra laisser visiter les lieux deux heures par jour les jours ouvrables.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 10 : Clause Résolutoire</h3>
-                        <p>À défaut de paiement d'un seul terme de loyer à son échéance ou d'inexécution d'une seule des conditions du bail, et un mois après un commandement de payer ou une mise en demeure resté infructueux, le bail sera résilié de plein droit si bon semble au Bailleur.</p>
+                        <p>À défaut de paiement d&apos;un seul terme de loyer à son échéance ou d&apos;inexécution d&apos;une seule des conditions du bail, et un mois après un commandement de payer ou une mise en demeure resté infructueux, le bail sera résilié de plein droit si bon semble au Bailleur.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 11 : État des Lieux</h3>
-                        <p>Un état des lieux contradictoire sera établi lors de la remise des clés et lors de leur restitution. À défaut d'état des lieux de sortie, le Preneur sera présumé avoir reçu les lieux en bon état de réparations locatives.</p>
+                        <p>Un état des lieux contradictoire sera établi lors de la remise des clés et lors de leur restitution. À défaut d&apos;état des lieux de sortie, le Preneur sera présumé avoir reçu les lieux en bon état de réparations locatives.</p>
                     </div>
 
                     <div>
                         <h3 className="font-bold text-black uppercase mb-0.5 tracking-tighter">Article 12 : Élection de Domicile et Litiges</h3>
-                        <p>Pour l'exécution des présentes, les parties font élection de domicile en leurs demeures respectives. En cas de litige, compétence est attribuée aux tribunaux du lieu de situation de l'immeuble.</p>
+                        <p>Pour l&apos;exécution des présentes, les parties font élection de domicile en leurs demeures respectives. En cas de litige, compétence est attribuée aux tribunaux du lieu de situation de l&apos;immeuble.</p>
                     </div>
                 </div>
 
-                {/* SIGNATURES ET AUDIT TRAIL */}
                 <div className="mt-auto pt-4 border-t-2 border-black">
                     <p className="mb-6 text-xs text-right italic font-serif">
                         Fait à Abidjan, le <strong>{new Date().toLocaleDateString('fr-FR', {dateStyle: 'long'})}</strong>.

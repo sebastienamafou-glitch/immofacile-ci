@@ -9,11 +9,13 @@ export const dynamic = 'force-dynamic';
 async function checkSuperAdminPermission(request: Request) {
   // 1. Identification par ID (Session via Middleware)
   const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-  if (!userId) {
+  
+  // 🔒 CORRECTION : Retourner l'objet standardisé au lieu de NextResponse
+  if (!session || !session.user?.id) {
     return { authorized: false, status: 401, error: "Non authentifié" };
   }
+  
+  const userId = session.user.id;
 
   // 2. Vérification Rôle
   const admin = await prisma.user.findUnique({ 

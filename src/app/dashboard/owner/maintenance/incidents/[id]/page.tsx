@@ -20,7 +20,7 @@ type ExtendedQuote = Quote & { items: QuoteItem[] };
 type IncidentWithDetails = Incident & {
   reporter: Partial<User>;
   assignedTo?: Partial<User>;
-  quote?: ExtendedQuote | null; // C'est un objet, pas un tableau
+  quote?: ExtendedQuote | null;
 };
 
 export default function OwnerIncidentDetail() {
@@ -34,7 +34,6 @@ export default function OwnerIncidentDetail() {
   // 1. CHARGEMENT DES DONNÉES
   const fetchData = async () => {
     try {
-      // ✅ CORRECTION : La bonne route sécurisée que nous avons créée
       const res = await api.get(`/owner/maintenance/${id}`);
       if (res.data.success) {
           setIncident(res.data.incident);
@@ -54,71 +53,79 @@ export default function OwnerIncidentDetail() {
 
   useEffect(() => { if(id) fetchData(); }, [id]);
 
-  // 2. ACTION : VALIDER OU REFUSER LE DEVIS
-  const handleQuoteResponse = async (quoteId: string, action: 'ACCEPT' | 'REJECT') => {
-      try {
-          const toastId = toast.loading("Traitement de la transaction...");
+  // 2. ACTION : REFUSER LE DEVIS (Uniquement si gestion directe PENDING)
+  const handleQuoteReject = async (quoteId: string) => {
+    try {
+        const toastId = toast.loading("Annulation en cours...");
+        await api.post('/owner/quotes/respond', { quoteId, action: 'REJECT' });
+        toast.dismiss(toastId);
+        toast.info("Devis refusé.");
+        fetchData();
+    } catch (e: any) {
+        toast.dismiss();
+        toast.error("Erreur lors du refus.");
+    }
+  };
 
-          // Cette route API sera notre prochain point d'audit critique
-          await api.post('/owner/quotes/respond', { quoteId, action });
-          
-          toast.dismiss(toastId);
-
-          if (action === 'ACCEPT') {
-            Swal.fire({
-                title: 'Paiement Validé !',
-                text: 'Le montant a été débité et l\'artisan notifié.',
-                icon: 'success',
-                background: '#0F172A', color: '#fff',
-                confirmButtonColor: '#10B981'
-            });
-            fetchData(); 
-          } else {
-            toast.info("Devis refusé.");
-            fetchData();
-          }
-          
-      } catch (e: any) {
-          toast.dismiss();
-
-          if (e.response && e.response.status === 402) {
-              const { required, balance, redirectUrl } = e.response.data;
-              const missing = required - balance;
-
-              Swal.fire({
-                  title: 'Fonds Insuffisants 💸',
-                  html: `
-                    <div class="text-slate-300 text-sm mb-4">
-                        Le devis s'élève à <b>${formatCurrency(required)}</b> mais votre Wallet ne contient que <b>${formatCurrency(balance)}</b>.
-                    </div>
-                    <div class="bg-orange-500/20 border border-orange-500/50 p-3 rounded-lg text-orange-400 font-bold text-lg">
-                        Manque à payer : ${formatCurrency(missing)} FCFA
-                    </div>
-                  `,
-                  icon: 'warning',
-                  background: '#1E293B',
-                  color: '#fff',
-                  showCancelButton: true,
-                  confirmButtonText: '⚡ Recharger mon Wallet',
-                  cancelButtonText: 'Annuler',
-                  confirmButtonColor: '#F97316',
-                  cancelButtonColor: '#64748B'
-              }).then((result) => {
-                  if (result.isConfirmed) {
-                      router.push(redirectUrl);
-                  }
-              });
-              return;
-          }
-
-          toast.error(e.response?.data?.error || "Erreur technique lors de la validation.");
+  // 3. ACTION : PAYER LE DEVIS (CINETPAY)
+  const handlePayQuote = async (quoteId: string) => {
+    const { value: phone, isDismissed } = await Swal.fire({
+      title: 'Paiement Sécurisé',
+      html: `
+        <p class="text-sm text-slate-300 mb-4 text-justify">
+          Veuillez entrer votre numéro Wave/OM pour régler ce devis de <strong>${formatCurrency(activeQuote!.totalAmount)}</strong>. Les fonds seront consignés.
+        </p>
+        <input id="swal-phone" class="swal2-input bg-slate-800 text-white border-slate-700" placeholder="Ex: 0705080800" type="tel">
+      `,
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonColor: '#10B981',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Payer via CinetPay',
+      cancelButtonText: 'Annuler',
+      background: '#0F172A',
+      color: '#fff',
+      preConfirm: () => {
+        const input = document.getElementById('swal-phone') as HTMLInputElement;
+        const phoneVal = input?.value;
+        if (!/^0\d{9}$/.test(phoneVal)) {
+          Swal.showValidationMessage('Format ivoirien invalide (10 chiffres requis commençant par 0)');
+        }
+        return phoneVal;
       }
+    });
+
+    if (isDismissed || !phone) return;
+
+    try {
+      const toastId = toast.loading("Initialisation du paiement...");
+      
+      // 🔒 CORRECTION 1 : Alignement strict avec le schéma Zod de route.ts
+      const payload = {
+        type: 'QUOTE', 
+        referenceId: quoteId,
+        idempotencyKey: crypto.randomUUID(), // Ajout de la clé requise
+        phone: phone
+      };
+
+      // 🔒 CORRECTION 2 : Retrait du "/api" redondant pour éviter la 404
+      const paymentRes = await api.post("/payment/initiate", payload);
+      toast.dismiss(toastId);
+
+      if (paymentRes.data.success && paymentRes.data.paymentUrl) {
+        window.location.href = paymentRes.data.paymentUrl;
+      } else {
+        toast.error("URL de paiement introuvable.");
+      }
+    } catch (e: any) {
+      toast.dismiss();
+      toast.error(e.response?.data?.error || "Erreur d'initialisation du paiement.");
+    }
   };
 
   if (loading) return <div className="h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-10 h-10"/></div>;
   if (!incident) return null;
 
-  // ✅ CORRECTION : Utilisation de l'objet singulier retourné par Prisma
   const activeQuote = incident.quote;
 
   return (
@@ -166,6 +173,8 @@ export default function OwnerIncidentDetail() {
                     <p className="text-slate-300 text-lg leading-relaxed font-medium italic">
                         "{incident.description}"
                     </p>
+                    
+                    {/* RESTAURATION DE L'AFFICHAGE DES PHOTOS */}
                     {incident.photos && incident.photos.length > 0 && (
                         <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
                             {incident.photos.map((url: string, i: number) => (
@@ -184,7 +193,7 @@ export default function OwnerIncidentDetail() {
                         <div className="flex-1 overflow-hidden">
                             {currentUser?.id && (
                                 <IncidentChat incidentId={incident.id} currentUserId={currentUser.id} />
-  )}
+                            )}
                         </div>
                     </div>
                 )}
@@ -197,16 +206,16 @@ export default function OwnerIncidentDetail() {
                     <div className="bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl relative animate-in slide-in-from-bottom-4 duration-500">
                         
                         {/* Status Header */}
-                        <div className={`p-6 border-b border-white/5 flex justify-between items-start ${activeQuote.status === 'ACCEPTED' ? 'bg-emerald-900/20' : 'bg-orange-900/10'}`}>
+                        <div className={`p-6 border-b border-white/5 flex justify-between items-start ${activeQuote.status === 'PAID' ? 'bg-emerald-900/20' : activeQuote.status === 'ACCEPTED' ? 'bg-blue-900/20' : 'bg-orange-900/10'}`}>
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                                    <FileText className={activeQuote.status === 'ACCEPTED' ? 'text-emerald-500' : 'text-orange-500'}/> 
+                                    <FileText className={activeQuote.status === 'PAID' ? 'text-emerald-500' : 'text-orange-500'}/> 
                                     Devis #{activeQuote.number?.split('-')[1] || 'PROVISOIRE'}
                                 </h2>
                                 <p className="text-slate-400 text-xs mt-1 uppercase tracking-wide">Date: {new Date(activeQuote.createdAt).toLocaleDateString()}</p>
                             </div>
-                            <Badge className={`${activeQuote.status === 'ACCEPTED' ? 'bg-emerald-500' : 'bg-orange-500'} text-black font-bold border-none`}>
-                                {activeQuote.status === 'ACCEPTED' ? 'VALIDÉ' : 'EN ATTENTE'}
+                            <Badge className={`${activeQuote.status === 'PAID' ? 'bg-emerald-500' : activeQuote.status === 'ACCEPTED' ? 'bg-blue-500' : 'bg-orange-500'} text-white font-bold border-none`}>
+                                {activeQuote.status === 'PAID' ? 'PAYÉ' : activeQuote.status === 'ACCEPTED' ? 'VALIDÉ PAR AGENCE' : 'EN ATTENTE'}
                             </Badge>
                         </div>
 
@@ -229,31 +238,33 @@ export default function OwnerIncidentDetail() {
                             <span className="text-3xl font-black text-white">{formatCurrency(activeQuote.totalAmount)} <span className="text-orange-500 text-lg">FCFA</span></span>
                         </div>
 
-                        {/* ACTIONS (Uniquement si PENDING) */}
-                        {activeQuote.status === 'PENDING' && (
-                            <div className="p-6 grid grid-cols-2 gap-4 bg-[#0F172A] border-t border-slate-800">
+                        {/* 🔒 CORRECTION LOGIQUE : Affichage des boutons si PENDING ou ACCEPTED */}
+                        {(activeQuote.status === 'PENDING' || activeQuote.status === 'ACCEPTED') && (
+                            <div className="p-6 flex flex-col md:flex-row gap-4 bg-[#0F172A] border-t border-slate-800">
+                                {activeQuote.status === 'PENDING' && (
+                                    <Button 
+                                        onClick={() => handleQuoteReject(activeQuote.id)} 
+                                        variant="outline" 
+                                        className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10 h-14 uppercase font-bold text-xs tracking-widest"
+                                    >
+                                        <XCircle className="mr-2 h-5 w-5"/> Refuser
+                                    </Button>
+                                )}
+                                
                                 <Button 
-                                    onClick={() => handleQuoteResponse(activeQuote.id, 'REJECT')} 
-                                    variant="outline" 
-                                    className="border-red-500/30 text-red-500 hover:bg-red-500/10 h-14 uppercase font-bold text-xs tracking-widest"
+                                    onClick={() => handlePayQuote(activeQuote.id)} 
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white h-14 uppercase font-bold text-xs tracking-widest shadow-lg shadow-emerald-900/20"
                                 >
-                                    <XCircle className="mr-2 h-5 w-5"/> Refuser
-                                </Button>
-                                {/* LE BOUTON DÉCLENCHEUR DU PAIEMENT */}
-                                <Button 
-                                    onClick={() => handleQuoteResponse(activeQuote.id, 'ACCEPT')} 
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white h-14 uppercase font-bold text-xs tracking-widest shadow-lg shadow-emerald-900/20"
-                                >
-                                    <CheckCircle className="mr-2 h-5 w-5"/> Valider & Payer
+                                    <CheckCircle className="mr-2 h-5 w-5"/> Payer (CinetPay)
                                 </Button>
                             </div>
                         )}
                         
-                        {/* Message si validé */}
-                        {activeQuote.status === 'ACCEPTED' && (
+                        {/* Message UNIQUEMENT si le statut est PAID */}
+                        {activeQuote.status === 'PAID' && (
                             <div className="p-4 bg-emerald-500/10 text-emerald-400 text-center font-bold text-xs uppercase tracking-widest border-t border-emerald-500/20">
                                 <CheckCircle className="w-4 h-4 inline-block mr-2"/>
-                                Travaux payés et autorisés le {new Date(activeQuote.updatedAt).toLocaleDateString()}
+                                Fonds consignés et travaux autorisés le {new Date(activeQuote.updatedAt).toLocaleDateString()}
                             </div>
                         )}
                     </div>
@@ -264,6 +275,8 @@ export default function OwnerIncidentDetail() {
                         </div>
                         <h3 className="text-white font-bold text-lg mb-2">En attente de devis</h3>
                         <p className="text-sm max-w-xs mx-auto mb-6">L'artisan étudie actuellement le problème. Vous recevrez une notification dès qu'il aura chiffré l'intervention.</p>
+                        
+                        {/* RESTAURATION DE L'ANIMATION DE CHARGEMENT */}
                         <div className="flex items-center gap-2 text-xs font-mono text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full animate-pulse">
                             <Loader2 className="w-3 h-3 animate-spin"/>
                             Traitement en cours...

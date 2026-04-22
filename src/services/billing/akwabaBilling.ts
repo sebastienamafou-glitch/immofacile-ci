@@ -5,16 +5,16 @@ import {
     TransactionType, 
     BalanceType,
     Role,
-    PaymentStatus
+    PaymentStatus,
+    TransactionStatus // ✅ 1. IMPORT DE L'ENUM MANQUANT
 } from "@prisma/client";
 import { sendNotification } from "@/lib/notifications";
 import { logActivity } from "@/lib/logger";
-import { prisma } from "@/lib/prisma";
-import { mapCinetPayMethod } from "@/lib/utils"; // ✅ Import du traducteur strict
-import { TxClient, CinetPayApiData } from "@/services/billing/types"; // ✅ Typage unifié (DRY)
+import { mapCinetPayMethod } from "@/lib/utils";
+import { TxClient, CinetPayApiData } from "@/services/billing/types";
 
 // =============================================================================
-// 🚀 MOTEUR DE TRAITEMENT (AKWABA / COURT SÉJOUR)
+// 🚀 MOTEUR DE TRAITEMENT (AKWABA / COURT SÉJOUR) - OPTION A
 // =============================================================================
 export async function processAkwabaPayment(
     tx: TxClient, 
@@ -23,7 +23,8 @@ export async function processAkwabaPayment(
     amountPaid: number, 
     transactionId: string, 
     apiData: CinetPayApiData, 
-    postActions: Array<() => Promise<void>>
+    postActions: Array<() => Promise<void>>,
+    superAdminId: string | null 
 ) {
     if (bookingPayment.status === PaymentStatus.SUCCESS) return;
 
@@ -62,14 +63,13 @@ export async function processAkwabaPayment(
     const hostPayout = amountPaid - platformFee;
     const hostId = bookingData.listing.hostId;
 
-    // ✅ MAPPER STRICT : Protection contre le crash Prisma P2009
     const safeProvider = mapCinetPayMethod(apiData.payment_method);
 
     await tx.bookingPayment.update({ 
         where: { id: bookingPayment.id }, 
         data: { 
             status: PaymentStatus.SUCCESS, 
-            provider: safeProvider, // 👈 CORRECTION : Typage fort Enum appliqué
+            provider: safeProvider, 
             platformCommission: platformFee, 
             agencyCommission: 0,
             hostPayout: hostPayout, 
@@ -82,16 +82,12 @@ export async function processAkwabaPayment(
         data: { status: BookingStatus.PAID } 
     });
 
-    // 1. Paiement du Propriétaire (Host) via UserFinance
-    await tx.userFinance.update({ 
-        where: { userId: hostId }, 
-        data: { walletBalance: { increment: hostPayout } }
-    });
+    // 1. Paiement du Propriétaire (Host)
     await tx.transaction.create({ 
         data: { 
             amount: hostPayout, 
             type: TransactionType.CREDIT, 
-            status: 'SUCCESS', 
+            status: TransactionStatus.SUCCESS, // ✅ 2. CORRECTION STRICTE
             reason: `Réservation Akwaba #${bookingData.listing.title}`, 
             userId: hostId, 
             reference: `AKW-${transactionId}`, 
@@ -99,21 +95,19 @@ export async function processAkwabaPayment(
         } 
     });
 
-    // 2. Paiement de la Plateforme (Requête hors verrou transactionnel)
-    const superAdmin = await prisma.user.findFirst({ where: { role: Role.SUPER_ADMIN } });
-    
-    if (superAdmin && platformFee > 0) {
+    // 2. Paiement de la Plateforme
+    if (superAdminId && platformFee > 0) {
         await tx.userFinance.update({
-            where: { userId: superAdmin.id },
+            where: { userId: superAdminId },
             data: { walletBalance: { increment: platformFee } }
         });
         await tx.transaction.create({
             data: {
                 amount: platformFee,
                 type: TransactionType.CREDIT,
-                status: 'SUCCESS',
+                status: TransactionStatus.SUCCESS, // ✅ 3. CORRECTION STRICTE
                 reason: `Commission Plateforme Akwaba (10%) - ${bookingData.listing.title}`,
-                userId: superAdmin.id,
+                userId: superAdminId,
                 reference: `PLAT-AKW-${transactionId}`,
                 balanceType: BalanceType.WALLET
             }

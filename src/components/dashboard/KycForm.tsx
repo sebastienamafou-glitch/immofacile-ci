@@ -18,14 +18,17 @@ export default function KycForm() {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     
-    // Le champ caché "documentUrl" contient déjà l'URL grâce au state,
-    // donc le Server Action le recevra automatiquement.
+    // 🔒 CORRECTION : Extraction explicite des champs
+    const idType = formData.get("idType") as string;
+    const idNumber = formData.get("idNumber") as string;
     
-    const result = await submitKycApplication(formData);
+    // 🔒 CORRECTION : Appel avec les 3 arguments stricts requis par le serveur
+    const result = await submitKycApplication(uploadedUrl, idType, idNumber);
     
     if (result.success) {
-        alert("Succès : " + result.success);
-        setUploadedUrl(""); // Reset
+        alert("Succès : Dossier envoyé !");
+        setUploadedUrl(""); 
+        (e.target as HTMLFormElement).reset(); // Reset visuel du formulaire
     } else {
         alert("Erreur : " + result.error);
     }
@@ -46,6 +49,18 @@ export default function KycForm() {
             <option value="PASSPORT">Passeport</option>
             <option value="VOTE_CARD">Carte d'Électeur</option>
           </select>
+        </div>
+
+        {/* 🔒 CORRECTION : AJOUT DU CHAMP NUMÉRO DE PIÈCE MANQUANT */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">Numéro de la pièce</label>
+          <input 
+            type="text" 
+            name="idNumber" 
+            required 
+            placeholder="Ex: C001234567" 
+            className="w-full border border-gray-300 p-2.5 rounded-md focus:ring-2 focus:ring-blue-500 bg-white"
+          />
         </div>
 
         {/* WIDGET CLOUDINARY */}

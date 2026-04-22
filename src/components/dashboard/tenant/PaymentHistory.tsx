@@ -2,17 +2,12 @@
 
 import { History, Receipt, Download, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
+import Link from "next/link";
 // ✅ IMPORT DU TYPE SSOT
 import { TenantPaymentData } from "@/lib/types/tenant";
 
 export default function PaymentHistory({ payments }: { payments: TenantPaymentData[] }) {
   
-  const handleDownloadReceipt = (id: string) => {
-      // Placeholder: À connecter à votre générateur PDF plus tard
-      toast.info("Téléchargement du reçu...");
-  };
-
   return (
     <Card className="bg-[#0F172A] border-white/5 rounded-[2.5rem] shadow-xl overflow-hidden min-h-[400px]">
         <CardHeader className="flex flex-row items-center justify-between mx-6 px-0 pb-6 border-b border-white/5">
@@ -47,14 +42,15 @@ export default function PaymentHistory({ payments }: { payments: TenantPaymentDa
                                 </div>
                             </div>
                             
+                            {/* 🎯 LE LIEN EST ICI */}
                             {payment.status === 'SUCCESS' && (
-                                <button 
-                                    onClick={() => handleDownloadReceipt(payment.id)} 
-                                    className="p-2 text-slate-500 transition-all rounded-lg bg-white/5 hover:text-orange-500 active:scale-95"
-                                    title="Télécharger Reçu"
+                                <Link 
+                                    href={`/dashboard/tenant/receipts/${payment.id}`}
+                                    className="p-2 text-slate-500 transition-all rounded-lg bg-white/5 hover:text-orange-500 active:scale-95 flex items-center justify-center"
+                                    title="Voir la quittance"
                                 >
                                     <Download className="w-4 h-4" />
-                                </button>
+                                </Link>
                             )}
                         </div>
                     ))

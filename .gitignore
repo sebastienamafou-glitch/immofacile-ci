@@ -12,3 +12,14 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 .env.production
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Testing
+/coverage
+.vitest/

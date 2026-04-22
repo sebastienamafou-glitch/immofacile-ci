@@ -33,11 +33,13 @@ interface ArtisanData {
   user: {
     name: string;
     email: string;
-    walletBalance: number;
     isAvailable: boolean;
     isVerified: boolean; 
   };
-  stats: any;
+  stats: {
+    totalEarnings: number;
+    [key: string]: any;
+  };
   jobs: Job[];
 }
 
@@ -168,8 +170,15 @@ export default function ArtisanDashboard() {
                         </div>
                      </div>
                      <div className="bg-slate-900 px-6 py-4 rounded-xl border border-slate-800 shadow-lg text-right w-full md:w-auto">
-                        <p className="text-xs font-bold text-slate-500 uppercase mb-1">Solde Portefeuille</p>
-                        <p className="text-3xl font-black text-emerald-400 tracking-tight">{formatCurrency(data.user.walletBalance)}</p>
+                        <div className="flex items-center justify-end gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                Revenus Encaissés (Wave/OM)
+                            </p>
+                        </div>
+                        <p className="text-3xl font-black text-emerald-400 tracking-tight">
+                            {formatCurrency(data.stats.totalEarnings)}
+                        </p>
                     </div>
                 </div>
             </div>

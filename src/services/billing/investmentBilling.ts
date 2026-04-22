@@ -4,11 +4,10 @@ import {
     Role, 
     TransactionType, 
     BalanceType,
-    InvestmentStatus // ✅ IMPORT DE L'ENUMÉRATION
+    InvestmentStatus
 } from "@prisma/client";
 import { logActivity } from "@/lib/logger";
-import { prisma } from "@/lib/prisma";
-import { TxClient } from "@/services/billing/types"; // ✅ Typage unifié (DRY)
+import { TxClient } from "@/services/billing/types"; 
 
 // =============================================================================
 // 🚀 MOTEUR DE TRAITEMENT (CROWDFUNDING & INVESTISSEMENT)
@@ -18,15 +17,15 @@ export async function processInvestmentPayment(
     investmentContract: InvestmentContract, 
     isValidPayment: boolean, 
     amountPaid: number, 
-    transactionId: string
+    transactionId: string,
+    superAdminId: string | null // ✅ Ajout du 6ème argument pour TypeScript et patch stabilité
 ) {
-    // ✅ CORRECTION ENUMÉRATION : Utilisation de InvestmentStatus.ACTIVE
     if (investmentContract.status === InvestmentStatus.ACTIVE || investmentContract.status === InvestmentStatus.COMPLETED) return;
 
     if (!isValidPayment) {
         await tx.investmentContract.update({ 
             where: { id: investmentContract.id }, 
-            data: { status: InvestmentStatus.CANCELLED } // 👈 CORRECTION
+            data: { status: InvestmentStatus.CANCELLED } 
         });
         return;
     }
@@ -35,14 +34,14 @@ export async function processInvestmentPayment(
         console.error(`🚨 [Alerte Fraude] Investissement ${investmentContract.id} : attendu ${investmentContract.amount}, reçu ${amountPaid}`);
         await tx.investmentContract.update({ 
             where: { id: investmentContract.id }, 
-            data: { status: InvestmentStatus.CANCELLED } // 👈 CORRECTION
+            data: { status: InvestmentStatus.CANCELLED } 
         });
         return;
     }
 
     await tx.investmentContract.update({ 
         where: { id: investmentContract.id }, 
-        data: { status: InvestmentStatus.ACTIVE } // 👈 CORRECTION
+        data: { status: InvestmentStatus.ACTIVE } 
     });
 
     let newRole: Role = Role.GUEST; 
@@ -65,16 +64,11 @@ export async function processInvestmentPayment(
         } 
     });
 
-    // Validation comptable : Encaissement des fonds sur le compte Plateforme (Requête hors verrou)
-    const superAdmin = await prisma.user.findFirst({ 
-        where: { role: Role.SUPER_ADMIN }, 
-        select: { id: true } 
-    });
-
-    if (superAdmin) {
-        // ✅ CORRECTION ARCHITECTURE : Ciblage de UserFinance
+    // Validation comptable : Encaissement des fonds sur le compte Plateforme
+    // ✅ Utilisation du superAdminId pré-résolu (fini les lectures hors snapshot)
+    if (superAdminId) {
         await tx.userFinance.update({
-            where: { userId: superAdmin.id },
+            where: { userId: superAdminId },
             data: { walletBalance: { increment: amountPaid } }
         });
         
@@ -84,7 +78,7 @@ export async function processInvestmentPayment(
                 type: TransactionType.CREDIT,
                 status: 'SUCCESS',
                 reason: `Investissement Crowdfunding - Contrat #${investmentContract.id}`,
-                userId: superAdmin.id,
+                userId: superAdminId,
                 reference: `INV-PLAT-${transactionId}`,
                 balanceType: BalanceType.WALLET
             }

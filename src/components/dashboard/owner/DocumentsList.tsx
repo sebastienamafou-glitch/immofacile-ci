@@ -16,18 +16,26 @@ const DownloadRentReceipt = dynamic(() => import('@/components/pdf/DownloadRentR
   )
 });
 
-// ✅ DTO STRICT : Sécurisation des paiements optionnels
+// ✅ DTO STRICT : Mise à jour avec les champs fiscaux
 export interface DashboardDocumentProperty {
     title: string;
     address: string;
     leases: {
         id?: string;
         startDate?: string | Date;
+        depositAmount?: number;      // 🟢 AJOUT FISCAL
+        advanceAmount?: number;      // 🟢 AJOUT FISCAL
+        tenantLeasingFee?: number;   // 🟢 AJOUT FISCAL
         tenant: {
             name: string | null;
             email: string | null;
         } | null;
-        payments?: { date: Date | string; amount: number; id: string }[]; // Optionnel
+        payments?: { 
+            id: string; 
+            date: Date | string; 
+            amount: number; 
+            type: string;            // 🟢 LE SÉSAME !
+        }[];
     }[];
 }
 

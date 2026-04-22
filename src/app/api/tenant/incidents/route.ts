@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { Role, LeaseStatus } from "@prisma/client";
+import { Role, LeaseStatus, IncidentPriority } from "@prisma/client"; // 👈 AJOUT
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       data: {
         title: finalTitle,
         description,
-        priority,
+        priority: priority as IncidentPriority, 
         status: 'OPEN',
         photos,
         reporterId: userId,

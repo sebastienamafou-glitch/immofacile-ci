@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendNotification } from "@/lib/notifications";
 import { logActivity } from "@/lib/logger";
+import { AuditAction } from "@prisma/client";
 
 const CRON_SECRET = process.env.CRON_SECRET 
 
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
 
         // 6. LOG D'AUDIT SÉCURISÉ
         await logActivity({
-          action: "SECURITY_ALERT",
+          action: AuditAction.SECURITY_ALERT,
           entityId: f.userId,
           entityType: "FINANCE",
           userId: "SYSTEM_CRON",

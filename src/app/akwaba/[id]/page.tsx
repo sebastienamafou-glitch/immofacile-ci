@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { differenceInDays } from "date-fns";
 import { toast } from "sonner";
 import { contactHost } from "@/actions/messages"; 
-import { createBooking } from "@/actions/bookings";
+import { createSecureBooking } from "@/actions/akwaba/booking.action";
 import { toggleWishlist as toggleWishlistAction } from "@/actions/wishlist"; // ✅ Import renommé pour éviter conflit
 import { 
   MapPin, User, ShieldCheck, Wifi, Car, Tv, Wind, Coffee, Star,
@@ -112,7 +112,16 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
     
     setBookingLoading(true);
     try {
-        const result = await createBooking(listing!.id, startDate, endDate);
+        // 👇 ========================================== 👇
+        // 👇 NOUVELLE SYNTAXE : APPEL AVEC UN OBJET 👇
+        const result = await createSecureBooking({
+            listingId: listing!.id,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            guestCount: 1 // Par défaut 1 (à lier à ton state si tu ajoutes un sélecteur plus tard)
+        });
+        // 👆 FIN DE LA NOUVELLE SYNTAXE               👆
+        // 👆 ========================================== 👆
         
         if (result.success) {
             toast.success("Demande envoyée !", { description: "Accédez à vos voyages pour le paiement." });
@@ -125,7 +134,7 @@ export default function ListingDetailPage({ params }: { params: { id: string } }
     } finally {
         setBookingLoading(false);
     }
-};
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();

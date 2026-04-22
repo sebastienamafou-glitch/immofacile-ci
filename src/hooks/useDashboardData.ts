@@ -13,7 +13,6 @@ export function useDashboardData() {
     try {
       setLoading(true);
       
-      // L'instance 'api' transmet automatiquement les cookies de session.
       const res = await api.get<DashboardResponse>('/owner/dashboard', { signal });
       
       if (res.data.success) {
@@ -22,16 +21,15 @@ export function useDashboardData() {
       } else {
         setError("Erreur API : Données non validées.");
       }
+      setLoading(false); // ✅ Déplacé ici (Succès)
 
     } catch (err: unknown) {
-      // Ignorer l'erreur si elle résulte de l'annulation de la requête (démontage UI)
       if (err instanceof Error && (err.name === 'CanceledError' || err.name === 'AbortError')) {
-        return;
+        return; // ✅ L'annulation stoppe tout, sans passer loading à false
       }
 
       console.error("[DASHBOARD_FETCH_ERROR]", err);
       
-      // Vérification sécurisée de la structure d'erreur (évite le 'any')
       const errorResponse = (err as { response?: { status?: number, data?: { error?: string } } }).response;
       
       if (errorResponse?.status === 401 || errorResponse?.status === 403) {
@@ -39,9 +37,9 @@ export function useDashboardData() {
       } else {
          setError(errorResponse?.data?.error || "Impossible de charger les données.");
       }
-    } finally {
-      setLoading(false);
+      setLoading(false); // ✅ Déplacé ici (Vraie Erreur)
     }
+    // ❌ Plus de bloc 'finally'
   }, [router]);
 
   useEffect(() => {

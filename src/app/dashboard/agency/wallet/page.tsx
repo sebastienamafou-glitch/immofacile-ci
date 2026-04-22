@@ -1,26 +1,22 @@
-
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, History, Building2 } from "lucide-react";
+import { Wallet, TrendingUp, History, Building2, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import WithdrawForm from "@/components/agency/WithdrawForm"; 
 import TransactionList from "@/components/agency/TransactionList";
+import UnpaidRentsTable from "@/components/agency/UnpaidRentsTable";
 import { auth } from "@/auth";
 
 export const dynamic = 'force-dynamic';
 
 export default async function AgencyWalletPage() {
-  // 1. SÉCURITÉ ZERO TRUST (Auth v5)
-const session = await auth();
+  const session = await auth();
 
-// Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
-if (!session || !session.user?.id) {
-  redirect("/login");
-}
+  if (!session || !session.user?.id) {
+    redirect("/login");
+  }
 
-const userId = session.user.id;
+  const userId = session.user.id;
 
-  // 2. VÉRIFICATION ADMIN & AGENCE
   const admin = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, agencyId: true }
@@ -30,11 +26,9 @@ const userId = session.user.id;
     redirect("/dashboard");
   }
 
-  // 3. RÉCUPÉRATION DONNÉES FINANCIÈRES DE L'AGENCE (B2B)
   const agency = await prisma.agency.findUnique({
     where: { id: admin.agencyId },
     include: { 
-        // On récupère les 20 dernières transactions DE L'AGENCE (AgencyTransaction)
         transactions: {
             orderBy: { createdAt: 'desc' },
             take: 20
@@ -44,26 +38,79 @@ const userId = session.user.id;
 
   if (!agency) redirect("/dashboard");
 
-  // 4. CALCUL KPI (Fintech)
-  // A. Commissions sur Location Saisonnière
-  const shortTermStats = await prisma.bookingPayment.aggregate({
-    _sum: { agencyCommission: true },
+  // RÉCUPÉRATION DES IMPAYÉS ET RETARDS
+  const rawPendingSchedules = await prisma.rentSchedule.findMany({
     where: {
-        booking: { listing: { agencyId: agency.id } },
-        status: "SUCCESS"
-    }
+      status: { in: ['PENDING', 'LATE'] },
+      lease: {
+        property: { agencyId: agency.id }
+      }
+    },
+    include: {
+      lease: {
+        select: {
+          property: { select: { title: true } },
+          tenant: { select: { name: true, phone: true, email: true } }
+        }
+      }
+    },
+    orderBy: { expectedDate: 'asc' }
   });
 
-  // B. Honoraires sur Gestion Longue Durée
-  const longTermStats = await prisma.payment.aggregate({
-    _sum: { amountAgency: true }, // ✅ Correction : amountAgency (pas amountAgent qui est pour le freelance)
+  const scheduleIds = rawPendingSchedules.map(s => s.id);
+
+  // RÉCUPÉRATION DE L'HISTORIQUE DES RELANCES
+  const reminderLogs = await prisma.auditLog.findMany({
     where: {
-        lease: { property: { agencyId: agency.id } },
-        status: "SUCCESS"
-    }
+      entityType: "RENT_SCHEDULE",
+      entityId: { in: scheduleIds }
+    },
+    orderBy: { createdAt: 'desc' }
   });
 
-  const totalRevenue = (shortTermStats._sum.agencyCommission || 0) + (longTermStats._sum.amountAgency || 0);
+  const pendingSchedules = rawPendingSchedules.map(schedule => {
+    const scheduleLogs = reminderLogs.filter(log => 
+        log.entityId === schedule.id && 
+        (log.metadata as any)?.actionOrigin === "MANUAL_RENT_REMINDER"
+    );
+
+    return {
+        ...schedule,
+        reminderCount: scheduleLogs.length,
+        lastReminderAt: scheduleLogs.length > 0 ? scheduleLogs[0].createdAt.toISOString() : null
+    };
+  });
+
+  // CALCUL KPI - Option A : Calculs basés sur les transactions réelles
+  
+  // A. Chiffre d'Affaires Global (Toutes les transactions de crédit de l'agence)
+  const globalRevenueStats = await prisma.agencyTransaction.aggregate({
+    _sum: { amount: true },
+    where: {
+        agencyId: agency.id,
+        type: 'CREDIT',
+        status: 'SUCCESS'
+    }
+  });
+  
+  const totalRevenue = globalRevenueStats._sum.amount || 0;
+
+  // B. Chiffre d'Affaires du Mois en Cours
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const monthlyRevenueStats = await prisma.agencyTransaction.aggregate({
+    _sum: { amount: true },
+    where: {
+        agencyId: agency.id,
+        type: 'CREDIT',
+        status: 'SUCCESS',
+        createdAt: { gte: startOfMonth }
+    }
+  });
+  
+  const monthlyRevenue = monthlyRevenueStats._sum.amount || 0;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 min-h-screen bg-[#020617] text-slate-200">
@@ -75,7 +122,7 @@ const userId = session.user.id;
              <Wallet className="text-orange-500 w-8 h-8" /> Portefeuille Agence
           </h1>
           <p className="text-slate-400 mt-1">
-            Finance & Trésorerie de <span className="text-white font-bold">{agency.name}</span>.
+            Revenus &amp; Comptabilité de <span className="text-white font-bold">{agency.name}</span>.
           </p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 rounded-lg border border-slate-800">
@@ -84,22 +131,27 @@ const userId = session.user.id;
         </div>
       </div>
 
+      {/* INFORMATION SUR L'OPTION A */}
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex items-start gap-3">
+        <AlertCircle className="text-blue-500 w-5 h-5 shrink-0 mt-0.5" />
+        <div className="text-sm text-blue-200">
+          <strong>Mode Paiement Direct :</strong> Les commissions de votre agence sont versées automatiquement sur votre compte de dépôt. Ce tableau de bord sert d&apos;historique comptable.
+        </div>
+      </div>
+
       {/* STATS CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* CARTE SOLDE PRINCIPAL (Withdrawal Ready) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* CARTE CA DU MOIS */}
           <Card className="bg-gradient-to-br from-orange-600 to-orange-800 border-none text-white shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Wallet size={120} />
+                  <TrendingUp size={120} />
               </div>
               <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-orange-200 uppercase tracking-wider font-bold">Solde Disponible</CardTitle>
+                  <CardTitle className="text-sm font-medium text-orange-200 uppercase tracking-wider font-bold">Chiffre d&apos;Affaires (Mois en cours)</CardTitle>
               </CardHeader>
               <CardContent>
                   <div className="text-5xl font-black tracking-tighter">
-                      {agency.walletBalance.toLocaleString()} <span className="text-2xl font-normal opacity-80">F</span>
-                  </div>
-                  <div className="mt-6">
-                      <WithdrawForm maxAmount={agency.walletBalance} />
+                      {monthlyRevenue.toLocaleString()} <span className="text-2xl font-normal opacity-80">F</span>
                   </div>
               </CardContent>
           </Card>
@@ -107,47 +159,30 @@ const userId = session.user.id;
           {/* CARTE REVENUS TOTAUX */}
           <Card className="bg-slate-900 border-slate-800 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-bold text-slate-400 uppercase">Chiffre d'Affaires</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  <CardTitle className="text-sm font-bold text-slate-400 uppercase">Chiffre d&apos;Affaires (Global)</CardTitle>
+                  <Wallet className="h-4 w-4 text-emerald-500" />
               </CardHeader>
               <CardContent>
-                  <div className="text-3xl font-black text-white">
-                      {totalRevenue.toLocaleString()} <span className="text-lg font-normal text-slate-500">F</span>
+                  <div className="text-4xl font-black text-white mt-2">
+                      {totalRevenue.toLocaleString()} <span className="text-xl font-normal text-slate-500">F</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                      Commissions cumulées (Court + Long terme)
+                  <p className="text-sm text-slate-500 mt-2">
+                      Total des commissions générées depuis la création.
                   </p>
-              </CardContent>
-          </Card>
-
-          {/* CARTE MOUVEMENTS */}
-          <Card className="bg-slate-900 border-slate-800 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-bold text-slate-400 uppercase">Flux du mois</CardTitle>
-                  <History className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                  <div className="space-y-4 mt-2">
-                      <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center text-emerald-400 font-bold"><ArrowDownLeft size={16} className="mr-2"/> Entrées</span>
-                          <span className="text-white font-mono font-bold">{(shortTermStats._sum.agencyCommission || 0).toLocaleString()} F</span>
-                      </div>
-                      <div className="w-full h-[1px] bg-slate-800"></div>
-                      <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center text-slate-500 font-bold"><ArrowUpRight size={16} className="mr-2"/> Sorties</span>
-                          <span className="text-slate-500 font-mono">--</span> 
-                      </div>
-                  </div>
               </CardContent>
           </Card>
       </div>
 
+      {/* MODULE DE RELANCE DES IMPAYÉS */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+        <UnpaidRentsTable schedules={pendingSchedules} />
+      </div>
+
       {/* HISTORIQUE TRANSACTIONS */}
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <History className="text-slate-500" /> Historique des Transactions
+              <History className="text-slate-500" /> Historique Comptable
           </h3>
-          {/* Mapping pour compatibilité format Date si nécessaire */}
           <TransactionList transactions={agency.transactions.map(t => ({
               ...t,
               createdAt: t.createdAt.toISOString()

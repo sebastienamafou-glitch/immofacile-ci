@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { AuditAction } from "@prisma/client";
 
 export async function signLeaseAsOwnerAction(leaseId: string) {
   const session = await auth();
@@ -68,7 +69,7 @@ export async function signLeaseAsOwnerAction(leaseId: string) {
         // D. TRAÇABILITÉ : Ajout au registre d'audit pour le Super Admin
         await tx.auditLog.create({
             data: {
-                action: "LEASE_SIGNED_BY_OWNER",
+                action: AuditAction.LEASE_SIGNED,
                 entityId: leaseId,
                 entityType: "LEASE",
                 userId: ownerId,

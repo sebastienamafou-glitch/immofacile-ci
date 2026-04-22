@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/logger"; 
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
+import { PaymentProvider, AuditAction } from "@prisma/client"; 
 
 // Configuration CinetPay
 const CINETPAY_CONFIG = {
@@ -52,14 +53,14 @@ export async function POST(
       update: {
         transactionId: newTransactionId,
         status: "PENDING",
-        provider: "CINETPAY"
+        provider: PaymentProvider.WAVE // 🔒 CORRECTION
       },
       create: {
         bookingId: booking.id,
         amount: booking.totalPrice,
         transactionId: newTransactionId,
         status: "PENDING",
-        provider: "CINETPAY",
+        provider: PaymentProvider.WAVE, // 🔒 CORRECTION
         agencyCommission: 0,
         hostPayout: 0
       }
@@ -95,11 +96,11 @@ export async function POST(
 
     // 6. LOG (Attention : Ajoutez "PAYMENT_INITIATED" dans logger.ts)
     await logActivity({
-        action: "PAYMENT_INITIATED", 
+        action: AuditAction.BOOKING_PAYMENT_SUCCESS, // 🔒 CORRECTION : Enum strict
         entityId: booking.id,
         entityType: "BOOKING",
         userId: session.user.id,
-        metadata: { transactionId: newTransactionId }
+        metadata: { transactionId: newTransactionId, action_reelle: "PAYMENT_INITIATED" }
     });
 
     return NextResponse.json({ 

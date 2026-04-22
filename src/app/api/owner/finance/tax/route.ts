@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
-
 
 export const dynamic = 'force-dynamic';
 
@@ -27,52 +25,47 @@ export async function GET(request: Request) {
     const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
     const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
 
-    // 4. REQUÊTE HAUTE PRÉCISION
+    // 4. RÉCUPÉRATION GLOBALE DES PROPRIÉTÉS ET DÉPENSES
     const properties = await prisma.property.findMany({
       where: { ownerId: owner.id },
       include: {
-        leases: {
-            include: {
-                payments: {
-                    where: {
-                        date: { gte: startDate, lte: endDate },
-                        status: 'SUCCESS',
-                        // On garde les revenus locatifs, on exclut les cautions
-                        type: { in: ['LOYER', 'CHARGES'] } 
-                    }
-                }
-            }
-        },
         incidents: {
             where: {
                 updatedAt: { gte: startDate, lte: endDate },
-                status: { in: ['RESOLVED', 'CLOSED'] }, // On ne déduit que les factures payées/fermées
+                status: { in: ['RESOLVED', 'CLOSED'] },
                 finalCost: { not: null }
             }
         }
       }
     });
 
-    // 5. MOTEUR DE CALCUL (Correction Fiscale)
+    // 5. RÉCUPÉRATION DES REVENUS (Option A : via Transactions comptables)
+    // On prend toutes les transactions de crédit liées à ce propriétaire dans l'année.
+    const transactions = await prisma.transaction.findMany({
+        where: {
+            userId: owner.id,
+            type: 'CREDIT',
+            status: 'SUCCESS',
+            createdAt: { gte: startDate, lte: endDate }
+        }
+    });
+
+    // 6. VENTILATION PAR PROPRIÉTÉ
     let totalRevenue = 0;
     let totalExpenses = 0;
 
     const breakdown = properties.map((prop) => {
-        
-        // REVENUS : On prend le NET PERÇU (amountOwner)
-        // Si ancien paiement avant migration, fallback sur une estimation (net = 90% brut) ou 0
-        const propRevenue = prop.leases.reduce((sum, lease) => {
-            return sum + lease.payments.reduce((pSum, p) => {
-                // ✅ CORRECTIF CRITIQUE : Seul l'argent reçu dans le wallet est imposable
-                return pSum + (p.amountOwner || 0); 
-            }, 0);
-        }, 0);
-
-        // DÉPENSES : Coût final des incidents
+        // DÉPENSES : Coût final des incidents pour cette propriété
         const propExpenses = prop.incidents.reduce((sum, inc) => {
             return sum + (inc.finalCost || 0);
         }, 0);
         
+        // REVENUS : On cherche dans le 'reason' de la transaction si le titre de la propriété y figure.
+        // C'est pourquoi nous avons formaté les raisons comme "Loyer/Caution (Net) - Titre de la propriété"
+        const propRevenue = transactions
+            .filter(tx => tx.reason.includes(prop.title))
+            .reduce((sum, tx) => sum + tx.amount, 0);
+
         totalRevenue += propRevenue;
         totalExpenses += propExpenses;
 
@@ -85,6 +78,22 @@ export async function GET(request: Request) {
             net: propRevenue - propExpenses
         };
     });
+
+    // Ajouter les revenus "orphelins" (qui ne correspondent à aucune propriété activement listée)
+    const categorizedRevenue = breakdown.reduce((sum, p) => sum + p.rev, 0);
+    const orphanRevenue = transactions.reduce((sum, tx) => sum + tx.amount, 0) - categorizedRevenue;
+
+    if (orphanRevenue > 0) {
+        totalRevenue += orphanRevenue;
+        breakdown.push({
+            id: "other",
+            title: "Autres revenus (Akwaba / Historique)",
+            commune: "-",
+            rev: orphanRevenue,
+            exp: 0,
+            net: orphanRevenue
+        });
+    }
 
     return NextResponse.json({
       success: true,

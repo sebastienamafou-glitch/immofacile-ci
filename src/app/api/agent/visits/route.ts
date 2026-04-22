@@ -8,9 +8,13 @@ export const dynamic = 'force-dynamic';
 // --- SÉCURITÉ : VÉRIFICATION AGENT ---
 async function checkAgentPermission(request: Request) {
   const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
-  if (!userId) return { authorized: false, status: 401, error: "Non authentifié" };
+  
+  // 🔒 CORRECTION : Retourner l'objet standardisé au lieu de NextResponse
+  if (!session || !session.user?.id) {
+    return { authorized: false, status: 401, error: "Non authentifié" };
+  }
+  
+  const userId = session.user.id;
 
   const agent = await prisma.user.findUnique({
     where: { id: userId },

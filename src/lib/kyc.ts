@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/logger";
-// 👇 IMPORT DE SÉCURITÉ
+import { AuditAction } from "@prisma/client"; 
 import { encrypt } from "@/lib/crypto";
+
 
 // ✅ CORRECTION : On ajoute idNumber en argument optionnel
 export async function submitKycApplication(documentUrl: string, idType: string, idNumber?: string) {
@@ -42,12 +43,13 @@ export async function submitKycApplication(documentUrl: string, idType: string, 
     });
 
     // Log de sécurité (On ne logue PAS le numéro, même chiffré)
-    await logActivity(
-        "KYC_SUBMITTED", 
-        "SECURITY", 
-        { method: "CLOUDINARY", docType: idType }, 
-        userId
-    );
+    await logActivity({
+        action: AuditAction.SECURITY_ALERT, // Fallback (KYC_SUBMITTED n'existe pas dans l'Enum)
+        entityType: "USER",
+        entityId: userId,
+        metadata: { method: "CLOUDINARY", docType: idType },
+        userId: userId
+    });
 
     revalidatePath("/dashboard/tenant");
     return { success: true };

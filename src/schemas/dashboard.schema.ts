@@ -37,6 +37,12 @@ export const DashboardResponseSchema = z.object({
       monthlyRent: z.number(),
       isActive: z.boolean(),
       startDate: z.union([z.date(), z.string()]).optional(),
+      
+      // 🟢 AJOUTS FISCAUX ICI
+      depositAmount: z.number().optional(),      
+      advanceAmount: z.number().nullable().optional(), 
+      tenantLeasingFee: z.number().optional(),   
+
       tenant: z.object({
         id: z.string().optional(),
         name: z.string().nullable(),
@@ -49,6 +55,7 @@ export const DashboardResponseSchema = z.object({
         amount: z.number(),
         date: z.union([z.date(), z.string()]),
         status: z.string(),
+        type: z.string().optional(), // 🟢 AJOUT DU TYPE ICI
       })).optional()
     })).default([]),
   })),

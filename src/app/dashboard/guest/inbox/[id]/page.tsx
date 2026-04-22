@@ -117,7 +117,7 @@ export default async function ConversationPage({ params }: PageProps) {
         <div className="hidden lg:block space-y-4">
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                 <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
-                    À propos de {isGuest ? "l'hôte" : "l'invité"}
+                    À propos de {isGuest ? "l&apos;hôte" : "l&apos;invité"}
                 </h4>
                 <div className="flex flex-col items-center text-center">
                     <div className="w-20 h-20 relative mb-3">

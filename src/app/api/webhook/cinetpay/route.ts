@@ -46,13 +46,21 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
 
   try {
-    // 1. SÉCURITÉ PÉRIMÉTRIQUE (HMAC)
-    const signatureHeader = request.headers.get("x-cinetpay-signature");
-    if (!signatureHeader) return new NextResponse("Unauthorized: Missing Signature", { status: 401 });
+    // 🛠️ 1. LE BYPASS DE DÉVELOPPEMENT (Pour Postman)
+    const isPostmanTest = 
+        process.env.NODE_ENV !== "production" && 
+        request.headers.get("x-test-bypass") === "true";
 
-    if (CINETPAY_CONFIG.SECRET_KEY) {
+    // 2. SÉCURITÉ PÉRIMÉTRIQUE (HMAC)
+    const signatureHeader = request.headers.get("x-cinetpay-signature");
+    
+    if (!signatureHeader && !isPostmanTest) {
+        return new NextResponse("Unauthorized: Missing Signature", { status: 401 });
+    }
+
+    if (CINETPAY_CONFIG.SECRET_KEY && !isPostmanTest) {
       const expectedSignature = createHmac("sha256", CINETPAY_CONFIG.SECRET_KEY).update(rawBody).digest("hex");
-      const sigBuffer = Buffer.from(signatureHeader);
+      const sigBuffer = Buffer.from(signatureHeader!);
       const expectedBuffer = Buffer.from(expectedSignature);
 
       if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
@@ -60,7 +68,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. EXTRACTION ET VALIDATION ZOD
+    // 3. EXTRACTION ET VALIDATION ZOD
     let bodyData: unknown;
     try {
       bodyData = JSON.parse(rawBody);
@@ -76,18 +84,38 @@ export async function POST(request: Request) {
     transactionId = String(parsedBody.data.cpm_trans_id || parsedBody.data.cpm_custom || "");
     if (!transactionId) return NextResponse.json({ error: "Missing Transaction ID" }, { status: 400 });
 
-    // 3. VÉRIFICATION CHEZ CINETPAY (Double Check)
-    const verification = await axios.post(CINETPAY_CONFIG.CHECK_URL, {
-      apikey: CINETPAY_CONFIG.API_KEY,
-      site_id: CINETPAY_CONFIG.SITE_ID,
-      transaction_id: transactionId
-    });
+    // 4. VÉRIFICATION CHEZ CINETPAY (Double Check ou Simulation)
+    let isValidPayment = false;
+    let amountPaid = 0;
+    let apiData: any = {};
 
-    const apiData = verification.data.data;
-    const isValidPayment = verification.data.code === "00" && apiData.status === "ACCEPTED";
-    const amountPaid = parseInt(apiData.amount || "0", 10);
-    
+    if (isPostmanTest) {
+        // 🧪 MODE SIMULATION
+        console.log(`🛠️ [DEV MODE] Simulation de paiement réussi pour la transaction ${transactionId}`);
+        isValidPayment = true;
+        amountPaid = parseInt(parsedBody.data.cpm_amount || "0", 10);
+        apiData = { status: "ACCEPTED", amount: amountPaid };
+    } else {
+        // 🔒 MODE PRODUCTION STRICT
+        const verification = await axios.post(CINETPAY_CONFIG.CHECK_URL, {
+            apikey: CINETPAY_CONFIG.API_KEY,
+            site_id: CINETPAY_CONFIG.SITE_ID,
+            transaction_id: transactionId
+        }, { timeout: 8000 });
+
+        apiData = verification.data.data;
+        isValidPayment = verification.data.code === "00" && apiData.status === "ACCEPTED";
+        amountPaid = parseInt(apiData.amount || "0", 10);
+    }
+    // ✅ RÉSOLUTION DU SUPER ADMIN AVANT LA TRANSACTION
+    const superAdminRecord = await prisma.user.findFirst({
+        where:  { role: "SUPER_ADMIN" },
+        select: { id: true },
+    });
+    const superAdminId = superAdminRecord?.id ?? null;
+
     const postTransactionActions: Array<() => Promise<void>> = [];
+    
 
     // 4. EXÉCUTION ATOMIQUE, LOCK & ROUTAGE O(1)
     try {
@@ -102,13 +130,13 @@ export async function POST(request: Request) {
         if (transactionId.startsWith("AKW-")) {
           const bookingPayment = await tx.bookingPayment.findUnique({ where: { transactionId } });
           if (bookingPayment) {
-              await processAkwabaPayment(tx, bookingPayment, isValidPayment, amountPaid, transactionId, apiData, postTransactionActions);
+              await processAkwabaPayment(tx, bookingPayment, isValidPayment, amountPaid, transactionId, apiData, postTransactionActions, superAdminId); // ✅ superAdminId ajouté
           }
         } 
         else if (transactionId.startsWith("INV-")) {
           const investmentContract = await tx.investmentContract.findUnique({ where: { paymentReference: transactionId } });
           if (investmentContract) {
-              await processInvestmentPayment(tx, investmentContract, isValidPayment, amountPaid, transactionId);
+              await processInvestmentPayment(tx, investmentContract, isValidPayment, amountPaid, transactionId, superAdminId); // ✅ superAdminId ajouté
           }
         } 
         else {
@@ -121,7 +149,7 @@ export async function POST(request: Request) {
             }
           });
           if (paymentRecord) {
-              await processRealEstatePayment(tx, paymentRecord, isValidPayment, amountPaid, transactionId, apiData);
+              await processRealEstatePayment(tx, paymentRecord, isValidPayment, amountPaid, transactionId, apiData, superAdminId);
           }
         }
 

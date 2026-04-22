@@ -3,40 +3,42 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth"; 
-import { headers } from "next/headers"; // Juste pour l'IP
+import { headers } from "next/headers"; 
+import { InvestmentPack } from "@prisma/client";
 
 export async function signInvestmentContract(signatureData: string | undefined) {
   try {
-    // 🛡️ 1. IDENTIFICATION VIA SESSION
     const session = await auth();
     const userId = session?.user?.id;
 
     if (!userId) return { success: false, error: "Session expirée. Veuillez vous reconnecter." };
     if (!signatureData) return { success: false, error: "Signature manquante." };
 
-    // Métadonnées d'audit (IP/UserAgent sont ok via headers car informatifs)
     const headersList = headers();
     const ip = headersList.get('x-forwarded-for') || 'Unknown IP';
     const userAgent = headersList.get('user-agent') || 'Unknown UA';
 
-    // 2. Récupération Données (Avec relation Finance)
     const user = await prisma.user.findUnique({ 
         where: { id: userId },
-        include: { finance: true } //  Important pour lire le solde
+        include: { finance: true } 
     });
 
     if (!user) return { success: false, error: "Utilisateur introuvable." };
 
-    // 3. CRÉATION CONTRAT
+    // 🔒 CORRECTION : Conversion sécurisée vers l'Enum strict
+    const validPacks = Object.values(InvestmentPack) as string[];
+    const safePackName = (user.backerTier && validPacks.includes(user.backerTier)) 
+        ? (user.backerTier as InvestmentPack) 
+        : InvestmentPack.STARTER;
+
     const newContract = await prisma.investmentContract.create({
       data: {
         userId: userId,
         ipAddress: ip,
         userAgent: userAgent,
         signatureData: signatureData,
-        // Correction : le solde est dans user.finance, pas user direct
         amount: user.finance?.walletBalance || 0, 
-        packName: user.backerTier || "Standard"
+        packName: (user.backerTier as InvestmentPack) || InvestmentPack.STARTER // 🔒 CORRECTION
       }
     });
 

@@ -60,6 +60,9 @@ model User {
   finance              UserFinance?
   kyc                  UserKYC?
   wishlists            Wishlist[]
+  applications Application[]
+  mandatesAsOwner  ManagementMandate[] @relation("MandatesAsOwner")
+  
 }
 
 model UserFinance {
@@ -112,7 +115,34 @@ model Agency {
   transactions          AgencyTransaction[]
   listings              Listing[]
   properties            Property[]
+  mandates              ManagementMandate[]
   users                 User[]
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  status      ApplicationStatus @default(PENDING)
+  message     String?
+  documents   String[]          // Pour stocker les URLs des fiches de paie/CNI spécifiques à ce dossier
+  propertyId  String
+  applicantId String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  applicant   User              @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, applicantId]) // Un candidat ne peut postuler qu'une seule fois au même bien
+  @@index([propertyId])
+  @@index([applicantId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
 }
 
 model Account {
@@ -184,6 +214,9 @@ model Property {
   agent        User?         @relation("PropertyAgent", fields: [agentId], references: [id])
   owner        User          @relation("PropertyOwner", fields: [ownerId], references: [id])
   transactions Transaction[]
+  applications Application[]
+  mandates     ManagementMandate[]
+
 
   @@index([commune])
   @@index([price])
@@ -218,6 +251,9 @@ model Lease {
   payments             Payment[]
   rentSchedules        RentSchedule[]
   signatures           SignatureProof[]
+  tenantLeasingFee     Int              @default(0) // Part locataire
+  ownerLeasingFee      Int              @default(0) // Part propriétaire prélevée sur l'avance
+
 }
 
 model RentSchedule {
@@ -632,12 +668,22 @@ enum AuditAction {
   PAYMENT_FAILED
   FRAUD_ATTEMPT
   KYC_VALIDATED
+  KYC_REJECTED
   USER_DELETED
   NOTICE_GIVEN
   NOTICE_ACKNOWLEDGED
   DEPOSIT_REFUNDED
-  PROPERTY_CREATED 
-  PROPERTY_UPDATED 
+  PROPERTY_CREATED
+  PROPERTY_UPDATED
+  AGENCY_CREATED
+  MISSION_CREATED
+  MISSION_ACCEPTED
+  LEASE_APPLICATION
+  LEASE_SIGNED
+  LEASE_TERMINATED
+  LISTING_CREATED
+  LISTING_UPDATED
+  SECURITY_ALERT
 }
 
 enum TransactionType {
@@ -728,6 +774,7 @@ enum PaymentProvider {
   MOOV_MONEY
   STRIPE
   CASH
+  CINETPAY
 }
 
 enum PaymentStatus {
@@ -770,4 +817,33 @@ enum TransactionStatus {
   SUCCESS
   FAILED
   REVERSED
+}
+
+enum MandateStatus {
+  PENDING
+  ACTIVE
+  TERMINATED
+}
+
+model ManagementMandate {
+  id              String          @id @default(cuid())
+  commissionRate  Float           // ex: 8.0 pour 8% de frais de gestion
+  startDate       DateTime        @default(now())
+  endDate         DateTime?
+  status          MandateStatus   @default(PENDING)
+  signatureStatus SignatureStatus @default(PENDING) // Utilise ton Enum existant
+  documentUrl     String?         // URL du PDF signé (Cloudinary/S3)
+
+  // Relations
+  propertyId      String
+  property        Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  ownerId         String
+  owner           User            @relation("MandatesAsOwner", fields: [ownerId], references: [id])
+
+  agencyId        String
+  agency          Agency          @relation(fields: [agencyId], references: [id])
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }

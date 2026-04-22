@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { cancelBooking } from "@/actions/bookings";
+import { cancelBooking } from "@/actions/akwaba/booking.action";
 
 export default function CancelTripButton({ bookingId, status }: { bookingId: string, status: string }) {
   const [loading, setLoading] = useState(false);

@@ -291,12 +291,20 @@ export default async function TenantContractPage({ params }: { params: { id: str
                     </div>
 
                     <div className="bg-slate-50 print:bg-transparent print:border-l-2 p-2 print:p-0.5 print:-mx-0.5 -mx-2 border-l-4 border-slate-300">
-                        <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer et Dépôt de Garantie</h3>
+                        <h3 className="font-bold text-black uppercase mb-0.5">Article 3 : Loyer, Avance et Dépôt de Garantie</h3>
                         <p className="mb-1 print:mb-0">
                             Loyer mensuel : <strong className="text-sm print:text-[9px] mx-1">{lease.monthlyRent.toLocaleString()} FCFA</strong> payable d'avance.
                         </p>
+                        
+                        {/* 🔒 CORRECTION : Affichage conditionnel de l'avance sur loyer (Loi ivoirienne) */}
+                        {lease.advanceAmount && lease.advanceAmount > 0 && (
+                            <p className="mb-1 print:mb-0">
+                                Avance sur loyer : <strong>{lease.advanceAmount.toLocaleString()} FCFA</strong>. Cette somme sera imputée sur les premiers mois de loyer selon la législation en vigueur.
+                            </p>
+                        )}
+                        
                         <p>
-                            Dépôt de garantie : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. 
+                            Dépôt de garantie (Caution) : <strong>{lease.depositAmount.toLocaleString()} FCFA</strong>. 
                             Cette somme ne pourra en aucun cas s'imputer sur le paiement des loyers et sera restituée au Preneur après l'état des lieux de sortie, déduction faite des sommes dues au titre des réparations locatives.
                         </p>
                     </div>

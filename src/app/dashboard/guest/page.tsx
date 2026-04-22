@@ -51,8 +51,8 @@ export default function GuestDashboard() {
   const fetchListings = async (searchQuery: string) => {
     setLoading(true);
     try {
-        // ✅ Appel direct à la fonction serveur (plus de fetch API)
-        const result = await searchListings(searchQuery);
+        // ✅ CORRECTION : On envoie un objet qui correspond à la nouvelle interface SearchParams
+        const result = await searchListings({ query: searchQuery });
         
         if (result.success && result.listings) {
             setListings(result.listings);
@@ -78,7 +78,7 @@ export default function GuestDashboard() {
   };
 
   const userName = session?.user?.name || session?.user?.email?.split('@')[0] || "Voyageur";
-  const isVerified = session?.user?.isVerified || false; // Assurez-vous que le type session inclut isVerified, sinon par défaut false
+  const isVerified = (session?.user as { isVerified?: boolean })?.isVerified || false;
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-200 pb-20 font-sans">

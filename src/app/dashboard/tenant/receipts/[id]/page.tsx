@@ -29,7 +29,7 @@ export default async function TenantReceiptPage(props: PageProps) {
           property: {
             include: {
               owner: { select: { name: true, email: true, phone: true } },
-              agency: { select: { name: true, email: true, phone: true, address: true, taxId: true } }
+              agency: { select: { name: true, email: true, phone: true, taxId: true } } 
             }
           },
           tenant: { select: { name: true, email: true, phone: true } }
@@ -46,7 +46,7 @@ export default async function TenantReceiptPage(props: PageProps) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-500">
             <BackButton className="mb-4" />
-            <p>Le paiement n'étant pas validé, la quittance n'est pas disponible.</p>
+            <p>Le paiement n&apos;étant pas validé, la quittance n&apos;est pas disponible.</p>
         </div>
       );
   }
@@ -62,8 +62,10 @@ export default async function TenantReceiptPage(props: PageProps) {
     
   const tenantName = payment.lease.tenant.name || "Le Locataire";
 
-  // Montant en lettres (Obligation légale)
   const amountInWords = writtenNumber(payment.amount, { lang: 'fr' });
+
+  // ⚖️ LOGIQUE FISCALE CRUCIALE
+  const isDeposit = payment.type === "DEPOSIT";
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20 print:bg-white print:pb-0">
@@ -76,7 +78,7 @@ export default async function TenantReceiptPage(props: PageProps) {
                      
                      <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3 mt-2">
                         <FileText className="w-7 h-7 text-orange-500"/>
-                        Quittance de Loyer
+                        {isDeposit ? "Quittance d'Entrée" : "Quittance de Loyer"}
                      </h1>
                      <p className="text-slate-500 text-sm mt-1">Période : <span className="capitalize font-medium text-slate-700">{periodMonthYear}</span></p>
                 </div>
@@ -97,9 +99,11 @@ export default async function TenantReceiptPage(props: PageProps) {
                 {/* EN-TÊTE DU DOCUMENT */}
                 <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6 mb-10">
                     <div className="flex-1"> 
-                        <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900 mb-2">Quittance de Loyer</h1>
+                        <h1 className="text-4xl font-black tracking-tighter uppercase text-slate-900 mb-2">
+                            {isDeposit ? "Quittance d'Entrée" : "Quittance de Loyer"}
+                        </h1>
                         <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">
-                            Mois de : <span className="text-slate-900 font-bold capitalize">{periodMonthYear}</span>
+                            {isDeposit ? "Droits d'entrée & Cautions" : <>Mois de : <span className="text-slate-900 font-bold capitalize">{periodMonthYear}</span></>}
                         </p>
                     </div>
                     <div className="flex flex-col items-end gap-2 text-right">
@@ -117,7 +121,7 @@ export default async function TenantReceiptPage(props: PageProps) {
                         <p className="font-black text-lg uppercase">{landlordName}</p>
                         {payment.lease.property.agency ? (
                             <>
-                                <p className="text-slate-600">{payment.lease.property.agency.address}</p>
+                                <p className="text-slate-600">{payment.lease.property.agency.email}</p>
                                 {payment.lease.property.agency.taxId && <p className="text-slate-500 text-xs mt-1">NCC/NINEA: {payment.lease.property.agency.taxId}</p>}
                                 <p className="text-slate-500 text-xs">Tél: {payment.lease.property.agency.phone}</p>
                             </>
@@ -152,12 +156,15 @@ export default async function TenantReceiptPage(props: PageProps) {
                     </div>
 
                     <p>
-                        Ce montant est versé au titre du paiement intégral du loyer et des charges contractuelles pour la période du <strong>1er au dernier jour du mois de {periodMonthYear}</strong>.
+                        {isDeposit 
+                            ? "Ce montant est versé au titre des droits d'entrée, comprenant l'avance sur loyer, le dépôt de garantie et les éventuels honoraires." 
+                            : `Ce montant est versé au titre du paiement intégral du loyer et des charges contractuelles pour la période du 1er au dernier jour du mois de ${periodMonthYear}.`
+                        }
                     </p>
                     
                     <p className="mt-4 text-xs text-slate-500 font-medium">
                         Ce paiement a été réglé avec succès le <strong>{exactDateString}</strong> via la plateforme sécurisée Babimmo. 
-                        Cette quittance est délivrée sous réserve de tous mes droits pour le passé comme pour l'avenir, et n'implique aucune renonciation à l'application des clauses du bail.
+                        Cette quittance est délivrée sous réserve de tous mes droits pour le passé comme pour l&apos;avenir, et n&apos;implique aucune renonciation à l&apos;application des clauses du bail.
                     </p>
                 </div>
 
@@ -171,10 +178,29 @@ export default async function TenantReceiptPage(props: PageProps) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            <tr>
-                                <td className="px-4 py-4 text-slate-600">Loyer et charges contractuelles (Mois de {periodMonthYear})</td>
-                                <td className="px-4 py-4 font-medium text-slate-900 text-right">{payment.amount.toLocaleString()}</td>
-                            </tr>
+                            {isDeposit ? (
+                                <>
+                                    <tr>
+                                        <td className="px-4 py-4 text-slate-600">Avance sur loyer</td>
+                                        <td className="px-4 py-4 font-medium text-slate-900 text-right">{(payment.lease.advanceAmount || 0).toLocaleString()}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-4 text-slate-600">Dépôt de garantie (Caution)</td>
+                                        <td className="px-4 py-4 font-medium text-slate-900 text-right">{(payment.lease.depositAmount || 0).toLocaleString()}</td>
+                                    </tr>
+                                    {(payment.lease.tenantLeasingFee || 0) > 0 && (
+                                        <tr>
+                                            <td className="px-4 py-4 text-slate-600">Honoraires de location</td>
+                                            <td className="px-4 py-4 font-medium text-slate-900 text-right">{(payment.lease.tenantLeasingFee || 0).toLocaleString()}</td>
+                                        </tr>
+                                    )}
+                                </>
+                            ) : (
+                                <tr>
+                                    <td className="px-4 py-4 text-slate-600">Loyer et charges contractuelles (Mois de {periodMonthYear})</td>
+                                    <td className="px-4 py-4 font-medium text-slate-900 text-right">{payment.amount.toLocaleString()}</td>
+                                </tr>
+                            )}
                             <tr className="bg-slate-50">
                                 <td className="px-4 py-4 font-black text-slate-900 uppercase">Total payé</td>
                                 <td className="px-4 py-4 font-black text-xl text-emerald-600 text-right">{payment.amount.toLocaleString()}</td>

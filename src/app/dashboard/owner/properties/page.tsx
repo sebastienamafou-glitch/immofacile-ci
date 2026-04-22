@@ -66,8 +66,7 @@ export default function OwnerPropertiesPage() {
   }, []);
 
   // 2. GESTION DÉLÉGATION
-  const handleOpenDelegate = (property: Property) => {
-    // Cast sécurisé car on sait que l'API renvoie le type étendu
+  const handleOpenDelegate = (property: unknown) => {
     const richProperty = property as PropertyWithStats;
     
     setSelectedProperty(richProperty);

@@ -24,7 +24,7 @@ const PropertySchema = z.object({
   commune: z.string().min(2),
   type: z.nativeEnum(PropertyType),
   isAvailable: z.boolean().default(true),
-  // ✅ NOUVEAU : Validation stricte d'un tableau d'URLs
+  isPublished: z.boolean().default(false),
   images: z.array(z.string().url("URL d'image invalide")).default([]), 
 });
 
@@ -44,21 +44,21 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
 
   const rawData = {
     title: formData.get("title"),
-    description: formData.get("description"),
+    description: formData.get("description") ? String(formData.get("description")) : undefined,
     price: formData.get("price"),
-    surface: formData.get("surface"),
+    surface: formData.get("surface") ? formData.get("surface") : undefined,
     bedrooms: formData.get("bedrooms"),
     bathrooms: formData.get("bathrooms"),
     address: formData.get("address"),
     commune: formData.get("commune"),
-    type: formData.get("type"),
-    // ✅ NOUVEAU : Extraction de toutes les entrées 'images' du FormData
-    images: formData.getAll("images").map(String), 
+    type: String(formData.get("type")).toUpperCase(),
+    isPublished: formData.get("isPublished") === "on", 
+    images: formData.getAll("images").map(String).filter(img => img.trim() !== ""), 
   };
-
   const validatedFields = PropertySchema.safeParse(rawData);
 
   if (!validatedFields.success) {
+    console.log("🚨 ERREURS ZOD :", validatedFields.error.flatten().fieldErrors);
     return { error: "Données invalides", issues: validatedFields.error.flatten().fieldErrors };
   }
 
@@ -69,7 +69,6 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
       data: {
         ...validatedFields.data,
         isAvailable: true,
-        isPublished: true, 
         ownerId: session.user.id,
         agentId: session.user.id, 
         agencyId: user.agencyId,  
@@ -83,7 +82,7 @@ export async function createPropertyAction(prevState: ActionState | null, formDa
       entityId: newProperty.id,
       entityType: "PROPERTY",
       userId: session.user.id,
-      metadata: { source: "Agency Dashboard", price: newProperty.price, imagesCount: validatedFields.data.images.length }
+      metadata: { source: "Agency Dashboard", price: newProperty.price, isPublished: validatedFields.data.isPublished }
     });
 
   } catch (error: unknown) {
@@ -115,17 +114,17 @@ export async function updatePropertyAction(
 
   const rawData = {
     title: formData.get("title"),
-    description: formData.get("description"),
+    description: formData.get("description") ? String(formData.get("description")) : undefined,
     price: formData.get("price"),
-    surface: formData.get("surface"),
+    surface: formData.get("surface") ? formData.get("surface") : undefined,
     bedrooms: formData.get("bedrooms"),
     bathrooms: formData.get("bathrooms"),
     address: formData.get("address"),
     commune: formData.get("commune"),
-    type: formData.get("type"),
+    type: String(formData.get("type")).toUpperCase(),
     isAvailable: formData.get("isAvailable") === "on",
-    // ✅ NOUVEAU : Récupération des images lors de l'update
-    images: formData.getAll("images").map(String),
+    isPublished: formData.get("isPublished") === "on", 
+    images: formData.getAll("images").map(String).filter(img => img.trim() !== ""),
   };
 
   const validatedFields = PropertySchema.safeParse(rawData);
@@ -162,8 +161,8 @@ export async function updatePropertyAction(
       });
     });
 
-  } catch (error: any) {
-    if (error.message === "UNAUTHORIZED_OR_NOT_FOUND") {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED_OR_NOT_FOUND") {
         return { error: "Bien introuvable ou accès refusé" };
     }
     console.error("Update Error:", error);

@@ -100,7 +100,7 @@ export default function CreateQuotePage() {
             validityDays
         });
         
-        toast.success("Devis envoyé au propriétaire !");
+        toast.success("Devis envoyé avec succès !");
         router.push('/dashboard/artisan'); // Retour au dashboard
     } catch (e: any) {
         console.error(e);

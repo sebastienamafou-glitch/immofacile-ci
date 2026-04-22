@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/logger"; 
 import { sendNotification } from "@/lib/notifications"; 
-
+import { AuditAction } from "@prisma/client";
 export async function POST(req: Request) {
   try {
     // 1. SÉCURITÉ
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
     // B. Audit Log
     await logActivity({
-        action: "LEASE_TERMINATED",
+        action: AuditAction.LEASE_TERMINATED,
         entityId: leaseId,
         entityType: "LEASE",
         userId: userId,

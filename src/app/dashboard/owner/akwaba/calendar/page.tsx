@@ -28,14 +28,9 @@ export default function MasterCalendarPage() {
   const fetchEvents = async (date: Date) => {
     setLoading(true);
     try {
-      // On passe la date pour optimiser la requête côté serveur
       const dateString = format(date, 'yyyy-MM-dd');
-      const res = await fetch(`/api/owner/akwaba/calendar?date=${dateString}`, {
-          headers: {
-              // Récupération auth safe
-              'x-user-email': JSON.parse(localStorage.getItem("immouser") || "{}").email || ""
-          }
-      });
+      // ✅ On retire le header 'x-user-email', Auth.js gère le cookie de session tout seul
+      const res = await fetch(`/api/owner/akwaba/calendar?date=${dateString}`);
       const data = await res.json();
       if (data.success) setEvents(data.events);
     } catch (error) {

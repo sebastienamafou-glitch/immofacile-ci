@@ -24,21 +24,27 @@ const KpiCard = ({ title, value, icon: Icon, colorClass, subtext }: KpiCardProps
   </div>
 );
 
-// Typage strict des statistiques globales
+// ✅ TYPAGE STRICT : Aligné avec la nouvelle macro-économie de la route API
 interface DashboardStats {
-  revenue: { total: number; shortTerm: number };
-  ops: { incidentsCount: number };
-  hr: { artisansReady: number };
-  assets: { activeBookings: number };
+  revenue: { 
+      total: number; 
+      shortTerm: number;
+      longTerm: number;
+      grossVolume: number;
+      failedTransactions: number;
+  };
+  ops: { incidentsCount: number; kycCount: number };
+  hr: { users: number; agencies: number; artisansReady: number };
+  assets: { total: number; activeBookings: number };
 }
 
 export default function KpiGrid({ stats }: { stats: DashboardStats }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-500">
         <KpiCard 
-            title="Trésorerie Globale" 
-            value={`${stats.revenue.total.toLocaleString()} F`} 
-            subtext={`+${stats.revenue.shortTerm.toLocaleString()} F (Semaine)`} 
+            title="Trésorerie Nette" 
+            value={`${stats.revenue.total.toLocaleString('fr-FR')} F`} 
+            subtext={`Classique: ${stats.revenue.longTerm.toLocaleString('fr-FR')} F | Akwaba: ${stats.revenue.shortTerm.toLocaleString('fr-FR')} F`} 
             icon={Wallet} 
             colorClass="text-emerald-500" 
         />
@@ -52,14 +58,14 @@ export default function KpiGrid({ stats }: { stats: DashboardStats }) {
         <KpiCard 
             title="Artisans Disponibles" 
             value={stats.hr.artisansReady} 
-            subtext="Sur 12 zones couvertes" 
+            subtext="Disponibles sur le réseau" 
             icon={Hammer} 
             colorClass="text-blue-500" 
         />
         <KpiCard 
             title="Akwaba Live" 
             value={stats.assets.activeBookings} 
-            subtext="Voyageurs hébergés" 
+            subtext="Voyageurs en cours de séjour" 
             icon={Plane} 
             colorClass="text-purple-500" 
         />

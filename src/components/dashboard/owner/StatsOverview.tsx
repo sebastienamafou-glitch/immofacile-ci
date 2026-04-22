@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Wallet, Plus, TrendingUp, TrendingDown, ArrowUpRight, DollarSign, Activity, PieChart } from "lucide-react"; 
+import { Wallet, Plus, TrendingUp, TrendingDown, DollarSign, Activity, PieChart, ShieldAlert } from "lucide-react"; 
 import Swal from 'sweetalert2';
 import { api } from "@/lib/api"; 
 import FinanceChart from "./FinanceChart";
 
-// ✅ 1. Interfaces alignées sur le payload réel de route.ts
+// ✅ Interfaces alignées sur le payload réel de route.ts
 interface DashboardUser {
   id: string;
   name: string | null;
@@ -22,11 +22,10 @@ interface DashboardStats {
   occupancyRate: number;
   monthlyIncome: number;
   activeIncidentsCount: number;
-  totalExpenses: number; // Ajouté suite à l'évolution de l'API
-  netIncomeYTD: number;  // Ajouté suite à l'évolution de l'API
+  totalExpenses: number; 
+  netIncomeYTD: number;  
 }
 
-// Interface partielle car l'API ne renvoie pas une Property Prisma complète
 interface DashboardProperty {
     id: string;
     title: string;
@@ -46,31 +45,73 @@ interface StatsProps {
   user: DashboardUser; 
   stats: DashboardStats; 
   properties: DashboardProperty[]; 
-  onWithdraw: () => void;
+  onWithdraw?: () => void; // Rendu optionnel pour ne pas casser page.tsx, mais inutilisé ici.
   onRefresh?: () => void;
 }
 
-export default function StatsOverview({ user, stats, properties, onWithdraw, onRefresh }: StatsProps) {
+export default function StatsOverview({ user, stats, properties, onRefresh }: StatsProps) {
   const router = useRouter();
 
-  // --- MODALE RECHARGEMENT ---
-  const handleRecharge = () => {
-    Swal.fire({
-      icon: 'info',
-      title: 'Bientôt disponible 🚧',
+  // --- MODALE RECHARGEMENT HYBRIDE ---
+  const handleRecharge = async () => {
+    const { value: formValues, isDismissed } = await Swal.fire({
+      title: 'Recharger mon Portefeuille',
       html: `
-        <div class="text-sm text-slate-300 mt-2">
-          Le module de rechargement sécurisé (Wave, Orange Money, MTN, Visa) est en cours de finalisation par nos équipes techniques.
-          <br/><br/>
-          <span class="text-xs text-slate-500 font-bold uppercase tracking-widest">Merci de votre patience !</span>
+        <div class="text-left font-sans space-y-4 mt-4">
+            <div class="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 text-xs text-blue-200">
+                Ce portefeuille sert exclusivement à payer vos artisans ou honoraires de plateforme.
+            </div>
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Montant à recharger (FCFA)</label>
+                <input id="swal-topup-amt" type="number" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mt-1 outline-none focus:border-emerald-500 font-mono" placeholder="Ex: 50000">
+            </div>
+            <div>
+                <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Numéro Wave / Orange Money</label>
+                <input id="swal-topup-phone" type="tel" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white mt-1 outline-none focus:border-emerald-500 font-mono" placeholder="0700000000">
+            </div>
         </div>
       `,
-      confirmButtonText: "C'est noté",
-      confirmButtonColor: '#F59E0B',
-      background: '#0F172A',
-      color: '#fff',
-      customClass: { popup: 'border border-white/10 rounded-3xl' }
+      focusConfirm: false, showCancelButton: true, confirmButtonText: 'Procéder au paiement', confirmButtonColor: '#10B981', cancelButtonText: 'Annuler',
+      background: '#0B1120', color: '#fff',
+      customClass: { popup: 'border border-white/10 rounded-[2rem] p-8' },
+      preConfirm: () => {
+        const amount = parseInt((document.getElementById('swal-topup-amt') as HTMLInputElement).value, 10);
+        const phone = (document.getElementById('swal-topup-phone') as HTMLInputElement).value;
+        if (!amount || amount < 100) Swal.showValidationMessage('Montant minimum : 100 FCFA');
+        if (!phone || !/^(01|05|07)\d{8}$/.test(phone)) Swal.showValidationMessage('Format ivoirien invalide (10 chiffres)');
+        return { amount, phone };
+      }
     });
+
+    if (!isDismissed && formValues) {
+        try {
+            Swal.fire({
+                title: 'Initialisation...',
+                text: 'Connexion au serveur de paiement sécurisé',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); },
+                background: '#0B1120', color: '#fff'
+            });
+
+            // Appel à ton API hybride (Simulera CinetPay en local)
+            const res = await api.post('/payment/initiate', {
+                type: 'TOPUP',
+                manualAmount: formValues.amount,
+                referenceId: user.id, // On utilise l'ID du user comme référence pour un TopUp
+                idempotencyKey: crypto.randomUUID(),
+                phone: formValues.phone
+            });
+
+            if (res.data.success && res.data.paymentUrl) {
+                window.location.href = res.data.paymentUrl;
+            } else {
+                throw new Error("URL de paiement non reçue");
+            }
+
+        } catch (error: any) {
+            Swal.fire({ icon: 'error', title: 'Erreur', text: error.response?.data?.error || "Impossible d'initier le rechargement.", background: '#0B1120', color: '#fff' });
+        }
+    }
   };
 
   // --- MODALE DÉPENSES ---
@@ -187,12 +228,11 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 </div>
             </div>
             <div className="h-64 w-full"> 
-                {/* Suppression du as any, le typage est désormais strict */}
                 <FinanceChart stats={stats} /> 
             </div>
         </div>
 
-        {/* 2. CARTE WALLET */}
+        {/* 2. CARTE WALLET (Refondue en Portefeuille de Charges) */}
         <div className="lg:col-span-1 h-auto min-h-[320px] p-8 bg-gradient-to-bl from-orange-400 to-orange-600 rounded-[2rem] shadow-2xl shadow-orange-500/20 text-white relative overflow-hidden flex flex-col justify-between group transform hover:-translate-y-1 transition duration-500">
             
             {/* Effets de fond */}
@@ -205,13 +245,13 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                     <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 shadow-inner">
                         <Wallet className="w-6 h-6 text-white" />
                     </div>
-                    <span className="px-3 py-1 bg-black/20 backdrop-blur-sm rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10">
-                        Compte Principal
+                    <span className="px-3 py-1 bg-black/20 backdrop-blur-sm rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 shadow-sm">
+                        Portefeuille de charges
                     </span>
                 </div>
 
                 <div>
-                    <p className="text-orange-100/80 text-xs font-bold uppercase tracking-widest mb-1">Solde Disponible</p>
+                    <p className="text-orange-100/80 text-xs font-bold uppercase tracking-widest mb-1">Fonds en Transit (Top-Ups)</p>
                     <h2 className="text-4xl lg:text-5xl font-black tracking-tighter text-white drop-shadow-lg truncate">
                         {user?.walletBalance?.toLocaleString('fr-FR') || 0}
                         <span className="text-2xl text-orange-200/90 ml-1">F</span>
@@ -219,26 +259,15 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
                 </div>
             </div>
 
-            <div className="relative z-10 space-y-4">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
-                        <span className="block opacity-70 text-[9px] uppercase">Séquestre</span>
-                        {/* Valeurs fictives ou à ajouter plus tard dans l'API */}
-                        <span className="font-bold">0 F</span>
-                    </div>
-                    <div className="bg-black/10 rounded-lg p-2 backdrop-blur-sm">
-                        <span className="block opacity-70 text-[9px] uppercase">Commissions</span>
-                        <span className="font-bold">0 F</span>
-                    </div>
+            {/* Avertissement Légal de Transparence */}
+            <div className="relative z-10 mt-6 bg-black/15 border border-white/10 rounded-xl p-4 backdrop-blur-sm shadow-inner">
+                <div className="flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-orange-200 shrink-0 mt-0.5" />
+                    <p className="text-[10px] font-medium leading-relaxed text-orange-50">
+                        <strong className="text-white uppercase tracking-wider block mb-1">Transparence Totale</strong>
+                        Vos revenus locatifs et cautions sont virés <strong>directement</strong> sur votre compte Mobile Money personnel (Split Payment). Ce portefeuille sert uniquement à provisionner vos artisans.
+                    </p>
                 </div>
-
-                <Button
-                    onClick={onWithdraw} 
-                    className="w-full bg-white text-orange-600 hover:bg-orange-50 font-black py-6 rounded-xl shadow-xl transition-all active:scale-95 flex items-center justify-between px-6 group/btn border-0"
-                >
-                    <span className="uppercase tracking-wide text-xs">Retirer des fonds</span>
-                    <ArrowUpRight className="w-4 h-4 group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
-                </Button>
             </div>
         </div>
       </div>
@@ -246,7 +275,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
       {/* 3. KPIS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* KPI Revenus (Adapté aux données réelles) */}
+          {/* KPI Revenus */}
           <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-emerald-500/30 transition duration-300">
             <div className="absolute top-0 right-0 p-16 bg-emerald-500/5 blur-3xl rounded-full group-hover:bg-emerald-500/10 transition"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -263,7 +292,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
             </div>
           </div>
 
-          {/* KPI Propriétés (Adapté) */}
+          {/* KPI Propriétés */}
           <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-blue-500/30 transition duration-300">
             <div className="absolute top-0 right-0 p-16 bg-blue-500/5 blur-3xl rounded-full group-hover:bg-blue-500/10 transition"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -280,7 +309,7 @@ export default function StatsOverview({ user, stats, properties, onWithdraw, onR
             </div>
           </div>
 
-          {/* KPI Incidents/Occupation (Adapté) */}
+          {/* KPI Incidents/Occupation */}
           <div className="bg-slate-900 border border-white/5 p-6 rounded-[2rem] relative overflow-hidden group hover:border-red-500/30 transition duration-300">
             <div className="absolute top-0 right-0 p-16 bg-red-500/5 blur-3xl rounded-full group-hover:bg-red-500/10 transition"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">

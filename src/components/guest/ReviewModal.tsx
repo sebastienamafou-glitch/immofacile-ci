@@ -12,7 +12,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea"; // Assurez-vous d'avoir ce composant ou utilisez <textarea> standard
 import { toast } from "sonner";
 import { createReview } from "@/actions/reviews";
 
@@ -21,7 +20,7 @@ export default function ReviewModal({ listingId, listingTitle }: { listingId: st
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
-  const [hoverRating, setHoverRating] = useState(0); // Pour l'effet visuel au survol
+  const [hoverRating, setHoverRating] = useState(0); 
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -38,7 +37,7 @@ export default function ReviewModal({ listingId, listingTitle }: { listingId: st
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error("Impossible d'envoyer l'avis.");
     } finally {
       setLoading(false);
@@ -60,12 +59,11 @@ export default function ReviewModal({ listingId, listingTitle }: { listingId: st
              Notez votre séjour
           </DialogTitle>
           <DialogDescription className="text-slate-400">
-            Comment s'est passé votre séjour à <strong>{listingTitle}</strong> ?
+            Comment s&apos;est passé votre séjour à <strong>{listingTitle}</strong> ?
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-6 space-y-6">
-            {/* SÉLECTEUR D'ÉTOILES */}
             <div className="flex justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -95,7 +93,6 @@ export default function ReviewModal({ listingId, listingTitle }: { listingId: st
                 {hoverRating === 5 && "Exceptionnel !"}
             </div>
 
-            {/* COMMENTAIRE */}
             <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}

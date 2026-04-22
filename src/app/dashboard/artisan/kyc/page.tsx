@@ -4,38 +4,103 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, HardHat, FileText, CheckCircle2, Loader2, Camera, ShieldCheck, Hammer, Construction, XCircle, RefreshCcw, AlertTriangle, Lock } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
-import { submitKycApplication } from "@/actions/kyc";
-import { api } from "@/lib/api"; // ✅ IMPORT DE L'AXIOS SÉCURISÉ
+import { submitKycApplication, getLiveKycStatus } from "@/actions/kyc"; // 🟢 IMPORT UNIFIÉ
 import Swal from "sweetalert2";
+import confetti from "canvas-confetti"; // 🟢 AJOUT DES CONFETTIS
 
 export default function ArtisanKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(true); // 🟢 Remplacé "loading" par "isSyncing"
 
   // ✅ 1. ÉTATS DE SÉCURITÉ
   const [consent, setConsent] = useState(false);
-  const [idNumber, setIdNumber] = useState(""); // Numéro KBIS/NINEA à chiffrer
-  const [idType, setIdType] = useState("KBIS_ARTISAN"); // Type par défaut
+  const [idNumber, setIdNumber] = useState(""); 
+  const [idType, setIdType] = useState("KBIS_ARTISAN"); 
 
-  // ✅ 2. VÉRIFICATION SERVEUR (ZERO TRUST)
+  // ✅ 2. 🟢 INITIALISATION ABSOLUE (DB + LocalStorage)
   useEffect(() => {
-    const fetchKycStatus = async () => {
+    const initSync = async () => {
       try {
-        const res = await api.get('/artisan/kyc');
-        if (res.data.success) {
-          setStatus(res.data.kyc?.status || "NONE");
-          setRejectionReason(res.data.kyc?.rejectionReason || null);
+        // Optimistic UI depuis le cache
+        const storedUser = localStorage.getItem('immouser');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setStatus(user.kycStatus || "NONE");
+          if (user.kycRejectionReason) setRejectionReason(user.kycRejectionReason);
+        }
+
+        // La Vérité depuis la base de données via Server Action unifiée
+        const realKyc = await getLiveKycStatus();
+        if (realKyc) {
+            setStatus(realKyc.status);
+            setRejectionReason(realKyc.rejectionReason);
+
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                user.kycStatus = realKyc.status;
+                user.isVerified = realKyc.isVerified;
+                user.kycRejectionReason = realKyc.rejectionReason;
+                localStorage.setItem('immouser', JSON.stringify(user));
+            }
         }
       } catch (e) {
-        console.error("Impossible de récupérer le statut KYC", e);
+        console.error("Erreur Init KYC Artisan", e);
       } finally {
-        setLoading(false);
+        setIsSyncing(false);
       }
     };
-    fetchKycStatus();
+
+    initSync();
   }, []);
+
+  // ✅ 3. ⚡️ POLLING TEMPS RÉEL (Si le dossier est PENDING)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (status === 'PENDING') {
+        interval = setInterval(async () => {
+            const freshData = await getLiveKycStatus();
+            
+            if (freshData && freshData.status !== 'PENDING') {
+                setStatus(freshData.status);
+                setRejectionReason(freshData.rejectionReason || null);
+
+                const storedUser = localStorage.getItem('immouser');
+                if (storedUser) {
+                    const user = JSON.parse(storedUser);
+                    user.kycStatus = freshData.status;
+                    user.isVerified = freshData.isVerified;
+                    user.kycRejectionReason = freshData.rejectionReason;
+                    localStorage.setItem('immouser', JSON.stringify(user));
+                }
+
+                if (freshData.status === 'VERIFIED') {
+                    confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#ea580c', '#f97316', '#10b981'] });
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Félicitations ! 🥳',
+                        text: 'Votre habilitation Artisan a été validée.',
+                        timer: 4000,
+                        showConfirmButton: false,
+                        background: '#0F172A', color: '#fff'
+                    });
+                } else if (freshData.status === 'REJECTED') {
+                     Swal.fire({
+                        icon: 'error',
+                        title: 'Mise à jour Dossier',
+                        text: 'Votre justificatif a été refusé.',
+                        background: '#0F172A', color: '#fff'
+                    });
+                }
+            }
+        }, 5000); 
+    }
+
+    return () => clearInterval(interval); 
+  }, [status]);
+
 
   const handleKycSuccess = async (result: any) => {
     setUploading(true);
@@ -47,12 +112,20 @@ export default function ArtisanKYCPage() {
     }
 
     try {
-      // ✅ 3. ENVOI SÉCURISÉ AVEC NUMÉRO
       const response = await submitKycApplication(secureUrl, idType, idNumber);
       
       if (response.error) throw new Error(response.error);
 
       setStatus("PENDING");
+
+      // Synchronisation immédiate du cache local
+      const storedUser = localStorage.getItem('immouser');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        user.kycStatus = "PENDING";
+        user.kycRejectionReason = null;
+        localStorage.setItem('immouser', JSON.stringify(user));
+      }
 
       Swal.fire({
         icon: 'success',
@@ -77,7 +150,7 @@ export default function ArtisanKYCPage() {
       setIdNumber(""); // Reset
   };
 
-  if (loading) {
+  if (isSyncing && status === "NONE") {
       return <div className="min-h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-orange-500" /></div>;
   }
 
@@ -142,7 +215,7 @@ export default function ArtisanKYCPage() {
                 </div>
 
             ) : status === 'REJECTED' ? (
-                // CAS 3 : REJETÉ
+                // REJETÉ
                 <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                         <XCircle className="w-8 h-8 text-red-500" />
@@ -163,7 +236,7 @@ export default function ArtisanKYCPage() {
                 </div>
 
             ) : (
-                // CAS 4 : UPLOAD
+                // UPLOAD
                 <div className="relative z-10">
                     
                     {/* ✅ CHAMP DE SAISIE */}
@@ -236,7 +309,7 @@ export default function ArtisanKYCPage() {
 
                                         {(!consent || idNumber.length <= 5) && (
                                             <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-6 animate-pulse">
-                                                ⚠️ Remplissez le NINEA et cochez la case
+                                                ⚠️ Remplissez le numéro d'immatriculation et cochez la case
                                             </p>
                                         )}
 

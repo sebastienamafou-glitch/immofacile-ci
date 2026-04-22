@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, TrendingUp, ArrowLeft, Ghost } from "lucide-react";
+import { Loader2, TrendingUp, ArrowLeft, Ghost, AlertTriangle, Activity } from "lucide-react";
 import { api } from "@/lib/api";
 
 import HeaderWarRoom from "@/components/dashboard/superadmin/HeaderWarRoom";
@@ -16,19 +16,15 @@ import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-// 1. LE COMPOSANT INTELLIGENT
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // ✅ DÉTECTION DU SCRIPT ASPIRATEUR
   const isGhostMode = searchParams.get('action') === 'ghost';
 
-  const [loading, setLoading] = useState(!isGhostMode); // Pas de chargement si mode Ghost
+  const [loading, setLoading] = useState(!isGhostMode);
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
-    // ✅ SI ON EST EN MODE GHOST, ON ANNULE LA LOURDE REQUÊTE DB
     if (isGhostMode) return;
 
     const fetchData = async () => {
@@ -44,9 +40,6 @@ function DashboardContent() {
     fetchData();
   }, [router, isGhostMode]);
 
-  // ==========================================
-  // RENDU 1 : MODE ASPIRATEUR ULTRA-RAPIDE
-  // ==========================================
   if (isGhostMode) {
       return (
         <div className="min-h-screen bg-[#020617] text-slate-200 p-6 md:p-12">
@@ -63,23 +56,20 @@ function DashboardContent() {
                         <p className="text-slate-400">Génération d'annonce optimisée (sans charger les statistiques).</p>
                     </div>
                 </div>
-                {/* On n'affiche QUE ce composant */}
                 <GhostGenerator /> 
             </div>
         </div>
       );
   }
 
-  // ==========================================
-  // RENDU 2 : DASHBOARD SUPERADMIN COMPLET
-  // ==========================================
   if (loading) return <div className="h-screen bg-[#020617] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-12 h-12"/></div>;
   if (!data) return null;
 
+  // 📈 GRAPHIQUE 100% DYNAMIQUE
   const chartData = {
-    labels: ['J-5', 'J-4', 'J-3', 'J-2', 'Hier', 'Auj'],
+    labels: data.chart?.labels || ['J-6', 'J-5', 'J-4', 'J-3', 'J-2', 'Hier', 'Auj'],
     datasets: [{
-        data: [12000, 19000, 3000, 5000, 20000, data.stats?.revenue?.shortTerm || 0], 
+        data: data.chart?.data || [0, 0, 0, 0, 0, 0, 0], 
         borderColor: '#F59E0B', 
         backgroundColor: (context: any) => {
             const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 300);
@@ -95,15 +85,41 @@ function DashboardContent() {
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans pb-24 selection:bg-orange-500/30">
       <HeaderWarRoom />
       <main className="max-w-[1800px] mx-auto p-6 space-y-8">
+        
+        {/* 🚨 BANDEAU D'ALERTE : Échecs de paiement (Health Check) */}
+        {(data.stats?.revenue?.failedTransactions > 0) && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center gap-3">
+                    <AlertTriangle className="text-red-500 w-6 h-6" />
+                    <div>
+                        <h4 className="text-red-400 font-bold text-sm">Alerte d'Infrastructure de Paiement</h4>
+                        <p className="text-red-500/80 text-xs mt-0.5"><strong className="text-white">{data.stats.revenue.failedTransactions} transactions</strong> ont échoué récemment. Vérifiez la passerelle CinetPay.</p>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <KpiGrid stats={data.stats} />
+        
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-2 space-y-8">
                 <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-8 shadow-2xl">
                     <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-black text-white flex items-center gap-2"><TrendingUp className="text-orange-500 w-6 h-6"/> Flux Financier Temps Réel</h2>
+                        <div>
+                            <h2 className="text-xl font-black text-white flex items-center gap-2">
+                                <TrendingUp className="text-orange-500 w-6 h-6"/> Trésorerie & Commissions Nettes
+                            </h2>
+                            <p className="text-slate-500 text-xs mt-1 font-medium flex items-center gap-1">
+                                <Activity className="w-3 h-3"/> Temps réel sur les 7 derniers jours
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Volume Brut (GMV)</p>
+                            <p className="text-2xl font-mono text-white font-bold">{data.stats?.revenue?.grossVolume?.toLocaleString('fr-FR')} <span className="text-sm text-slate-500">FCFA</span></p>
+                        </div>
                     </div>
                     <div className="h-[300px] w-full">
-                        <Line data={chartData} options={{ maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false } } }} />
+                        <Line data={chartData} options={{ maintainAspectRatio: false, scales: { x: { display: true, grid: { color: '#1e293b' } }, y: { display: false } }, plugins: { tooltip: { mode: 'index', intersect: false } } }} />
                     </div>
                 </div>
                 <CreditGuichet owners={data.lists?.owners || []} />
@@ -119,7 +135,6 @@ function DashboardContent() {
   );
 }
 
-// 2. LE WRAPPER SUSPENSE OBLIGATOIRE POUR NEXT.JS
 export default function WarRoomDashboard() {
     return (
         <Suspense fallback={<div className="h-screen bg-[#020617] flex items-center justify-center"><Loader2 className="animate-spin text-orange-500 w-12 h-12"/></div>}>

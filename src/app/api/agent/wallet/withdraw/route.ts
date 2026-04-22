@@ -6,7 +6,6 @@ import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
 
-// 1. VALIDATION STRICTE (Anti-Injection)
 const withdrawSchema = z.object({
   amount: z.number().positive("Le montant doit être supérieur à 0"),
   paymentMethod: z.string().min(2, "Moyen de paiement requis (ex: WAVE, ORANGE_MONEY)"),
@@ -15,7 +14,6 @@ const withdrawSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    // 2. SÉCURITÉ PÉRIMÉTRIQUE
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -30,60 +28,58 @@ export async function POST(request: Request) {
 
     const { amount, paymentMethod, paymentNumber } = validation.data;
 
-    // 3. EXÉCUTION ATOMIQUE (Anti-Double-Spend)
     const result = await prisma.$transaction(async (tx) => {
-        // Lecture avec verrouillage de plage implicite (Serializable)
         const agent = await tx.user.findUnique({
             where: { id: userId },
             select: { 
                 role: true, 
-                walletBalance: true, 
+                finance: { select: { walletBalance: true } }, // 🔒 CORRECTION
                 kyc: { select: { status: true } } 
             }
         });
 
-        // A. Vérification des droits
         if (!agent || agent.role !== Role.AGENT) {
             throw new Error("Accès refusé. Profil Agent requis.");
         }
 
-        // B. Conformité KYC (Lutte Anti-Blanchiment)
         if (agent.kyc?.status !== VerificationStatus.VERIFIED) {
             throw new Error("Accréditation (KYC) requise pour effectuer un retrait.");
         }
 
-        // C. Contrôle de solvabilité
-        if (agent.walletBalance < amount) {
+        const currentBalance = agent.finance?.walletBalance || 0; // 🔒 CORRECTION
+        if (currentBalance < amount) {
             throw new Error("Solde insuffisant pour ce retrait.");
         }
 
-        // D. Mutation financière
+        // 🔒 CORRECTION : Mise à jour ciblée sur la table UserFinance
         const updatedUser = await tx.user.update({
             where: { id: userId },
-            data: { walletBalance: { decrement: amount } }
+            data: { 
+                finance: { update: { walletBalance: { decrement: amount } } } 
+            },
+            include: { finance: true }
         });
 
-        // E. Audit Trail (Inscription au Grand Livre)
         const transaction = await tx.transaction.create({
             data: {
                 amount: amount,
-                type: TransactionType.DEBIT, // Constante stricte [cite: 63]
+                type: TransactionType.DEBIT,
                 balanceType: BalanceType.WALLET,
-                reason: `Retrait de commissions vers ${paymentMethod} (${paymentNumber})`,
+                reason: `Demande de paiement agence vers ${paymentMethod} (${paymentNumber})`,
                 status: "SUCCESS", 
                 userId: userId,
                 reference: `WDR-${Date.now().toString().slice(-6)}-${userId.substring(0, 6)}`
             }
         });
 
-        return { newBalance: updatedUser.walletBalance, transactionId: transaction.id };
+        return { newBalance: updatedUser.finance?.walletBalance || 0, transactionId: transaction.id };
     }, { isolationLevel: "Serializable" });
 
     return NextResponse.json({ success: true, data: result });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[API_AGENT_WITHDRAW]", error);
-    // Renvoi du message d'erreur métier généré dans la transaction
-    return NextResponse.json({ error: error.message || "Erreur interne lors du retrait." }, { status: 400 });
+    const errorMessage = error instanceof Error ? error.message : "Erreur interne lors du retrait.";
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 }

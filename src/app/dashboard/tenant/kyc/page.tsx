@@ -13,63 +13,92 @@ export default function TenantKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true); 
   
-  // ✅ NOUVEAUX STATES POUR LA SÉCURITÉ
   const [consent, setConsent] = useState(false);
-  const [idNumber, setIdNumber] = useState(""); // Le numéro à chiffrer
-  const [idType, setIdType] = useState("CNI");  // Le type de document
+  const [idNumber, setIdNumber] = useState(""); 
+  const [idType, setIdType] = useState("CNI");  
 
-  // 1. CHARGEMENT INITIAL
+  // 1. 🟢 INITIALISATION ABSOLUE (DB + LocalStorage)
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('immouser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        setStatus(user.kycStatus || "NONE");
-        if (user.kycRejectionReason) setRejectionReason(user.kycRejectionReason);
+    const initSync = async () => {
+      try {
+        // Optimistic UI depuis le cache
+        const storedUser = localStorage.getItem('immouser');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setStatus(user.kycStatus || "NONE");
+          if (user.kycRejectionReason) setRejectionReason(user.kycRejectionReason);
+        }
+
+        // La Vérité depuis la base de données
+        const realKyc = await getLiveKycStatus();
+        if (realKyc) {
+            setStatus(realKyc.status);
+            setRejectionReason(realKyc.rejectionReason);
+
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                user.kycStatus = realKyc.status;
+                user.isVerified = realKyc.isVerified;
+                user.kycRejectionReason = realKyc.rejectionReason;
+                localStorage.setItem('immouser', JSON.stringify(user));
+            }
+        }
+      } catch (e) {
+        console.error("Erreur Init KYC", e);
+      } finally {
+        setIsSyncing(false);
       }
-    } catch (e) { console.error(e); }
+    };
+
+    initSync();
   }, []);
 
-  // 2. ⚡️ POLLING TEMPS RÉEL
+  // 2. ⚡️ POLLING TEMPS RÉEL (AVEC ANTI-CRASH RÉSEAU)
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
     if (status === 'PENDING') {
         interval = setInterval(async () => {
-            const freshData = await getLiveKycStatus();
-            
-            if (freshData && freshData.status !== 'PENDING') {
-                setStatus(freshData.status);
-                setRejectionReason(freshData.rejectionReason || null);
+            try { // 🟢 ON AJOUTE LE TRY ICI POUR PROTÉGER LE POLLING
+                const freshData = await getLiveKycStatus();
+                
+                if (freshData && freshData.status !== 'PENDING') {
+                    setStatus(freshData.status);
+                    setRejectionReason(freshData.rejectionReason || null);
 
-                const storedUser = localStorage.getItem('immouser');
-                if (storedUser) {
-                    const user = JSON.parse(storedUser);
-                    user.kycStatus = freshData.status;
-                    user.isVerified = freshData.isVerified;
-                    user.kycRejectionReason = freshData.rejectionReason;
-                    localStorage.setItem('immouser', JSON.stringify(user));
-                }
+                    const storedUser = localStorage.getItem('immouser');
+                    if (storedUser) {
+                        const user = JSON.parse(storedUser);
+                        user.kycStatus = freshData.status;
+                        user.isVerified = freshData.isVerified;
+                        user.kycRejectionReason = freshData.rejectionReason;
+                        localStorage.setItem('immouser', JSON.stringify(user));
+                    }
 
-                if (freshData.status === 'VERIFIED') {
-                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Félicitations ! 🥳',
-                        text: 'Votre identité vient d\'être validée.',
-                        timer: 4000,
-                        showConfirmButton: false,
-                        background: '#0F172A', color: '#fff'
-                    });
-                } else if (freshData.status === 'REJECTED') {
-                     Swal.fire({
-                        icon: 'error',
-                        title: 'Mise à jour Dossier',
-                        text: 'Votre document a été refusé.',
-                        background: '#0F172A', color: '#fff'
-                    });
+                    if (freshData.status === 'VERIFIED') {
+                        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Félicitations ! 🥳',
+                            text: 'Votre identité vient d\'être validée.',
+                            timer: 4000,
+                            showConfirmButton: false,
+                            background: '#0F172A', color: '#fff'
+                        });
+                    } else if (freshData.status === 'REJECTED') {
+                         Swal.fire({
+                            icon: 'error',
+                            title: 'Mise à jour Dossier',
+                            text: 'Votre document a été refusé.',
+                            background: '#0F172A', color: '#fff'
+                        });
+                    }
                 }
+            } catch (error) {
+                // 🟢 ON IGNORE SILENCIEUSEMENT LES COUPURES RÉSEAU LORS DE LA COMPILATION
+                console.warn("Coupure réseau temporaire ignorée lors du polling.");
             }
         }, 5000); 
     }
@@ -88,7 +117,6 @@ export default function TenantKYCPage() {
     }
 
     try {
-      // ✅ MISE À JOUR : On envoie aussi le numéro et le type
       const response = await submitKycApplication(secureUrl, idType, idNumber);
       
       if (response.error) throw new Error(response.error);
@@ -122,8 +150,13 @@ export default function TenantKYCPage() {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
-      setIdNumber(""); // On reset
+      setIdNumber(""); 
   };
+
+  // 🟢 On protège l'affichage pendant la synchronisation initiale
+  if (isSyncing && status === "NONE") {
+      return <div className="min-h-screen bg-[#060B18] flex items-center justify-center"><Loader2 className="w-8 h-8 text-blue-500 animate-spin" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 lg:p-10 font-sans pb-24">
@@ -175,7 +208,6 @@ export default function TenantKYCPage() {
                 </div>
 
                 {status === 'VERIFIED' ? (
-                    // CAS 1 : VÉRIFIÉ
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center animate-in zoom-in">
                         <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
                         <h3 className="text-xl font-black text-white">Identité Validée ✅</h3>
@@ -183,7 +215,6 @@ export default function TenantKYCPage() {
                     </div>
 
                 ) : status === 'PENDING' ? (
-                    // CAS 2 : EN ATTENTE (LIVE)
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-8 text-center animate-pulse">
                         <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
                         <h3 className="text-xl font-black text-white">Vérification en cours...</h3>
@@ -191,7 +222,6 @@ export default function TenantKYCPage() {
                     </div>
 
                 ) : status === 'REJECTED' ? (
-                    // CAS 3 : REJETÉ
                     <div className="bg-red-500/10 border border-red-500/20 rounded-[2rem] p-8 text-center animate-in shake duration-500">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                             <XCircle className="w-8 h-8 text-red-500" />
@@ -207,10 +237,8 @@ export default function TenantKYCPage() {
                     </div>
 
                 ) : (
-                    // CAS 4 : FORMULAIRE COMPLET
                     <div className="space-y-6">
                         
-                        {/* 1. TYPE DE DOCUMENT */}
                         <div className="grid grid-cols-2 gap-4">
                             <button 
                                 onClick={() => setIdType("CNI")}
@@ -226,7 +254,6 @@ export default function TenantKYCPage() {
                             </button>
                         </div>
 
-                        {/* 2. NUMÉRO DU DOCUMENT */}
                         <div>
                             <label className="text-xs font-bold uppercase text-slate-500 mb-2 block ml-1">Numéro du document (Sera chiffré)</label>
                             <div className="relative">
@@ -241,7 +268,6 @@ export default function TenantKYCPage() {
                             </div>
                         </div>
 
-                        {/* 3. CONSENTEMENT */}
                         <div className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700 transition hover:border-blue-500/30">
                             <input 
                                 type="checkbox" 
@@ -256,7 +282,6 @@ export default function TenantKYCPage() {
                             </label>
                         </div>
 
-                        {/* 4. UPLOAD */}
                         <CldUploadWidget 
                             uploadPreset="babimmo_kyc"
                             onSuccess={handleKycSuccess}
@@ -314,7 +339,7 @@ export default function TenantKYCPage() {
             </div>
         )}
 
-        {/* --- ONGLET 2 : PROPRIÉTAIRE (Inchangé) --- */}
+        {/* --- ONGLET 2 : DOSSIER LOCATIF (Inchangé) --- */}
         {activeTab === 'RENTAL' && (
             <div className="bg-[#0F172A] border border-white/5 rounded-[2.5rem] p-8 animate-in fade-in zoom-in duration-300">
                 <div className="flex items-start gap-4 mb-8 pb-8 border-b border-white/5">

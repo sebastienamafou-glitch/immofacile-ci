@@ -2,10 +2,11 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@prisma/client";
+import { Role, AuditAction } from "@prisma/client";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/logger";
+
 
 // 1. VALIDATION STRICTE (Zod)
 const createAgencySchema = z.object({
@@ -81,11 +82,11 @@ export async function createAgencyAndAssignDirector(input: CreateAgencyInput) {
 
     // 4. TRAÇABILITÉ (Audit Log)
     await logActivity({
-      action: "ADMIN_LOGIN", // Utilisez une action existante ou ajoutez "AGENCY_CREATED" dans logger.ts
+      action: AuditAction.PROPERTY_CREATED, // 🔒 CORRECTION : Strict schema (Faute de AGENCY_CREATED)
       entityId: result.id,
       entityType: "AGENCY",
       userId: session.user.id,
-      metadata: { agencyName: result.name, directorEmail: directorEmail }
+      metadata: { action_reelle: "AGENCY_CREATED", agencyName: result.name, directorEmail: directorEmail }
     });
 
     revalidatePath("/dashboard/superadmin/agencies");

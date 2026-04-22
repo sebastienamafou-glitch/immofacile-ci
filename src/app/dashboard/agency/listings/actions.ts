@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/logger"; // Notre système d'audit
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
+import { AuditAction } from "@prisma/client";
 // --- 1. SCHÉMA DE VALIDATION (Zod) ---
 const ListingSchema = z.object({
   title: z.string().min(5, "Le titre est trop court (min 5 chars)"),
@@ -76,7 +76,7 @@ export async function createListingAction(prevState: any, formData: FormData) {
 
     // 🔒 AUDIT LOG (CRITIQUE)
     await logActivity({
-      action: "LISTING_CREATED",
+      action: AuditAction.LISTING_CREATED,
       entityId: newListing.id,
       entityType: "LISTING",
       userId: session.user.id,
@@ -127,8 +127,9 @@ export async function updateListingAction(listingId: string, prevState: any, for
         bathrooms: formData.get("bathrooms"),
         maxGuests: formData.get("maxGuests"),
         hostId: formData.get("hostId"),
-        images: formData.getAll("images"),
+        images: formData.getAll("images").map(String).filter(url => url.startsWith("http")),
         isPublished: formData.get("isPublished") === "on",
+        
     };
 
     const validated = ListingSchema.safeParse(rawData);
@@ -144,7 +145,7 @@ export async function updateListingAction(listingId: string, prevState: any, for
 
         // 🔒 AUDIT LOG
         await logActivity({
-            action: "LISTING_UPDATED",
+            action: AuditAction.LISTING_UPDATED,
             entityId: listingId,
             entityType: "LISTING",
             userId: session.user.id,

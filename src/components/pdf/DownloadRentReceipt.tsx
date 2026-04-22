@@ -20,7 +20,12 @@ export default function DownloadRentReceipt({ payment, lease, tenant, property, 
     propertyAddress: property?.title || "Adresse inconnue",
     ownerName: owner?.name || "Propriétaire",
     amount: payment.amount,
-    reference: `QUIT-${payment.id.substring(0, 6).toUpperCase()}`
+    reference: `QUIT-${payment.id.substring(0, 6).toUpperCase()}`,
+    // ✅ AJOUTS FISCAUX CRUCIAUX ICI
+    type: payment.type,
+    depositAmount: lease?.depositAmount || 0,
+    advanceAmount: lease?.advanceAmount || 0,
+    feesAmount: lease?.tenantLeasingFee || 0,
   };
 
   return (

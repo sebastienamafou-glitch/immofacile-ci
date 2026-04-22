@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { MissionType, Role } from "@prisma/client";
-
+import { AuditAction } from "@prisma/client";
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     // 5. AUDIT LOG (Optionnel mais recommandé par votre schéma)
     await prisma.auditLog.create({
       data: {
-        action: "MISSION_CREATED",
+        action: AuditAction.MISSION_CREATED,
         entityId: newMission.id,
         entityType: "MISSION",
         userId: userId,

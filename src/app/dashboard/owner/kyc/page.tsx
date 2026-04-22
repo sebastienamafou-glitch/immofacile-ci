@@ -4,30 +4,53 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Shield, CheckCircle2, Loader2, Camera, Lock, ShieldCheck, XCircle, RefreshCcw, Clock, FileText } from "lucide-react";
 import Link from "next/link";
 import { CldUploadWidget } from "next-cloudinary";
-import { submitKycApplication } from "@/actions/kyc"; 
+import { submitKycApplication, getLiveKycStatus } from "@/actions/kyc";
 import Swal from "sweetalert2";
 
 export default function OwnerKYCPage() {
   const [status, setStatus] = useState<string>("NONE"); 
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true); // 🟢 État de synchronisation
   
-  // ✅ NOUVEAUX STATES POUR LA SÉCURITÉ
   const [consent, setConsent] = useState(false);
-  const [idNumber, setIdNumber] = useState(""); // Le numéro à chiffrer
-  const [idType, setIdType] = useState("CNI");  // Le type de document
+  const [idNumber, setIdNumber] = useState(""); 
+  const [idType, setIdType] = useState("CNI");  
 
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('immouser');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        setStatus(user.kycStatus || "NONE");
-        if (user.kycRejectionReason) {
-             setRejectionReason(user.kycRejectionReason);
+    const syncStatus = async () => {
+      try {
+        // 1. Affichage instantané via LocalStorage (Optimistic UI)
+        const storedUser = localStorage.getItem('immouser');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setStatus(user.kycStatus || "NONE");
+          if (user.kycRejectionReason) setRejectionReason(user.kycRejectionReason);
         }
+
+        // 2. 🟢 VÉRIFICATION ABSOLUE EN BASE DE DONNÉES (La Vérité)
+        const realKyc = await getLiveKycStatus();
+        
+        if (realKyc) {
+            setStatus(realKyc.status);
+            setRejectionReason(realKyc.rejectionReason);
+
+            // 3. Mise à jour du LocalStorage pour corriger le décalage
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                user.kycStatus = realKyc.status;
+                user.kycRejectionReason = realKyc.rejectionReason;
+                localStorage.setItem('immouser', JSON.stringify(user));
+            }
+        }
+      } catch (e) { 
+        console.error("Erreur de synchronisation KYC", e); 
+      } finally {
+        setIsSyncing(false);
       }
-    } catch (e) { console.error(e); }
+    };
+
+    syncStatus();
   }, []);
 
   const handleKycSuccess = async (result: any) => {
@@ -40,10 +63,9 @@ export default function OwnerKYCPage() {
     }
 
     try {
-      // ✅ MISE À JOUR : On envoie aussi le numéro et le type
       const response = await submitKycApplication(secureUrl, idType, idNumber);
       
-      if (response.error) throw new Error(response.error);
+      if (response?.error) throw new Error(response.error);
 
       setStatus("PENDING");
       
@@ -75,8 +97,13 @@ export default function OwnerKYCPage() {
       setStatus("NONE");
       setRejectionReason(null);
       setConsent(false);
-      setIdNumber(""); // On reset le numéro
+      setIdNumber(""); 
   };
+
+  // 🟢 On évite les flashs d'écran pendant la synchronisation silencieuse
+  if (isSyncing && status === "NONE") {
+      return <div className="min-h-screen bg-[#060B18] flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#060B18] text-slate-200 p-4 lg:p-10 font-sans pb-24">

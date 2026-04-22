@@ -1,7 +1,64 @@
-"use server";
+'use server'
 
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+
+export async function signLeaseAsTenantAction(leaseId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Non autorisé" };
+
+  const userId = session.user.id;
+
+  try {
+    const headersList = headers();
+    const ip = headersList.get("x-forwarded-for")?.split(',')[0] || "::1";
+    const userAgent = headersList.get("user-agent") || "Unknown Device";
+
+    await prisma.$transaction(async (tx) => {
+        const lease = await tx.lease.findUnique({
+            where: { id: leaseId }
+        });
+
+        if (!lease || lease.tenantId !== userId) {
+            throw new Error("Bail introuvable ou non autorisé.");
+        }
+
+        if (lease.signatureStatus !== "PENDING") {
+            throw new Error("Ce bail a déjà été signé par le locataire.");
+        }
+
+        // 1. Création de la preuve de signature
+        await tx.signatureProof.create({
+            data: {
+                leaseId: leaseId,
+                signerId: userId,
+                ipAddress: ip,
+                userAgent: userAgent,
+                documentType: "LEASE_AGREEMENT",
+                signatureData: `Tenant Signature. ID: ${userId}`
+            }
+        });
+
+        // 2. Mise à jour du statut du bail
+        await tx.lease.update({
+            where: { id: leaseId },
+            data: {
+                signatureStatus: "SIGNED_TENANT",
+                updatedAt: new Date()
+            }
+        });
+    });
+
+    revalidatePath(`/dashboard/tenant/contract/${leaseId}`);
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Erreur signature locataire:", error);
+    return { error: error.message || "Erreur technique lors de la signature." };
+  }
+}
 
 // ============================================================================
 // 1. LOCATAIRE : SOUMISSION DU PRÉAVIS

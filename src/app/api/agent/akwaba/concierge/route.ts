@@ -1,51 +1,41 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
 import { prisma } from "@/lib/prisma";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 
 export const dynamic = 'force-dynamic';
 
+// ==========================================
+// 1. GET : LECTURE DES MOUVEMENTS (Arrivées/Départs)
+// ==========================================
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ ZERO TRUST (ID injecté par Middleware)
     const session = await auth();
-if (!session || !session.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-const userId = session.user.id;
+    const userId = session?.user?.id;
     if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    // 2. VÉRIFICATION AGENT & AGENCE
-    const agent = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { 
-          id: true, 
-          role: true, 
-          agencyId: true 
-      }
+      select: { role: true, agencyId: true }
     });
 
-    if (!agent || agent.role !== 'AGENT') {
-        return NextResponse.json({ error: "Accès réservé aux agents." }, { status: 403 });
-    }
+    if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
 
-    if (!agent.agencyId) {
-        return NextResponse.json({ error: "Aucune agence rattachée à votre compte." }, { status: 403 });
-    }
-
-    // 3. LOGIQUE CONCIERGERIE
-    // Récupération des Check-in / Check-out des 7 prochains jours pour TOUTE l'agence
     const today = startOfDay(new Date());
     const nextWeek = endOfDay(addDays(today, 7));
 
+    // 🛡️ SÉCURITÉ : Filtre dynamique (Propriétaire Solo vs Agent d'Agence)
+    const accessFilter = user.agencyId 
+        ? { listing: { agencyId: user.agencyId } } // Périmètre Agence
+        : { listing: { hostId: userId } };         // Périmètre Propriétaire Solo
+
     const bookings = await prisma.booking.findMany({
       where: {
-        listing: { 
-            agencyId: agent.agencyId // ✅ Périmètre Agence B2B
-        },
-        status: { in: ['CONFIRMED', 'PAID'] },
+        ...accessFilter,
+        status: { in: ['CONFIRMED', 'PAID', 'CHECKED_IN'] },
         OR: [
-            { startDate: { gte: today, lte: nextWeek } }, // Arrivées
-            { endDate: { gte: today, lte: nextWeek } }    // Départs
+            { startDate: { gte: today, lte: nextWeek } },
+            { endDate: { gte: today, lte: nextWeek } }
         ]
       },
       include: {
@@ -55,36 +45,78 @@ const userId = session.user.id;
       orderBy: { startDate: 'asc' }
     });
 
-    // 4. FORMATAGE DES MOUVEMENTS
     const movements = bookings.map(b => {
-        // Est-ce une arrivée aujourd'hui ou dans le futur proche ?
-        const isCheckIn = new Date(b.startDate) >= today && new Date(b.startDate) <= nextWeek;
-        // Sinon c'est un départ (car filtré par le OR plus haut)
-        
-        // Note de sécurité : un booking très court peut être les deux. 
-        // Ici on simplifie : si startDate est dans la fenêtre, c'est un Check-in prioritaire.
-        // Pour être parfait, on pourrait générer deux mouvements si le séjour est < 7 jours.
-        // Dans cette version, on garde votre logique de mapping simple :
+        const isCheckIn = new Date(b.startDate) >= today && new Date(b.startDate) <= nextWeek && b.status !== 'CHECKED_IN';
         const type = isCheckIn ? 'CHECK_IN' : 'CHECK_OUT';
-        const date = isCheckIn ? b.startDate : b.endDate;
         
         return {
             id: b.id,
             type,
-            date,
+            date: isCheckIn ? b.startDate : b.endDate,
             guest: b.guest,
             listing: b.listing,
-            notes: type === 'CHECK_IN' ? "Remise clés + État des lieux" : "Vérification + Reprise clés"
+            status: b.status,
+            notes: type === 'CHECK_IN' ? "Remise des clés" : "Reprise des clés"
         };
     });
 
-    // Tri chronologique
     movements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return NextResponse.json({ success: true, movements });
 
   } catch (error) {
-    console.error("Conciergerie Error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+// ==========================================
+// 2. POST : MODIFICATION DES STATUTS
+// ==========================================
+export async function POST(request: Request) {
+  try {
+    const session = await auth();
+    const userId = session?.user?.id;
+    if (!userId) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+
+    const body = await request.json();
+    const { bookingId, action } = body; 
+
+    const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { listing: true }
+    });
+
+    if (!booking) return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
+
+    // 🛡️ SÉCURITÉ : Le demandeur est-il le proprio ou l'agent de l'agence ?
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (booking.listing.hostId !== userId && booking.listing.agencyId !== user?.agencyId) {
+        return NextResponse.json({ error: "Accès refusé pour ce bien." }, { status: 403 });
+    }
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const startDate = new Date(booking.startDate);
+    startDate.setHours(0,0,0,0);
+
+    if (action === 'CHECK_IN') {
+        if (!['CONFIRMED', 'PAID'].includes(booking.status)) return NextResponse.json({ error: "Statut invalide pour un Check-in." }, { status: 400 });
+        if (today < startDate) return NextResponse.json({ error: "Trop tôt pour faire le Check-in." }, { status: 400 });
+
+        await prisma.booking.update({ where: { id: bookingId }, data: { status: 'CHECKED_IN' } });
+        return NextResponse.json({ success: true, message: "Check-in validé !" });
+    }
+
+    if (action === 'CHECK_OUT') {
+        if (booking.status !== 'CHECKED_IN') return NextResponse.json({ error: "Le client n'est pas Checked-In." }, { status: 400 });
+        
+        await prisma.booking.update({ where: { id: bookingId }, data: { status: 'COMPLETED' } });
+        return NextResponse.json({ success: true, message: "Check-out validé ! Séjour terminé." });
+    }
+
+    return NextResponse.json({ error: "Action inconnue" }, { status: 400 });
+
+  } catch (error) {
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

@@ -1,4 +1,3 @@
-
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { Building2, Plus, AlertCircle } from "lucide-react";
@@ -11,14 +10,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function AgencyPropertiesPage() {
   // 1. SÉCURITÉ ZERO TRUST (Auth v5)
-const session = await auth();
+  const session = await auth();
 
-// Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
-if (!session || !session.user?.id) {
-  redirect("/login");
-}
+  // Si aucune session ou pas d'ID utilisateur, redirection immédiate vers le login
+  if (!session || !session.user?.id) {
+    redirect("/login");
+  }
 
-const userId = session.user.id;
+  const userId = session.user.id;
 
   // 2. VÉRIFICATION ADMIN AGENCE
   const admin = await prisma.user.findUnique({
@@ -39,7 +38,13 @@ const userId = session.user.id;
   // 3. REQUÊTE SÉCURISÉE (Scope Agence)
   const properties = await prisma.property.findMany({
     where: {
-      agencyId: admin.agencyId // 🔒 SÉCURITÉ : Uniquement les biens de l'agence
+      agencyId: admin.agencyId,
+      // 🛡️ Filtre critique : on ne montre pas les biens dont la délégation n'est pas acceptée
+      mandates: {
+        none: {
+          status: "PENDING"
+        }
+      }
     },
     include: {
         owner: {
@@ -70,6 +75,13 @@ const userId = session.user.id;
         </div>
         
         <div className="flex gap-3 w-full md:w-auto">
+            {/* BOUTON IMPORT CSV AJOUTÉ */}
+            <Link href="/dashboard/agency/properties/import">
+                <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white font-bold gap-2">
+                    Importer CSV
+                </Button>
+            </Link>
+            
             <Link href="/dashboard/agency/properties/create">
                 <Button className="bg-orange-600 hover:bg-orange-500 text-white font-bold gap-2 shadow-lg shadow-orange-900/20 transition-transform active:scale-95">
                     <Plus size={18} /> Nouveau Mandat

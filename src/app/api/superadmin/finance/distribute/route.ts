@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { TransactionType, BalanceType, Prisma } from "@prisma/client";
+// ✅ IMPORT DU STATUT STRICT
+import { TransactionType, BalanceType, Prisma, InvestmentStatus } from "@prisma/client";
 import { z } from "zod";
 
 export const dynamic = 'force-dynamic';
 
-// 1. VALIDATION STRICTE
 const distributeSchema = z.object({
   amount: z.number().positive("Le montant global doit être positif"),
   periodName: z.string().min(2, "Le nom de la période est requis")
@@ -14,7 +14,6 @@ const distributeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    // 2. SÉCURITÉ BLINDÉE (Auth v5)
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    // 3. VALIDATION INPUT
     const body = await request.json();
     const validation = distributeSchema.safeParse(body);
     
@@ -39,17 +37,17 @@ export async function POST(request: Request) {
 
     const { amount: globalDividendPool, periodName } = validation.data;
 
-    // 4. RÉCUPÉRATION SÉCURISÉE DES INVESTISSEURS (Uniquement les contrats validés)
+    // 🔒 CORRECTION 1 : Utilisation de l'Enum InvestmentStatus.ACTIVE (Le statut "SUCCESS" n'existe pas)
     const investors = await prisma.user.findMany({
         where: { 
             role: "INVESTOR", 
             isActive: true,
-            investmentContracts: { some: { status: "SUCCESS" } } 
+            investmentContracts: { some: { status: InvestmentStatus.ACTIVE } } 
         },
         select: {
             id: true,
             investmentContracts: { 
-                where: { status: "SUCCESS" }, // Filtre anti-fonds fantômes
+                where: { status: InvestmentStatus.ACTIVE }, 
                 select: { amount: true } 
             }
         }
@@ -59,10 +57,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Aucun investisseur éligible avec des fonds validés." }, { status: 400 });
     }
 
-    // 5. CALCUL MASSE MONÉTAIRE
     let totalInvestedCapital = 0;
     const shareholderMap = investors.map(investor => {
-        const userCapital = investor.investmentContracts.reduce((sum, contract) => sum + contract.amount, 0);
+        // 🔒 CORRECTION 2 : Typage explicite de 'sum' et 'contract' pour éviter l'erreur 'any' implicite
+        const userCapital = investor.investmentContracts.reduce((sum: number, contract: { amount: number }) => sum + contract.amount, 0);
         totalInvestedCapital += userCapital;
         return { userId: investor.id, userCapital };
     });
@@ -71,8 +69,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Capital total validé nul." }, { status: 400 });
     }
 
-    // 6. PRÉPARATION TRANSACTION (ACID)
-    // ✅ Typage explicite pour éviter l'inférence 'any[]'
     const prismaOperations: Prisma.PrismaPromise<unknown>[] = [];
     let distributedCheck = 0;
     let beneficiariesCount = 0;
@@ -87,15 +83,16 @@ export async function POST(request: Request) {
                 beneficiariesCount++;
                 distributedCheck += shareAmount;
 
-                // A. Crédit Wallet unifié (Modèle User)
+                // 🔒 CORRECTION 3 : Ciblage de la table UserFinance via nested update
                 prismaOperations.push(
                     prisma.user.update({
                         where: { id: shareholder.userId },
-                        data: { walletBalance: { increment: shareAmount } }
+                        data: { 
+                            finance: { update: { walletBalance: { increment: shareAmount } } } 
+                        }
                     })
                 );
 
-                // B. Trace Transaction (Typage Strict Prisma)
                 prismaOperations.push(
                     prisma.transaction.create({
                         data: {
@@ -113,7 +110,6 @@ export async function POST(request: Request) {
         }
     }
 
-    // 7. EXÉCUTION ATOMIQUE
     if (prismaOperations.length > 0) {
         await prisma.$transaction(prismaOperations);
     }
@@ -129,7 +125,7 @@ export async function POST(request: Request) {
         }
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[API_FINANCE_DISTRIBUTE]", error);
     return NextResponse.json({ error: "Erreur critique lors de la distribution." }, { status: 500 });
   }

@@ -9,7 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import CancelTripButton from "@/components/guest/CancelTripButton"; // ✅ Nouvel import
+import CancelTripButton from "@/components/guest/CancelTripButton"; 
+import PayTripButton from "@/components/guest/PayTripButton";
 
 // Configuration visuelle des statuts
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -142,13 +143,20 @@ export default async function GuestTripsPage() {
                         </CardContent>
 
                         <CardFooter className="p-5 pt-0 flex flex-col gap-2">
-                            <Link href={`/akwaba/${booking.listing.id}`} className="w-full">
-                                <Button variant="outline" className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900">
-                                    Voir l'annonce <ArrowRight className="w-4 h-4 ml-2 opacity-50" />
-                                </Button>
-                            </Link>
-                            {/* ✅ AJOUT DU BOUTON D'ANNULATION */}
+                        {/* ✅ LE NOUVEAU BOUTON APPARAÎT SEULEMENT SI EN ATTENTE */}
+                        {booking.status === 'PENDING' && (
+                            <PayTripButton bookingId={booking.id} />
+                        )}
+    
+                        <Link href={`/akwaba/${booking.listing.id}`} className="w-full">
+                            <Button variant="outline" className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900">
+                                Voir l&apos;annonce <ArrowRight className="w-4 h-4 ml-2 opacity-50" />
+                            </Button>
+                        </Link>
+    
+                        {booking.status === 'PENDING' && (
                             <CancelTripButton bookingId={booking.id} status={booking.status} />
+                        )}
                         </CardFooter>
                     </Card>
                 );

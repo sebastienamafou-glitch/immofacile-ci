@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Role } from "@prisma/client"; // 👈 AJOUT
 
 export async function claimScrapedProperty(propertyId: string) {
   try {
@@ -35,10 +36,10 @@ export async function claimScrapedProperty(propertyId: string) {
 
       // On s'assure que l'utilisateur a le rôle Propriétaire
       const user = await tx.user.findUnique({ where: { id: userId } });
-      if (user && user.role === "USER") {
+      if (user && user.role === Role.UNASSIGNED) { // 🔒 CORRECTION : Utilise l'Enum valide
         await tx.user.update({
           where: { id: userId },
-          data: { role: "OWNER" }
+          data: { role: Role.OWNER }
         });
       }
     });

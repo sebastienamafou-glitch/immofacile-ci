@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Transaction } from "@prisma/client"; // 👈 AJOUT
 
 export const dynamic = 'force-dynamic';
 
@@ -39,9 +40,9 @@ export async function GET() {
                         take: batchSize,
                         skip: cursor ? 1 : 0,
                         cursor: cursor ? { id: cursor } : undefined,
-                        orderBy: { id: 'asc' }, // Tri immuable obligatoire pour le curseur
+                        orderBy: { id: 'asc' },
                         include: { user: { select: { email: true, name: true } } }
-                    });
+                    }) as Array<Transaction & { user: { email: string | null; name: string | null } | null }>; 
 
                     if (transactions.length === 0) {
                         hasMore = false;

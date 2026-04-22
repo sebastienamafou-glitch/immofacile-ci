@@ -228,3 +228,33 @@ export async function sendOwnerIncomeNotification(email: string, ownerName: stri
 export async function sendCredentialsEmail(email: string, name: string, pass: string, role: string) {
     return sendCredentialsEmail_LEGACY_UNSAFE(email, name, pass, role);
 }
+
+export async function sendRentReminderEmail(
+    email: string, 
+    tenantName: string, 
+    amount: number, 
+    propertyTitle: string, 
+    expectedDate: Date
+) {
+  const safeName = escapeHtml(tenantName);
+  const safeTitle = escapeHtml(propertyTitle);
+  const formattedDate = expectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  const content = `
+    <p>Bonjour ${safeName},</p>
+    <p>Sauf erreur ou omission de notre part, nous n'avons pas encore reçu le règlement de votre loyer de <strong>${amount.toLocaleString()} FCFA</strong> concernant le bien "${safeTitle}" pour le mois de ${formattedDate}.</p>
+    
+    <div class="warning-box">
+      ⚠️ Merci de régulariser votre situation dans les plus brefs délais pour éviter l'application de pénalités de retard conformément à votre contrat de bail.
+    </div>
+
+    <p>Si vous avez déjà effectué ce paiement entre-temps, veuillez ignorer ce message.</p>
+    <p>Cordialement,<br>Votre Agence Gestionnaire.</p>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: `🔔 Rappel de loyer impayé - ${safeTitle}`,
+    html: wrapHtml(content, "Rappel de Loyer"),
+  });
+}

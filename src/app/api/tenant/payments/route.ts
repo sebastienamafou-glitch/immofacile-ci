@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    // 1. SÉCURITÉ BLINDÉE (Auth v5)
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -16,15 +15,13 @@ export async function GET(request: Request) {
 
     const tenant = await prisma.user.findUnique({ 
         where: { id: userId },
-        select: { id: true, role: true, walletBalance: true } 
+        select: { id: true, role: true, finance: { select: { walletBalance: true } } } // 🔒 CORRECTION
     });
 
     if (!tenant || tenant.role !== "TENANT") {
         return NextResponse.json({ error: "Accès réservé aux locataires." }, { status: 403 });
     }
 
-    // 2. RÉCUPÉRATION DES PAIEMENTS ENRICHIS (Optimisé avec Select)
-    // 2. RÉCUPÉRATION DES PAIEMENTS ENRICHIS
     const payments = await prisma.payment.findMany({
       where: {
         OR: [
@@ -32,11 +29,11 @@ export async function GET(request: Request) {
             { userId: tenant.id } 
         ]
       },
-      orderBy: { date: 'desc' }, // ✅ CORRECTION : Utilisation de 'date'
+      orderBy: { date: 'desc' }, 
       select: { 
         id: true,
         amount: true,
-        date: true, // ✅ CORRECTION : Utilisation de 'date'
+        date: true, 
         reference: true,
         type: true,
         status: true,
@@ -51,11 +48,10 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. FORMATAGE SÉCURISÉ POUR LE FRONTEND
     const formatted = payments.map(p => ({
         id: p.id,
         amount: p.amount,
-        createdAt: p.date, // ✅ CORRECTION : On mappe 'date' vers 'createdAt' pour le front
+        createdAt: p.date,
         reference: p.reference || `REF-${p.id.substring(0,8).toUpperCase()}`, 
         type: p.type,
         status: p.status,
@@ -67,7 +63,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ 
         success: true, 
         payments: formatted,
-        tenant: { walletBalance: tenant.walletBalance || 0 } 
+        tenant: { walletBalance: tenant.finance?.walletBalance || 0 } // 🔒 CORRECTION
     });
 
   } catch (error) {

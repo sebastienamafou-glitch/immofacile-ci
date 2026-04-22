@@ -5,13 +5,13 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  Eye, 
-  FileSignature, 
   Briefcase, 
   Building2, 
   User, 
+  Users,
   Wallet, 
-  ArrowUpRight 
+  ArrowUpRight,
+  FileSignature
 } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
@@ -21,14 +21,14 @@ export default async function AgencyContractsIndex() {
   const session = await auth();
   if (!session?.user?.agencyId) return redirect("/dashboard/agency");
 
-  // 2. REQUÊTE : Données enrichies pour l'affichage
+  // 2. REQUÊTE : Données enrichies pour l'affichage (Ajout du téléphone)
   const leases = await prisma.lease.findMany({
     where: {
       property: { agencyId: session.user.agencyId }
     },
     include: {
       property: { select: { title: true, address: true, images: true } },
-      tenant: { select: { name: true, email: true } },
+      tenant: { select: { name: true, email: true, phone: true } },
     },
     orderBy: { updatedAt: 'desc' }
   });
@@ -51,12 +51,20 @@ export default async function AgencyContractsIndex() {
               {leases.length} mandat(s) de gestion actifs sous votre enseigne
             </p>
           </div>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/agency/tenants/import">
+              <Button variant="outline" className="border-purple-500/50 text-purple-400 bg-purple-500/10 hover:bg-purple-500/20 transition-colors px-6 py-6 rounded-xl font-bold">
+                <Users className="w-5 h-5 mr-2" />
+                Importer Locataires
+              </Button>
+            </Link>
           <Link href="/dashboard/agency/contracts/new">
             <Button className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-6 rounded-xl shadow-lg shadow-purple-900/20 transition-all hover:scale-105">
               <FileSignature className="w-5 h-5 mr-2" />
               Nouveau Contrat
             </Button>
           </Link>
+        </div>
         </div>
 
         {/* LISTE DES CONTRATS (Cards au lieu de Table pour meilleure lisibilité) */}
@@ -99,7 +107,10 @@ export default async function AgencyContractsIndex() {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-200">{lease.tenant.name}</p>
-                          <p className="text-xs text-slate-500">{lease.tenant.email}</p>
+                          <p className="text-xs text-slate-500">
+                              {/* Rendu conditionnel intelligent pour prioriser l'email, puis le téléphone */}
+                              {lease.tenant.email || lease.tenant.phone || "Sans contact direct"}
+                          </p>
                         </div>
                       </div>
                     </div>

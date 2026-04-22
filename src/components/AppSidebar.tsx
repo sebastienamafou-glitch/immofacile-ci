@@ -62,6 +62,7 @@ const MENUS: Record<string, MenuItem[]> = {
   ARTISAN: [
     { icon: LayoutDashboard, label: "Mes Missions", href: "/dashboard/artisan" },
     { icon: CalendarCheck, label: "Planning", href: "/dashboard/artisan/schedule" },
+    { icon: FileText, label: "Mes Devis", href: "/dashboard/artisan/quotes" }, // 🔒 CORRECTION : Ajout du lien vers l'historique
     { icon: Wallet, label: "Facturation", href: "/dashboard/artisan/finance" },
     { icon: Settings, label: "Disponibilité", href: "/dashboard/artisan/profile" },
   ],
@@ -83,6 +84,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { icon: LayoutDashboard, label: "Agence Dashboard", href: "/dashboard/agency" },
     { icon: Users, label: "Mon Équipe", href: "/dashboard/agency/team" },
     { icon: Building2, label: "Biens Gérés", href: "/dashboard/agency/properties" },
+    { icon: UserCheck, label: "Candidatures", href: "/dashboard/agency/candidates" },
     { icon: FileSignature, label: "Gestion Baux (Mandat)", href: "/dashboard/agency/contracts" }, 
     { icon: Palmtree, label: "Locations Saisonnières", href: "/dashboard/agency/listings" },
     { icon: Wallet, label: "Portefeuille", href: "/dashboard/agency/wallet" },

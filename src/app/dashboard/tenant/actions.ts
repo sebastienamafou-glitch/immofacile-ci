@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { AuditAction } from "@prisma/client"; // 👈 Ajout ici
 
 export async function signContractAction(leaseId: string) {
   // 1. SÉCURITÉ : Vérifier la session
@@ -61,11 +62,11 @@ export async function signContractAction(leaseId: string) {
       // D. TRAÇABILITÉ : Ajout au registre d'audit pour le Super Admin
       await tx.auditLog.create({
         data: {
-          action: "LEASE_SIGNED_BY_TENANT",
+          action: AuditAction.PROPERTY_UPDATED, // 🔒 CORRECTION : Strict schema
           entityId: leaseId,
           entityType: "LEASE",
           userId: userId,
-          metadata: { ip, userEmail, documentType: "LEASE_AGREEMENT" }
+          metadata: { action_reelle: "LEASE_SIGNED_BY_TENANT", ip, userEmail, documentType: "LEASE_AGREEMENT" }
         }
       });
     }); // <-- Fin de la transaction

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-
+import { PaymentProvider } from "@prisma/client";
 /**
  * 🛡️ PROTOCOLE FINANCIER V2 (Compatible TOPUP & DEVIS)
  * 1. Atomicité : Le paiement est créé en base AVANT l'appel CinetPay.
@@ -35,7 +35,7 @@ const paymentInitSchema = z.object({
   type: z.enum(['RENT', 'INVESTMENT', 'QUOTE', 'DEPOSIT', 'TOPUP']), 
   referenceId: z.string(), 
   idempotencyKey: z.string(),
-  phone: z.string().regex(/^(01|05|07)\d{8}$/, "Format CI invalide (10 chiffres requis)"),
+  phone: z.string().regex(/^0\d{9}$/, "Format CI invalide (10 chiffres requis commençant par 0)"),
   manualAmount: z.number().optional()
 }).refine((data) => {
   // Règle : Si TOPUP, le montant est obligatoire et > 100
@@ -112,13 +112,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Bail introuvable ou accès refusé" }, { status: 403 });
         }
 
-        // Calcul Montant
+        // ⚖️ CORRECTION LÉGALE V2 : Caution + Avance + Part Locataire des honoraires
         amountToPay = type === 'DEPOSIT' 
-            ? (lease.depositAmount + lease.monthlyRent) 
+            ? (lease.depositAmount + (lease.advanceAmount || 0) + lease.tenantLeasingFee) 
             : lease.monthlyRent;
 
-        // Ventilation
-        const commissionRate = lease.agencyCommissionRate || 0.10; 
+        // La ventilation ici n'est qu'indicative (le Webhook refera le calcul exact et légal)
+        const commissionRate = Math.min(lease.agencyCommissionRate || 0.08, 0.08); 
         const totalCommission = Math.floor(amountToPay * commissionRate);
         const platformShareHT = Math.floor(totalCommission * 0.20); 
         
@@ -142,7 +142,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Devis introuvable ou accès refusé" }, { status: 403 });
         }
         
-        if (quote.status !== 'PENDING') {
+        // 🔒 CORRECTION : Le paiement est autorisé si PENDING (Propriétaire direct) ou ACCEPTED (Validé par Agence)
+        if (quote.status !== 'PENDING' && quote.status !== 'ACCEPTED') {
              return NextResponse.json({ error: "Ce devis n'est plus en attente de paiement" }, { status: 400 });
         }
 
@@ -184,11 +185,10 @@ export async function POST(request: Request) {
     }
 
     // 5. 💾 ENREGISTREMENT EN BASE (État PENDING)
-    // Mapping du type Frontend vers l'Enum Prisma PaymentType
-    // Note: 'CHARGES' est utilisé comme fourre-tout pour TOPUP car l'enum Prisma ne contient pas TOPUP
-    let prismaPaymentType: "LOYER" | "DEPOSIT" | "FEE" | "CHARGES" = "LOYER";
+    // Mapping direct vers l'Enum Prisma PaymentType
+    let prismaPaymentType: "LOYER" | "DEPOSIT" | "FEE" | "CHARGES" | "TOPUP" = "LOYER";
     
-    if (type === 'TOPUP') prismaPaymentType = 'CHARGES';
+    if (type === 'TOPUP') prismaPaymentType = 'TOPUP';
     else if (type === 'QUOTE') prismaPaymentType = 'FEE';
     else if (type === 'DEPOSIT') prismaPaymentType = 'DEPOSIT';
 
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
             amount: amountToPay,
             type: prismaPaymentType,
             status: "PENDING",
-            method: "CINETPAY",
+            method: PaymentProvider.CINETPAY, 
             reference: transactionId,
             idempotencyKey: idempotencyKey,
             date: new Date(),
@@ -216,12 +216,35 @@ export async function POST(request: Request) {
         }
     });
 
-    // 6. 📡 APPEL CINETPAY
-    // Construction des métadonnées vitales pour le webhook
+    // 6. 📡 GESTIONNAIRE DE FLUX HYBRIDE (CINETPAY vs SIMULATION)
+    
+    // Détection de l'état du système
+    const isDev = process.env.NODE_ENV !== "production";
+    const hasCinetPayConfig = !!(CINETPAY_CONFIG.API_KEY && CINETPAY_CONFIG.SITE_ID);
+
+    // Décision : On simule si on est en dev OU si les clés manquent
+    const shouldSimulate = isDev || !hasCinetPayConfig;
+
+    if (shouldSimulate) {
+        if (!hasCinetPayConfig && !isDev) {
+            // Sécurité : Alerte si on est en prod mais que les clés ont disparu
+            console.error("🚨 [CRITICAL] CinetPay keys missing in production environment!");
+            return NextResponse.json({ error: "Service temporairement indisponible" }, { status: 500 });
+        }
+
+        console.log(`🛠️ [HYBRID-MODE] Simulation active pour ${transactionId}`);
+        return NextResponse.json({ 
+            success: true, 
+            paymentUrl: `/dashboard?simulation_id=${transactionId}`, 
+            transactionId: transactionId 
+        });
+    }
+
+    // --- MODE PRODUCTION STRICT ---
     const metadataPayload = {
         type,
         referenceId,
-        userId: user.id, // VITAL pour le TOPUP (le webhook l'utilise pour savoir qui créditer)
+        userId: user.id, 
         idempotencyKey
     };
 
@@ -234,9 +257,12 @@ export async function POST(request: Request) {
       description: description,
       customer_email: user.email,
       customer_phone_number: phone,
-      customer_name: user.name,
+      customer_name: user.name || "Client",
+      customer_surname: user.name || "Babimmo", // Requis strict CinetPay V2
       customer_city: "Abidjan",
       customer_country: "CI",
+      customer_state: "CI",
+      customer_zip_code: "00225",
       notify_url: CINETPAY_CONFIG.NOTIFY_URL,
       return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=processing`,
       channels: "ALL",

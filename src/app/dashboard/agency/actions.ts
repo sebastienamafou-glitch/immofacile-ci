@@ -71,3 +71,35 @@ export async function signLeaseAsAgencyAction(leaseId: string) {
     return { error: error.message || "Erreur technique." };
   }
 }
+
+// ============================================================================
+// 🎯 NOUVEAU : Récupération des locataires du carnet d'adresses de l'agence
+// ============================================================================
+export async function getAgencyTenantsAction() {
+  const session = await auth();
+  
+  if (!session?.user?.agencyId) {
+    return { error: "Accès refusé" };
+  }
+
+  try {
+    const tenants = await prisma.user.findMany({
+      where: {
+        agencyId: session.user.agencyId,
+        role: "TENANT"
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    return { success: true, tenants };
+  } catch (error) {
+    console.error("Erreur fetch tenants:", error);
+    return { error: "Erreur serveur lors de la récupération." };
+  }
+}

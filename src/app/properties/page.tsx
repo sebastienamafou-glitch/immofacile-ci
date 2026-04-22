@@ -19,6 +19,7 @@ interface PublicProperty {
   bedrooms: number;
   bathrooms: number;
   surface: number;
+  agencyId?: string;
   images: string[];
   owner?: {
     kyc?: {
@@ -210,7 +211,8 @@ export default function PropertiesPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                     {safeProperties.map((prop) => {
                         // Détection de la fiabilité
-                        const isVerified = prop.owner?.kyc?.status === 'VERIFIED';
+                        const isAgencyProperty = !!prop.agencyId;
+                        const isVerified = isAgencyProperty || prop.owner?.kyc?.status === 'VERIFIED';
 
                         return (
                         <Link 

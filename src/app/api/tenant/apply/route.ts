@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logActivity } from "@/lib/logger"; // ✅ Audit Trail
 import { LEASE_CONSTANTS } from "@/lib/constants/lease";
+import { AuditAction } from "@prisma/client";
 
 export async function POST(request: Request) {
   try {
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
 
     // 6. 🔒 AUDIT LOG (Traçabilité)
     await logActivity({
-        action: "LEASE_APPLICATION", // Pensez à l'ajouter dans logger.ts
+        action: AuditAction.LEASE_APPLICATION,
         entityId: newLease.id,
         entityType: "LEASE",
         userId: userId,
