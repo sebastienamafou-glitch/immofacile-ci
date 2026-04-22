@@ -34,4 +34,12 @@ export default defineConfig({
       dependencies: ['setup'], 
     },
   ],
+
+  // ✅ CORRECTION : Le bloc webServer indispensable pour la CI (GitHub Actions)
+  webServer: {
+    command: 'npm run dev', // Commande pour démarrer ton app
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI, // Réutilise le serveur si tu es en local, mais en crée un neuf sur GitHub
+    timeout: 120 * 1000, // On laisse 2 minutes max au serveur pour s'allumer
+  },
 });
