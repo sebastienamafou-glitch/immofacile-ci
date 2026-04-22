@@ -9,7 +9,6 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     
-    # 1. CRÉATION DE LA BASE DE DONNÉES ÉPHÉMÈRE
     services:
       postgres:
         image: postgres:15
@@ -34,11 +33,16 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    # 2. INITIALISATION DE LA BASE DE DONNÉES AVEC PRISMA
+    # ✅ CORRECTION : Création d'un vrai fichier .env physique sur le serveur
+    - name: 🔐 Création du fichier d'environnement (.env)
+      run: |
+        echo "AUTH_SECRET=une-cle-secrete-bidon-pour-les-tests-github-actions" >> .env
+        echo "NEXTAUTH_SECRET=une-cle-secrete-bidon-pour-les-tests-github-actions" >> .env
+        echo "NEXTAUTH_URL=http://localhost:3000" >> .env
+        echo "DATABASE_URL=postgresql://postgres:password@localhost:5432/babimmo_test?schema=public" >> .env
+        echo "DIRECT_URL=postgresql://postgres:password@localhost:5432/babimmo_test?schema=public" >> .env
+
     - name: Générer le client Prisma et créer les tables
-      env:
-        DATABASE_URL: "postgresql://postgres:password@localhost:5432/babimmo_test?schema=public"
-        DIRECT_URL: "postgresql://postgres:password@localhost:5432/babimmo_test?schema=public"
       run: |
         npx prisma generate
         npx prisma db push --accept-data-loss
@@ -46,16 +50,8 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
       
-    # 3. LANCEMENT DES TESTS E2E
     - name: Run Playwright tests
       run: npx playwright test
-      env: 
-        AUTH_SECRET: "une-cle-secrete-bidon-pour-les-tests-github-actions"
-        NEXTAUTH_SECRET: "une-cle-secrete-bidon-pour-les-tests-github-actions"
-        NEXTAUTH_URL: "http://localhost:3000"
-        # On indique à Next.js de se connecter à notre base de données jetable
-        DATABASE_URL: "postgresql://postgres:password@localhost:5432/babimmo_test?schema=public"
-        DIRECT_URL: "postgresql://postgres:password@localhost:5432/babimmo_test?schema=public"
 
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
