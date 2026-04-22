@@ -1,6 +1,5 @@
 name: Babimmo CI/CD - Pipeline Qualité
 
-# Déclencheurs : Le robot s'active à chaque push ou création de PR sur la branche principale
 on:
   push:
     branches: [ "main" ]
@@ -8,32 +7,29 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # Job 1 : Les Tests de Logique Métier (Vitest)
   backend-logic-tests:
     name: 🧠 Logique Métier (Vitest)
-    runs-on: ubuntu-latest # Environnement cloud standard ultra-rapide
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. Le serveur télécharge ton code
       - name: 📥 Récupération du code
         uses: actions/checkout@v4
 
-      # 2. Installation de Node.js (LTS)
+      # On configure Node et on lui dit de mettre en cache les modules npm pour accélérer les futurs tests
       - name: ⚙️ Configuration Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      # 3. Installation de ton package manager préféré
-      - name: 📦 Installation de pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      # 4. Installation des dépendances (exactement comme le package.json)
+      # Plus besoin de l'action pnpm, npm est natif sur Node
       - name: 🏗️ Installation des dépendances
-        run: pnpm install --frozen-lockfile
+        run: npm install
 
-      # 5. L'épreuve du feu : Exécution des 40 tests que nous venons de coder
+      # Utilisation de npx (l'équivalent npm de pnpm dlx)
+      - name: 🗄️ Génération du Client Prisma
+        run: npx prisma generate
+
+      # Lancement direct de vitest avec npx
       - name: 🧪 Exécution des tests Vitest
-        run: pnpm test run
+        run: npx vitest run
