@@ -46,6 +46,7 @@ jobs:
       run: |
         npx prisma generate
         npx prisma db push --accept-data-loss
+        npx prisma db seed
 
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
