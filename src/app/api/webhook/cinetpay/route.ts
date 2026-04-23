@@ -166,17 +166,17 @@ export async function POST(request: Request) {
       throw error; 
     }
 
-    // 5. DÉLÉGATION ASYNCHRONE DES EFFETS DE BORD (Anti-Timeout)
-    // Exécution "Fire-and-Forget" pour libérer instantanément la connexion de CinetPay
-    Promise.allSettled(postTransactionActions.map(action => action())).then((results) => {
-        results.forEach((result) => {
-            if (result.status === "rejected") {
-                console.error("[Webhook Post-Action Error]:", result.reason);
-                Sentry.captureException(result.reason, { 
-                    tags: { source: "webhook_post_action", transaction_id: transactionId } 
-                });
-            }
-        });
+    // 5. DÉLÉGATION ASYNCHRONE DES EFFETS DE BORD (SÉCURITÉ VERCEL)
+    // On doit obligatoirement 'await' sinon Vercel tue le processus avant l'envoi des emails/notifs
+    const results = await Promise.allSettled(postTransactionActions.map(action => action()));
+    
+    results.forEach((result) => {
+        if (result.status === "rejected") {
+            console.error("[Webhook Post-Action Error]:", result.reason);
+            Sentry.captureException(result.reason, { 
+                tags: { source: "webhook_post_action", transaction_id: transactionId } 
+            });
+        }
     });
 
     return new NextResponse("OK", { status: 200 });

@@ -217,3 +217,80 @@ export const generateInvestmentContract = (user: any, contractData: any) => {
   
   doc.save(fileName);
 };
+
+export const generateRentReceiptPDF = (data: {
+  receiptNumber: string;
+  tenantName: string;
+  propertyName: string;
+  propertyAddress: string;
+  amount: number;
+  period: string;
+  agencyName: string;
+  datePaid: Date;
+}) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+
+  // Header
+  doc.setFillColor(22, 163, 74); // Vert Émeraude pour le succès/cash
+  doc.rect(0, 0, pageWidth, 30, 'F');
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text("QUITTANCE DE LOYER (ESPÈCES)", margin, 20);
+
+  // Méta
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Reçu N°: ${data.receiptNumber}`, margin, 45);
+  doc.text(`Date de paiement: ${new Date(data.datePaid).toLocaleDateString('fr-FR')}`, margin, 52);
+
+  // Blocs Parties
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 23, 42);
+  doc.text("Émis par :", margin, 70);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.agencyName, margin, 77);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Reçu de :", pageWidth / 2, 70);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.tenantName, pageWidth / 2, 77);
+
+  // Corps
+  const bodyY = 100;
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(248, 250, 252);
+  doc.rect(margin, bodyY, pageWidth - (margin * 2), 60, 'FD');
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Je soussigné(e), déclare avoir reçu le paiement correspondant au loyer", margin + 5, bodyY + 15);
+  doc.text(`et aux charges pour la période de : ${data.period}.`, margin + 5, bodyY + 22);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Bien concerné :", margin + 5, bodyY + 35);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${data.propertyName} - ${data.propertyAddress}`, margin + 5, bodyY + 42);
+
+  // Montant
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(22, 163, 74);
+  doc.text(`TOTAL PAYÉ : ${formatMoney(data.amount)}`, margin + 5, bodyY + 52);
+
+  // Pied de page
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(100, 116, 139);
+  doc.text("Paiement certifié effectué en espèces de la main à la main.", margin, 180);
+  doc.text("Cette quittance annule tous les reçus provisoires donnés antérieurement.", margin, 186);
+
+  // Signature
+  doc.setFont("helvetica", "bold");
+  doc.text("L'Agence (Cachet et Signature)", pageWidth - margin - 60, 205);
+  
+  const safeFileName = data.tenantName.replace(/[^a-z0-9]/gi, '_').toUpperCase();
+  doc.save(`Quittance_Cash_${data.period.replace(/\s+/g, '_')}_${safeFileName}.pdf`);
+};

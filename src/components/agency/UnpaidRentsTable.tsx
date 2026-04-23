@@ -6,6 +6,7 @@ import { Mail, MessageCircle, AlertCircle, Loader2, Calendar, History } from "lu
 import { Button } from "@/components/ui/button";
 import { createWhatsAppLink } from "@/lib/whatsapp";
 import { sendManualRentReminderAction } from "@/app/dashboard/agency/wallet/actions";
+import CashExpressButton from "./CashExpressButton";
 
 interface UnpaidSchedule {
   id: string;
@@ -118,7 +119,16 @@ export default function UnpaidRentsTable({ schedules }: { schedules: UnpaidSched
                 </div>
               </div>
 
-              <div className="flex w-full md:w-auto items-center gap-2 mt-4 md:mt-0">
+              {/* 👇 AJOUT DE flex-wrap POUR LE RESPONSIVE MOBILE */}
+              <div className="flex w-full md:w-auto items-center gap-2 mt-4 md:mt-0 flex-wrap">
+                
+                {/* 👇 INJECTION DU BOUTON CASH EXPRESS ICI (En premier, car c'est l'action positive) */}
+                <CashExpressButton 
+                  scheduleId={schedule.id} 
+                  amount={schedule.amount} 
+                  expectedDate={schedule.expectedDate} 
+                />
+
                 <Button 
                   onClick={() => handleWhatsApp(tenant.phone, schedule.amount, schedule.lease.property.title, schedule.expectedDate)}
                   className="flex-1 md:flex-none bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 font-bold"
