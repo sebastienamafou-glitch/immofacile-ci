@@ -62,7 +62,8 @@ model User {
   wishlists            Wishlist[]
   applications Application[]
   mandatesAsOwner  ManagementMandate[] @relation("MandatesAsOwner")
-  
+  propertiesForSale PropertyForSale[] @relation("UserPropertiesForSale")
+  saleOffers        SaleOffer[]       @relation("UserSaleOffers")
 }
 
 model UserFinance {
@@ -93,6 +94,7 @@ model UserKYC {
   reviewedBy      String?
   reviewedAt      DateTime?
   rejectionReason String?
+  documentUrl     String?            // Stocke le lien Cloudinary de la CNI/Passeport
   updatedAt       DateTime           @updatedAt
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -846,4 +848,67 @@ model ManagementMandate {
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+}
+
+// ==========================================
+// 🏗️ MODULE VENTE & FONCIER (ISOLÉ)
+// ==========================================
+
+// 1. Les statuts légaux spécifiques à la Côte d'Ivoire
+enum IvorianLegalStatus {
+  ACD                       // Arrêté de Concession Définitive (Sécurité Max)
+  TITRE_FONCIER             // Titre Foncier classique
+  CERTIFICAT_MOUCHETE       // Certificat de propriété
+  ATTESTATION_VILLAGEOISE   // Risque élevé, nécessite approbation villageoise/ministérielle
+  LETTRE_ATTRIBUTION
+}
+
+// 2. Le pipeline de la transaction immobilière
+enum SaleTransactionStep {
+  AVAILABLE                 // En vente
+  OFFER_PENDING             // Offres en cours d'analyse
+  OFFER_ACCEPTED            // Offre acceptée, attente notaire
+  COMPROMIS_SIGNED          // Promesse de vente signée chez le notaire
+  ACTE_AUTHENTIQUE_SIGNED   // Vente définitive actée
+  CLOSED                    // Fonds débloqués, transaction terminée
+  CANCELLED
+}
+
+// 3. Modèle du Bien en Vente (Terrain ou Maison)
+model PropertyForSale {
+  id              String              @id @default(cuid())
+  ownerId         String              // Relation vers User (Le Vendeur)
+  
+  title           String
+  description     String
+  priceCfa        Decimal             @db.Decimal(15, 2) // Précision financière stricte
+  surfaceArea     Float               // en m²
+  location        String              // ex: "Cocody Angré, Abidjan"
+  images          String[]           
+  
+  legalStatus     IvorianLegalStatus  // La garantie légale du terrain
+  status          SaleTransactionStep @default(AVAILABLE)
+  
+  // Relations actives
+  owner           User                @relation("UserPropertiesForSale", fields: [ownerId], references: [id])
+  offers          SaleOffer[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+// 4. Modèle de l'Offre d'Achat (Nécessite le KYC de l'Acheteur)
+model SaleOffer {
+  id              String              @id @default(cuid())
+  propertyId      String
+  buyerId         String              // Relation vers User (L'Acheteur KYC Validé)
+  
+  amountCfa       Decimal             @db.Decimal(15, 2)
+  status          QuoteStatus         @default(PENDING) // On réutilise l'enum existant
+  
+  property        PropertyForSale     @relation(fields: [propertyId], references: [id])
+  buyer           User                @relation("UserSaleOffers", fields: [buyerId], references: [id])
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 }

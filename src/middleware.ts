@@ -36,6 +36,7 @@ const PUBLIC_ROUTES = [
   '/devis', 
   '/search', 
   '/properties', 
+  '/sales',
   '/pricing',
   '/privacy', 
   '/confirm',

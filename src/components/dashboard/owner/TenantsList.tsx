@@ -56,7 +56,7 @@ export default function TenantsList({ properties }: { properties: DashboardTenan
             </div>
             
             <Link 
-                href="/dashboard/owner/tenants/add" 
+                href="/dashboard/owner/leases/new" 
                 className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-2 transition shadow-lg shadow-purple-500/20 active:scale-95"
             >
                 <Plus className="w-4 h-4" /> Nouveau Bail

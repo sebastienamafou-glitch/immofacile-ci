@@ -34,13 +34,17 @@ export default function Hero() {
             </p>
 
                   {/* Call to Action */}
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                      <Link href="/signup" className="px-8 py-4 bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-black rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
+                  <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                      <Link href="/signup" className="w-full sm:w-auto px-8 py-4 bg-[#F59E0B] hover:bg-orange-500 text-[#020617] font-black rounded-xl shadow-[0_0_30px_rgba(245,158,11,0.2)] transition transform hover:scale-105 flex items-center justify-center gap-2 text-sm uppercase tracking-wide">
                           Créer mon compte gratuit
                       </Link>
-                      <Link href="/properties" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide group">
+                      <Link href="/sales" className="w-full sm:w-auto px-6 py-4 bg-white/5 hover:bg-orange-500/20 text-white font-bold rounded-xl border border-white/10 hover:border-orange-500/50 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wide group">
+                          <ShieldCheck className="w-4 h-4 text-orange-500 group-hover:scale-110 transition-transform" /> 
+                          <span>Acheter (ACD)</span>
+                      </Link>
+                      <Link href="/properties" className="w-full sm:w-auto px-6 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wide group">
                           <Search className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" /> 
-                          <span>Chercher une location</span>
+                          <span>Louer</span>
                       </Link>
                   </div>
               </div>

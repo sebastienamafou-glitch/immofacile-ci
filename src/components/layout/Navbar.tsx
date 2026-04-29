@@ -28,28 +28,43 @@ export default function Navbar() {
               </div>
           </Link>
 
-          {/* BOUTONS DESKTOP & ESPACE LOCATAIRE */}
+          {/* BOUTONS DESKTOP & ESPACE B2C */}
           <div className="flex md:order-2 gap-4 items-center">
               <div className="hidden md:flex items-center gap-5">
                   
-                  {/* DROPDOWN ESPACE LOCATAIRE (B2C) */}
+                  {/* DROPDOWN PARCOURIR LES BIENS (B2C & ACHETEURS) */}
                   <div className="relative group py-2">
                       <button className="text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1 transition uppercase tracking-wide">
-                          Espace Locataire <ChevronDown className="w-3 h-3 group-hover:rotate-180 transition-transform" />
+                          Nos Biens <ChevronDown className="w-3 h-3 group-hover:rotate-180 transition-transform" />
                       </button>
-                      <div className="absolute right-0 top-full mt-0 w-56 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col p-2">
+                      <div className="absolute right-0 top-full mt-0 w-64 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col p-2">
+                          
+                          {/* Lien Vente (Nouveau) */}
+                          <Link href="/sales" className="flex items-center gap-3 px-3 py-3 hover:bg-orange-500/10 rounded-lg text-xs font-bold text-orange-400 transition">
+                              <ShieldCheck className="w-4 h-4" />
+                              <div className="flex flex-col">
+                                  <span>Acheter un bien</span>
+                                  <span className="text-[9px] text-orange-500/70 font-normal mt-0.5">Terrains & Villas vérifiés (ACD)</span>
+                              </div>
+                          </Link>
+
+                          <div className="h-px w-full bg-white/5 my-1"></div>
+
+                          {/* Lien Location */}
                           <Link href="/properties" className="flex items-center gap-3 px-3 py-3 hover:bg-white/5 rounded-lg text-xs font-bold text-white transition">
                               <Building2 className="w-4 h-4 text-slate-400" /> 
                               <div className="flex flex-col">
-                                  <span>Locations</span>
-                                  <span className="text-[9px] text-slate-500 font-normal">Longue durée</span>
+                                  <span>Louer un logement</span>
+                                  <span className="text-[9px] text-slate-500 font-normal mt-0.5">Baux longue durée sécurisés</span>
                               </div>
                           </Link>
+
+                          {/* Lien Akwaba */}
                           <Link href="/akwaba" className="flex items-center gap-3 px-3 py-3 hover:bg-emerald-500/10 rounded-lg text-xs font-bold text-emerald-400 transition">
                               <Palmtree className="w-4 h-4" />
                               <div className="flex flex-col">
                                   <span>Séjours Akwaba</span>
-                                  <span className="text-[9px] text-emerald-500/70 font-normal">Courte durée</span>
+                                  <span className="text-[9px] text-emerald-500/70 font-normal mt-0.5">Courte durée & Vacances</span>
                               </div>
                           </Link>
                       </div>
@@ -98,15 +113,20 @@ export default function Navbar() {
                       <Link href="/signup" onClick={toggleMenu} className="w-full bg-[#F59E0B] text-black py-4 rounded-2xl shadow-xl font-black uppercase">Créer mon compte</Link>
                   </li>
 
-                  {/* Section Locataires (B2C) */}
-                  <li className="text-[10px] text-slate-500 uppercase tracking-[0.2em] mt-8 mb-2">Vous cherchez un logement ?</li>
+                  {/* Section Acheteurs & Locataires (B2C) */}
+                  <li className="text-[10px] text-slate-500 uppercase tracking-[0.2em] mt-8 mb-2">Vous cherchez un bien ?</li>
                   <li>
-                      <Link href="/properties" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-white border-b border-white/5 bg-white/5 rounded-xl">
+                      <Link href="/sales" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-orange-400 border-b border-white/5 bg-orange-400/5 rounded-xl">
+                          <ShieldCheck className="w-5 h-5" /> Acheter en sécurité (ACD)
+                      </Link>
+                  </li>
+                  <li>
+                      <Link href="/properties" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-white border-b border-white/5 bg-white/5 rounded-xl mt-2">
                           <Building2 className="w-5 h-5" /> Locations Classiques
                       </Link>
                   </li>
                   <li>
-                      <Link href="/akwaba" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-[#F59E0B] border-b border-white/5 bg-[#F59E0B]/5 rounded-xl">
+                      <Link href="/akwaba" onClick={toggleMenu} className="flex items-center justify-center gap-2 py-4 text-emerald-400 border-b border-white/5 bg-emerald-500/5 rounded-xl mt-2">
                           <Palmtree className="w-5 h-5" /> Séjours Akwaba
                       </Link>
                   </li>

@@ -52,19 +52,22 @@ export function ImportPropertiesModal() {
         return;
       }
 
-      // Mapping vers le format attendu par la validation Zod du backend
-      const propertiesToImport = rawData.map((row) => ({
-        Titre: String(row['Titre'] || ''),
-        Type: (String(row['Type']).toUpperCase() as PropertyType) || 'APPARTEMENT',
-        Commune: String(row['Commune'] || ''),
-        Adresse: String(row['Adresse'] || ''),
-        Loyer: Number(row['Loyer']) || 0,
-        Chambres: Number(row['Chambres']) || 0,
-        SallesDeBain: Number(row['SallesDeBain'] || row['Salles de bain'] || 0),
-        EmailProprietaire: String(row['EmailProprietaire'] || row['Email'] || ''),
+      // Mapping STRICT vers le format attendu par la validation backend
+      const mappedProperties = rawData.map((row) => ({
+        title: String(row['Titre'] || ''),
+        type: (String(row['Type']).toUpperCase() as PropertyType) || 'APPARTEMENT',
+        commune: String(row['Commune'] || ''),
+        address: String(row['Adresse'] || ''),
+        price: Number(row['Loyer']) || 0,
+        bedrooms: Number(row['Chambres']) || 0, // Correction de 'rooms' vers 'bedrooms'
+        bathrooms: Number(row['SallesDeBain'] || row['Salles de bain'] || 0),
+        ownerEmail: String(row['EmailProprietaire'] || row['Email'] || ''),
+        description: String(row['Description'] || ''),
+        ownerId: '', // Champ exigé par l'interface
+        agencyId: '' // Champ exigé par l'interface
       }));
 
-      const result = await importPropertiesAction(propertiesToImport);
+      const result = await importPropertiesAction(mappedProperties);
 
       if (result.success) {
         toast.success(result.message, { id: toastId });
@@ -72,8 +75,7 @@ export function ImportPropertiesModal() {
       } else {
         toast.error(result.message, { id: toastId });
       }
-    } catch (error) {
-      console.error('Erreur de parsing:', error);
+    } catch {
       toast.error('Erreur lors de la lecture du fichier. Vérifiez le format.', { id: toastId });
     } finally {
       setIsUploading(false);

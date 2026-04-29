@@ -73,7 +73,7 @@ function LoginForm() {
             if (investorType === 'investor') {
                 const packId = searchParams.get('pack');
                 const amount = searchParams.get('amount');
-                window.location.href = `/investor/dashboard?pack=${packId}&amount=${amount}&welcome=true`;
+                window.location.href = `/invest/dashboard?pack=${packId}&amount=${amount}&welcome=true`;
                 return;
             }
 
