@@ -123,7 +123,7 @@ export default async function ArtisanQuotesHistoryPage() {
                     </div>
                     
                     <Link 
-                      href={`/dashboard/artisan/maintenance/${quote.incidentId}`}
+                      href={`/dashboard/artisan/incidents/${quote.incidentId}`}
                       className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all"
                     >
                       Détails <ArrowRight className="w-4 h-4" />
